@@ -16,3 +16,7 @@ MonoBehaviour:
   rotationSpeed: 120
   flySpeed: 180
   turnResponsiveness: 5
+  health: 100
+  damage: 10
+  fireRate: 0.2
+  bulletSpeed: 400

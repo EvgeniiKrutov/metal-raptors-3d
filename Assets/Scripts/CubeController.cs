@@ -20,10 +20,13 @@ namespace MetalRaptors
     /// <see cref="OnReachedGoal"/>. Both fire once.
     /// </summary>
     [RequireComponent(typeof(Rigidbody))]
-    public class CubeController : MonoBehaviour
+    public class CubeController : MonoBehaviour, IDamageable
     {
         public event Action OnCrashed;
         public event Action OnReachedGoal;
+
+        /// <summary>Hit points left; starts at <see cref="CubeConfig.health"/>.</summary>
+        public float CurrentHealth { get; private set; }
 
         CubeConfig _config;
         Rigidbody _rb;
@@ -49,6 +52,8 @@ namespace MetalRaptors
             _worldWidth = maxX - minX;
             _ceilingY   = ceilingY;
             _edgeMargin = edgeMargin;
+
+            CurrentHealth = Mathf.Max(1f, config.health);
 
             _rb = GetComponent<Rigidbody>();
             _rb.useGravity = false;
@@ -164,6 +169,17 @@ namespace MetalRaptors
         {
             // Heading is an angle in the XY plane -> rotation about Z (the axis the camera looks down).
             transform.rotation = Quaternion.Euler(0f, 0f, _heading * Mathf.Rad2Deg);
+        }
+
+        /// <summary>
+        /// Future enemy fire lands here (via <see cref="IDamageable"/>); at zero health the
+        /// plane goes down exactly like a ground crash.
+        /// </summary>
+        public void TakeDamage(float amount)
+        {
+            if (!_active) return;
+            CurrentHealth -= amount;
+            if (CurrentHealth <= 0f) OnCrashed?.Invoke();
         }
 
         void OnCollisionEnter(Collision collision)

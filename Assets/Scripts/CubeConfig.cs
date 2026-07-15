@@ -24,5 +24,20 @@ namespace MetalRaptors
         [Tooltip("How quickly the turn rate eases toward the target (sibling: 5.0). " +
                  "Used together with mass as turnResponsiveness / mass.")]
         public float turnResponsiveness = 5f;
+
+        [Tooltip("Hit points of the plane (sibling: 100). Future enemy fire subtracts from this.")]
+        public float health = 100f;
+
+        [Tooltip("Damage one bullet deals to whatever it hits (sibling: 10). Applied to enemies " +
+                 "(future IDamageable targets) when a bullet collides with them.")]
+        public float damage = 10f;
+
+        [Tooltip("Time in seconds between two bullets while the trigger is held " +
+                 "(sibling fires 5 shots/s = 0.2 s).")]
+        public float fireRate = 0.2f;
+
+        [Tooltip("Bullet speed in metres/second. Keep it well above flySpeed so rounds " +
+                 "visibly pull away from the plane.")]
+        public float bulletSpeed = 400f;
     }
 }

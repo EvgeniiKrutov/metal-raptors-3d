@@ -55,6 +55,7 @@ namespace MetalRaptors
         const float BackdropZ = PlayPlaneZ + 150f; // shadow-receiving wall sits this far behind the play plane
 
         CubeController _cube;
+        PlaneShooter _shooter;
         Transform _cubeTr;
         Transform _goal;
         Camera _cam;
@@ -159,6 +160,39 @@ namespace MetalRaptors
 
             // Start heading straight to the right (velocity +X => angle 0), ceiling clamped for the plane's size.
             _cube.Initialize(config, 0f, MinX, MaxX, WorldTop - CubeHalf, EdgeMargin);
+
+            SetupGuns(config, go, plane);
+        }
+
+        /// <summary>
+        /// Mounts the machine guns: a muzzle transform just ahead of the propeller disc, at the
+        /// height of the Dr.1's twin Spandaus (atop the cowling, slightly above the prop hub —
+        /// the model has no gun nodes, so the offset is derived from the prop's bounds), plus a
+        /// <see cref="PlaneShooter"/> that fires from it while F is held.
+        /// </summary>
+        void SetupGuns(CubeConfig config, GameObject body, Transform model)
+        {
+            const float MuzzleClearance = 2f;    // ahead of the prop disc, so rounds spawn clear of it
+            const float GunHeightAboveHub = 2.5f; // Spandaus sit on the cowling above the hub
+
+            // At spawn the body's heading is 0 (identity rotation), so world offsets from the
+            // body can be stored directly as the muzzle's local position.
+            Transform prop = FindDeep(model, "propBlades") ?? FindDeep(model, "propPivot") ?? model;
+            var renderers = prop.GetComponentsInChildren<Renderer>();
+            Bounds bounds = renderers.Length > 0
+                ? renderers[0].bounds
+                : new Bounds(body.transform.position, Vector3.one);
+            for (int i = 1; i < renderers.Length; i++) bounds.Encapsulate(renderers[i].bounds);
+
+            var muzzle = new GameObject("Muzzle").transform;
+            muzzle.SetParent(body.transform, false);
+            muzzle.localPosition = new Vector3(
+                bounds.max.x + MuzzleClearance - body.transform.position.x,
+                bounds.center.y + GunHeightAboveHub - body.transform.position.y,
+                0f); // stay exactly on the play plane
+
+            _shooter = body.AddComponent<PlaneShooter>();
+            _shooter.Initialize(config, muzzle, body.GetComponentInChildren<Collider>());
         }
 
         /// <summary>
@@ -340,6 +374,7 @@ namespace MetalRaptors
             if (_gameOver) return;
             _gameOver = true;
             _cube.Stop();
+            if (_shooter != null) _shooter.Stop();
 
             if (GameManager.Instance != null)
                 GameManager.Instance.UnlockLevel(levelNumber + 1);
@@ -365,6 +400,7 @@ namespace MetalRaptors
             if (_gameOver) return;
             _gameOver = true;
             _cube.Stop();
+            if (_shooter != null) _shooter.Stop();
 
             var canvas = NewOverlay(new Color(0.12f, 0f, 0f, 0.82f));
             UIFactory.CreateText(canvas.transform, "MISSION FAILED", 96,
@@ -391,7 +427,7 @@ namespace MetalRaptors
                 new Vector2(0, 420), new Vector2(1200, 50));
 
             UIFactory.CreateText(canvas.transform,
-                "A / D to steer  •  reach the goal  •  don't hit the ground", 28,
+                "A / D to steer  •  F to fire  •  reach the goal  •  don't hit the ground", 28,
                 new Vector2(0, -500), new Vector2(1600, 50));
         }
 
