@@ -10,21 +10,21 @@ namespace MetalRaptors
     /// Shared controller for the playable "Air Fights" levels (Level 1, Level 2). The scene
     /// sets <see cref="levelNumber"/> in the inspector so one script serves both.
     ///
-    /// Builds a worldWidth x 1000 m flight arena at runtime: ground at the bottom (either the
+    /// Builds a worldWidth x 700 m flight arena at runtime: ground at the bottom (either the
     /// flat placeholder slab or the procedural Verdun-style land, see
-    /// <see cref="ProceduralTerrain"/>), a hard ceiling at the top, horizontal wrap-around on
-    /// the sides, and a glowing goal near the top. The player cube (coloured by the Garage
-    /// selection) flies with the sibling repo's physics via <see cref="CubeController"/>. A
-    /// perspective camera follows the cube, giving a 2.5D platformer feel. Touching the ground
-    /// fails the level; reaching the goal completes it.
+    /// <see cref="ProceduralTerrain"/>), a hard ceiling at the top, soft boundaries on the sides
+    /// that steer the cube back toward the middle, and a glowing goal near the top. The player
+    /// cube (coloured by the Garage selection) flies with the sibling repo's physics via
+    /// <see cref="CubeController"/>. A perspective camera follows the cube, giving a 2.5D
+    /// platformer feel. Touching the ground fails the level; reaching the goal completes it.
     /// </summary>
     public class LevelController : MonoBehaviour
     {
         [Tooltip("Which level this scene represents (1 for Level1, 2 for Level2, ...).")]
         [SerializeField] int levelNumber = 1;
 
-        [Tooltip("Playable width of the arena in metres (the wrap-around distance).")]
-        [SerializeField] float worldWidth = 1000f;
+        [Tooltip("Playable width of the arena in metres (the soft-boundary span).")]
+        [SerializeField] float worldWidth = 1500f;
 
         [Tooltip("Replace the flat placeholder ground with the procedurally generated terrain.")]
         [SerializeField] bool proceduralTerrain;
@@ -33,14 +33,21 @@ namespace MetalRaptors
         [SerializeField] int terrainSeed = 1916;
 
         // ---- World geometry (metres). X is centred on 0; Y runs from the ground up. ----
-        const float WorldHeight = 1000f;
+        const float WorldHeight = 700f;
         const float GroundY = 0f;              // top surface of the flat ground
-        const float WorldTop = WorldHeight;    //  1000, the hard ceiling
+        const float WorldTop = WorldHeight;    //  700, the hard ceiling
         float MinX => -worldWidth / 2f;
         float MaxX => worldWidth / 2f;
 
+        // Width of the soft-boundary band inside each side edge. Once the cube noses into this
+        // band heading toward the edge, it is steered back toward the centre (see CubeController).
+        const float EdgeMargin = 220f;
+
         const float CubeScale = 30f;
         const float CubeHalf = CubeScale / 2f;
+        const float PlaneScale = 60f;          // on-screen size (longest side) of the Fokker Dr.1 model
+        const float ModelPitchDeg = -10f;       // cosmetic nose-down tilt of the model about the view axis
+                                               // (visual only; the flight heading is driven by the parent)
         const float CameraDistance = 420f;     // camera sits this far back on -Z of the play plane
         const float PlayPlaneZ = 100f;         // the flight plane sits this far into the land (+Z), so a
                                                // falling cube lands on the land, not on its front cut edge
@@ -53,7 +60,6 @@ namespace MetalRaptors
         Camera _cam;
 
         float _halfViewHeight;   // half the world height visible on screen (for camera clamping)
-        float _lastCubeX;
         bool _gameOver;
 
         void Start()
@@ -135,26 +141,136 @@ namespace MetalRaptors
 
         void SpawnPlayer(CubeConfig config)
         {
-            var color = GameManager.Instance != null ? GameManager.Instance.SelectedColor : Color.white;
+            // The physics body is a bare GameObject that CubeController yaws to the heading each
+            // frame (it writes transform.rotation directly). The visible Fokker Dr.1 hangs off it
+            // as a child so the plane's own orientation (the +90° X stand-up fix, see below)
+            // composes with the heading instead of being overwritten.
+            var go = new GameObject("PlayerPlane");
+            // Spawn on the left side of the map, just inside the soft-boundary band so the plane
+            // starts at the left edge without being immediately steered back toward the centre.
+            go.transform.position = new Vector3(MinX + EdgeMargin, 150f, PlayPlaneZ);
 
-            var go = UIFactory.CreatePrimitive3D(PrimitiveType.Cube,
-                new Vector3(0f, 150f, PlayPlaneZ), Vector3.one * CubeScale, color);
-            go.name = "PlayerCube";
-
-            // Make sure the cube throws a shadow onto whatever is below it: the procedural
-            // terrain in Level 1, or the flat ground / backdrop wall in the placeholder levels.
-            // See ConfigureShadows(), which extends the shadow distance so it actually shows.
-            var cubeRenderer = go.GetComponent<Renderer>();
-            if (cubeRenderer != null) cubeRenderer.shadowCastingMode = ShadowCastingMode.On;
+            var plane = BuildPlaneModel(go.transform);
 
             _cube = go.AddComponent<CubeController>();
             _cubeTr = go.transform;
             _cube.OnCrashed += OnCrashed;
             _cube.OnReachedGoal += OnReachedGoal;
 
-            // Start heading straight up (velocity +Y => angle π/2), ceiling clamped for the cube's size.
-            _cube.Initialize(config, Mathf.PI / 2f, MinX, MaxX, WorldTop - CubeHalf);
-            _lastCubeX = _cubeTr.position.x;
+            // Start heading straight to the right (velocity +X => angle 0), ceiling clamped for the plane's size.
+            _cube.Initialize(config, 0f, MinX, MaxX, WorldTop - CubeHalf, EdgeMargin);
+        }
+
+        /// <summary>
+        /// Instantiates the Fokker Dr.1 model under <paramref name="parent"/> (the physics body):
+        /// tips it upright with a +90° rotation about X, scales it to the old cube's ~30 m
+        /// footprint, gives it a tight convex mesh collider so ground crashes and the goal trigger
+        /// still fire, turns on shadow casting, and starts the propeller spinning.
+        /// </summary>
+        Transform BuildPlaneModel(Transform parent)
+        {
+            var prefab = Resources.Load<GameObject>("fokker_dr1");
+            if (prefab == null)
+            {
+                // Should never happen once the FBX is under Resources; fall back to a cube so the
+                // level is still playable rather than crashing on a null model.
+                Debug.LogError("LevelController: fokker_dr1 model not found in Resources.");
+                var fallback = UIFactory.CreatePrimitive3D(PrimitiveType.Cube,
+                    Vector3.zero, Vector3.one * CubeScale, Color.white);
+                fallback.transform.SetParent(parent, false);
+                return fallback.transform;
+            }
+
+            var model = Instantiate(prefab);
+            model.name = "FokkerDr1";
+            model.transform.SetParent(parent, false);
+
+            // "Rotate the whole model in X axis first by 90 degrees" — the model is exported
+            // lying flat, so stand it up before anything else touches its orientation. The -90° yaw
+            // about Y swings the nose to point along the heading direction: a plain +90° puts a wing
+            // forward, and the opposite 180° from there leaves the tail forward, so -90° is the one
+            // that leads with the nose. The extra 180° roll about the nose (X, the heading/flight
+            // axis) flips the plane wheels-down instead of wheels-up.
+            //
+            // The outer +10° about Z (the camera's view axis, the plane's pitch axis on screen)
+            // drops the nose down a touch. It's applied to the model only, so it's purely visual —
+            // the flight direction comes from the parent's heading and is unaffected.
+            model.transform.localRotation = Quaternion.Euler(0f, 0f, ModelPitchDeg)
+                                          * Quaternion.Euler(180f, 0f, 0f)
+                                          * Quaternion.Euler(90f, -90f, 0f);
+
+            // Scale the model down to roughly the old cube's on-screen size (~45 m across its
+            // longest side), measured from its combined renderer bounds so we don't depend on the
+            // FBX's own unit scale.
+            NormalizeSize(model.transform, PlaneScale);
+
+            // Cast a shadow onto the terrain/ground below, matching the old cube (ConfigureShadows
+            // extends the shadow distance so it actually shows at this camera depth).
+            foreach (var r in model.GetComponentsInChildren<Renderer>())
+                r.shadowCastingMode = ShadowCastingMode.On;
+
+            AddPlaneCollider(model.transform);
+            StartPropeller(model.transform);
+            return model.transform;
+        }
+
+        /// <summary>
+        /// Uniformly scales <paramref name="model"/> so the longest side of its combined
+        /// world-space renderer bounds equals <paramref name="targetSize"/>.
+        /// </summary>
+        void NormalizeSize(Transform model, float targetSize)
+        {
+            var renderers = model.GetComponentsInChildren<Renderer>();
+            if (renderers.Length == 0) return;
+
+            var bounds = renderers[0].bounds;
+            for (int i = 1; i < renderers.Length; i++) bounds.Encapsulate(renderers[i].bounds);
+
+            float longest = Mathf.Max(bounds.size.x, bounds.size.y, bounds.size.z);
+            if (longest > 0.0001f)
+                model.localScale *= targetSize / longest;
+        }
+
+        /// <summary>
+        /// Gives the plane a single tight convex mesh collider built from its largest mesh (the
+        /// fuselage) so <see cref="CubeController"/> still detects ground crashes and the goal
+        /// trigger. Convex is required for a moving Rigidbody and for trigger overlaps.
+        /// </summary>
+        void AddPlaneCollider(Transform model)
+        {
+            MeshFilter biggest = null;
+            float biggestSize = 0f;
+            foreach (var mf in model.GetComponentsInChildren<MeshFilter>())
+            {
+                if (mf.sharedMesh == null) continue;
+                float size = mf.sharedMesh.bounds.size.sqrMagnitude;
+                if (size > biggestSize) { biggestSize = size; biggest = mf; }
+            }
+            if (biggest == null) return;
+
+            var col = biggest.gameObject.AddComponent<MeshCollider>();
+            col.sharedMesh = biggest.sharedMesh;
+            col.convex = true;
+        }
+
+        /// <summary>
+        /// Finds the propeller pivot (<c>propPivot</c>, parent of <c>propBlades</c>) and attaches
+        /// <see cref="PropellerSpin"/> so the blades turn. Falls back to the blades themselves if
+        /// the pivot node is missing, so the animation runs either way.
+        /// </summary>
+        void StartPropeller(Transform model)
+        {
+            Transform spinner = FindDeep(model, "propPivot") ?? FindDeep(model, "propBlades");
+            if (spinner != null) spinner.gameObject.AddComponent<PropellerSpin>();
+            else Debug.LogWarning("LevelController: propeller node not found on the plane model.");
+        }
+
+        /// <summary>Depth-first search for a descendant transform by name.</summary>
+        static Transform FindDeep(Transform root, string name)
+        {
+            foreach (var t in root.GetComponentsInChildren<Transform>(true))
+                if (t.name == name) return t;
+            return null;
         }
 
         void SetupCamera()
@@ -192,10 +308,6 @@ namespace MetalRaptors
         {
             Vector3 cubePos = _cubeTr.position;
 
-            // Follow X directly, but snap (no smoothing) when the cube wraps around an edge.
-            bool wrapped = Mathf.Abs(cubePos.x - _lastCubeX) > worldWidth * 0.5f;
-            _lastCubeX = cubePos.x;
-
             // Clamp Y so the view never shows past the ground or the ceiling. With terrain,
             // the camera may sink low enough to reveal the dirt cut below the surface line.
             float minCamY = (proceduralTerrain ? ProceduralTerrain.CutRevealY : GroundY) + _halfViewHeight;
@@ -206,7 +318,7 @@ namespace MetalRaptors
             var target = new Vector3(cubePos.x, targetY, CamZ);
             Vector3 cur = _cam.transform.position;
 
-            if (instant || wrapped)
+            if (instant)
             {
                 _cam.transform.position = target;
             }

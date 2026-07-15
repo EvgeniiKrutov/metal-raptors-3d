@@ -13,6 +13,6 @@ MonoBehaviour:
   m_Name: CubeConfig
   m_EditorClassIdentifier:
   mass: 2.5
-  rotationSpeed: 180
-  flySpeed: 120
+  rotationSpeed: 120
+  flySpeed: 180
   turnResponsiveness: 5

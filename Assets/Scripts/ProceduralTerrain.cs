@@ -11,9 +11,10 @@ namespace MetalRaptors
     /// below the ground line, Hill Climb style, so a low camera reveals the inside of the earth.
     ///
     /// The height field tiles seamlessly along X (sine octaves with whole cycle counts,
-    /// blended Perlin, wrap-aware crater stamps), so the level's horizontal wrap-around
-    /// teleport lands on identical ground. One extra terrain + wall copy sits on each side
-    /// so the view never runs off the edge of the land near the wrap point.
+    /// blended Perlin, wrap-aware crater stamps), and one extra terrain + wall copy sits on
+    /// each side so the land runs well past the play area's soft side boundaries — the view
+    /// (which follows the cube, and the cube is steered back before it reaches the edge) never
+    /// runs off the end of the world.
     ///
     /// Surfaces are plain flat colours (no generated textures); heightmap, materials and fog
     /// are built in code from one seed — no assets to import, same land every run.
@@ -35,6 +36,13 @@ namespace MetalRaptors
 
         // ---- Craters ----
         const float CratersPerMetre = 0.017f;  // ~34 craters across 2000 m ("moderate")
+
+        // ---- Mine craters ----
+        // Big pits blown from a gallery driven under the line. Placed at random across the field,
+        // with depth varying widely per-crater: most are deep, but a random minority stay shallow.
+        const float MinesPerMetre = 0.0035f;   // ~3 per 800 m
+        const float MineDepthShallow = 0.20f;  // depth-to-radius ratio for the shallowest mines
+        const float MineDepthDeep = 0.62f;     // ...and for the deepest
 
         // ---- What the camera may reveal ----
         public const float CutRevealY = -80f;  // lowest world Y the camera should ever show
@@ -75,7 +83,8 @@ namespace MetalRaptors
             Mesh wallMesh = BuildCutWallMesh(cutLine, width);
             var wallMat = CutWallMaterial();
 
-            // Main land at tile 0, one visual copy per side so the wrap teleport never shows an edge.
+            // Main land at tile 0, one visual copy per side so the land runs past the play
+            // area's soft side boundaries and the view never shows the end of the world.
             for (int tile = -1; tile <= 1; tile++)
             {
                 float x0 = -width / 2f + tile * width;
@@ -159,6 +168,7 @@ namespace MetalRaptors
             }
 
             StampCraters(rng, metres, width);
+            StampMineCraters(rng, metres, width);
 
             // Clamp, normalize, and force the tiling column to be bit-identical.
             for (int iz = 0; iz < Res; iz++)
@@ -206,6 +216,64 @@ namespace MetalRaptors
                     for (int j = icx - ixSpan; j <= icx + ixSpan; j++)
                     {
                         // Wrap into [0, Res-1); the duplicate last column is re-synced later.
+                        int ix = ((j % (Res - 1)) + (Res - 1)) % (Res - 1);
+                        float dx = j * xStep - cx;
+
+                        float r = Mathf.Sqrt(dx * dx + dz * dz);
+                        if (r > influence) continue;
+
+                        float delta = rim * Mathf.Exp(-((r - radius) / rimSigma) * ((r - radius) / rimSigma));
+                        if (r < radius)
+                        {
+                            float t = 1f - (r / radius) * (r / radius);
+                            delta -= depth * t * t;
+                        }
+                        metres[iz, ix] += delta;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Mine craters: big pits scattered at random across the field. Same wrap-aware bowl+rim
+        /// maths as <see cref="StampCraters"/>, but larger and with a widely varying per-crater
+        /// depth (<see cref="MineDepthShallow"/>..<see cref="MineDepthDeep"/>), biased so most are
+        /// deep while a random minority stay shallow.
+        /// </summary>
+        static void StampMineCraters(System.Random rng, float[,] metres, float width)
+        {
+            int count = Mathf.Max(1, Mathf.RoundToInt(width * MinesPerMetre));
+            float xStep = width / (Res - 1);
+            float zStep = Depth / (Res - 1);
+
+            for (int c = 0; c < count; c++)
+            {
+                float cx = (float)rng.NextDouble() * width;
+                float cz = Mathf.Lerp(10f, Depth - 40f, (float)rng.NextDouble());
+                float radius = Mathf.Lerp(40f, 80f, (float)rng.NextDouble());
+
+                // Depth varies a lot between mines. Square the roll so most land toward the deep
+                // end, but a random handful stay shallow — 1 - u^2 keeps u near 0 (shallow) rare-ish
+                // yet always possible.
+                float u = (float)rng.NextDouble();
+                float depthFrac = Mathf.Lerp(MineDepthShallow, MineDepthDeep, 1f - u * u);
+                float depth = radius * depthFrac;
+                float rim = depth * 0.45f;                // taller lip on the deeper pits
+                float rimSigma = radius * 0.3f;
+                float influence = radius * 1.7f;
+
+                int izMin = cz - influence < FrontStrip ? 0 : Mathf.FloorToInt((cz - influence) / zStep);
+                int izMax = Mathf.Min(Res - 1, Mathf.CeilToInt((cz + influence) / zStep));
+                int icx = Mathf.RoundToInt(cx / xStep);
+                int ixSpan = Mathf.CeilToInt(influence / xStep);
+
+                for (int iz = izMin; iz <= izMax; iz++)
+                {
+                    // Same front-strip flattening as the base field.
+                    float dz = Mathf.Max(Depth * iz / (Res - 1), FrontStrip) - cz;
+
+                    for (int j = icx - ixSpan; j <= icx + ixSpan; j++)
+                    {
                         int ix = ((j % (Res - 1)) + (Res - 1)) % (Res - 1);
                         float dx = j * xStep - cx;
 

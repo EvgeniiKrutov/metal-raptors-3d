@@ -30,3 +30,7 @@ crashlytics-build.properties
 # OS
 .DS_Store
 Thumbs.db
+
+#Private Resources
+/Assets/Resources
+/Assets/Textures
