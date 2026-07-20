@@ -16,6 +16,23 @@ namespace MetalRaptors
         float _damage;
         Camera _cam;
 
+        /// <summary>
+        /// Builds the one inactive round a gun clones every shot, so all of its bullets share a
+        /// single material instead of creating one per shot. An 8 m emissive cylinder —
+        /// tracer-sized, so it still reads at the camera's ~420 m distance. The player's guns
+        /// use yellow; enemy guns use red so both sides' fire is tellable apart.
+        /// </summary>
+        public static GameObject BuildTemplate(Color color)
+        {
+            var template = UIFactory.CreatePrimitive3D(PrimitiveType.Cylinder,
+                Vector3.zero, new Vector3(1.2f, 4f, 1.2f),
+                color, emissive: true);
+            template.AddComponent<Bullet>(); // RequireComponent pulls the Rigidbody in with it
+            template.SetActive(false);
+            template.name = "BulletTemplate";
+            return template;
+        }
+
         /// <param name="ignore">
         /// The shooter's own collider; ignored so a fresh round can never clip the plane that
         /// fired it (e.g. while turning hard into the muzzle's path).

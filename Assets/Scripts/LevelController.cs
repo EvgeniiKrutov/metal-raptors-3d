@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
@@ -17,6 +18,9 @@ namespace MetalRaptors
     /// cube (coloured by the Garage selection) flies with the sibling repo's physics via
     /// <see cref="CubeController"/>. A perspective camera follows the cube, giving a 2.5D
     /// platformer feel. Touching the ground fails the level; reaching the goal completes it.
+    /// <see cref="enemyCount"/> enemy fighters (see <see cref="EnemyController"/>) spawn at
+    /// random spots outside the camera and hunt the player; their fire wears down the health
+    /// shown on the HUD, and at zero the plane falls out of the sky.
     /// </summary>
     public class LevelController : MonoBehaviour
     {
@@ -31,6 +35,9 @@ namespace MetalRaptors
 
         [Tooltip("Seed for the procedural terrain; the same seed always builds the same land.")]
         [SerializeField] int terrainSeed = 1916;
+
+        [Tooltip("How many enemy fighters patrol this level; set per scene to tune difficulty.")]
+        [SerializeField] int enemyCount = 1;
 
         // ---- World geometry (metres). X is centred on 0; Y runs from the ground up. ----
         const float WorldHeight = 700f;
@@ -60,6 +67,16 @@ namespace MetalRaptors
         Transform _goal;
         Camera _cam;
 
+        EnemyConfig _enemyConfig;
+        readonly List<EnemyController> _enemies = new List<EnemyController>();
+
+        // Player health readout on the HUD (bar + number, top-left).
+        const float HudBarWidth = 400f;
+        const float HudBarHeight = 38f;
+        const float HudBarPadding = 4f;
+        Image _healthFill;
+        Text _healthText;
+
         float _halfViewHeight;   // half the world height visible on screen (for camera clamping)
         bool _gameOver;
 
@@ -71,7 +88,8 @@ namespace MetalRaptors
             ConfigureShadows();
             BuildWorld();
             SpawnPlayer(config);
-            SetupCamera();
+            SetupCamera();   // before SpawnEnemies: spawn points must be outside the camera view
+            SpawnEnemies();
             BuildHud();
         }
 
@@ -157,6 +175,7 @@ namespace MetalRaptors
             _cubeTr = go.transform;
             _cube.OnCrashed += OnCrashed;
             _cube.OnReachedGoal += OnReachedGoal;
+            _cube.OnShotDown += OnShotDown;
 
             // Start heading straight to the right (velocity +X => angle 0), ceiling clamped for the plane's size.
             _cube.Initialize(config, 0f, MinX, MaxX, WorldTop - CubeHalf, EdgeMargin);
@@ -193,6 +212,67 @@ namespace MetalRaptors
 
             _shooter = body.AddComponent<PlaneShooter>();
             _shooter.Initialize(config, muzzle, body.GetComponentInChildren<Collider>());
+        }
+
+        // ---------------------------------------------------------------- enemies
+
+        /// <summary>
+        /// Spawns <see cref="enemyCount"/> enemy fighters at random positions outside the
+        /// camera view, wired to the same world bounds the player flies in.
+        /// </summary>
+        void SpawnEnemies()
+        {
+            _enemyConfig = Resources.Load<EnemyConfig>("EnemyConfig");
+            if (_enemyConfig == null) _enemyConfig = ScriptableObject.CreateInstance<EnemyConfig>();
+
+            var playerBody = _cube.GetComponent<Rigidbody>();
+            // The AI measures altitude from the terrain's highest crest, so its ground
+            // margins hold over every hill; the flat slab's top is simply GroundY.
+            float aiGroundY = proceduralTerrain ? ProceduralTerrain.MaxHeight : GroundY;
+
+            for (int i = 0; i < enemyCount; i++)
+            {
+                var go = UIFactory.CreatePrimitive3D(PrimitiveType.Cube,
+                    RandomEnemySpawn(aiGroundY), Vector3.one * _enemyConfig.cubeScale,
+                    _enemyConfig.color);
+                go.name = "Enemy";
+
+                var enemy = go.AddComponent<EnemyController>();
+                enemy.Initialize(_enemyConfig, playerBody,
+                    MinX, MaxX, aiGroundY, WorldTop - _enemyConfig.cubeScale / 2f, EdgeMargin);
+                enemy.OnDestroyed += e => _enemies.Remove(e);
+                _enemies.Add(enemy);
+            }
+        }
+
+        /// <summary>
+        /// A random spot inside the world's soft boundaries but outside what the camera shows,
+        /// at an altitude the AI already considers safe (so it never spawns into a pull-up).
+        /// </summary>
+        Vector3 RandomEnemySpawn(float aiGroundY)
+        {
+            float halfViewWidth = _halfViewHeight * (_cam != null ? _cam.aspect : 16f / 9f);
+            float camX = _cam != null ? _cam.transform.position.x : 0f;
+
+            float minY = aiGroundY + _enemyConfig.safeAltitudeMargin;
+            float maxY = Mathf.Max(minY, WorldTop - 120f);
+
+            // Sample X until it lands off screen; every current level has far more world than
+            // screen, so this exits almost immediately (the last sample wins regardless).
+            float x = 0f;
+            for (int attempt = 0; attempt < 32; attempt++)
+            {
+                x = Random.Range(MinX + EdgeMargin, MaxX - EdgeMargin);
+                if (Mathf.Abs(x - camX) > halfViewWidth + 60f) break;
+            }
+            return new Vector3(x, Random.Range(minY, maxY), PlayPlaneZ);
+        }
+
+        /// <summary>The fight is over (either way): the survivors cease fire and cruise.</summary>
+        void StandDownEnemies()
+        {
+            foreach (var enemy in _enemies)
+                if (enemy != null) enemy.StandDown();
         }
 
         /// <summary>
@@ -336,6 +416,7 @@ namespace MetalRaptors
         {
             if (_goal != null) _goal.Rotate(0f, 60f * Time.deltaTime, 0f, Space.World);
             if (_cam != null && _cubeTr != null) PositionCamera(instant: false);
+            UpdateHealthHud();
         }
 
         void PositionCamera(bool instant)
@@ -369,12 +450,20 @@ namespace MetalRaptors
 
         // ---------------------------------------------------------------- outcomes
 
+        /// <summary>Health hit zero: the guns fall silent while the plane falls; the crash
+        /// (and its MISSION FAILED overlay) comes when it hits the ground.</summary>
+        void OnShotDown()
+        {
+            if (_shooter != null) _shooter.Stop();
+        }
+
         void OnReachedGoal()
         {
             if (_gameOver) return;
             _gameOver = true;
             _cube.Stop();
             if (_shooter != null) _shooter.Stop();
+            StandDownEnemies();
 
             if (GameManager.Instance != null)
                 GameManager.Instance.UnlockLevel(levelNumber + 1);
@@ -401,6 +490,7 @@ namespace MetalRaptors
             _gameOver = true;
             _cube.Stop();
             if (_shooter != null) _shooter.Stop();
+            StandDownEnemies();
 
             var canvas = NewOverlay(new Color(0.12f, 0f, 0f, 0.82f));
             UIFactory.CreateText(canvas.transform, "MISSION FAILED", 96,
@@ -429,6 +519,58 @@ namespace MetalRaptors
             UIFactory.CreateText(canvas.transform,
                 "A / D to steer  •  F to fire  •  reach the goal  •  don't hit the ground", 28,
                 new Vector2(0, -500), new Vector2(1600, 50));
+
+            BuildHealthBar(canvas.transform);
+        }
+
+        /// <summary>
+        /// The player's health readout, top-left: a dark plate, a fill that shrinks leftward
+        /// and shades from green to red as damage comes in, and the number on top.
+        /// </summary>
+        void BuildHealthBar(Transform parent)
+        {
+            var plate = new GameObject("HealthBar", typeof(Image));
+            plate.transform.SetParent(parent, false);
+            var plateImg = plate.GetComponent<Image>();
+            plateImg.color = new Color(0f, 0f, 0f, 0.55f);
+            plateImg.raycastTarget = false;
+            var rt = plateImg.rectTransform;
+            rt.sizeDelta = new Vector2(HudBarWidth, HudBarHeight);
+            rt.anchoredPosition = new Vector2(-660f, 480f);
+
+            var fillGo = new GameObject("Fill", typeof(Image));
+            fillGo.transform.SetParent(plate.transform, false);
+            _healthFill = fillGo.GetComponent<Image>();
+            _healthFill.raycastTarget = false;
+            var fillRt = _healthFill.rectTransform;
+            fillRt.anchorMin = new Vector2(0f, 0.5f); // pinned to the plate's left edge so the
+            fillRt.anchorMax = new Vector2(0f, 0.5f); // bar drains right-to-left
+            fillRt.pivot = new Vector2(0f, 0.5f);
+            fillRt.anchoredPosition = new Vector2(HudBarPadding, 0f);
+            fillRt.sizeDelta = new Vector2(HudBarWidth - HudBarPadding * 2f,
+                HudBarHeight - HudBarPadding * 2f);
+
+            _healthText = UIFactory.CreateText(plate.transform, "", 24, Vector2.zero,
+                new Vector2(HudBarWidth, HudBarHeight), TextAnchor.MiddleCenter, FontStyle.Bold);
+
+            UpdateHealthHud();
+        }
+
+        void UpdateHealthHud()
+        {
+            if (_cube == null || _healthFill == null) return;
+
+            float frac = _cube.MaxHealth > 0f
+                ? Mathf.Clamp01(_cube.CurrentHealth / _cube.MaxHealth) : 0f;
+
+            var size = _healthFill.rectTransform.sizeDelta;
+            size.x = (HudBarWidth - HudBarPadding * 2f) * frac;
+            _healthFill.rectTransform.sizeDelta = size;
+            _healthFill.color = Color.Lerp(
+                new Color(0.9f, 0.25f, 0.15f), new Color(0.35f, 0.85f, 0.3f), frac);
+
+            _healthText.text =
+                $"{Mathf.CeilToInt(_cube.CurrentHealth)} / {Mathf.CeilToInt(_cube.MaxHealth)}";
         }
 
         Canvas NewOverlay(Color dimColor)

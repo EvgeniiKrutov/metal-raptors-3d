@@ -26,7 +26,8 @@ namespace MetalRaptors
         const float HeightScale = 90f;         // terrain-data vertical range (heights are 0..1 of this)
         const float BaseLevel = 30f;           // mean ground height the hills undulate around
         const float MinHeight = 4f;            // never carve below this (keeps dirt above the wall's UVs)
-        const float MaxHeight = 85f;           // never build above this
+        public const float MaxHeight = 85f;    // never build above this (enemy AI treats this
+                                               // as "the ground" so its margins hold over hills)
         const float FrontStrip = 130f;         // near z-band kept height-constant: the play plane sits
                                                // back from z=0 (see LevelController.PlayPlaneZ). Keep this
                                                // past the cube's far Z so it flies/lands over a flat front

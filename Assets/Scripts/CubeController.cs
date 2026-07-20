@@ -25,8 +25,19 @@ namespace MetalRaptors
         public event Action OnCrashed;
         public event Action OnReachedGoal;
 
+        /// <summary>Raised once when health hits zero and the plane starts falling.</summary>
+        public event Action OnShotDown;
+
         /// <summary>Hit points left; starts at <see cref="CubeConfig.health"/>.</summary>
         public float CurrentHealth { get; private set; }
+
+        /// <summary>Full hit points, for the HUD's health bar.</summary>
+        public float MaxHealth { get; private set; }
+
+        // Extra downward pull while shot down, on top of gravity, so the death dive
+        // doesn't take ages from high altitude.
+        const float FallExtraGravity = 20f;
+        const float ExplosionSize = 60f; // matches the plane model's on-screen size
 
         CubeConfig _config;
         Rigidbody _rb;
@@ -34,6 +45,7 @@ namespace MetalRaptors
         float _heading;         // radians; +Y (up) = π/2
         float _angularVelocity; // radians/second, eased toward the desired rate
         bool _active;
+        bool _falling;          // health hit zero: gravity owns the plane until it hits something
 
         // World bounds, supplied by LevelController at spawn.
         float _minX, _maxX, _worldWidth, _ceilingY, _edgeMargin;
@@ -54,6 +66,7 @@ namespace MetalRaptors
             _edgeMargin = edgeMargin;
 
             CurrentHealth = Mathf.Max(1f, config.health);
+            MaxHealth = CurrentHealth;
 
             _rb = GetComponent<Rigidbody>();
             _rb.useGravity = false;
@@ -84,6 +97,14 @@ namespace MetalRaptors
         {
             if (!_active || _config == null) return;
 
+            if (_falling)
+            {
+                // Shot down: no steering, no thrust — just gravity (plus a little extra pull)
+                // carrying the leftover momentum down to the ground.
+                _rb.AddForce(Vector3.down * FallExtraGravity, ForceMode.Acceleration);
+                return;
+            }
+
             float dt = Time.fixedDeltaTime;
 
             // ---- Steering (sibling Plane.applyTurnRate) ----
@@ -97,7 +118,8 @@ namespace MetalRaptors
             // ---- Soft side boundaries ----
             // Near either edge, override the pilot's input and turn the cube back toward the
             // middle, so it banks away from the world edge instead of flying off it.
-            desiredRate = EdgeSteer(_rb.position.x, maxRate, desiredRate);
+            desiredRate = FlightSteering.EdgeSteer(_rb.position.x, _heading,
+                _minX, _maxX, _edgeMargin, maxRate, desiredRate);
 
             float approach = 1f - Mathf.Exp(-(_config.turnResponsiveness / _rb.mass) * dt);
             _angularVelocity += (desiredRate - _angularVelocity) * approach;
@@ -117,54 +139,6 @@ namespace MetalRaptors
             if (pos.y > _ceilingY) { pos.y = _ceilingY; _rb.position = pos; }
         }
 
-        /// <summary>
-        /// Soft side boundary: while the cube is inside the <see cref="_edgeMargin"/> band at an
-        /// edge and its heading still carries it toward that edge, force the desired turn rate to
-        /// bank it back toward the world centre. The forcing scales with how deep it has pushed
-        /// into the band (0 at the band's inner lip, full rate at the very edge), so a shallow
-        /// intrusion is nudged and a deep one is turned hard — it always comes about before
-        /// leaving the world. Outside the bands the pilot's own <paramref name="pilotRate"/> is
-        /// returned unchanged.
-        /// </summary>
-        float EdgeSteer(float x, float maxRate, float pilotRate)
-        {
-            // Signed depth into a band: >0 means inside it. Only one side can be active at once.
-            float leftPen  = _minX + _edgeMargin - x; // how far past the left band's inner lip
-            float rightPen = x - (_maxX - _edgeMargin); // ...and the right band's
-
-            // Direction of travel in X: cos(heading) > 0 heads right (+X), < 0 heads left (-X).
-            float headingX = Mathf.Cos(_heading);
-
-            // Near the left edge and still drifting left -> turn toward +X (down from straight up
-            // is CW = negative rate; but which way is "toward centre" depends on the current
-            // heading, so steer by the shortest turn that flips headingX to point inward).
-            if (leftPen > 0f && headingX < 0f)
-            {
-                float strength = Mathf.Clamp01(leftPen / _edgeMargin);
-                return TurnToward(+1f) * maxRate * strength;
-            }
-            if (rightPen > 0f && headingX > 0f)
-            {
-                float strength = Mathf.Clamp01(rightPen / _edgeMargin);
-                return TurnToward(-1f) * maxRate * strength;
-            }
-            return pilotRate;
-        }
-
-        /// <summary>
-        /// Sign of the turn rate that rotates the current heading toward pointing in
-        /// <paramref name="targetXDir"/> (+1 = +X, -1 = -X) along the shorter arc. Positive is
-        /// CCW (matches A/left); negative is CW (matches D/right).
-        /// </summary>
-        float TurnToward(float targetXDir)
-        {
-            // Target heading is 0 (points +X) or π (points -X). Wrap the difference to (-π, π]
-            // and steer by its sign so we always take the short way round.
-            float target = targetXDir > 0f ? 0f : Mathf.PI;
-            float delta = Mathf.DeltaAngle(_heading * Mathf.Rad2Deg, target * Mathf.Rad2Deg);
-            return Mathf.Sign(delta);
-        }
-
         void ApplyRotation()
         {
             // Heading is an angle in the XY plane -> rotation about Z (the axis the camera looks down).
@@ -172,24 +146,71 @@ namespace MetalRaptors
         }
 
         /// <summary>
-        /// Future enemy fire lands here (via <see cref="IDamageable"/>); at zero health the
-        /// plane goes down exactly like a ground crash.
+        /// Enemy fire lands here (via <see cref="IDamageable"/>); at zero health the plane
+        /// stops flying and falls out of the sky — the crash itself happens when it hits
+        /// the ground (see <see cref="OnCollisionEnter"/>).
         /// </summary>
         public void TakeDamage(float amount)
         {
-            if (!_active) return;
-            CurrentHealth -= amount;
-            if (CurrentHealth <= 0f) OnCrashed?.Invoke();
+            if (!_active || _falling) return;
+            CurrentHealth = Mathf.Max(0f, CurrentHealth - amount);
+            if (CurrentHealth <= 0f) BeginFall();
+        }
+
+        /// <summary>
+        /// Shot down: hand the plane to gravity. It keeps its forward momentum, tumbles about
+        /// the view axis, and crashes for real on whatever it hits on the way down.
+        /// </summary>
+        void BeginFall()
+        {
+            _falling = true;
+            OnShotDown?.Invoke();
+
+            _rb.useGravity = true;
+            _rb.angularVelocity = new Vector3(0f, 0f,
+                (UnityEngine.Random.value < 0.5f ? -1f : 1f) * 2.5f);
         }
 
         void OnCollisionEnter(Collision collision)
         {
-            if (_active) OnCrashed?.Invoke();
+            if (!_active) return;
+
+            // Bullets are not a crash: they already applied their damage via TakeDamage.
+            if (collision.gameObject.GetComponent<Bullet>() != null) return;
+
+            // Ramming an enemy destroys both planes in one fireball.
+            var enemy = collision.gameObject.GetComponentInParent<EnemyController>();
+            if (enemy != null)
+            {
+                Explosion.Spawn(transform.position, ExplosionSize);
+                enemy.Explode();
+                HideModel();
+                OnCrashed?.Invoke();
+                return;
+            }
+
+            // A shot-down plane goes up in flames when its fall ends.
+            if (_falling)
+            {
+                Explosion.Spawn(transform.position, ExplosionSize);
+                HideModel();
+            }
+
+            OnCrashed?.Invoke();
+        }
+
+        /// <summary>Removes the plane from view after it explodes (the body object itself
+        /// survives so the camera's follow target stays valid).</summary>
+        void HideModel()
+        {
+            foreach (Transform child in transform)
+                child.gameObject.SetActive(false);
         }
 
         void OnTriggerEnter(Collider other)
         {
-            if (_active) OnReachedGoal?.Invoke();
+            // A falling wreck can't win the level by dropping through the goal.
+            if (_active && !_falling) OnReachedGoal?.Invoke();
         }
     }
 }

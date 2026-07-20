@@ -30,7 +30,7 @@ namespace MetalRaptors
             _muzzle = muzzle;
             _planeCollider = planeCollider;
 
-            _bulletTemplate = BuildBulletTemplate();
+            _bulletTemplate = Bullet.BuildTemplate(new Color(1f, 0.9f, 0.2f));
 
             _shotClip = Resources.Load<AudioClip>("Sounds/bullet_shot_1");
             if (_shotClip == null)
@@ -69,22 +69,6 @@ namespace MetalRaptors
                 _planeCollider);
 
             if (_shotClip != null) _audio.PlayOneShot(_shotClip, ShotVolume);
-        }
-
-        /// <summary>
-        /// Builds the one inactive round every shot is cloned from, so all bullets share a
-        /// single material instead of creating one per shot. An 8 m emissive yellow cylinder —
-        /// tracer-sized, so it still reads at the camera's ~420 m distance.
-        /// </summary>
-        GameObject BuildBulletTemplate()
-        {
-            var template = UIFactory.CreatePrimitive3D(PrimitiveType.Cylinder,
-                Vector3.zero, new Vector3(1.2f, 4f, 1.2f),
-                new Color(1f, 0.9f, 0.2f), emissive: true);
-            template.AddComponent<Bullet>(); // RequireComponent pulls the Rigidbody in with it
-            template.SetActive(false);
-            template.name = "BulletTemplate";
-            return template;
         }
     }
 }
