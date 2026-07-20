@@ -13,20 +13,40 @@ namespace MetalRaptors
     [RequireComponent(typeof(Rigidbody))]
     public class Bullet : MonoBehaviour
     {
+        // Safety net: no round outlives this, even one that never re-enters the camera view.
+        const float MaxLife = 6f;
+
         float _damage;
         Camera _cam;
+        bool _wasOnScreen; // becomes true once the round is seen, so a miss is culled only after it leaves
+        float _age;
 
         /// <summary>
         /// Builds the one inactive round a gun clones every shot, so all of its bullets share a
-        /// single material instead of creating one per shot. An 8 m emissive cylinder —
-        /// tracer-sized, so it still reads at the camera's ~420 m distance. The player's guns
-        /// use yellow; enemy guns use red so both sides' fire is tellable apart.
+        /// single material instead of creating one per shot. A stubby brass slug — thick enough
+        /// to read at the camera's ~420 m distance, with only a faint glow so it looks like a
+        /// warm metal round catching the light, not a laser bolt. The <paramref name="color"/>
+        /// sets the brass tone: the player's guns use a bright polished brass, the enemies' a
+        /// darker copper, so both sides' fire is still tellable apart.
         /// </summary>
         public static GameObject BuildTemplate(Color color)
         {
             var template = UIFactory.CreatePrimitive3D(PrimitiveType.Cylinder,
-                Vector3.zero, new Vector3(1.2f, 4f, 1.2f),
+                Vector3.zero, new Vector3(2.4f, 3.5f, 2.4f),
                 color, emissive: true);
+
+            // Dress the shared material as brass: metallic and a little glossy so the scene light
+            // glints off it, and a much dimmer emission than the old tracers (was color * 2) so it
+            // reads as metal rather than glowing harshly.
+            var rend = template.GetComponent<Renderer>();
+            if (rend != null && rend.sharedMaterial != null)
+            {
+                var mat = rend.sharedMaterial;
+                mat.SetFloat("_Metallic", 0.9f);
+                mat.SetFloat("_Smoothness", 0.55f);
+                mat.SetColor("_EmissionColor", color * 0.75f);
+            }
+
             template.AddComponent<Bullet>(); // RequireComponent pulls the Rigidbody in with it
             template.SetActive(false);
             template.name = "BulletTemplate";
@@ -56,12 +76,24 @@ namespace MetalRaptors
 
         void Update()
         {
-            // Out of the camera view, with a small margin so the round visibly leaves the
-            // screen before it disappears.
+            // Hard cap so a stray round can never live forever.
+            _age += Time.deltaTime;
+            if (_age > MaxLife) { Destroy(gameObject); return; }
+
             if (_cam == null) return;
+
+            // On screen, with a small margin so a round visibly crosses the edge before anything
+            // happens. Enemy rounds are often fired from just off-camera and only fly into view on
+            // their way to the player, so a round is culled for leaving the view *only once it has
+            // actually been seen* — otherwise an incoming tracer would be destroyed before it ever
+            // rendered (which is exactly why enemy fire used to hit from nowhere).
             Vector3 vp = _cam.WorldToViewportPoint(transform.position);
-            if (vp.x < -0.05f || vp.x > 1.05f || vp.y < -0.05f || vp.y > 1.05f)
-                Destroy(gameObject);
+            bool onScreen = vp.z > 0f
+                         && vp.x > -0.05f && vp.x < 1.05f
+                         && vp.y > -0.05f && vp.y < 1.05f;
+
+            if (onScreen) _wasOnScreen = true;
+            else if (_wasOnScreen) Destroy(gameObject);
         }
 
         void OnCollisionEnter(Collision collision)

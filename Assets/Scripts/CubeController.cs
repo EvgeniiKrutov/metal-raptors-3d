@@ -28,7 +28,7 @@ namespace MetalRaptors
         /// <summary>Raised once when health hits zero and the plane starts falling.</summary>
         public event Action OnShotDown;
 
-        /// <summary>Hit points left; starts at <see cref="CubeConfig.health"/>.</summary>
+        /// <summary>Hit points left; starts at <see cref="PlayerConfig.health"/>.</summary>
         public float CurrentHealth { get; private set; }
 
         /// <summary>Full hit points, for the HUD's health bar.</summary>
@@ -39,7 +39,7 @@ namespace MetalRaptors
         const float FallExtraGravity = 20f;
         const float ExplosionSize = 60f; // matches the plane model's on-screen size
 
-        CubeConfig _config;
+        PlayerConfig _config;
         Rigidbody _rb;
 
         float _heading;         // radians; +Y (up) = π/2
@@ -55,7 +55,7 @@ namespace MetalRaptors
         /// Width of the soft-boundary band inside each side edge; inside it the cube is steered
         /// back toward the centre so it turns away from the world edge instead of leaving it.
         /// </param>
-        public void Initialize(CubeConfig config, float startHeadingRad, float minX, float maxX, float ceilingY, float edgeMargin)
+        public void Initialize(PlayerConfig config, float startHeadingRad, float minX, float maxX, float ceilingY, float edgeMargin)
         {
             _config     = config;
             _heading    = startHeadingRad;

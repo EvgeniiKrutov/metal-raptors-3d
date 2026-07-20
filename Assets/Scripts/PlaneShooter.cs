@@ -4,8 +4,8 @@ using UnityEngine.InputSystem;
 namespace MetalRaptors
 {
     /// <summary>
-    /// The player plane's machine guns. While F is held, fires a glowing yellow tracer round
-    /// from the muzzle every <see cref="CubeConfig.fireRate"/> seconds and plays the shot sound
+    /// The player plane's machine guns. While F is held, fires a brass machine-gun round
+    /// from the muzzle every <see cref="PlayerConfig.fireRate"/> seconds and plays the shot sound
     /// (the sibling repo's <c>bullet_shot_1.wav</c>). Lives on the physics body next to
     /// <see cref="CubeController"/>, whose yaw makes this transform's +X the flight heading, so
     /// rounds always leave along the nose. Wired up by <see cref="LevelController"/>, which also
@@ -15,7 +15,7 @@ namespace MetalRaptors
     {
         const float ShotVolume = 0.3f; // matches the sibling repo's bullet_shot volume
 
-        CubeConfig _config;
+        PlayerConfig _config;
         Transform _muzzle;
         Collider _planeCollider;
 
@@ -24,13 +24,14 @@ namespace MetalRaptors
         AudioClip _shotClip;
         float _cooldown;
 
-        public void Initialize(CubeConfig config, Transform muzzle, Collider planeCollider)
+        public void Initialize(PlayerConfig config, Transform muzzle, Collider planeCollider)
         {
             _config = config;
             _muzzle = muzzle;
             _planeCollider = planeCollider;
 
-            _bulletTemplate = Bullet.BuildTemplate(new Color(1f, 0.9f, 0.2f));
+            // Bright polished brass for the player's rounds.
+            _bulletTemplate = Bullet.BuildTemplate(new Color(0.85f, 0.62f, 0.30f));
 
             _shotClip = Resources.Load<AudioClip>("Sounds/bullet_shot_1");
             if (_shotClip == null)

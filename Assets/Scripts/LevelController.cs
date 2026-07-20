@@ -82,8 +82,8 @@ namespace MetalRaptors
 
         void Start()
         {
-            var config = Resources.Load<CubeConfig>("CubeConfig");
-            if (config == null) config = ScriptableObject.CreateInstance<CubeConfig>(); // safety fallback
+            var config = Resources.Load<PlayerConfig>("PlayerConfig");
+            if (config == null) config = ScriptableObject.CreateInstance<PlayerConfig>(); // safety fallback
 
             ConfigureShadows();
             BuildWorld();
@@ -158,7 +158,7 @@ namespace MetalRaptors
             _goal = goalGo.transform;
         }
 
-        void SpawnPlayer(CubeConfig config)
+        void SpawnPlayer(PlayerConfig config)
         {
             // The physics body is a bare GameObject that CubeController yaws to the heading each
             // frame (it writes transform.rotation directly). The visible Fokker Dr.1 hangs off it
@@ -189,7 +189,7 @@ namespace MetalRaptors
         /// the model has no gun nodes, so the offset is derived from the prop's bounds), plus a
         /// <see cref="PlaneShooter"/> that fires from it while F is held.
         /// </summary>
-        void SetupGuns(CubeConfig config, GameObject body, Transform model)
+        void SetupGuns(PlayerConfig config, GameObject body, Transform model)
         {
             const float MuzzleClearance = 2f;    // ahead of the prop disc, so rounds spawn clear of it
             const float GunHeightAboveHub = 2.5f; // Spandaus sit on the cowling above the hub
@@ -232,14 +232,16 @@ namespace MetalRaptors
 
             for (int i = 0; i < enemyCount; i++)
             {
-                var go = UIFactory.CreatePrimitive3D(PrimitiveType.Cube,
-                    RandomEnemySpawn(aiGroundY), Vector3.one * _enemyConfig.cubeScale,
-                    _enemyConfig.color);
-                go.name = "Enemy";
+                // Same bare-body-plus-model rig as the player: a physics body the EnemyController
+                // yaws to the heading, carrying the Fokker Dr.1 as a child. The model is mirrored
+                // because the enemies attack from the right and mostly fly left (see BuildPlaneModel).
+                var go = new GameObject("Enemy");
+                go.transform.position = RandomEnemySpawn(aiGroundY);
+                BuildPlaneModel(go.transform, mirrored: true);
 
                 var enemy = go.AddComponent<EnemyController>();
                 enemy.Initialize(_enemyConfig, playerBody,
-                    MinX, MaxX, aiGroundY, WorldTop - _enemyConfig.cubeScale / 2f, EdgeMargin);
+                    MinX, MaxX, aiGroundY, WorldTop - PlaneScale / 2f, EdgeMargin);
                 enemy.OnDestroyed += e => _enemies.Remove(e);
                 _enemies.Add(enemy);
             }
@@ -277,11 +279,12 @@ namespace MetalRaptors
 
         /// <summary>
         /// Instantiates the Fokker Dr.1 model under <paramref name="parent"/> (the physics body):
-        /// tips it upright with a +90° rotation about X, scales it to the old cube's ~30 m
-        /// footprint, gives it a tight convex mesh collider so ground crashes and the goal trigger
-        /// still fire, turns on shadow casting, and starts the propeller spinning.
+        /// tips it upright with a +90° rotation about X, scales it to the plane's on-screen size,
+        /// gives it a tight convex mesh collider so ground crashes and the goal trigger still fire,
+        /// turns on shadow casting, and starts the propeller spinning. Pass
+        /// <paramref name="mirrored"/> for the enemy plane, which flies left instead of right.
         /// </summary>
-        Transform BuildPlaneModel(Transform parent)
+        Transform BuildPlaneModel(Transform parent, bool mirrored = false)
         {
             var prefab = Resources.Load<GameObject>("fokker_dr1");
             if (prefab == null)
@@ -296,7 +299,7 @@ namespace MetalRaptors
             }
 
             var model = Instantiate(prefab);
-            model.name = "FokkerDr1";
+            model.name = mirrored ? "FokkerDr1 (enemy)" : "FokkerDr1";
             model.transform.SetParent(parent, false);
 
             // "Rotate the whole model in X axis first by 90 degrees" — the model is exported
@@ -306,11 +309,21 @@ namespace MetalRaptors
             // that leads with the nose. The extra 180° roll about the nose (X, the heading/flight
             // axis) flips the plane wheels-down instead of wheels-up.
             //
-            // The outer +10° about Z (the camera's view axis, the plane's pitch axis on screen)
-            // drops the nose down a touch. It's applied to the model only, so it's purely visual —
-            // the flight direction comes from the parent's heading and is unaffected.
-            model.transform.localRotation = Quaternion.Euler(0f, 0f, ModelPitchDeg)
-                                          * Quaternion.Euler(180f, 0f, 0f)
+            // The enemy is the mirror image: it attacks from the right and flies LEFT, and a heading
+            // of ~180° is a 180° spin about the view axis — which would leave a right-upright plane
+            // belly-up. So for the enemy we DROP that wheels-down roll (leaving it belly-up at
+            // heading 0), and the parent's 180° heading spin then lands it belly-down and upright
+            // while flying left. The cosmetic nose pitch is flipped to match, so the nose still dips
+            // toward the flight direction. (The Dr.1 is left-right symmetric, so this reads as a true
+            // mirror without the inside-out normals a negative scale would cause.)
+            //
+            // The outer Z rotation (the camera's view axis, the plane's pitch axis on screen) drops
+            // the nose down a touch. It's applied to the model only, so it's purely visual — the
+            // flight direction comes from the parent's heading and is unaffected.
+            Quaternion wheelsDown = mirrored ? Quaternion.identity : Quaternion.Euler(180f, 0f, 0f);
+            float pitch = mirrored ? -ModelPitchDeg : ModelPitchDeg;
+            model.transform.localRotation = Quaternion.Euler(0f, 0f, pitch)
+                                          * wheelsDown
                                           * Quaternion.Euler(90f, -90f, 0f);
 
             // Scale the model down to roughly the old cube's on-screen size (~45 m across its

@@ -4,9 +4,9 @@ using UnityEngine;
 namespace MetalRaptors
 {
     /// <summary>
-    /// An enemy fighter — for now a red cube — flying the same constant-speed physics as the
-    /// player's <see cref="CubeController"/>, driven by the sibling repo's FighterPlane AI
-    /// ported 1:1. States:
+    /// An enemy fighter — a mirrored Fokker Dr.1 (it attacks from the right and flies left) —
+    /// flying the same constant-speed physics as the player's <see cref="CubeController"/>,
+    /// driven by the sibling repo's FighterPlane AI ported 1:1. States:
     ///
     ///   * Attack  - chase the player with lead-prediction aim, guns firing when lined up.
     ///   * Fly     - break away toward high altitude, weaving, before the next attack run.
@@ -17,7 +17,7 @@ namespace MetalRaptors
     ///
     /// The soft side boundaries steer it away from the world edges exactly like the player
     /// (shared <see cref="FlightSteering"/>), and the same hard ceiling applies. A world-space
-    /// health bar hangs above the cube; at zero health the fighter explodes and is removed
+    /// health bar hangs above the plane; at zero health the fighter explodes and is removed
     /// from the map. Ramming is handled by <see cref="CubeController"/>, which destroys both.
     /// </summary>
     [RequireComponent(typeof(Rigidbody))]
@@ -29,7 +29,7 @@ namespace MetalRaptors
         // Health bar geometry (metres, world space).
         const float BarWidth = 36f;
         const float BarHeight = 3.2f;
-        const float BarLift = 26f; // bar centre this far above the cube's centre
+        const float BarLiftMargin = 8f; // bar centre sits this far above the top of the plane
 
         /// <summary>Raised once when this fighter is destroyed, however it died.</summary>
         public event Action<EnemyController> OnDestroyed;
@@ -45,6 +45,7 @@ namespace MetalRaptors
         Rigidbody _rb;
         Collider _collider;
         Camera _cam;
+        float _bodyRadius;   // half the plane model's longest extent — sizes the muzzle, explosion and health bar
 
         float _heading;         // radians; +Y (up) = π/2 — same convention as CubeController
         float _angularVelocity; // rad/s, eased toward the desired rate
@@ -106,8 +107,11 @@ namespace MetalRaptors
             _rb.interpolation = RigidbodyInterpolation.Interpolate;
             _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
 
-            _collider = GetComponent<Collider>();
-            _bulletTemplate = Bullet.BuildTemplate(new Color(1f, 0.25f, 0.15f)); // red: theirs
+            // The plane model hangs off this body, so its convex mesh collider (added by
+            // LevelController.BuildPlaneModel) lives on a child, not on the body itself.
+            _collider = GetComponentInChildren<Collider>();
+            _bodyRadius = MeasureBodyRadius();
+            _bulletTemplate = Bullet.BuildTemplate(new Color(0.72f, 0.42f, 0.18f)); // darker copper: theirs
 
             _shotClip = Resources.Load<AudioClip>("Sounds/bullet_shot_1");
             _audio = gameObject.AddComponent<AudioSource>();
@@ -331,6 +335,17 @@ namespace MetalRaptors
             return Mathf.Atan2(point.y - transform.position.y, point.x - transform.position.x);
         }
 
+        /// <summary>Half the longest side of the plane model's combined renderer bounds, so the
+        /// muzzle, explosion and health bar all scale to whatever size the model is built at.</summary>
+        float MeasureBodyRadius()
+        {
+            var rends = GetComponentsInChildren<Renderer>();
+            if (rends.Length == 0) return 15f;
+            var b = rends[0].bounds;
+            for (int i = 1; i < rends.Length; i++) b.Encapsulate(rends[i].bounds);
+            return Mathf.Max(b.size.x, b.size.y, b.size.z) * 0.5f;
+        }
+
         // ---------------------------------------------------------------- guns
 
         /// <summary>Fires when the player is on screen, in range, and the nose is within the
@@ -351,8 +366,8 @@ namespace MetalRaptors
             _fireCooldown = Mathf.Max(0.01f, _config.fireRate);
 
             Vector3 dir = new Vector3(Mathf.Cos(_heading), Mathf.Sin(_heading), 0f);
-            // From the cube's nose, clear of its own collider.
-            Vector3 muzzle = transform.position + dir * (_config.cubeScale * 0.75f);
+            // From the plane's nose, clear of its own collider.
+            Vector3 muzzle = transform.position + dir * (_bodyRadius + 6f);
             // Same -90° trick as PlaneShooter: lays the tracer's long axis along the heading.
             var go = Instantiate(_bulletTemplate, muzzle,
                 transform.rotation * Quaternion.Euler(0f, 0f, -90f));
@@ -412,7 +427,7 @@ namespace MetalRaptors
             if (_dead) return;
             _dead = true;
 
-            Explosion.Spawn(transform.position, _config != null ? _config.cubeScale : 30f);
+            Explosion.Spawn(transform.position, _bodyRadius > 0f ? _bodyRadius * 2f : 30f);
             OnDestroyed?.Invoke(this);
             Destroy(gameObject); // OnDestroy takes the health bar with it
         }
@@ -483,7 +498,8 @@ namespace MetalRaptors
 
         void PlaceHealthBar()
         {
-            if (_bar != null) _bar.position = transform.position + Vector3.up * BarLift;
+            if (_bar != null)
+                _bar.position = transform.position + Vector3.up * (_bodyRadius + BarLiftMargin);
         }
 
         void LateUpdate()

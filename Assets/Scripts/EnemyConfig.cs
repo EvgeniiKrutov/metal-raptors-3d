@@ -4,9 +4,9 @@ namespace MetalRaptors
 {
     /// <summary>
     /// Tunable stats and AI parameters for the enemy fighter, stored as a standalone asset
-    /// (Assets/Resources/EnemyConfig.asset) like <see cref="CubeConfig"/>. Values are ported
+    /// (Assets/Resources/EnemyConfig.asset) like <see cref="PlayerConfig"/>. Values are ported
     /// from the metal-raptors sibling repo (enemies/fighter.json), rescaled to this world the
-    /// same way the player's were: speeds against the live CubeConfig.asset (player 500 px/s
+    /// same way the player's were: speeds against the live PlayerConfig.asset (player 500 px/s
     /// -> 180 m/s), distances against the sibling's 3240 px world height -> 700 m here, with
     /// the ground margins widened to cover this fighter's larger turn radius.
     /// </summary>
@@ -14,7 +14,7 @@ namespace MetalRaptors
     public class EnemyConfig : ScriptableObject
     {
         [Header("Stats (fighter.json stats)")]
-        [Tooltip("Hit points (sibling: 100). Player fire subtracts CubeConfig.damage per hit.")]
+        [Tooltip("Hit points (sibling: 100). Player fire subtracts PlayerConfig.damage per hit.")]
         public float health = 100f;
 
         [Tooltip("Damage one enemy bullet deals to the player (sibling: 10).")]
@@ -83,11 +83,12 @@ namespace MetalRaptors
         [Tooltip("How many times per second the jitter heading re-rolls (sibling: 16).")]
         public float jitterHz = 16f;
 
-        [Header("Body")]
-        [Tooltip("Edge length of the enemy cube in metres (matches the old player cube).")]
+        [Header("Body (legacy)")]
+        [Tooltip("Unused: the enemy is now the Fokker Dr.1 model, sized to the player's plane. " +
+                 "Kept only so the existing asset still deserializes cleanly.")]
         public float cubeScale = 30f;
 
-        [Tooltip("Colour of the enemy cube.")]
+        [Tooltip("Unused: the enemy plane uses the model's own materials, not a flat colour.")]
         public Color color = new Color(0.62f, 0.14f, 0.12f);
     }
 }

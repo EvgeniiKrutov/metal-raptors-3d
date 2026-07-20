@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 728438ded2bb4d66a92f38a0659a2e72, type: 3}
-  m_Name: CubeConfig
+  m_Name: PlayerConfig
   m_EditorClassIdentifier:
   mass: 2.5
   rotationSpeed: 120

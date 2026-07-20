@@ -3,22 +3,22 @@ using UnityEngine;
 namespace MetalRaptors
 {
     /// <summary>
-    /// Tunable flight parameters for the player cube, stored as a standalone asset
-    /// (Assets/Resources/CubeConfig.asset) so the numbers live in a separate file and
+    /// Tunable flight parameters for the player plane, stored as a standalone asset
+    /// (Assets/Resources/PlayerConfig.asset) so the numbers live in a separate file and
     /// can be edited without touching code. Values are ported from the metal-raptors
     /// sibling repo (player.json + physics.json), with <see cref="flySpeed"/> rescaled
     /// for this 1000 m world.
     /// </summary>
-    [CreateAssetMenu(fileName = "CubeConfig", menuName = "Metal Raptors/Cube Config")]
-    public class CubeConfig : ScriptableObject
+    [CreateAssetMenu(fileName = "PlayerConfig", menuName = "Metal Raptors/Player Config")]
+    public class PlayerConfig : ScriptableObject
     {
-        [Tooltip("Cube mass. Higher mass = heavier, more sluggish turns (sibling: 2.5).")]
+        [Tooltip("Plane mass. Higher mass = heavier, more sluggish turns (sibling: 2.5).")]
         public float mass = 2.5f;
 
         [Tooltip("Maximum turn rate in degrees/second (sibling turnSpeed: 180).")]
         public float rotationSpeed = 180f;
 
-        [Tooltip("Constant flight speed in metres/second. The cube never stops.")]
+        [Tooltip("Constant flight speed in metres/second. The plane never stops.")]
         public float flySpeed = 120f;
 
         [Tooltip("How quickly the turn rate eases toward the target (sibling: 5.0). " +
