@@ -30,8 +30,8 @@ namespace MetalRaptors
             _muzzle = muzzle;
             _planeCollider = planeCollider;
 
-            // Bright polished brass for the player's rounds.
-            _bulletTemplate = Bullet.BuildTemplate(new Color(0.85f, 0.62f, 0.30f));
+            // Both sides fire the same polished-brass round.
+            _bulletTemplate = Bullet.BuildTemplate(Bullet.RoundColor);
 
             _shotClip = Resources.Load<AudioClip>("Sounds/bullet_shot_1");
             if (_shotClip == null)

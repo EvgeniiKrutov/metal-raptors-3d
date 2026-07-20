@@ -111,7 +111,7 @@ namespace MetalRaptors
             // LevelController.BuildPlaneModel) lives on a child, not on the body itself.
             _collider = GetComponentInChildren<Collider>();
             _bodyRadius = MeasureBodyRadius();
-            _bulletTemplate = Bullet.BuildTemplate(new Color(0.72f, 0.42f, 0.18f)); // darker copper: theirs
+            _bulletTemplate = Bullet.BuildTemplate(Bullet.RoundColor); // same brass as the player's rounds
 
             _shotClip = Resources.Load<AudioClip>("Sounds/bullet_shot_1");
             _audio = gameObject.AddComponent<AudioSource>();

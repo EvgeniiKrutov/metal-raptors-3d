@@ -16,14 +16,12 @@ namespace MetalRaptors
     ///   * Hard ceiling            - the cube cannot climb past the top of the world.
     ///
     /// The cube lives in the XY play-plane (Z frozen); its heading is a rotation about Z.
-    /// Hitting the solid ground raises <see cref="OnCrashed"/>; entering the goal trigger raises
-    /// <see cref="OnReachedGoal"/>. Both fire once.
+    /// Hitting the solid ground raises <see cref="OnCrashed"/> (once).
     /// </summary>
     [RequireComponent(typeof(Rigidbody))]
     public class CubeController : MonoBehaviour, IDamageable
     {
         public event Action OnCrashed;
-        public event Action OnReachedGoal;
 
         /// <summary>Raised once when health hits zero and the plane starts falling.</summary>
         public event Action OnShotDown;
@@ -205,12 +203,6 @@ namespace MetalRaptors
         {
             foreach (Transform child in transform)
                 child.gameObject.SetActive(false);
-        }
-
-        void OnTriggerEnter(Collider other)
-        {
-            // A falling wreck can't win the level by dropping through the goal.
-            if (_active && !_falling) OnReachedGoal?.Invoke();
         }
     }
 }

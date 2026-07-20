@@ -16,6 +16,16 @@ namespace MetalRaptors
         // Safety net: no round outlives this, even one that never re-enters the camera view.
         const float MaxLife = 6f;
 
+        // Both sides fire the same polished-brass round.
+        public static readonly Color RoundColor = new Color(0.85f, 0.62f, 0.30f);
+
+        // Rounds carry almost no mass. A round only needs to register the hit and deal its
+        // damage — it never has to physically push anything (it self-destructs on contact) —
+        // so keeping its momentum near zero means a hit no longer kicks the plane it strikes
+        // into a visible jump/shake. A full-mass round at bulletSpeed transfers a huge impulse
+        // into the (mass 2.5) plane, which the plane's scripted flight can't fully cancel.
+        const float Mass = 0.01f;
+
         float _damage;
         Camera _cam;
         bool _wasOnScreen; // becomes true once the round is seen, so a miss is culled only after it leaves
@@ -26,8 +36,8 @@ namespace MetalRaptors
         /// single material instead of creating one per shot. A stubby brass slug — thick enough
         /// to read at the camera's ~420 m distance, with only a faint glow so it looks like a
         /// warm metal round catching the light, not a laser bolt. The <paramref name="color"/>
-        /// sets the brass tone: the player's guns use a bright polished brass, the enemies' a
-        /// darker copper, so both sides' fire is still tellable apart.
+        /// sets the brass tone; both the player's and the enemies' guns fire the same polished
+        /// brass round (see <see cref="RoundColor"/>).
         /// </summary>
         public static GameObject BuildTemplate(Color color)
         {
@@ -64,6 +74,9 @@ namespace MetalRaptors
 
             var rb = GetComponent<Rigidbody>();
             rb.useGravity = false;
+            // Near-massless so the round deals damage without physically shoving the plane it
+            // hits (see the Mass note above): a hit no longer kicks the target into a shake.
+            rb.mass = Mass;
             rb.constraints = RigidbodyConstraints.FreezePositionZ;
             // At bulletSpeed the round covers several metres per physics step; continuous
             // detection keeps it from tunnelling through the ground slab or thin terrain.

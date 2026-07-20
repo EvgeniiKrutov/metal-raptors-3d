@@ -13,11 +13,11 @@ namespace MetalRaptors
     ///
     /// Builds a worldWidth x 700 m flight arena at runtime: ground at the bottom (either the
     /// flat placeholder slab or the procedural Verdun-style land, see
-    /// <see cref="ProceduralTerrain"/>), a hard ceiling at the top, soft boundaries on the sides
-    /// that steer the cube back toward the middle, and a glowing goal near the top. The player
-    /// cube (coloured by the Garage selection) flies with the sibling repo's physics via
-    /// <see cref="CubeController"/>. A perspective camera follows the cube, giving a 2.5D
-    /// platformer feel. Touching the ground fails the level; reaching the goal completes it.
+    /// <see cref="ProceduralTerrain"/>), a hard ceiling at the top, and soft boundaries on the
+    /// sides that steer the cube back toward the middle. The player cube (coloured by the Garage
+    /// selection) flies with the sibling repo's physics via <see cref="CubeController"/>. A
+    /// perspective camera follows the cube, giving a 2.5D platformer feel. Touching the ground
+    /// fails the level; the level is won by shooting down every enemy fighter.
     /// <see cref="enemyCount"/> enemy fighters (see <see cref="EnemyController"/>) spawn at
     /// random spots outside the camera and hunt the player; their fire wears down the health
     /// shown on the HUD, and at zero the plane falls out of the sky.
@@ -64,7 +64,6 @@ namespace MetalRaptors
         CubeController _cube;
         PlaneShooter _shooter;
         Transform _cubeTr;
-        Transform _goal;
         Camera _cam;
 
         EnemyConfig _enemyConfig;
@@ -145,17 +144,6 @@ namespace MetalRaptors
                 new Vector3(0f, WorldTop, PlayPlaneZ),
                 new Vector3(worldWidth + 200f, 8f, 60f),
                 new Color(0.55f, 0.6f, 0.7f), emissive: true, keepCollider: false);
-
-            // Glowing goal near the top; its X differs per level so Level 2 needs more steering.
-            float goalX = levelNumber >= 2 ? 260f : 0f;
-            var goalGo = UIFactory.CreatePrimitive3D(PrimitiveType.Sphere,
-                new Vector3(goalX, WorldTop - 90f, PlayPlaneZ),
-                Vector3.one * 90f,
-                new Color(1f, 0.85f, 0.15f), emissive: true);
-            goalGo.name = "Goal";
-            var goalCol = goalGo.GetComponent<Collider>();
-            if (goalCol != null) goalCol.isTrigger = true; // trigger -> OnTriggerEnter, not a crash
-            _goal = goalGo.transform;
         }
 
         void SpawnPlayer(PlayerConfig config)
@@ -174,7 +162,6 @@ namespace MetalRaptors
             _cube = go.AddComponent<CubeController>();
             _cubeTr = go.transform;
             _cube.OnCrashed += OnCrashed;
-            _cube.OnReachedGoal += OnReachedGoal;
             _cube.OnShotDown += OnShotDown;
 
             // Start heading straight to the right (velocity +X => angle 0), ceiling clamped for the plane's size.
@@ -242,7 +229,7 @@ namespace MetalRaptors
                 var enemy = go.AddComponent<EnemyController>();
                 enemy.Initialize(_enemyConfig, playerBody,
                     MinX, MaxX, aiGroundY, WorldTop - PlaneScale / 2f, EdgeMargin);
-                enemy.OnDestroyed += e => _enemies.Remove(e);
+                enemy.OnDestroyed += OnEnemyDestroyed;
                 _enemies.Add(enemy);
             }
         }
@@ -275,6 +262,19 @@ namespace MetalRaptors
         {
             foreach (var enemy in _enemies)
                 if (enemy != null) enemy.StandDown();
+        }
+
+        /// <summary>
+        /// An enemy fighter was destroyed. Clearing the last one wins the level — but only while
+        /// the player is still flying, so a plane shot down by that enemy's last burst still
+        /// crashes into a failure rather than a win.
+        /// </summary>
+        void OnEnemyDestroyed(EnemyController enemy)
+        {
+            _enemies.Remove(enemy);
+
+            if (!_gameOver && _enemies.Count == 0 && _cube != null && _cube.CurrentHealth > 0f)
+                WinLevel();
         }
 
         /// <summary>
@@ -427,7 +427,6 @@ namespace MetalRaptors
 
         void LateUpdate()
         {
-            if (_goal != null) _goal.Rotate(0f, 60f * Time.deltaTime, 0f, Space.World);
             if (_cam != null && _cubeTr != null) PositionCamera(instant: false);
             UpdateHealthHud();
         }
@@ -470,7 +469,9 @@ namespace MetalRaptors
             if (_shooter != null) _shooter.Stop();
         }
 
-        void OnReachedGoal()
+        /// <summary>The level was won — every enemy is down — so freeze the fight, unlock the
+        /// next level, and show the win overlay.</summary>
+        void WinLevel()
         {
             if (_gameOver) return;
             _gameOver = true;
@@ -530,7 +531,7 @@ namespace MetalRaptors
                 new Vector2(0, 420), new Vector2(1200, 50));
 
             UIFactory.CreateText(canvas.transform,
-                "A / D to steer  •  F to fire  •  reach the goal  •  don't hit the ground", 28,
+                "A / D to steer  •  F to fire  •  destroy the enemy  •  don't hit the ground", 28,
                 new Vector2(0, -500), new Vector2(1600, 50));
 
             BuildHealthBar(canvas.transform);
