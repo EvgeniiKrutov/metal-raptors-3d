@@ -18,13 +18,21 @@ namespace MetalRaptors
     /// The soft side boundaries steer it away from the world edges exactly like the player
     /// (shared <see cref="FlightSteering"/>), and the same hard ceiling applies. A world-space
     /// health bar hangs above the plane; at zero health the fighter explodes and is removed
-    /// from the map. Ramming is handled by <see cref="CubeController"/>, which destroys both.
+    /// from the map. Scraping another plane (the player or a wingman) nicks a little health off
+    /// both fighters rather than the old fatal ram — only the ground still downs it outright.
     /// </summary>
     [RequireComponent(typeof(Rigidbody))]
     public class EnemyController : MonoBehaviour, IDamageable
     {
         const float ShotVolume = 0.15f;          // half the player's 0.3 — quieter, and further away
         const float RecoverClimbAngleDeg = 70f;  // sibling RECOVER_CLIMB_ANGLE_DEG
+
+        // A plane-to-plane scrape (with the player or another fighter) nicks this much health off
+        // both planes instead of the old ram-kills-both. Planes no longer physically collide —
+        // LevelController disables their mutual collisions and detects the overlap itself — so the
+        // cooldown is what keeps one encounter (several frames of overlap) to a single hit.
+        const float CollisionDamage = 10f;
+        const float CollisionCooldown = 0.5f;
 
         // Health bar geometry (metres, world space).
         const float BarWidth = 36f;
@@ -67,6 +75,8 @@ namespace MetalRaptors
         float _flyWeaveT;
         float _flyBaseX;
         float _fireCooldown;
+        float _lastCollisionTime = -999f; // last plane-to-plane scrape, for the collision-damage debounce
+        ShakeEffect _shake;               // wobbles the visible model on a scrape; the body flies straight on
 
         GameObject _bulletTemplate;
         AudioSource _audio;
@@ -110,6 +120,7 @@ namespace MetalRaptors
             // The plane model hangs off this body, so its convex mesh collider (added by
             // LevelController.BuildPlaneModel) lives on a child, not on the body itself.
             _collider = GetComponentInChildren<Collider>();
+            _shake = GetComponentInChildren<ShakeEffect>(); // lives on the plane model child
             _bodyRadius = MeasureBodyRadius();
             _bulletTemplate = Bullet.BuildTemplate(Bullet.RoundColor); // same brass as the player's rounds
 
@@ -407,21 +418,25 @@ namespace MetalRaptors
         public void TakeDamage(float amount)
         {
             if (_dead) return;
-            CurrentHealth = Mathf.Max(0f, CurrentHealth - amount);
-            UpdateHealthBar();
+            ApplyDamage(amount);
 
-            if (CurrentHealth <= 0f)
-            {
-                Explode();
-                return;
-            }
-
-            // Sibling onDamaged: a hit knocks it out of Attack/Fly into the corkscrew evade.
-            if (_state == AiState.Attack || _state == AiState.Fly) EnterEvade();
+            // Sibling onDamaged: being *shot* knocks it out of Attack/Fly into the corkscrew
+            // evade. Only gunfire comes through TakeDamage; a plane scrape uses ApplyDamage
+            // directly, so it costs health without jolting the AI out of its run.
+            if (!_dead && (_state == AiState.Attack || _state == AiState.Fly)) EnterEvade();
         }
 
-        /// <summary>Destroys the fighter in a fireball and removes it from the map. Also called
-        /// by <see cref="CubeController"/> when the player rams it.</summary>
+        /// <summary>Subtracts health and refreshes the bar, exploding at zero. No AI reaction —
+        /// the caller decides whether the hit should also provoke an evade.</summary>
+        void ApplyDamage(float amount)
+        {
+            CurrentHealth = Mathf.Max(0f, CurrentHealth - amount);
+            UpdateHealthBar();
+            if (CurrentHealth <= 0f) Explode();
+        }
+
+        /// <summary>Destroys the fighter in a fireball and removes it from the map — reached at
+        /// zero health (gunfire or a plane scrape that empties the bar) or on a ground crash.</summary>
         public void Explode()
         {
             if (_dead) return;
@@ -439,11 +454,29 @@ namespace MetalRaptors
             // Bullets apply their damage via TakeDamage; the impact itself isn't a crash.
             if (collision.gameObject.GetComponent<Bullet>() != null) return;
 
-            // Ramming the player is the player's case: CubeController explodes both planes.
-            if (collision.gameObject.GetComponentInParent<CubeController>() != null) return;
-
-            // Anything else solid — the ground the AI failed to dodge, another fighter — kills it.
+            // Plane-to-plane contact never reaches here: LevelController disables collisions
+            // between planes and handles the scrape (damage + shake) via its own overlap check.
+            // The only solid thing left to hit is the ground the AI failed to dodge — which kills it.
             Explode();
+        }
+
+        /// <summary>
+        /// A plane-to-plane scrape, driven by <see cref="LevelController"/>'s overlap check: nick
+        /// off <see cref="CollisionDamage"/> and shiver the model, at most once per
+        /// <see cref="CollisionCooldown"/> so one encounter is one hit. Returns whether the hit
+        /// actually landed (false while on cooldown or already dead). Uses <see cref="ApplyDamage"/>
+        /// rather than <see cref="TakeDamage"/> so bumping the player is not treated as being shot —
+        /// the fighter keeps flying its current run instead of breaking into an evade.
+        /// </summary>
+        public bool Scrape()
+        {
+            if (_dead) return false;
+            if (Time.time - _lastCollisionTime < CollisionCooldown) return false;
+            _lastCollisionTime = Time.time;
+
+            ApplyDamage(CollisionDamage);
+            if (!_dead && _shake != null) _shake.Play();
+            return true;
         }
 
         // ---------------------------------------------------------------- health bar

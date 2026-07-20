@@ -37,13 +37,22 @@ namespace MetalRaptors
         const float FallExtraGravity = 20f;
         const float ExplosionSize = 60f; // matches the plane model's on-screen size
 
+        // A plane-to-plane scrape costs this much health (on both planes) instead of the old
+        // ram-kills-both. Planes no longer physically collide (LevelController turns off their
+        // mutual collisions and detects the overlap itself), so the cooldown is what keeps one
+        // encounter — which spans several frames of overlap — to a single hit.
+        const float CollisionDamage = 10f;
+        const float CollisionCooldown = 0.5f;
+
         PlayerConfig _config;
         Rigidbody _rb;
+        ShakeEffect _shake; // wobbles the visible model on a scrape; the body flies straight on
 
         float _heading;         // radians; +Y (up) = π/2
         float _angularVelocity; // radians/second, eased toward the desired rate
         bool _active;
         bool _falling;          // health hit zero: gravity owns the plane until it hits something
+        float _lastCollisionTime = -999f; // last plane-to-plane scrape, for the collision-damage debounce
 
         // World bounds, supplied by LevelController at spawn.
         float _minX, _maxX, _worldWidth, _ceilingY, _edgeMargin;
@@ -74,6 +83,8 @@ namespace MetalRaptors
             _rb.mass = Mathf.Max(0.0001f, config.mass);
             _rb.interpolation = RigidbodyInterpolation.Interpolate;
             _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+
+            _shake = GetComponentInChildren<ShakeEffect>(); // lives on the plane model child
 
             ApplyRotation();
             _active = true;
@@ -156,6 +167,26 @@ namespace MetalRaptors
         }
 
         /// <summary>
+        /// A plane-to-plane scrape, driven by <see cref="LevelController"/>'s overlap check: shave
+        /// off <see cref="CollisionDamage"/> and shiver the model, at most once per
+        /// <see cref="CollisionCooldown"/> so one encounter is one hit. Returns whether the hit
+        /// actually landed (false while on cooldown or already down), so the caller only shakes the
+        /// camera on a real player scrape.
+        /// </summary>
+        public bool Scrape()
+        {
+            if (!_active || _falling) return false;
+            if (Time.time - _lastCollisionTime < CollisionCooldown) return false;
+            _lastCollisionTime = Time.time;
+
+            TakeDamage(CollisionDamage);
+            if (_shake != null) _shake.Play();
+            // Cosmetic scrape feedback at the plane's position — collider-free, deals no damage.
+            Sparks.Spawn(transform.position, ExplosionSize);
+            return true;
+        }
+
+        /// <summary>
         /// Shot down: hand the plane to gravity. It keeps its forward momentum, tumbles about
         /// the view axis, and crashes for real on whatever it hits on the way down.
         /// </summary>
@@ -176,16 +207,12 @@ namespace MetalRaptors
             // Bullets are not a crash: they already applied their damage via TakeDamage.
             if (collision.gameObject.GetComponent<Bullet>() != null) return;
 
-            // Ramming an enemy destroys both planes in one fireball.
-            var enemy = collision.gameObject.GetComponentInParent<EnemyController>();
-            if (enemy != null)
-            {
-                Explosion.Spawn(transform.position, ExplosionSize);
-                enemy.Explode();
-                HideModel();
-                OnCrashed?.Invoke();
-                return;
-            }
+            // Brushing an enemy is a scrape, never a crash. Planes share a layer whose
+            // self-collisions are off (LevelController.DisablePlanePlaneCollisions), so a plane
+            // contact normally never reaches here — but swallow it if one slips through, so a brush
+            // can't fail the level. The scrape's damage, model shake and sparks come from
+            // LevelController.CheckPlaneScrapes; the only solid thing left to hit is the ground.
+            if (collision.gameObject.GetComponentInParent<EnemyController>() != null) return;
 
             // A shot-down plane goes up in flames when its fall ends.
             if (_falling)

@@ -188,8 +188,13 @@ namespace MetalRaptors
 
             if (!keepCollider)
             {
+                // DestroyImmediate, not Destroy: GameObject.CreatePrimitive attaches a collider,
+                // and a plain Destroy is deferred to end-of-frame — leaving the collider live for
+                // the rest of this frame. For decorative objects spawned on top of the player
+                // (e.g. scrape Sparks), that stray collider triggers a bogus collision before it's
+                // torn down. Removing it now guarantees the object never touches the physics step.
                 var col = go.GetComponent<Collider>();
-                if (col != null) UnityEngine.Object.Destroy(col);
+                if (col != null) UnityEngine.Object.DestroyImmediate(col);
             }
 
             var renderer = go.GetComponent<Renderer>();

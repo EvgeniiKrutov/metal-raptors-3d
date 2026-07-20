@@ -53,6 +53,24 @@ namespace MetalRaptors
         const float CubeScale = 30f;
         const float CubeHalf = CubeScale / 2f;
         const float PlaneScale = 60f;          // on-screen size (longest side) of the Fokker Dr.1 model
+
+        // Plane-to-plane scrape hitbox radius: far smaller than the model's 60 m span, so only a
+        // real fuselage overlap counts — a wingtip clipping a tail slips past untouched. Two planes
+        // scrape when their centres come within twice this (~30 m).
+        const float PlaneHitboxRadius = 15f;
+
+        // Dedicated physics layer for every plane's collider. Its self-collisions are switched off
+        // (DisablePlanePlaneCollisions) so two planes never physically hit — they pass cleanly
+        // through one another and the scrape is detected by distance in CheckPlaneScrapes, instead
+        // of the fragile per-pair Physics.IgnoreCollision that let a contact through and ram-exploded
+        // both planes. Any unused layer works: nothing in the project filters by layer, and
+        // plane-vs-ground and plane-vs-bullet stay on (those colliders live on the Default layer,
+        // which this layer still collides with).
+        const int PlaneLayer = 8;
+
+        // Camera kick on a player scrape: a short, decaying jitter of the follow position.
+        const float CamShakeMagnitude = 7f;   // metres of jitter at full strength
+        const float CamShakeDuration = 0.3f;  // seconds to decay back to steady
         const float ModelPitchDeg = -10f;       // cosmetic nose-down tilt of the model about the view axis
                                                // (visual only; the flight heading is driven by the parent)
         const float CameraDistance = 420f;     // camera sits this far back on -Z of the play plane
@@ -78,6 +96,9 @@ namespace MetalRaptors
 
         float _halfViewHeight;   // half the world height visible on screen (for camera clamping)
         bool _gameOver;
+        float _camShake;         // 1 -> 0 decaying camera-shake strength, kicked by a player scrape
+        Vector3 _camBasePos;     // un-shaken follow position, so the shake offset never feeds back into the smoothing
+        readonly List<EnemyController> _scrapeScratch = new List<EnemyController>(); // per-step live-enemy snapshot
 
         void Start()
         {
@@ -89,6 +110,7 @@ namespace MetalRaptors
             SpawnPlayer(config);
             SetupCamera();   // before SpawnEnemies: spawn points must be outside the camera view
             SpawnEnemies();
+            DisablePlanePlaneCollisions(); // planes pass through each other; scrapes are detected in FixedUpdate
             BuildHud();
         }
 
@@ -338,6 +360,7 @@ namespace MetalRaptors
 
             AddPlaneCollider(model.transform);
             StartPropeller(model.transform);
+            model.AddComponent<ShakeEffect>(); // scrape feedback: shivers the model, never the body
             return model.transform;
         }
 
@@ -378,6 +401,11 @@ namespace MetalRaptors
             var col = biggest.gameObject.AddComponent<MeshCollider>();
             col.sharedMesh = biggest.sharedMesh;
             col.convex = true;
+
+            // Put the plane's one collider on the plane layer, whose self-collisions are off, so it
+            // passes through other planes (scrape is detected in CheckPlaneScrapes) while still
+            // hitting the ground and bullets. See PlaneLayer / DisablePlanePlaneCollisions.
+            biggest.gameObject.layer = PlaneLayer;
         }
 
         /// <summary>
@@ -425,10 +453,81 @@ namespace MetalRaptors
 
         // ---------------------------------------------------------------- loop
 
+        void FixedUpdate()
+        {
+            if (_gameOver) return;
+            CheckPlaneScrapes();
+        }
+
         void LateUpdate()
         {
             if (_cam != null && _cubeTr != null) PositionCamera(instant: false);
+            if (_camShake > 0f) _camShake = Mathf.Max(0f, _camShake - Time.deltaTime / CamShakeDuration);
             UpdateHealthHud();
+        }
+
+        // ---------------------------------------------------------------- plane-to-plane scrapes
+
+        /// <summary>
+        /// Switches off physical collisions between planes by disabling self-collision on their
+        /// shared <see cref="PlaneLayer"/>, so they pass cleanly through one another instead of
+        /// jamming and juddering — two script-driven rigidbodies can never settle a contact,
+        /// because their velocity is overwritten every step. This filters in the physics broadphase,
+        /// so (unlike the per-pair Physics.IgnoreCollision it replaces) it can't be defeated by the
+        /// timing of runtime-created colliders — which is what was letting a contact through and
+        /// ram-exploding both planes. Ground and bullet collisions (Default layer) are untouched;
+        /// the scrape itself is detected in <see cref="CheckPlaneScrapes"/>.
+        /// </summary>
+        void DisablePlanePlaneCollisions()
+        {
+            Physics.IgnoreLayerCollision(PlaneLayer, PlaneLayer, true);
+        }
+
+        /// <summary>
+        /// Stands in for the physical plane-to-plane collisions we switched off: each physics step,
+        /// any two planes whose small fuselage hitboxes overlap take a scrape — a little damage and
+        /// a model shiver — and keep flying through each other. A scrape the player is part of also
+        /// kicks the camera. The play plane is flat (Z frozen), so the test is a plain 2D distance.
+        /// </summary>
+        void CheckPlaneScrapes()
+        {
+            float reach = PlaneHitboxRadius * 2f;
+            float reachSq = reach * reach;
+
+            // Snapshot the live enemies first: a scrape can drop one to zero health and pull it out
+            // of _enemies mid-check (via OnEnemyDestroyed), which would wreck a live iteration.
+            _scrapeScratch.Clear();
+            foreach (var enemy in _enemies)
+                if (enemy != null) _scrapeScratch.Add(enemy);
+
+            // Player against each enemy.
+            if (_cube != null && _cube.CurrentHealth > 0f && _cubeTr != null)
+            {
+                Vector2 playerPos = _cubeTr.position;
+                foreach (var enemy in _scrapeScratch)
+                {
+                    if (enemy == null) continue;
+                    if (((Vector2)enemy.transform.position - playerPos).sqrMagnitude > reachSq) continue;
+
+                    bool playerHit = _cube.Scrape();
+                    enemy.Scrape();
+                    if (playerHit) _camShake = 1f;
+                }
+            }
+
+            // Enemy against enemy (rare, but keeps the rule consistent — no camera kick).
+            for (int i = 0; i < _scrapeScratch.Count; i++)
+                for (int j = i + 1; j < _scrapeScratch.Count; j++)
+                {
+                    var a = _scrapeScratch[i];
+                    var b = _scrapeScratch[j];
+                    if (a == null || b == null) continue;
+                    if (((Vector2)a.transform.position - (Vector2)b.transform.position).sqrMagnitude > reachSq)
+                        continue;
+
+                    a.Scrape();
+                    b.Scrape();
+                }
         }
 
         void PositionCamera(bool instant)
@@ -443,21 +542,30 @@ namespace MetalRaptors
             float targetY = Mathf.Clamp(cubePos.y, minCamY, maxCamY);
 
             var target = new Vector3(cubePos.x, targetY, CamZ);
-            Vector3 cur = _cam.transform.position;
 
             if (instant)
             {
-                _cam.transform.position = target;
+                _camBasePos = target;
             }
             else
             {
-                // Smooth follow (matches the sibling's camera lerp feel).
+                // Smooth follow (matches the sibling's camera lerp feel). Smooth the un-shaken base
+                // so a scrape's jitter can't feed back into the follow and drift the framing.
                 float t = 1f - Mathf.Exp(-8f * Time.deltaTime);
-                _cam.transform.position = new Vector3(
-                    Mathf.Lerp(cur.x, target.x, t),
-                    Mathf.Lerp(cur.y, target.y, t),
+                _camBasePos = new Vector3(
+                    Mathf.Lerp(_camBasePos.x, target.x, t),
+                    Mathf.Lerp(_camBasePos.y, target.y, t),
                     CamZ);
             }
+
+            // Scrape shake: a short decaying jitter laid on top of the follow position.
+            Vector3 pos = _camBasePos;
+            if (_camShake > 0f)
+            {
+                Vector2 j = Random.insideUnitCircle * (CamShakeMagnitude * _camShake);
+                pos += new Vector3(j.x, j.y, 0f);
+            }
+            _cam.transform.position = pos;
         }
 
         // ---------------------------------------------------------------- outcomes
