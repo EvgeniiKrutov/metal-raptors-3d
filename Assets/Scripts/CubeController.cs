@@ -32,9 +32,17 @@ namespace MetalRaptors
         /// <summary>Full hit points, for the HUD's health bar.</summary>
         public float MaxHealth { get; private set; }
 
-        // Extra downward pull while shot down, on top of gravity, so the death dive
-        // doesn't take ages from high altitude.
-        const float FallExtraGravity = 20f;
+        // Gravity for the death dive. Unity's built-in 9.81 m/s² is tuned for a human-scale
+        // world; here a plane is ~60 units across in a 700 m arena, so real gravity reads as a
+        // slow, weightless drift. This is scaled up (~15× g) so a shot-down plane falls with the
+        // heft its mass implies — it commits to the ground fast instead of floating down.
+        const float FallGravity = 150f;
+        // A downward kick the instant the plane is hit, so the dive starts immediately with real
+        // vertical speed instead of easing in from zero while it sails forward on old momentum.
+        const float FallInitialDrop = 25f;
+        // How fast the leftover forward momentum bleeds off once falling, so the plane pitches into
+        // a dive rather than gliding sideways the whole way down.
+        const float FallHorizontalDrag = 1.5f;
         const float ExplosionSize = 60f; // matches the plane model's on-screen size
 
         // A plane-to-plane scrape costs this much health (on both planes) instead of the old
@@ -106,15 +114,19 @@ namespace MetalRaptors
         {
             if (!_active || _config == null) return;
 
+            float dt = Time.fixedDeltaTime;
+
             if (_falling)
             {
-                // Shot down: no steering, no thrust — just gravity (plus a little extra pull)
-                // carrying the leftover momentum down to the ground.
-                _rb.AddForce(Vector3.down * FallExtraGravity, ForceMode.Acceleration);
+                // Shot down: no steering, no thrust. A strong, scale-appropriate downward pull owns
+                // the plane so it plummets with weight, while the leftover forward momentum bleeds
+                // off — the plane tips into a dive instead of drifting sideways down to the ground.
+                Vector3 v = _rb.linearVelocity;
+                v.y -= FallGravity * dt;
+                v.x = Mathf.MoveTowards(v.x, 0f, Mathf.Abs(v.x) * FallHorizontalDrag * dt);
+                _rb.linearVelocity = v;
                 return;
             }
-
-            float dt = Time.fixedDeltaTime;
 
             // ---- Steering (sibling Plane.applyTurnRate) ----
             var kb = Keyboard.current;
@@ -195,7 +207,14 @@ namespace MetalRaptors
             _falling = true;
             OnShotDown?.Invoke();
 
-            _rb.useGravity = true;
+            // FixedUpdate drives the fall by hand with FallGravity, so keep Unity's built-in
+            // (human-scale, too-gentle) gravity off — we don't want both.
+            _rb.useGravity = false;
+            // Kick the nose down straight away so the dive reads as a fall, not a glide: the plane
+            // starts dropping the instant it's hit instead of coasting on its cruise momentum.
+            Vector3 v = _rb.linearVelocity;
+            v.y -= FallInitialDrop;
+            _rb.linearVelocity = v;
             _rb.angularVelocity = new Vector3(0f, 0f,
                 (UnityEngine.Random.value < 0.5f ? -1f : 1f) * 2.5f);
         }
