@@ -32,10 +32,15 @@ namespace MetalRaptors
         /// <summary>Full hit points, for the HUD's health bar.</summary>
         public float MaxHealth { get; private set; }
 
-        // Gravity for the death dive. Unity's built-in 9.81 m/s² is tuned for a human-scale
-        // world; here a plane is ~60 units across in a 700 m arena, so real gravity reads as a
-        // slow, weightless drift. This is scaled up (~15× g) so a shot-down plane falls with the
-        // heft its mass implies — it commits to the ground fast instead of floating down.
+        // Gravity magnitude (m/s² downward) for the death dive. Unity's built-in 9.81 is tuned for
+        // a human-scale world; here a plane is ~60 units across in a 700 m arena, so real gravity
+        // reads as a slow, weightless drift. This is scaled up (~15× g) so a shot-down plane falls
+        // with the heft its mass implies — it commits to the ground fast instead of floating down.
+        // Applied through Unity's own rigidbody gravity (BeginFall sets Physics.gravity to this and
+        // switches useGravity on), so the fall is real accelerating projectile motion, not a
+        // hand-stepped velocity edit. Only the shot-down player ever uses gravity — every plane
+        // spawns with useGravity off and enemies explode outright rather than fall — so overriding
+        // the global Physics.gravity here affects nothing else in the scene.
         const float FallGravity = 150f;
         // A downward kick the instant the plane is hit, so the dive starts immediately with real
         // vertical speed instead of easing in from zero while it sails forward on old momentum.
@@ -118,11 +123,11 @@ namespace MetalRaptors
 
             if (_falling)
             {
-                // Shot down: no steering, no thrust. A strong, scale-appropriate downward pull owns
-                // the plane so it plummets with weight, while the leftover forward momentum bleeds
-                // off — the plane tips into a dive instead of drifting sideways down to the ground.
+                // Shot down: no steering, no thrust — Unity's rigidbody gravity (switched on in
+                // BeginFall, scaled to FallGravity) owns the vertical fall, accelerating the plane
+                // downward as real projectile motion. All we do here is bleed off the leftover
+                // forward momentum so the plane tips into a dive instead of gliding sideways down.
                 Vector3 v = _rb.linearVelocity;
-                v.y -= FallGravity * dt;
                 v.x = Mathf.MoveTowards(v.x, 0f, Mathf.Abs(v.x) * FallHorizontalDrag * dt);
                 _rb.linearVelocity = v;
                 return;
@@ -207,9 +212,13 @@ namespace MetalRaptors
             _falling = true;
             OnShotDown?.Invoke();
 
-            // FixedUpdate drives the fall by hand with FallGravity, so keep Unity's built-in
-            // (human-scale, too-gentle) gravity off — we don't want both.
-            _rb.useGravity = false;
+            // Hand the plane to Unity's real rigidbody gravity for the dive, but at the arena's
+            // scale: 9.81 reads as a weightless drift here, so override Physics.gravity to the
+            // tuned FallGravity magnitude (straight down) and switch gravity on. From here the
+            // engine accelerates the fall as genuine projectile motion; FixedUpdate only bleeds the
+            // forward momentum. Safe to set globally — nothing else in the scene uses gravity.
+            Physics.gravity = new Vector3(0f, -FallGravity, 0f);
+            _rb.useGravity = true;
             // Kick the nose down straight away so the dive reads as a fall, not a glide: the plane
             // starts dropping the instant it's hit instead of coasting on its cruise momentum.
             Vector3 v = _rb.linearVelocity;

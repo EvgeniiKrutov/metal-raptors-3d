@@ -52,7 +52,8 @@ namespace MetalRaptors
 
         const float CubeScale = 30f;
         const float CubeHalf = CubeScale / 2f;
-        const float PlaneScale = 60f;          // on-screen size (longest side) of the Fokker Dr.1 model
+        const float PlaneScale = 60f;          // enemy plane on-screen size, for the enemy ceiling clamp
+                                               // (per-plane size otherwise lives in PlaneModelConfig)
 
         // Plane-to-plane scrape hitbox radius: far smaller than the model's 60 m span, so only a
         // real fuselage overlap counts — a wingtip clipping a tail slips past untouched. Two planes
@@ -171,7 +172,7 @@ namespace MetalRaptors
         void SpawnPlayer(PlayerConfig config)
         {
             // The physics body is a bare GameObject that CubeController yaws to the heading each
-            // frame (it writes transform.rotation directly). The visible Fokker Dr.1 hangs off it
+            // frame (it writes transform.rotation directly). The visible Sopwith Camel hangs off it
             // as a child so the plane's own orientation (the +90° X stand-up fix, see below)
             // composes with the heading instead of being overwritten.
             var go = new GameObject("PlayerPlane");
@@ -179,7 +180,9 @@ namespace MetalRaptors
             // starts at the left edge without being immediately steered back toward the centre.
             go.transform.position = new Vector3(MinX + EdgeMargin, 150f, PlayPlaneZ);
 
-            var plane = BuildPlaneModel(go.transform);
+            // The player flies the Sopwith Camel (the enemies keep the Fokker Dr.1, see SpawnEnemies).
+            var planeModel = PlaneModels.Sopwith;
+            var plane = BuildPlaneModel(go.transform, planeModel);
 
             _cube = go.AddComponent<CubeController>();
             _cubeTr = go.transform;
@@ -189,7 +192,7 @@ namespace MetalRaptors
             // Start heading straight to the right (velocity +X => angle 0), ceiling clamped for the plane's size.
             _cube.Initialize(config, 0f, MinX, MaxX, WorldTop - CubeHalf, EdgeMargin);
 
-            SetupGuns(config, go, plane);
+            SetupGuns(config, go, plane, planeModel);
         }
 
         /// <summary>
@@ -198,14 +201,14 @@ namespace MetalRaptors
         /// the model has no gun nodes, so the offset is derived from the prop's bounds), plus a
         /// <see cref="PlaneShooter"/> that fires from it while F is held.
         /// </summary>
-        void SetupGuns(PlayerConfig config, GameObject body, Transform model)
+        void SetupGuns(PlayerConfig config, GameObject body, Transform model, PlaneModelConfig plane)
         {
             const float MuzzleClearance = 2f;    // ahead of the prop disc, so rounds spawn clear of it
             const float GunHeightAboveHub = 2.5f; // Spandaus sit on the cowling above the hub
 
             // At spawn the body's heading is 0 (identity rotation), so world offsets from the
             // body can be stored directly as the muzzle's local position.
-            Transform prop = FindDeep(model, "propBlades") ?? FindDeep(model, "propPivot") ?? model;
+            Transform prop = FindDeep(model, plane.propBladesNode) ?? FindDeep(model, plane.propPivotNode) ?? model;
             var renderers = prop.GetComponentsInChildren<Renderer>();
             Bounds bounds = renderers.Length > 0
                 ? renderers[0].bounds
@@ -246,7 +249,7 @@ namespace MetalRaptors
                 // because the enemies attack from the right and mostly fly left (see BuildPlaneModel).
                 var go = new GameObject("Enemy");
                 go.transform.position = RandomEnemySpawn(aiGroundY);
-                BuildPlaneModel(go.transform, mirrored: true);
+                BuildPlaneModel(go.transform, PlaneModels.Fokker, mirrored: true);
 
                 var enemy = go.AddComponent<EnemyController>();
                 enemy.Initialize(_enemyConfig, playerBody,
@@ -300,20 +303,25 @@ namespace MetalRaptors
         }
 
         /// <summary>
-        /// Instantiates the Fokker Dr.1 model under <paramref name="parent"/> (the physics body):
-        /// tips it upright with a +90° rotation about X, scales it to the plane's on-screen size,
-        /// gives it a tight convex mesh collider so ground crashes and the goal trigger still fire,
-        /// turns on shadow casting, and starts the propeller spinning. Pass
-        /// <paramref name="mirrored"/> for the enemy plane, which flies left instead of right.
+        /// Instantiates the aircraft model described by <paramref name="plane"/> under
+        /// <paramref name="parent"/> (the physics body): tips it upright per the config's
+        /// stand-up rotation, scales it to the config's on-screen size, gives it a tight convex
+        /// mesh collider so ground crashes and the goal trigger still fire, turns on shadow casting,
+        /// and starts the propeller spinning. Pass <paramref name="mirrored"/> for the enemy plane,
+        /// which flies left instead of right.
+        ///
+        /// Everything model-specific (which FBX, its rest orientation, its size, its propeller node
+        /// names) comes from <paramref name="plane"/>, so a new aircraft is a new
+        /// <see cref="PlaneModelConfig"/> entry rather than an edit here.
         /// </summary>
-        Transform BuildPlaneModel(Transform parent, bool mirrored = false)
+        Transform BuildPlaneModel(Transform parent, PlaneModelConfig plane, bool mirrored = false)
         {
-            var prefab = Resources.Load<GameObject>("fokker_dr1");
+            var prefab = Resources.Load<GameObject>(plane.resourceName);
             if (prefab == null)
             {
                 // Should never happen once the FBX is under Resources; fall back to a cube so the
                 // level is still playable rather than crashing on a null model.
-                Debug.LogError("LevelController: fokker_dr1 model not found in Resources.");
+                Debug.LogError($"LevelController: {plane.resourceName} model not found in Resources.");
                 var fallback = UIFactory.CreatePrimitive3D(PrimitiveType.Cube,
                     Vector3.zero, Vector3.one * CubeScale, Color.white);
                 fallback.transform.SetParent(parent, false);
@@ -321,37 +329,37 @@ namespace MetalRaptors
             }
 
             var model = Instantiate(prefab);
-            model.name = mirrored ? "FokkerDr1 (enemy)" : "FokkerDr1";
+            model.name = mirrored ? $"{plane.resourceName} (enemy)" : plane.resourceName;
             model.transform.SetParent(parent, false);
 
-            // "Rotate the whole model in X axis first by 90 degrees" — the model is exported
-            // lying flat, so stand it up before anything else touches its orientation. The -90° yaw
-            // about Y swings the nose to point along the heading direction: a plain +90° puts a wing
-            // forward, and the opposite 180° from there leaves the tail forward, so -90° is the one
-            // that leads with the nose. The extra 180° roll about the nose (X, the heading/flight
-            // axis) flips the plane wheels-down instead of wheels-up.
+            // The model is exported lying flat, so stand it up before anything else touches its
+            // orientation. plane.standUpEuler does that per-model: for the Fokker it's (90, -90, 0)
+            // — +90° X tips it upright, -90° Y swings the nose to lead along the heading (a plain
+            // +90° puts a wing forward, the opposite 180° leaves the tail forward). The extra 180°
+            // roll about the nose (X, the heading/flight axis) flips the plane wheels-down instead
+            // of wheels-up, when the config asks for it.
             //
             // The enemy is the mirror image: it attacks from the right and flies LEFT, and a heading
             // of ~180° is a 180° spin about the view axis — which would leave a right-upright plane
             // belly-up. So for the enemy we DROP that wheels-down roll (leaving it belly-up at
             // heading 0), and the parent's 180° heading spin then lands it belly-down and upright
             // while flying left. The cosmetic nose pitch is flipped to match, so the nose still dips
-            // toward the flight direction. (The Dr.1 is left-right symmetric, so this reads as a true
-            // mirror without the inside-out normals a negative scale would cause.)
+            // toward the flight direction. (These planes are left-right symmetric, so this reads as a
+            // true mirror without the inside-out normals a negative scale would cause.)
             //
             // The outer Z rotation (the camera's view axis, the plane's pitch axis on screen) drops
             // the nose down a touch. It's applied to the model only, so it's purely visual — the
             // flight direction comes from the parent's heading and is unaffected.
-            Quaternion wheelsDown = mirrored ? Quaternion.identity : Quaternion.Euler(180f, 0f, 0f);
+            Quaternion wheelsDown = (plane.rollWheelsDown && !mirrored)
+                ? Quaternion.Euler(180f, 0f, 0f) : Quaternion.identity;
             float pitch = mirrored ? -ModelPitchDeg : ModelPitchDeg;
             model.transform.localRotation = Quaternion.Euler(0f, 0f, pitch)
                                           * wheelsDown
-                                          * Quaternion.Euler(90f, -90f, 0f);
+                                          * Quaternion.Euler(plane.standUpEuler);
 
-            // Scale the model down to roughly the old cube's on-screen size (~45 m across its
-            // longest side), measured from its combined renderer bounds so we don't depend on the
-            // FBX's own unit scale.
-            NormalizeSize(model.transform, PlaneScale);
+            // Scale the model down to the config's on-screen size, measured from its combined
+            // renderer bounds so we don't depend on the FBX's own unit scale.
+            NormalizeSize(model.transform, plane.onScreenSize);
 
             // Cast a shadow onto the terrain/ground below, matching the old cube (ConfigureShadows
             // extends the shadow distance so it actually shows at this camera depth).
@@ -359,7 +367,7 @@ namespace MetalRaptors
                 r.shadowCastingMode = ShadowCastingMode.On;
 
             AddPlaneCollider(model.transform);
-            StartPropeller(model.transform);
+            StartPropeller(model.transform, plane);
             model.AddComponent<ShakeEffect>(); // scrape feedback: shivers the model, never the body
             return model.transform;
         }
@@ -409,13 +417,13 @@ namespace MetalRaptors
         }
 
         /// <summary>
-        /// Finds the propeller pivot (<c>propPivot</c>, parent of <c>propBlades</c>) and attaches
-        /// <see cref="PropellerSpin"/> so the blades turn. Falls back to the blades themselves if
-        /// the pivot node is missing, so the animation runs either way.
+        /// Finds the propeller pivot node (parent of the blades) named by the config and attaches
+        /// <see cref="PropellerSpin"/> so the blades turn. Falls back to the blades node itself if
+        /// the pivot is missing, so the animation runs either way.
         /// </summary>
-        void StartPropeller(Transform model)
+        void StartPropeller(Transform model, PlaneModelConfig plane)
         {
-            Transform spinner = FindDeep(model, "propPivot") ?? FindDeep(model, "propBlades");
+            Transform spinner = FindDeep(model, plane.propPivotNode) ?? FindDeep(model, plane.propBladesNode);
             if (spinner != null) spinner.gameObject.AddComponent<PropellerSpin>();
             else Debug.LogWarning("LevelController: propeller node not found on the plane model.");
         }
