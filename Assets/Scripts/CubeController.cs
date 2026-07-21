@@ -57,9 +57,14 @@ namespace MetalRaptors
         const float CollisionDamage = 10f;
         const float CollisionCooldown = 0.5f;
 
+        // Below this much health the plane starts trailing damage smoke (see SmokeTrail). Same
+        // threshold for the player and the enemy fighters, so both start smoking when badly hurt.
+        const float SmokeHealthThreshold = 30f;
+
         PlayerConfig _config;
         Rigidbody _rb;
         ShakeEffect _shake; // wobbles the visible model on a scrape; the body flies straight on
+        SmokeTrail _smoke;  // damage smoke, armed once health drops below the danger threshold
 
         float _heading;         // radians; +Y (up) = π/2
         float _angularVelocity; // radians/second, eased toward the desired rate
@@ -98,6 +103,7 @@ namespace MetalRaptors
             _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
 
             _shake = GetComponentInChildren<ShakeEffect>(); // lives on the plane model child
+            _smoke = gameObject.AddComponent<SmokeTrail>();  // dormant until armed by low health
 
             ApplyRotation();
             _active = true;
@@ -180,6 +186,10 @@ namespace MetalRaptors
         {
             if (!_active || _falling) return;
             CurrentHealth = Mathf.Max(0f, CurrentHealth - amount);
+            // Badly hurt: start trailing smoke (SmokeTrail.Arm is idempotent, so it's safe to call
+            // on every further hit). ExplosionSize is the plane's on-screen size, so the smoke
+            // scales to the model.
+            if (CurrentHealth < SmokeHealthThreshold && _smoke != null) _smoke.Arm(ExplosionSize);
             if (CurrentHealth <= 0f) BeginFall();
         }
 
@@ -256,6 +266,10 @@ namespace MetalRaptors
         /// survives so the camera's follow target stays valid).</summary>
         void HideModel()
         {
+            // Sweep up the trailing smoke too: the emitter lives on the body (which survives) and its
+            // puffs are un-parented world-space objects, so hiding the child model wouldn't reach them.
+            if (_smoke != null) _smoke.Clear();
+
             foreach (Transform child in transform)
                 child.gameObject.SetActive(false);
         }

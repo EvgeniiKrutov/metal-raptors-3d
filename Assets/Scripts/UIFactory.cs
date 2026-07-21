@@ -214,5 +214,25 @@ namespace MetalRaptors
 
             return go;
         }
+
+        /// <summary>
+        /// Switches a URP/Lit material into transparent (alpha-blended) surface mode so the
+        /// <c>_BaseColor</c>'s alpha actually shows — the default surface is opaque and ignores it.
+        /// Used by cosmetic effects like the smoke trail that need to draw see-through. Flips the
+        /// Surface, blend, ZWrite and render-queue settings the URP shader keys off, exactly as the
+        /// material inspector's Surface Type = Transparent dropdown would.
+        /// </summary>
+        public static void MakeTransparent(Material mat)
+        {
+            if (mat == null) return;
+            mat.SetFloat("_Surface", 1f); // 0 = Opaque, 1 = Transparent
+            mat.SetFloat("_Blend", 0f);   // 0 = Alpha blend
+            mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            mat.SetFloat("_ZWrite", 0f);
+            mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            mat.DisableKeyword("_ALPHATEST_ON");
+            mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+        }
     }
 }

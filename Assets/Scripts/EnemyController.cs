@@ -34,6 +34,10 @@ namespace MetalRaptors
         const float CollisionDamage = 10f;
         const float CollisionCooldown = 0.5f;
 
+        // Below this much health the fighter starts trailing damage smoke (see SmokeTrail). Same
+        // threshold the player uses (CubeController.SmokeHealthThreshold), so both smoke when hurt.
+        const float SmokeHealthThreshold = 30f;
+
         // Health bar geometry (metres, world space).
         const float BarWidth = 36f;
         const float BarHeight = 3.2f;
@@ -77,6 +81,7 @@ namespace MetalRaptors
         float _fireCooldown;
         float _lastCollisionTime = -999f; // last plane-to-plane scrape, for the collision-damage debounce
         ShakeEffect _shake;               // wobbles the visible model on a scrape; the body flies straight on
+        SmokeTrail _smoke;                // damage smoke, armed once health drops below the danger threshold
 
         GameObject _bulletTemplate;
         AudioSource _audio;
@@ -122,6 +127,7 @@ namespace MetalRaptors
             _collider = GetComponentInChildren<Collider>();
             _shake = GetComponentInChildren<ShakeEffect>(); // lives on the plane model child
             _bodyRadius = MeasureBodyRadius();
+            _smoke = gameObject.AddComponent<SmokeTrail>();  // dormant until armed by low health
             _bulletTemplate = Bullet.BuildTemplate(Bullet.RoundColor); // same brass as the player's rounds
 
             _shotClip = Resources.Load<AudioClip>("Sounds/bullet_shot_1");
@@ -432,6 +438,9 @@ namespace MetalRaptors
         {
             CurrentHealth = Mathf.Max(0f, CurrentHealth - amount);
             UpdateHealthBar();
+            // Badly hurt: start trailing smoke (Arm is idempotent, so calling it on every further
+            // hit is fine). The model's on-screen size is twice its radius, so smoke scales to it.
+            if (CurrentHealth < SmokeHealthThreshold && _smoke != null) _smoke.Arm(_bodyRadius * 2f);
             if (CurrentHealth <= 0f) Explode();
         }
 
@@ -443,6 +452,7 @@ namespace MetalRaptors
             _dead = true;
 
             Explosion.Spawn(transform.position, _bodyRadius > 0f ? _bodyRadius * 2f : 30f);
+            if (_smoke != null) _smoke.Clear(); // sweep up the trailing smoke as the fighter blows up
             OnDestroyed?.Invoke(this);
             Destroy(gameObject); // OnDestroy takes the health bar with it
         }
