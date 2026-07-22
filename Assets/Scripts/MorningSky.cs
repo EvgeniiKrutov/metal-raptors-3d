@@ -40,8 +40,13 @@ namespace MetalRaptors
         static readonly Quaternion SunLightRotation = Quaternion.Euler(30f, -17f, 0f);
         const float SunLightIntensity = 1.25f;
 
-        /// <summary>Applies the whole look to the scene rendered by <paramref name="cam"/>.</summary>
-        public static void Apply(Camera cam)
+        /// <summary>
+        /// Applies the whole look to the scene rendered by <paramref name="cam"/>.
+        /// <paramref name="weather"/> is the seam where weather will modulate this atmosphere
+        /// (thicker haze, dimmer sun, harder wind on the grass); <see cref="Weather.Calm"/> is
+        /// the identity and changes nothing.
+        /// </summary>
+        public static void Apply(Camera cam, Weather weather)
         {
             BuildSkybox(cam);
             TuneSunLight();

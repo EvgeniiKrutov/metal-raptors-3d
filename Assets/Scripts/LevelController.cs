@@ -8,43 +8,44 @@ using UnityEngine.UI;
 namespace MetalRaptors
 {
     /// <summary>
-    /// Shared controller for the playable "Air Fights" levels (Level 1, Level 2). The scene
-    /// sets <see cref="levelNumber"/> in the inspector so one script serves both.
+    /// Shared controller — and composer — for the playable "Air Fights" levels. The scene sets
+    /// only <see cref="levelNumber"/> in the inspector; everything else about the level comes
+    /// from its <see cref="LevelDefinition"/> in the <see cref="Levels"/> registry, composed
+    /// from parts: the terrain to build, the daytime sky to fly under, the weather (calm-only
+    /// for now), and the enemy roster to spawn.
     ///
-    /// Builds a worldWidth x 700 m flight arena at runtime: ground at the bottom (either the
-    /// flat placeholder slab or the procedural Verdun-style land, see
+    /// Builds the definition's width x 700 m flight arena at runtime: ground at the bottom (the
+    /// flat placeholder slab or the procedural Verdun-style land, per the terrain part — see
     /// <see cref="ProceduralTerrain"/>), a hard ceiling at the top, and soft boundaries on the
     /// sides that steer the cube back toward the middle. The player cube (coloured by the Garage
     /// selection) flies with the sibling repo's physics via <see cref="CubeController"/>. A
     /// perspective camera follows the cube, giving a 2.5D platformer feel. Touching the ground
     /// fails the level; the level is won by shooting down every enemy fighter.
-    /// <see cref="enemyCount"/> enemy fighters (see <see cref="EnemyController"/>) spawn at
+    /// The roster's enemy fighters (see <see cref="EnemyController"/>) spawn at
     /// random spots outside the camera and hunt the player; their fire wears down the health
     /// shown on the HUD, and at zero the plane falls out of the sky.
     /// </summary>
     public class LevelController : MonoBehaviour
     {
-        [Tooltip("Which level this scene represents (1 for Level1, 2 for Level2, ...).")]
+        [Tooltip("Which level this scene represents (1 for Level1, 2 for Level2, ...). " +
+                 "Everything else — terrain, daytime, weather, enemies — comes from this " +
+                 "level's definition in the Levels registry.")]
         [SerializeField] int levelNumber = 1;
 
-        [Tooltip("Playable width of the arena in metres (the soft-boundary span).")]
-        [SerializeField] float worldWidth = 1500f;
-
-        [Tooltip("Replace the flat placeholder ground with the procedurally generated terrain.")]
-        [SerializeField] bool proceduralTerrain;
-
-        [Tooltip("Seed for the procedural terrain; the same seed always builds the same land.")]
-        [SerializeField] int terrainSeed = 1916;
-
-        [Tooltip("How many enemy fighters patrol this level; set per scene to tune difficulty.")]
-        [SerializeField] int enemyCount = 1;
+        // The parts this level is composed from, resolved from Levels in Start.
+        LevelDefinition _level;
 
         // ---- World geometry (metres). X is centred on 0; Y runs from the ground up. ----
         const float WorldHeight = 700f;
         const float GroundY = 0f;              // top surface of the flat ground
         const float WorldTop = WorldHeight;    //  700, the hard ceiling
-        float MinX => -worldWidth / 2f;
-        float MaxX => worldWidth / 2f;
+        float WorldWidth => _level.terrain.width;
+        float MinX => -WorldWidth / 2f;
+        float MaxX => WorldWidth / 2f;
+
+        // Whether this level flies over the procedural Verdun land (as opposed to the flat
+        // slab) — the land whose height field, camera reveal and atmosphere need special care.
+        bool VerdunLand => _level.terrain.kind == TerrainKind.Verdun;
 
         // Width of the soft-boundary band inside each side edge. Once the cube noses into this
         // band heading toward the edge, it is steered back toward the centre (see CubeController).
@@ -52,8 +53,6 @@ namespace MetalRaptors
 
         const float CubeScale = 30f;
         const float CubeHalf = CubeScale / 2f;
-        const float PlaneScale = 60f;          // enemy plane on-screen size, for the enemy ceiling clamp
-                                               // (per-plane size otherwise lives in PlaneModelConfig)
 
         // Plane-to-plane scrape hitbox radius: far smaller than the model's 60 m span, so only a
         // real fuselage overlap counts — a wingtip clipping a tail slips past untouched. Two planes
@@ -103,6 +102,8 @@ namespace MetalRaptors
 
         void Start()
         {
+            _level = Levels.ForNumber(levelNumber);
+
             var config = Resources.Load<PlayerConfig>("PlayerConfig");
             if (config == null) config = ScriptableObject.CreateInstance<PlayerConfig>(); // safety fallback
 
@@ -136,26 +137,29 @@ namespace MetalRaptors
 
         void BuildWorld()
         {
-            if (proceduralTerrain)
+            if (VerdunLand)
             {
-                // Verdun-style land; its TerrainCollider drives the fail on contact.
-                ProceduralTerrain.Build(terrainSeed, worldWidth, CameraDistance, PlayPlaneZ);
+                // Verdun-style land; its TerrainCollider drives the fail on contact. Weather
+                // rides along so the land's atmosphere (fog, grass wind) can follow it later.
+                ProceduralTerrain.Build(_level.terrain.seed, WorldWidth,
+                    CameraDistance, PlayPlaneZ, _level.daytime, _level.weather);
             }
             else
             {
                 // Solid flat ground at the bottom (its collider drives the fail on contact).
                 UIFactory.CreatePrimitive3D(PrimitiveType.Cube,
                     new Vector3(0f, GroundY - 10f, 0f),
-                    new Vector3(worldWidth + 200f, 20f, 400f),
+                    new Vector3(WorldWidth + 200f, 20f, 400f),
                     new Color(0.20f, 0.22f, 0.16f));
 
                 // Backdrop wall a little behind the play plane. The main light shines into +Z,
-                // so it projects the cube's silhouette onto this wall, giving Level 1 a clearly
-                // visible drop-shadow. Purely visual: it receives shadows but casts none and has
-                // no collider (the camera looks straight down +Z, so it never occludes the cube).
+                // so it projects the cube's silhouette onto this wall, giving the slab levels a
+                // clearly visible drop-shadow. Purely visual: it receives shadows but casts none
+                // and has no collider (the camera looks straight down +Z, so it never occludes
+                // the cube).
                 var backdrop = UIFactory.CreatePrimitive3D(PrimitiveType.Cube,
                     new Vector3(0f, WorldHeight / 2f, BackdropZ),
-                    new Vector3(worldWidth + 400f, WorldHeight + 200f, 10f),
+                    new Vector3(WorldWidth + 400f, WorldHeight + 200f, 10f),
                     new Color(0.16f, 0.17f, 0.20f), keepCollider: false);
                 var backdropRenderer = backdrop.GetComponent<Renderer>();
                 if (backdropRenderer != null)
@@ -165,7 +169,7 @@ namespace MetalRaptors
             // Ceiling bar (visual only) so the player can see the hard cap.
             UIFactory.CreatePrimitive3D(PrimitiveType.Cube,
                 new Vector3(0f, WorldTop, PlayPlaneZ),
-                new Vector3(worldWidth + 200f, 8f, 60f),
+                new Vector3(WorldWidth + 200f, 8f, 60f),
                 new Color(0.55f, 0.6f, 0.7f), emissive: true, keepCollider: false);
         }
 
@@ -229,8 +233,9 @@ namespace MetalRaptors
         // ---------------------------------------------------------------- enemies
 
         /// <summary>
-        /// Spawns <see cref="enemyCount"/> enemy fighters at random positions outside the
-        /// camera view, wired to the same world bounds the player flies in.
+        /// Spawns the definition's enemy roster — each <see cref="EnemyGroup"/>'s count of its
+        /// aircraft — at random positions outside the camera view, wired to the same world
+        /// bounds the player flies in.
         /// </summary>
         void SpawnEnemies()
         {
@@ -240,23 +245,25 @@ namespace MetalRaptors
             var playerBody = _cube.GetComponent<Rigidbody>();
             // The AI measures altitude from the terrain's highest crest, so its ground
             // margins hold over every hill; the flat slab's top is simply GroundY.
-            float aiGroundY = proceduralTerrain ? ProceduralTerrain.MaxHeight : GroundY;
+            float aiGroundY = VerdunLand ? ProceduralTerrain.MaxHeight : GroundY;
 
-            for (int i = 0; i < enemyCount; i++)
-            {
-                // Same bare-body-plus-model rig as the player: a physics body the EnemyController
-                // yaws to the heading, carrying the Fokker Dr.1 as a child. The model is mirrored
-                // because the enemies attack from the right and mostly fly left (see BuildPlaneModel).
-                var go = new GameObject("Enemy");
-                go.transform.position = RandomEnemySpawn(aiGroundY);
-                BuildPlaneModel(go.transform, PlaneModels.Fokker, mirrored: true);
+            foreach (var group in _level.enemies)
+                for (int i = 0; i < group.count; i++)
+                {
+                    // Same bare-body-plus-model rig as the player: a physics body the
+                    // EnemyController yaws to the heading, carrying the group's aircraft as a
+                    // child. The model is mirrored because the enemies attack from the right
+                    // and mostly fly left (see BuildPlaneModel).
+                    var go = new GameObject("Enemy");
+                    go.transform.position = RandomEnemySpawn(aiGroundY);
+                    BuildPlaneModel(go.transform, group.plane, mirrored: true);
 
-                var enemy = go.AddComponent<EnemyController>();
-                enemy.Initialize(_enemyConfig, playerBody,
-                    MinX, MaxX, aiGroundY, WorldTop - PlaneScale / 2f, EdgeMargin);
-                enemy.OnDestroyed += OnEnemyDestroyed;
-                _enemies.Add(enemy);
-            }
+                    var enemy = go.AddComponent<EnemyController>();
+                    enemy.Initialize(_enemyConfig, playerBody,
+                        MinX, MaxX, aiGroundY, WorldTop - group.plane.onScreenSize / 2f, EdgeMargin);
+                    enemy.OnDestroyed += OnEnemyDestroyed;
+                    _enemies.Add(enemy);
+                }
         }
 
         /// <summary>
@@ -444,12 +451,14 @@ namespace MetalRaptors
             _cam.orthographic = false; // perspective, per the chosen 2.5D look
             _cam.transform.rotation = Quaternion.identity; // look straight down +Z at the play plane
 
-            if (proceduralTerrain)
+            if (VerdunLand)
             {
-                // Foggy-morning-sun atmosphere: gradient skybox with a low glowing sun over
-                // the terrain's fogged far edge, warm key light, cool ambient, and post FX.
-                // Draw distance must still reach that far edge.
-                MorningSky.Apply(_cam);
+                // The level's chosen atmosphere: gradient skybox, key light, ambient and post
+                // FX (the fog was already built to match in ProceduralTerrain.Build). Weather
+                // rides along as the future modulation seam (Calm changes nothing). Draw
+                // distance must still reach the terrain's fogged far edge.
+                if (_level.daytime == Daytime.Midday) MiddaySky.Apply(_cam, _level.weather);
+                else MorningSky.Apply(_cam, _level.weather);
                 _cam.farClipPlane = 2200f;
             }
 
@@ -544,7 +553,7 @@ namespace MetalRaptors
 
             // Clamp Y so the view never shows past the ground or the ceiling. With terrain,
             // the camera may sink low enough to reveal the dirt cut below the surface line.
-            float minCamY = (proceduralTerrain ? ProceduralTerrain.CutRevealY : GroundY) + _halfViewHeight;
+            float minCamY = (VerdunLand ? ProceduralTerrain.CutRevealY : GroundY) + _halfViewHeight;
             float maxCamY = WorldTop - _halfViewHeight;
             if (minCamY > maxCamY) minCamY = maxCamY = (GroundY + WorldTop) * 0.5f;
             float targetY = Mathf.Clamp(cubePos.y, minCamY, maxCamY);
