@@ -22,7 +22,9 @@ namespace MetalRaptors
     public static class ProceduralTerrain
     {
         // ---- Land shape (metres) ----
-        public const float Depth = 520f;       // how far the land runs toward the horizon (+Z)
+        public const float Depth = 800f;       // how far the land runs toward the horizon (+Z);
+                                               // deep enough that the fog (below) saturates long
+                                               // before the far edge, so the edge is never seen
         const float HeightScale = 90f;         // terrain-data vertical range (heights are 0..1 of this)
         const float BaseLevel = 30f;           // mean ground height the hills undulate around
         const float MinHeight = 4f;            // never carve below this (keeps dirt above the wall's UVs)
@@ -54,10 +56,10 @@ namespace MetalRaptors
                                                // sliver is hidden against the flat dirt terrace behind it
 
         // ---- Palette (plain flat colours — no generated textures) ----
-        // Pale, bright mist so the sky and fog read like a foggy morning rather than war haze.
-        public static readonly Color HazeColor = new Color(0.82f, 0.83f, 0.85f); // fog + sky
-        static readonly Color LandColor = new Color(0.44f, 0.36f, 0.26f);        // flat surface earth
-        static readonly Color DirtColor = new Color(0.36f, 0.28f, 0.20f);        // flat cross-section dirt
+        // The mist colour lives in MorningSky.HazeColor: fog and the skybox's horizon band
+        // must be the same value for the land to dissolve seamlessly into the sky.
+        static readonly Color LandColor = new Color(0.44f, 0.36f, 0.26f); // flat surface earth
+        static readonly Color DirtColor = new Color(0.36f, 0.28f, 0.20f); // flat cross-section dirt
 
         /// <summary>
         /// Builds the whole land into the active scene. <paramref name="width"/> is the level's
@@ -111,15 +113,16 @@ namespace MetalRaptors
                 mr.shadowCastingMode = ShadowCastingMode.Off; // a cross-section shouldn't shade the land
             }
 
-            // Pale foggy-morning mist: clear at the play line, total by the terrain's far edge.
+            // Pale foggy-morning mist: clear at the play line, total well before the terrain's
+            // far edge — the last ~250 m of land sit in solid haze, so even from a high camera
+            // (whose slant distances shrink the fogged margin) the edge of the map never shows.
             // The far edge is at (front-edge distance) + Depth = (cameraDistance - playPlaneZ) + Depth.
+            // Ambient and the matching sky are set by MorningSky (see LevelController.SetupCamera).
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.Linear;
-            RenderSettings.fogColor = HazeColor;
+            RenderSettings.fogColor = MorningSky.HazeColor;
             RenderSettings.fogStartDistance = cameraDistance + 80f;
-            RenderSettings.fogEndDistance = cameraDistance - playPlaneZ + Depth - 60f;
-            RenderSettings.ambientMode = AmbientMode.Flat;   // soft, even morning light — no harsh sky bounce
-            RenderSettings.ambientLight = new Color(0.68f, 0.68f, 0.70f);
+            RenderSettings.fogEndDistance = cameraDistance - playPlaneZ + Depth - 250f;
         }
 
         // ---------------------------------------------------------------- height field

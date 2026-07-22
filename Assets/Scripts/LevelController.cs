@@ -446,10 +446,10 @@ namespace MetalRaptors
 
             if (proceduralTerrain)
             {
-                // Overcast war-haze sky matching the fog, and enough draw distance to reach
-                // the terrain's fogged far edge.
-                _cam.clearFlags = CameraClearFlags.SolidColor;
-                _cam.backgroundColor = ProceduralTerrain.HazeColor;
+                // Foggy-morning-sun atmosphere: gradient skybox with a low glowing sun over
+                // the terrain's fogged far edge, warm key light, cool ambient, and post FX.
+                // Draw distance must still reach that far edge.
+                MorningSky.Apply(_cam);
                 _cam.farClipPlane = 2200f;
             }
 
