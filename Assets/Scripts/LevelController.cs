@@ -36,9 +36,10 @@ namespace MetalRaptors
         LevelDefinition _level;
 
         // ---- World geometry (metres). X is centred on 0; Y runs from the ground up. ----
-        const float WorldHeight = 700f;
+        const float WorldHeight = 900f;
         const float GroundY = 0f;              // top surface of the flat ground
-        const float WorldTop = WorldHeight;    //  700, the hard ceiling
+        const float WorldTop = WorldHeight;    //  900, the hard ceiling
+        const float SkyHeadroom = 400f;        // backdrop/sky clearance above the ceiling (docs/level-geometry.md)
         float WorldWidth => _level.terrain.width;
         float MinX => -WorldWidth / 2f;
         float MaxX => WorldWidth / 2f;
@@ -141,20 +142,16 @@ namespace MetalRaptors
                 // clearly visible drop-shadow. Purely visual: it receives shadows but casts none
                 // and has no collider (the camera looks straight down +Z, so it never occludes
                 // the cube).
+                const float backdropBottomY = -100f;
+                float backdropTopY = WorldTop + SkyHeadroom;
                 var backdrop = UIFactory.CreatePrimitive3D(PrimitiveType.Cube,
-                    new Vector3(0f, WorldHeight / 2f, BackdropZ),
-                    new Vector3(WorldWidth + 400f, WorldHeight + 200f, 10f),
+                    new Vector3(0f, (backdropTopY + backdropBottomY) * 0.5f, BackdropZ),
+                    new Vector3(WorldWidth + 400f, backdropTopY - backdropBottomY, 10f),
                     new Color(0.16f, 0.17f, 0.20f), keepCollider: false);
                 var backdropRenderer = backdrop.GetComponent<Renderer>();
                 if (backdropRenderer != null)
                     backdropRenderer.shadowCastingMode = ShadowCastingMode.Off; // receive only
             }
-
-            // Ceiling bar (visual only) so the player can see the hard cap.
-            UIFactory.CreatePrimitive3D(PrimitiveType.Cube,
-                new Vector3(0f, WorldTop, PlayPlaneZ),
-                new Vector3(WorldWidth + 200f, 8f, 60f),
-                new Color(0.55f, 0.6f, 0.7f), emissive: true, keepCollider: false);
         }
 
         void SpawnPlayer(PlayerConfig config)

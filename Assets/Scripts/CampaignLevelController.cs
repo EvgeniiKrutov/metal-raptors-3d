@@ -19,7 +19,7 @@ namespace MetalRaptors
                  "definition in the CampaignLevels registry.")]
         [SerializeField] int levelNumber = 1;
 
-        const float WorldTop = 700f;           // hard ceiling, as in the fixed levels
+        const float WorldTop = 900f;           // hard ceiling, as in the fixed levels
         const float CubeHalf = 15f;            // half the plane body's nominal size
         const float CameraDistance = 420f;     // camera sits this far back on -Z of the play plane
         const float PlayPlaneZ = 100f;         // flight plane depth into the land (+Z)
@@ -59,7 +59,6 @@ namespace MetalRaptors
                 CameraDistance, PlayPlaneZ, StartX);
             SpawnPlayer(config);
             SetupCamera();
-            BuildCeilingBar();
             BuildHud();
         }
 
@@ -115,17 +114,6 @@ namespace MetalRaptors
             _halfViewWidth = _halfViewHeight * _cam.aspect;
 
             PositionCamera(instant: true);
-        }
-
-        /// <summary>The visible ceiling bar; endless levels re-centre it on the camera each
-        /// frame instead of stretching it across a fixed world.</summary>
-        void BuildCeilingBar()
-        {
-            var bar = UIFactory.CreatePrimitive3D(PrimitiveType.Cube,
-                new Vector3(StartX, WorldTop, PlayPlaneZ),
-                new Vector3(_halfViewWidth * 2f + 400f, 8f, 60f),
-                new Color(0.55f, 0.6f, 0.7f), emissive: true, keepCollider: false);
-            _ceilingBar = bar.transform;
         }
 
         void LateUpdate()
