@@ -72,16 +72,24 @@ namespace MetalRaptors
         bool _falling;          // health hit zero: gravity owns the plane until it hits something
         float _lastCollisionTime = -999f; // last plane-to-plane scrape, for the collision-damage debounce
 
-        // World bounds, supplied by LevelController at spawn.
+        // World bounds, supplied by the level controller at spawn.
         float _minX, _maxX, _worldWidth, _ceilingY, _edgeMargin;
+
+        // Campaign mode: instead of the soft side boundaries, a hard wall on the left that
+        // blocks like the ceiling does (no damage, no auto-turn). Its X advances with the
+        // camera via SetLeftWall.
+        bool _hardLeftWall;
+        float _wallX = float.NegativeInfinity;
 
         /// <param name="startHeadingRad">Initial heading in radians (π/2 = straight up).</param>
         /// <param name="edgeMargin">
         /// Width of the soft-boundary band inside each side edge; inside it the cube is steered
         /// back toward the centre so it turns away from the world edge instead of leaving it.
         /// </param>
-        public void Initialize(PlayerConfig config, float startHeadingRad, float minX, float maxX, float ceilingY, float edgeMargin)
+        public void Initialize(PlayerConfig config, float startHeadingRad, float minX, float maxX,
+            float ceilingY, float edgeMargin, bool hardLeftWall = false)
         {
+            _hardLeftWall = hardLeftWall;
             _config     = config;
             _heading    = startHeadingRad;
             _minX       = minX;
@@ -147,11 +155,12 @@ namespace MetalRaptors
             float maxRate = _config.rotationSpeed * Mathf.Deg2Rad;              // rad/s
             float desiredRate = (left ? maxRate : 0f) - (right ? maxRate : 0f); // A = turn left (CCW), D = right (CW)
 
-            // ---- Soft side boundaries ----
-            // Near either edge, override the pilot's input and turn the cube back toward the
-            // middle, so it banks away from the world edge instead of flying off it.
-            desiredRate = FlightSteering.EdgeSteer(_rb.position.x, _heading,
-                _minX, _maxX, _edgeMargin, maxRate, desiredRate);
+            // ---- Side boundaries ----
+            // Soft mode steers the cube back toward the middle near either edge; hard-wall mode
+            // leaves the pilot's input alone (the wall clamp below does the blocking).
+            if (!_hardLeftWall)
+                desiredRate = FlightSteering.EdgeSteer(_rb.position.x, _heading,
+                    _minX, _maxX, _edgeMargin, maxRate, desiredRate);
 
             float approach = 1f - Mathf.Exp(-(_config.turnResponsiveness / _rb.mass) * dt);
             _angularVelocity += (desiredRate - _angularVelocity) * approach;
@@ -165,11 +174,19 @@ namespace MetalRaptors
 
             // Hard ceiling: allow steering along it, but no further climb.
             if (pos.y >= _ceilingY && vel.y > 0f) vel.y = 0f;
+            // Hard left wall (campaign): allow sliding along it, but no flying back past it.
+            if (_hardLeftWall && pos.x <= _wallX && vel.x < 0f) vel.x = 0f;
             _rb.linearVelocity = vel;
 
-            // Clamp to the ceiling; the sides are handled by the soft boundary above.
-            if (pos.y > _ceilingY) { pos.y = _ceilingY; _rb.position = pos; }
+            // Clamp to the ceiling and, in campaign mode, to the wall.
+            bool clamped = false;
+            if (pos.y > _ceilingY) { pos.y = _ceilingY; clamped = true; }
+            if (_hardLeftWall && pos.x < _wallX) { pos.x = _wallX; clamped = true; }
+            if (clamped) _rb.position = pos;
         }
+
+        /// <summary>Moves the hard left wall (campaign mode only; it never retreats).</summary>
+        public void SetLeftWall(float x) => _wallX = Mathf.Max(_wallX, x);
 
         void ApplyRotation()
         {

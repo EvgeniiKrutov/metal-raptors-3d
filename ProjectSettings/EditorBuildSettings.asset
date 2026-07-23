@@ -15,6 +15,9 @@ EditorBuildSettings:
     path: Assets/Scenes/Level2.unity
     guid: b97616713ac6450b9bc11ce46e3170d8
   - enabled: 1
+    path: Assets/Scenes/CampaignLevel1.unity
+    guid: 7fd92347c0f2423c8323cb8564c8125e
+  - enabled: 1
     path: Assets/Scenes/Battlefield.unity
     guid: d0600006fd7742dc82cec05cb2372e96
   - enabled: 1

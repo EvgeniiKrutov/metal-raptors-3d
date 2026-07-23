@@ -59,20 +59,9 @@ namespace MetalRaptors
         // scrape when their centres come within twice this (~30 m).
         const float PlaneHitboxRadius = 15f;
 
-        // Dedicated physics layer for every plane's collider. Its self-collisions are switched off
-        // (DisablePlanePlaneCollisions) so two planes never physically hit — they pass cleanly
-        // through one another and the scrape is detected by distance in CheckPlaneScrapes, instead
-        // of the fragile per-pair Physics.IgnoreCollision that let a contact through and ram-exploded
-        // both planes. Any unused layer works: nothing in the project filters by layer, and
-        // plane-vs-ground and plane-vs-bullet stay on (those colliders live on the Default layer,
-        // which this layer still collides with).
-        const int PlaneLayer = 8;
-
         // Camera kick on a player scrape: a short, decaying jitter of the follow position.
         const float CamShakeMagnitude = 7f;   // metres of jitter at full strength
         const float CamShakeDuration = 0.3f;  // seconds to decay back to steady
-        const float ModelPitchDeg = -10f;       // cosmetic nose-down tilt of the model about the view axis
-                                               // (visual only; the flight heading is driven by the parent)
         const float CameraDistance = 420f;     // camera sits this far back on -Z of the play plane
         const float PlayPlaneZ = 100f;         // the flight plane sits this far into the land (+Z), so a
                                                // falling cube lands on the land, not on its front cut edge
@@ -87,12 +76,7 @@ namespace MetalRaptors
         EnemyConfig _enemyConfig;
         readonly List<EnemyController> _enemies = new List<EnemyController>();
 
-        // Player health readout on the HUD (bar + number, top-left).
-        const float HudBarWidth = 400f;
-        const float HudBarHeight = 38f;
-        const float HudBarPadding = 4f;
-        Image _healthFill;
-        Text _healthText;
+        HealthBar _healthBar;
 
         float _halfViewHeight;   // half the world height visible on screen (for camera clamping)
         bool _gameOver;
@@ -186,7 +170,7 @@ namespace MetalRaptors
 
             // The player flies the Sopwith Camel (the enemies keep the Fokker Dr.1, see SpawnEnemies).
             var planeModel = PlaneModels.Sopwith;
-            var plane = BuildPlaneModel(go.transform, planeModel);
+            var plane = PlaneFactory.BuildPlaneModel(go.transform, planeModel);
 
             _cube = go.AddComponent<CubeController>();
             _cubeTr = go.transform;
@@ -199,33 +183,11 @@ namespace MetalRaptors
             SetupGuns(config, go, plane, planeModel);
         }
 
-        /// <summary>
-        /// Mounts the machine guns: a muzzle transform just ahead of the propeller disc, at the
-        /// height of the Dr.1's twin Spandaus (atop the cowling, slightly above the prop hub —
-        /// the model has no gun nodes, so the offset is derived from the prop's bounds), plus a
-        /// <see cref="PlaneShooter"/> that fires from it while F is held.
-        /// </summary>
+        /// <summary>Mounts the machine guns: the muzzle (see <see cref="PlaneFactory.MountMuzzle"/>)
+        /// plus a <see cref="PlaneShooter"/> that fires from it while F is held.</summary>
         void SetupGuns(PlayerConfig config, GameObject body, Transform model, PlaneModelConfig plane)
         {
-            const float MuzzleClearance = 2f;    // ahead of the prop disc, so rounds spawn clear of it
-            const float GunHeightAboveHub = 2.5f; // Spandaus sit on the cowling above the hub
-
-            // At spawn the body's heading is 0 (identity rotation), so world offsets from the
-            // body can be stored directly as the muzzle's local position.
-            Transform prop = FindDeep(model, plane.propBladesNode) ?? FindDeep(model, plane.propPivotNode) ?? model;
-            var renderers = prop.GetComponentsInChildren<Renderer>();
-            Bounds bounds = renderers.Length > 0
-                ? renderers[0].bounds
-                : new Bounds(body.transform.position, Vector3.one);
-            for (int i = 1; i < renderers.Length; i++) bounds.Encapsulate(renderers[i].bounds);
-
-            var muzzle = new GameObject("Muzzle").transform;
-            muzzle.SetParent(body.transform, false);
-            muzzle.localPosition = new Vector3(
-                bounds.max.x + MuzzleClearance - body.transform.position.x,
-                bounds.center.y + GunHeightAboveHub - body.transform.position.y,
-                0f); // stay exactly on the play plane
-
+            var muzzle = PlaneFactory.MountMuzzle(body, model, plane);
             _shooter = body.AddComponent<PlaneShooter>();
             _shooter.Initialize(config, muzzle, body.GetComponentInChildren<Collider>());
         }
@@ -256,7 +218,7 @@ namespace MetalRaptors
                     // and mostly fly left (see BuildPlaneModel).
                     var go = new GameObject("Enemy");
                     go.transform.position = RandomEnemySpawn(aiGroundY);
-                    BuildPlaneModel(go.transform, group.plane, mirrored: true);
+                    PlaneFactory.BuildPlaneModel(go.transform, group.plane, mirrored: true);
 
                     var enemy = go.AddComponent<EnemyController>();
                     enemy.Initialize(_enemyConfig, playerBody,
@@ -307,140 +269,6 @@ namespace MetalRaptors
 
             if (!_gameOver && _enemies.Count == 0 && _cube != null && _cube.CurrentHealth > 0f)
                 WinLevel();
-        }
-
-        /// <summary>
-        /// Instantiates the aircraft model described by <paramref name="plane"/> under
-        /// <paramref name="parent"/> (the physics body): tips it upright per the config's
-        /// stand-up rotation, scales it to the config's on-screen size, gives it a tight convex
-        /// mesh collider so ground crashes and the goal trigger still fire, turns on shadow casting,
-        /// and starts the propeller spinning. Pass <paramref name="mirrored"/> for the enemy plane,
-        /// which flies left instead of right.
-        ///
-        /// Everything model-specific (which FBX, its rest orientation, its size, its propeller node
-        /// names) comes from <paramref name="plane"/>, so a new aircraft is a new
-        /// <see cref="PlaneModelConfig"/> entry rather than an edit here.
-        /// </summary>
-        Transform BuildPlaneModel(Transform parent, PlaneModelConfig plane, bool mirrored = false)
-        {
-            var prefab = Resources.Load<GameObject>(plane.resourceName);
-            if (prefab == null)
-            {
-                // Should never happen once the FBX is under Resources; fall back to a cube so the
-                // level is still playable rather than crashing on a null model.
-                Debug.LogError($"LevelController: {plane.resourceName} model not found in Resources.");
-                var fallback = UIFactory.CreatePrimitive3D(PrimitiveType.Cube,
-                    Vector3.zero, Vector3.one * CubeScale, Color.white);
-                fallback.transform.SetParent(parent, false);
-                return fallback.transform;
-            }
-
-            var model = Instantiate(prefab);
-            model.name = mirrored ? $"{plane.resourceName} (enemy)" : plane.resourceName;
-            model.transform.SetParent(parent, false);
-
-            // The model is exported lying flat, so stand it up before anything else touches its
-            // orientation. plane.standUpEuler does that per-model: for the Fokker it's (90, -90, 0)
-            // — +90° X tips it upright, -90° Y swings the nose to lead along the heading (a plain
-            // +90° puts a wing forward, the opposite 180° leaves the tail forward). The extra 180°
-            // roll about the nose (X, the heading/flight axis) flips the plane wheels-down instead
-            // of wheels-up, when the config asks for it.
-            //
-            // The enemy is the mirror image: it attacks from the right and flies LEFT, and a heading
-            // of ~180° is a 180° spin about the view axis — which would leave a right-upright plane
-            // belly-up. So for the enemy we DROP that wheels-down roll (leaving it belly-up at
-            // heading 0), and the parent's 180° heading spin then lands it belly-down and upright
-            // while flying left. The cosmetic nose pitch is flipped to match, so the nose still dips
-            // toward the flight direction. (These planes are left-right symmetric, so this reads as a
-            // true mirror without the inside-out normals a negative scale would cause.)
-            //
-            // The outer Z rotation (the camera's view axis, the plane's pitch axis on screen) drops
-            // the nose down a touch. It's applied to the model only, so it's purely visual — the
-            // flight direction comes from the parent's heading and is unaffected.
-            Quaternion wheelsDown = (plane.rollWheelsDown && !mirrored)
-                ? Quaternion.Euler(180f, 0f, 0f) : Quaternion.identity;
-            float pitch = mirrored ? -ModelPitchDeg : ModelPitchDeg;
-            model.transform.localRotation = Quaternion.Euler(0f, 0f, pitch)
-                                          * wheelsDown
-                                          * Quaternion.Euler(plane.standUpEuler);
-
-            // Scale the model down to the config's on-screen size, measured from its combined
-            // renderer bounds so we don't depend on the FBX's own unit scale.
-            NormalizeSize(model.transform, plane.onScreenSize);
-
-            // Cast a shadow onto the terrain/ground below, matching the old cube (ConfigureShadows
-            // extends the shadow distance so it actually shows at this camera depth).
-            foreach (var r in model.GetComponentsInChildren<Renderer>())
-                r.shadowCastingMode = ShadowCastingMode.On;
-
-            AddPlaneCollider(model.transform);
-            StartPropeller(model.transform, plane);
-            model.AddComponent<ShakeEffect>(); // scrape feedback: shivers the model, never the body
-            return model.transform;
-        }
-
-        /// <summary>
-        /// Uniformly scales <paramref name="model"/> so the longest side of its combined
-        /// world-space renderer bounds equals <paramref name="targetSize"/>.
-        /// </summary>
-        void NormalizeSize(Transform model, float targetSize)
-        {
-            var renderers = model.GetComponentsInChildren<Renderer>();
-            if (renderers.Length == 0) return;
-
-            var bounds = renderers[0].bounds;
-            for (int i = 1; i < renderers.Length; i++) bounds.Encapsulate(renderers[i].bounds);
-
-            float longest = Mathf.Max(bounds.size.x, bounds.size.y, bounds.size.z);
-            if (longest > 0.0001f)
-                model.localScale *= targetSize / longest;
-        }
-
-        /// <summary>
-        /// Gives the plane a single tight convex mesh collider built from its largest mesh (the
-        /// fuselage) so <see cref="CubeController"/> still detects ground crashes and the goal
-        /// trigger. Convex is required for a moving Rigidbody and for trigger overlaps.
-        /// </summary>
-        void AddPlaneCollider(Transform model)
-        {
-            MeshFilter biggest = null;
-            float biggestSize = 0f;
-            foreach (var mf in model.GetComponentsInChildren<MeshFilter>())
-            {
-                if (mf.sharedMesh == null) continue;
-                float size = mf.sharedMesh.bounds.size.sqrMagnitude;
-                if (size > biggestSize) { biggestSize = size; biggest = mf; }
-            }
-            if (biggest == null) return;
-
-            var col = biggest.gameObject.AddComponent<MeshCollider>();
-            col.sharedMesh = biggest.sharedMesh;
-            col.convex = true;
-
-            // Put the plane's one collider on the plane layer, whose self-collisions are off, so it
-            // passes through other planes (scrape is detected in CheckPlaneScrapes) while still
-            // hitting the ground and bullets. See PlaneLayer / DisablePlanePlaneCollisions.
-            biggest.gameObject.layer = PlaneLayer;
-        }
-
-        /// <summary>
-        /// Finds the propeller pivot node (parent of the blades) named by the config and attaches
-        /// <see cref="PropellerSpin"/> so the blades turn. Falls back to the blades node itself if
-        /// the pivot is missing, so the animation runs either way.
-        /// </summary>
-        void StartPropeller(Transform model, PlaneModelConfig plane)
-        {
-            Transform spinner = FindDeep(model, plane.propPivotNode) ?? FindDeep(model, plane.propBladesNode);
-            if (spinner != null) spinner.gameObject.AddComponent<PropellerSpin>();
-            else Debug.LogWarning("LevelController: propeller node not found on the plane model.");
-        }
-
-        /// <summary>Depth-first search for a descendant transform by name.</summary>
-        static Transform FindDeep(Transform root, string name)
-        {
-            foreach (var t in root.GetComponentsInChildren<Transform>(true))
-                if (t.name == name) return t;
-            return null;
         }
 
         void SetupCamera()
@@ -502,7 +330,7 @@ namespace MetalRaptors
         /// </summary>
         void DisablePlanePlaneCollisions()
         {
-            Physics.IgnoreLayerCollision(PlaneLayer, PlaneLayer, true);
+            Physics.IgnoreLayerCollision(PlaneFactory.PlaneLayer, PlaneFactory.PlaneLayer, true);
         }
 
         /// <summary>
@@ -664,57 +492,14 @@ namespace MetalRaptors
                 "A / D to steer  •  F to fire  •  destroy the enemy  •  don't hit the ground", 28,
                 new Vector2(0, -500), new Vector2(1600, 50));
 
-            BuildHealthBar(canvas.transform);
-        }
-
-        /// <summary>
-        /// The player's health readout, top-left: a dark plate, a fill that shrinks leftward
-        /// and shades from green to red as damage comes in, and the number on top.
-        /// </summary>
-        void BuildHealthBar(Transform parent)
-        {
-            var plate = new GameObject("HealthBar", typeof(Image));
-            plate.transform.SetParent(parent, false);
-            var plateImg = plate.GetComponent<Image>();
-            plateImg.color = new Color(0f, 0f, 0f, 0.55f);
-            plateImg.raycastTarget = false;
-            var rt = plateImg.rectTransform;
-            rt.sizeDelta = new Vector2(HudBarWidth, HudBarHeight);
-            rt.anchoredPosition = new Vector2(-660f, 480f);
-
-            var fillGo = new GameObject("Fill", typeof(Image));
-            fillGo.transform.SetParent(plate.transform, false);
-            _healthFill = fillGo.GetComponent<Image>();
-            _healthFill.raycastTarget = false;
-            var fillRt = _healthFill.rectTransform;
-            fillRt.anchorMin = new Vector2(0f, 0.5f); // pinned to the plate's left edge so the
-            fillRt.anchorMax = new Vector2(0f, 0.5f); // bar drains right-to-left
-            fillRt.pivot = new Vector2(0f, 0.5f);
-            fillRt.anchoredPosition = new Vector2(HudBarPadding, 0f);
-            fillRt.sizeDelta = new Vector2(HudBarWidth - HudBarPadding * 2f,
-                HudBarHeight - HudBarPadding * 2f);
-
-            _healthText = UIFactory.CreateText(plate.transform, "", 24, Vector2.zero,
-                new Vector2(HudBarWidth, HudBarHeight), TextAnchor.MiddleCenter, FontStyle.Bold);
-
+            _healthBar = new HealthBar(canvas.transform, new Vector2(-660f, 480f));
             UpdateHealthHud();
         }
 
         void UpdateHealthHud()
         {
-            if (_cube == null || _healthFill == null) return;
-
-            float frac = _cube.MaxHealth > 0f
-                ? Mathf.Clamp01(_cube.CurrentHealth / _cube.MaxHealth) : 0f;
-
-            var size = _healthFill.rectTransform.sizeDelta;
-            size.x = (HudBarWidth - HudBarPadding * 2f) * frac;
-            _healthFill.rectTransform.sizeDelta = size;
-            _healthFill.color = Color.Lerp(
-                new Color(0.9f, 0.25f, 0.15f), new Color(0.35f, 0.85f, 0.3f), frac);
-
-            _healthText.text =
-                $"{Mathf.CeilToInt(_cube.CurrentHealth)} / {Mathf.CeilToInt(_cube.MaxHealth)}";
+            if (_cube == null || _healthBar == null) return;
+            _healthBar.Set(_cube.CurrentHealth, _cube.MaxHealth);
         }
 
         Canvas NewOverlay(Color dimColor)

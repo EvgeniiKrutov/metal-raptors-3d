@@ -42,10 +42,14 @@ namespace MetalRaptors
         // ---- Level 1 weather/daytime (picked on level select, persisted) ----
         public Daytime Level1Daytime { get; private set; } = Daytime.Midday;
 
+        // ---- Campaign weather/daytime (picked on the campaign panel, persisted) ----
+        public Daytime CampaignDaytime { get; private set; } = Daytime.Midday;
+
         const string PrefVolume = "mr_master_volume";
         const string PrefUnlocked = "mr_highest_unlocked_level";
         const string PrefMech = "mr_selected_mech";
         const string PrefLevel1Daytime = "mr_level1_daytime";
+        const string PrefCampaignDaytime = "mr_campaign_daytime";
 
         // Ensures a GameManager exists even when you press Play directly in a non-menu scene.
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
@@ -95,6 +99,13 @@ namespace MetalRaptors
             PlayerPrefs.Save();
         }
 
+        public void SetCampaignDaytime(Daytime daytime)
+        {
+            CampaignDaytime = daytime;
+            PlayerPrefs.SetInt(PrefCampaignDaytime, (int)daytime);
+            PlayerPrefs.Save();
+        }
+
         // ---- Progress API ----
         public bool IsLevelUnlocked(int level) => level <= HighestUnlockedLevel;
 
@@ -116,6 +127,9 @@ namespace MetalRaptors
             int daytime = PlayerPrefs.GetInt(PrefLevel1Daytime, (int)Daytime.Midday);
             Level1Daytime = System.Enum.IsDefined(typeof(Daytime), daytime)
                 ? (Daytime)daytime : Daytime.Midday;
+            int campaign = PlayerPrefs.GetInt(PrefCampaignDaytime, (int)Daytime.Midday);
+            CampaignDaytime = System.Enum.IsDefined(typeof(Daytime), campaign)
+                ? (Daytime)campaign : Daytime.Midday;
         }
     }
 }

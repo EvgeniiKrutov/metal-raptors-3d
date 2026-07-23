@@ -26,13 +26,13 @@ namespace MetalRaptors
         public const float Depth = 800f;       // how far the land runs toward the horizon (+Z);
                                                // deep enough that the fog (below) saturates long
                                                // before the far edge, so the edge is never seen
-        const float HeightScale = 90f;         // terrain-data vertical range (heights are 0..1 of this)
+        internal const float HeightScale = 90f; // terrain-data vertical range (heights are 0..1 of this)
         public const float BaseLevel = 30f;    // mean ground height the hills undulate around;
                                                // SkyHorizon uses it as the far edge's horizon height
-        const float MinHeight = 4f;            // never carve below this (keeps dirt above the wall's UVs)
+        internal const float MinHeight = 4f;   // never carve below this (keeps dirt above the wall's UVs)
         public const float MaxHeight = 85f;    // never build above this (enemy AI treats this
                                                // as "the ground" so its margins hold over hills)
-        const float FrontStrip = 130f;         // near z-band kept height-constant: the play plane sits
+        internal const float FrontStrip = 130f; // near z-band kept height-constant: the play plane sits
                                                // back from z=0 (see LevelController.PlayPlaneZ). Keep this
                                                // past the cube's far Z so it flies/lands over a flat front
                                                // terrace — never behind an intervening ridge — and so the
@@ -40,19 +40,19 @@ namespace MetalRaptors
         const int Res = 1025;                  // heightmap resolution (square)
 
         // ---- Craters ----
-        const float CratersPerMetre = 0.017f;  // ~34 craters across 2000 m ("moderate")
+        internal const float CratersPerMetre = 0.017f; // ~34 craters across 2000 m ("moderate")
 
         // ---- Mine craters ----
         // Big pits blown from a gallery driven under the line. Placed at random across the field,
         // with depth varying widely per-crater: most are deep, but a random minority stay shallow.
-        const float MinesPerMetre = 0.0035f;   // ~3 per 800 m
-        const float MineDepthShallow = 0.20f;  // depth-to-radius ratio for the shallowest mines
-        const float MineDepthDeep = 0.62f;     // ...and for the deepest
+        internal const float MinesPerMetre = 0.0035f;  // ~3 per 800 m
+        internal const float MineDepthShallow = 0.20f; // depth-to-radius ratio for the shallowest mines
+        internal const float MineDepthDeep = 0.62f;    // ...and for the deepest
 
         // ---- What the camera may reveal ----
         public const float CutRevealY = -80f;  // lowest world Y the camera should ever show
-        const float WallBottomY = -120f;       // the cut wall reaches safely below that
-        const float WallSeamLift = 3f;         // the cut wall's top overshoots the terrain surface by this
+        internal const float WallBottomY = -120f; // the cut wall reaches safely below that
+        internal const float WallSeamLift = 3f; // the cut wall's top overshoots the terrain surface by this
                                                // much, so it always covers the terrain's front edge and
                                                // leaves no see-through seam despite terrain LOD; the extra
                                                // sliver is hidden against the flat dirt terrace behind it
@@ -66,16 +66,16 @@ namespace MetalRaptors
         const int GrassDetailRes = 1024;         // detail-map resolution (cells ~1.5 x 0.8 m, fine
                                                  // enough that the Poisson spacing survives the
                                                  // snap of each point into its cell)
-        const int GrassDetailPatch = 32;         // cells per cull patch
-        const float GrassSpacing = 4.5f;         // Poisson minimum distance between tufts; with
-                                                 // 3-6 m wide tufts this reads as a dense sward
-        const int GrassPoissonTries = 20;        // Bridson candidate attempts per active point
-        const float GrassMaxSlopeDeg = 30f;      // no grass on walls steeper than this
-        const float CraterBareRadii = 1.35f;     // a crater kills grass out to this many of its
-                                                 // radii: the bowl plus its blown-earth rim
-        const float GrassViewDistance = 800f;    // detail draw distance; the default 80 m would
-                                                 // cull everything (the camera sits ~320 m from
-                                                 // the nearest land, see LevelController.CamZ)
+        internal const int GrassDetailPatch = 32;    // cells per cull patch
+        internal const float GrassSpacing = 4.5f;    // Poisson minimum distance between tufts; with
+                                                     // 3-6 m wide tufts this reads as a dense sward
+        internal const int GrassPoissonTries = 20;   // Bridson candidate attempts per active point
+        internal const float GrassMaxSlopeDeg = 30f; // no grass on walls steeper than this
+        internal const float CraterBareRadii = 1.35f; // a crater kills grass out to this many of its
+                                                     // radii: the bowl plus its blown-earth rim
+        internal const float GrassViewDistance = 800f; // detail draw distance; the default 80 m would
+                                                     // cull everything (the camera sits ~320 m from
+                                                     // the nearest land, see LevelController.CamZ)
         // ---- Palette (plain flat colours — no generated textures) ----
         // The mist colour lives in the active sky's HazeColor (MorningSky or MiddaySky, per the
         // level's Daytime): fog and the skybox's horizon band must be the same value for the
@@ -154,6 +154,18 @@ namespace MetalRaptors
             // the colour must be the active sky's HazeColor (its horizon band) or the seam shows.
             // Per-daytime air thickness (fog start) is documented in docs/atmospheres.md; ambient
             // and the matching sky are applied per Daytime in LevelController.SetupCamera.
+            ApplyFog(daytime, cameraDistance, playPlaneZ);
+        }
+
+        /// <summary>The camera distance at which the linear fog saturates; past it the land is
+        /// pure haze (the campaign streamer uses this as its visibility horizon).</summary>
+        internal static float FogEndDistance(float cameraDistance, float playPlaneZ)
+            => cameraDistance - playPlaneZ + Depth - 250f;
+
+        /// <summary>Per-daytime distance haze shared by the fixed land and the campaign's
+        /// streamed chunks (see the comment above and docs/atmospheres.md).</summary>
+        internal static void ApplyFog(Daytime daytime, float cameraDistance, float playPlaneZ)
+        {
             Color haze;
             float startOffset;
             switch (daytime)
@@ -167,7 +179,7 @@ namespace MetalRaptors
             RenderSettings.fogMode = FogMode.Linear;
             RenderSettings.fogColor = haze;
             RenderSettings.fogStartDistance = cameraDistance + startOffset;
-            RenderSettings.fogEndDistance = cameraDistance - playPlaneZ + Depth - 250f;
+            RenderSettings.fogEndDistance = FogEndDistance(cameraDistance, playPlaneZ);
         }
 
         // ---------------------------------------------------------------- height field
@@ -274,14 +286,7 @@ namespace MetalRaptors
 
                         float r = Mathf.Sqrt(dx * dx + dz * dz);
                         if (r > influence) continue;
-
-                        float delta = rim * Mathf.Exp(-((r - radius) / rimSigma) * ((r - radius) / rimSigma));
-                        if (r < radius)
-                        {
-                            float t = 1f - (r / radius) * (r / radius);
-                            delta -= depth * t * t;
-                        }
-                        metres[iz, ix] += delta;
+                        metres[iz, ix] += CraterDelta(r, radius, depth, rim, rimSigma);
                     }
                 }
             }
@@ -333,17 +338,23 @@ namespace MetalRaptors
 
                         float r = Mathf.Sqrt(dx * dx + dz * dz);
                         if (r > influence) continue;
-
-                        float delta = rim * Mathf.Exp(-((r - radius) / rimSigma) * ((r - radius) / rimSigma));
-                        if (r < radius)
-                        {
-                            float t = 1f - (r / radius) * (r / radius);
-                            delta -= depth * t * t;
-                        }
-                        metres[iz, ix] += delta;
+                        metres[iz, ix] += CraterDelta(r, radius, depth, rim, rimSigma);
                     }
                 }
             }
+        }
+
+        /// <summary>The bowl-plus-raised-rim height change of one crater at radial distance
+        /// <paramref name="r"/> from its centre. Shared with the campaign's streamed chunks.</summary>
+        internal static float CraterDelta(float r, float radius, float depth, float rim, float rimSigma)
+        {
+            float delta = rim * Mathf.Exp(-((r - radius) / rimSigma) * ((r - radius) / rimSigma));
+            if (r < radius)
+            {
+                float t = 1f - (r / radius) * (r / radius);
+                delta -= depth * t * t;
+            }
+            return delta;
         }
 
         /// <summary>2D Perlin made periodic along X (period = width) by cross-fading two reads.</summary>
@@ -358,9 +369,13 @@ namespace MetalRaptors
 
         // ---------------------------------------------------------------- surface paint
 
-        static void PaintTerrain(TerrainData data)
+        static void PaintTerrain(TerrainData data) => PaintTerrain(data, CreateLandLayer());
+
+        /// <summary>The one flat-earth layer. Campaign chunks share a single instance so the
+        /// streamed land never allocates textures per chunk.</summary>
+        internal static TerrainLayer CreateLandLayer()
         {
-            var layer = new TerrainLayer
+            return new TerrainLayer
             {
                 diffuseTexture = SolidTexture(LandColor),
                 tileSize = new Vector2(25f, 25f),
@@ -374,6 +389,10 @@ namespace MetalRaptors
                 // alpha 0 so the distance basemap can't resurrect the shine.
                 smoothnessSource = TerrainLayerSmoothnessSource.ConstantOnly,
             };
+        }
+
+        internal static void PaintTerrain(TerrainData data, TerrainLayer layer)
+        {
             data.terrainLayers = new[] { layer };
 
             // One layer everywhere; a tiny alphamap is enough.
@@ -413,30 +432,40 @@ namespace MetalRaptors
         /// even look survives). The blade texture is painted in code from the same rng: no
         /// assets, same grass every run for a given seed.
         /// </summary>
-        static void PlantGrass(System.Random rng, TerrainData data, float width, List<Vector3> craters)
+        /// <summary>The grass tuft billboard description; the texture is shared so campaign
+        /// chunks don't repaint it per chunk.</summary>
+        internal static DetailPrototype CreateGrassPrototype(Texture2D bladesTexture)
         {
-            data.detailPrototypes = new[]
+            return new DetailPrototype
             {
-                new DetailPrototype
-                {
-                    prototypeTexture = GrassBladesTexture(rng),
-                    renderMode = DetailRenderMode.GrassBillboard,
-                    usePrototypeMesh = false,
-                    minWidth = 3f, maxWidth = 6f,   // world is ~6x life size (the planes span 60 m),
-                    minHeight = 3f, maxHeight = 7f, // so knee-high tufts land at a few metres
-                    noiseSpread = 0.15f,
-                    healthyColor = GrassHealthy,
-                    dryColor = GrassDry,
-                },
+                prototypeTexture = bladesTexture,
+                renderMode = DetailRenderMode.GrassBillboard,
+                usePrototypeMesh = false,
+                minWidth = 3f, maxWidth = 6f,   // world is ~6x life size (the planes span 60 m),
+                minHeight = 3f, maxHeight = 7f, // so knee-high tufts land at a few metres
+                noiseSpread = 0.15f,
+                healthyColor = GrassHealthy,
+                dryColor = GrassDry,
             };
-            data.SetDetailResolution(GrassDetailRes, GrassDetailPatch);
+        }
+
+        /// <summary>Wires the detail system and the weak breeze onto <paramref name="data"/>.</summary>
+        internal static void SetupGrassDetail(TerrainData data, DetailPrototype prototype, int detailRes)
+        {
+            data.detailPrototypes = new[] { prototype };
+            data.SetDetailResolution(detailRes, GrassDetailPatch);
             data.SetDetailScatterMode(DetailScatterMode.InstanceCountMode); // cell value = tuft count
 
-            // Weak morning breeze; near-white tint so the waving pass keeps the blades' brown.
+            // Weak breeze; near-white tint so the waving pass keeps the blades' brown.
             data.wavingGrassTint = new Color(0.95f, 0.93f, 0.85f);
             data.wavingGrassStrength = 0.22f;
             data.wavingGrassAmount = 0.25f;
             data.wavingGrassSpeed = 0.3f;
+        }
+
+        static void PlantGrass(System.Random rng, TerrainData data, float width, List<Vector3> craters)
+        {
+            SetupGrassDetail(data, CreateGrassPrototype(GrassBladesTexture(rng)), GrassDetailRes);
 
             var layer = new int[GrassDetailRes, GrassDetailRes]; // [z, x], like the heightmap
             foreach (var p in PoissonDiskPoints(rng, width, Depth, GrassSpacing, GrassPoissonTries))
@@ -558,7 +587,7 @@ namespace MetalRaptors
         /// detail billboards. Zero-alpha texels still carry the blade colour so bilinear
         /// filtering and mips never bleed dark fringes around the blades.
         /// </summary>
-        static Texture2D GrassBladesTexture(System.Random rng)
+        internal static Texture2D GrassBladesTexture(System.Random rng)
         {
             const int W = 64, H = 128;
             var tex = new Texture2D(W, H, TextureFormat.RGBA32, true)
@@ -612,7 +641,7 @@ namespace MetalRaptors
         /// see-through seam), the bottom is flat at <see cref="WallBottomY"/>, normals face the
         /// camera (-Z). Built in x = -width/2..width/2 local space so copies just shift along X.
         /// </summary>
-        static Mesh BuildCutWallMesh(float[] cutLine, float width)
+        internal static Mesh BuildCutWallMesh(float[] cutLine, float width)
         {
             int cols = cutLine.Length;
             var verts = new Vector3[cols * 2];
@@ -647,7 +676,7 @@ namespace MetalRaptors
             return mesh;
         }
 
-        static Material CutWallMaterial()
+        internal static Material CutWallMaterial()
         {
             var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
             mat.SetColor("_BaseColor", DirtColor);
