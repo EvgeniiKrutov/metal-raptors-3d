@@ -39,9 +39,13 @@ namespace MetalRaptors
         // ---- Progress / unlocks (persisted) ----
         public int HighestUnlockedLevel { get; private set; } = 1;
 
+        // ---- Level 1 weather/daytime (picked on level select, persisted) ----
+        public Daytime Level1Daytime { get; private set; } = Daytime.Midday;
+
         const string PrefVolume = "mr_master_volume";
         const string PrefUnlocked = "mr_highest_unlocked_level";
         const string PrefMech = "mr_selected_mech";
+        const string PrefLevel1Daytime = "mr_level1_daytime";
 
         // Ensures a GameManager exists even when you press Play directly in a non-menu scene.
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
@@ -83,6 +87,14 @@ namespace MetalRaptors
             PlayerPrefs.Save();
         }
 
+        // ---- Level 1 weather API ----
+        public void SetLevel1Daytime(Daytime daytime)
+        {
+            Level1Daytime = daytime;
+            PlayerPrefs.SetInt(PrefLevel1Daytime, (int)daytime);
+            PlayerPrefs.Save();
+        }
+
         // ---- Progress API ----
         public bool IsLevelUnlocked(int level) => level <= HighestUnlockedLevel;
 
@@ -101,6 +113,9 @@ namespace MetalRaptors
             MasterVolume = PlayerPrefs.GetFloat(PrefVolume, 1f);
             HighestUnlockedLevel = PlayerPrefs.GetInt(PrefUnlocked, 1);
             SelectedMechIndex = PlayerPrefs.GetInt(PrefMech, 0);
+            int daytime = PlayerPrefs.GetInt(PrefLevel1Daytime, (int)Daytime.Midday);
+            Level1Daytime = System.Enum.IsDefined(typeof(Daytime), daytime)
+                ? (Daytime)daytime : Daytime.Midday;
         }
     }
 }

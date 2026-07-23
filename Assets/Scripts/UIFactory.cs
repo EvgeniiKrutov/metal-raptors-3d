@@ -102,7 +102,7 @@ namespace MetalRaptors
         }
 
         public static Button CreateButton(Transform parent, string label, Vector2 anchoredPos, Action onClick,
-            Vector2? size = null, bool interactable = true)
+            Vector2? size = null, bool interactable = true, int fontSize = 34)
         {
             var s = size ?? new Vector2(460, 92);
 
@@ -136,7 +136,7 @@ namespace MetalRaptors
             var text = labelGo.GetComponent<Text>();
             text.font = DefaultFont;
             text.text = label;
-            text.fontSize = 34;
+            text.fontSize = fontSize;
             text.fontStyle = FontStyle.Bold;
             text.alignment = TextAnchor.MiddleCenter;
             text.color = interactable ? Color.white : new Color(0.5f, 0.5f, 0.5f, 1f);

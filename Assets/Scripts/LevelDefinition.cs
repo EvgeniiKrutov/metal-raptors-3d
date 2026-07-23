@@ -4,11 +4,12 @@ namespace MetalRaptors
 {
     /// <summary>
     /// Which atmosphere a terrain level flies under. Each value maps to one self-contained
-    /// static sky class (<see cref="MorningSky"/>, <see cref="MiddaySky"/>); the level's
-    /// definition picks a value, and <see cref="LevelController"/> applies the matching sky
-    /// while <see cref="ProceduralTerrain"/> builds the fog to match it.
+    /// static sky class (<see cref="MorningSky"/>, <see cref="MiddaySky"/>,
+    /// <see cref="EveningSky"/>, <see cref="NightSky"/>); the level's definition picks a
+    /// value, and <see cref="LevelController"/> applies the matching sky while
+    /// <see cref="ProceduralTerrain"/> builds the fog to match it.
     /// </summary>
-    public enum Daytime { Morning, Midday }
+    public enum Daytime { Morning, Midday, Evening, Night }
 
     /// <summary>
     /// The weather a level is flown in. Only <see cref="Calm"/> exists so far, and it changes
@@ -81,11 +82,13 @@ namespace MetalRaptors
     /// </summary>
     public static class Levels
     {
-        /// <summary>Level 1: a lone Fokker over the midday Verdun battlefield.</summary>
-        public static readonly LevelDefinition Level1 = new LevelDefinition
+        /// <summary>Level 1: a lone Fokker over the Verdun battlefield, under the daytime
+        /// picked on the level-select screen (see <see cref="GameManager.Level1Daytime"/>).</summary>
+        public static LevelDefinition Level1 => new LevelDefinition
         {
             terrain = new TerrainPart { kind = TerrainKind.Verdun, seed = 1916, width = 2000f },
-            daytime = Daytime.Midday,
+            daytime = GameManager.Instance != null
+                ? GameManager.Instance.Level1Daytime : Daytime.Midday,
             weather = Weather.Calm,
             enemies = new[] { new EnemyGroup(PlaneModels.Fokker, 1) },
         };

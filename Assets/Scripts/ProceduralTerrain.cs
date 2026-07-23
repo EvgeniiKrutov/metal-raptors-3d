@@ -27,7 +27,8 @@ namespace MetalRaptors
                                                // deep enough that the fog (below) saturates long
                                                // before the far edge, so the edge is never seen
         const float HeightScale = 90f;         // terrain-data vertical range (heights are 0..1 of this)
-        const float BaseLevel = 30f;           // mean ground height the hills undulate around
+        public const float BaseLevel = 30f;    // mean ground height the hills undulate around;
+                                               // SkyHorizon uses it as the far edge's horizon height
         const float MinHeight = 4f;            // never carve below this (keeps dirt above the wall's UVs)
         public const float MaxHeight = 85f;    // never build above this (enemy AI treats this
                                                // as "the ground" so its margins hold over hills)
@@ -151,15 +152,21 @@ namespace MetalRaptors
             // distances shrink the fogged margin) the edge of the map never shows. The far edge
             // is at (front-edge distance) + Depth = (cameraDistance - playPlaneZ) + Depth, and
             // the colour must be the active sky's HazeColor (its horizon band) or the seam shows.
-            // The morning's mist wraps the land from just past the play line; midday air is
-            // clear, so its fog holds off much longer and only thickens toward the horizon —
-            // same far anchor, thinner atmosphere. Ambient and the matching sky are applied per
-            // Daytime in LevelController.SetupCamera.
-            bool midday = daytime == Daytime.Midday;
+            // Per-daytime air thickness (fog start) is documented in docs/atmospheres.md; ambient
+            // and the matching sky are applied per Daytime in LevelController.SetupCamera.
+            Color haze;
+            float startOffset;
+            switch (daytime)
+            {
+                case Daytime.Midday: haze = MiddaySky.HazeColor; startOffset = 300f; break;
+                case Daytime.Evening: haze = EveningSky.HazeColor; startOffset = 100f; break;
+                case Daytime.Night: haze = NightSky.HazeColor; startOffset = 250f; break;
+                default: haze = MorningSky.HazeColor; startOffset = 80f; break;
+            }
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.Linear;
-            RenderSettings.fogColor = midday ? MiddaySky.HazeColor : MorningSky.HazeColor;
-            RenderSettings.fogStartDistance = cameraDistance + (midday ? 300f : 80f);
+            RenderSettings.fogColor = haze;
+            RenderSettings.fogStartDistance = cameraDistance + startOffset;
             RenderSettings.fogEndDistance = cameraDistance - playPlaneZ + Depth - 250f;
         }
 

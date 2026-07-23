@@ -24,11 +24,11 @@ namespace MetalRaptors
         static readonly Color SunLightColor = new Color(1.00f, 0.96f, 0.90f); // neutral daylight
         static readonly Color AmbientColor = new Color(0.66f, 0.72f, 0.82f);  // blue-sky fill
 
-        // Where the sun hangs on the SCREEN, as a viewport anchor (0..1 across, 0..1 up) — see
-        // MorningSky.SunViewportAnchor for how a skybox direction becomes a fixed screen spot
-        // under this never-rotating camera. x = 0.50 centres it; y = 0.85 parks it at the top
-        // of the frame — high noon overhead, above the dogfight, with room for the halo before
-        // the screen edge clips it.
+        // Where the sun hangs on the SCREEN, as a viewport anchor (0..1 across, 0..1 up): the
+        // camera never rotates, so a skybox direction is a fixed screen spot. x = 0.50 centres
+        // it; y = 0.85 parks it at the top of the frame — high noon overhead, above the
+        // dogfight. Unlike the low morning/evening suns it is not glued to the horizon; only
+        // the horizon band tracks the map edge (SkyHorizon with anchorSun off).
         static readonly Vector2 SunViewportAnchor = new Vector2(0.50f, 0.85f);
 
         // As in the morning, the key light can't shine out of the visible sun (that would
@@ -92,6 +92,8 @@ namespace MetalRaptors
 
             RenderSettings.skybox = sky;
             cam.clearFlags = CameraClearFlags.Skybox;
+
+            SkyHorizon.Attach(cam, sky);
         }
 
         /// <summary>Raises and whitens the scene's directional light into the noon key.</summary>

@@ -25,13 +25,11 @@ namespace MetalRaptors
         static readonly Color SunLightColor = new Color(1.00f, 0.84f, 0.64f);// amber key light
         static readonly Color AmbientColor = new Color(0.62f, 0.66f, 0.74f); // cool fill -> blue-ish shadows
 
-        // Where the sun hangs on the SCREEN, as a viewport anchor (0..1 across, 0..1 up). The
-        // camera in these levels never rotates — it always looks straight down +Z — so a skybox
-        // direction is effectively a fixed spot in the frame. Deriving that direction from the
-        // camera's real FOV/aspect (see BuildSkybox) pins the sun here at any aspect ratio:
-        // x = 0.80 keeps it visible but by the right edge, out of the dogfight's sightline;
-        // y = 0.63 lifts it clear of the hill silhouettes while staying low morning light.
-        static readonly Vector2 SunViewportAnchor = new Vector2(0.80f, 0.63f);
+        // Sun column on screen (0..1 across; right edge, out of the dogfight's sightline) and
+        // how far above the map-edge horizon the disc rides, as a viewport fraction. SkyHorizon
+        // re-anchors the sun there every frame so it dawns at the land's visible edge.
+        const float SunViewportX = 0.80f;
+        const float SunHorizonLift = 0.08f;
 
         // The key light can't actually come from the visible sun (that would backlight the
         // planes into unreadable silhouettes, since the camera looks straight down +Z), so it
@@ -78,12 +76,6 @@ namespace MetalRaptors
             sky.SetColor("_BottomColor", HazeColor);
             sky.SetFloat("_HorizonFalloff", 2.5f);   // wide horizon band — the air is thick
             sky.SetColor("_SunColor", SunColor);
-            // The world direction that puts the sun at SunViewportAnchor on this camera's
-            // screen (rotation is identity here, so the ray's direction is already in world
-            // space and only depends on the FOV/aspect actually in use).
-            Vector3 sunDir = cam.ViewportPointToRay(
-                new Vector3(SunViewportAnchor.x, SunViewportAnchor.y, 1f)).direction;
-            sky.SetVector("_SunDirection", sunDir);
             sky.SetFloat("_SunFalloff", 300f);       // soft ~6 degree core, not a hard disc
             sky.SetFloat("_SunIntensity", 1.4f);     // just past HDR white — glows without glare
             sky.SetFloat("_HaloFalloff", 7f);        // broad scattered-light patch around it
@@ -92,6 +84,9 @@ namespace MetalRaptors
 
             RenderSettings.skybox = sky;
             cam.clearFlags = CameraClearFlags.Skybox;
+
+            // Horizon band + sun glued to the map's fogged far edge (see docs/atmospheres.md).
+            SkyHorizon.Attach(cam, sky, SunViewportX, SunHorizonLift, anchorSun: true);
         }
 
         /// <summary>Warms and lowers the scene's directional light into the morning key.</summary>

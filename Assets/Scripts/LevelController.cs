@@ -457,8 +457,13 @@ namespace MetalRaptors
                 // FX (the fog was already built to match in ProceduralTerrain.Build). Weather
                 // rides along as the future modulation seam (Calm changes nothing). Draw
                 // distance must still reach the terrain's fogged far edge.
-                if (_level.daytime == Daytime.Midday) MiddaySky.Apply(_cam, _level.weather);
-                else MorningSky.Apply(_cam, _level.weather);
+                switch (_level.daytime)
+                {
+                    case Daytime.Midday: MiddaySky.Apply(_cam, _level.weather); break;
+                    case Daytime.Evening: EveningSky.Apply(_cam, _level.weather); break;
+                    case Daytime.Night: NightSky.Apply(_cam, _level.weather); break;
+                    default: MorningSky.Apply(_cam, _level.weather); break;
+                }
                 _cam.farClipPlane = 2200f;
             }
 
