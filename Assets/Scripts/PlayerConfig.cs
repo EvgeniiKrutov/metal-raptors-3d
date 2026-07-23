@@ -18,8 +18,21 @@ namespace MetalRaptors
         [Tooltip("Maximum turn rate in degrees/second (sibling turnSpeed: 180).")]
         public float rotationSpeed = 180f;
 
-        [Tooltip("Constant flight speed in metres/second. The plane never stops.")]
+        [Tooltip("Cruise speed in metres/second, held by the constant throttle. The plane " +
+                 "never flies slower than this (no stall); diving adds speed on top " +
+                 "(see docs/flight-model.md).")]
         public float flySpeed = 120f;
+
+        [Tooltip("Gravity pull along the flight path in m/s²: flying nose-down builds speed " +
+                 "above flySpeed, climbing sheds that extra speed again.")]
+        public float diveAcceleration = 90f;
+
+        [Tooltip("Fraction of the speed above flySpeed shed per second to drag. Bleeds dive " +
+                 "speed off in level flight and sets the terminal dive speed.")]
+        public float speedDrag = 0.9f;
+
+        [Tooltip("Hard cap on total speed as a multiple of flySpeed.")]
+        public float maxSpeedMultiplier = 1.6f;
 
         [Tooltip("How quickly the turn rate eases toward the target (sibling: 5.0). " +
                  "Used together with mass as turnResponsiveness / mass.")]

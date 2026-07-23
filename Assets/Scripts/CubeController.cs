@@ -8,7 +8,9 @@ namespace MetalRaptors
     /// Player-cube flight, ported 1:1 from the metal-raptors sibling repo
     /// (Plane.applyTurnRate + PhysicsSystem.updateFlight):
     ///
-    ///   * Constant forward speed - velocity = flySpeed * (cos θ, sin θ), gravity off. Never stops.
+    ///   * Cruise + dive energy   - velocity = speed * (cos θ, sin θ); speed never drops below
+    ///                               flySpeed (no stall), diving builds extra speed that climbing
+    ///                               and drag bleed off (docs/flight-model.md).
     ///   * A / D steer only        - they set the desired turn rate; the actual rate eases in with
     ///                               mass-based lag, so a heavier cube feels sluggish (W/S unused).
     ///   * Soft side boundaries    - nosing into the band near either edge steers the cube back
@@ -68,6 +70,7 @@ namespace MetalRaptors
 
         float _heading;         // radians; +Y (up) = π/2
         float _angularVelocity; // radians/second, eased toward the desired rate
+        float _speed;           // current airspeed: flySpeed plus any dive energy
         bool _active;
         bool _falling;          // health hit zero: gravity owns the plane until it hits something
         float _lastCollisionTime = -999f; // last plane-to-plane scrape, for the collision-damage debounce
@@ -100,6 +103,7 @@ namespace MetalRaptors
 
             CurrentHealth = Mathf.Max(1f, config.health);
             MaxHealth = CurrentHealth;
+            _speed = config.flySpeed;
 
             _rb = GetComponent<Rigidbody>();
             _rb.useGravity = false;
@@ -167,8 +171,9 @@ namespace MetalRaptors
             _heading += _angularVelocity * dt;
             ApplyRotation();
 
-            // ---- Constant-speed forward flight (sibling PhysicsSystem.updateFlight) ----
-            Vector3 vel = new Vector3(Mathf.Cos(_heading), Mathf.Sin(_heading), 0f) * _config.flySpeed;
+            // ---- Forward flight: throttle-held cruise plus dive energy (docs/flight-model.md) ----
+            UpdateSpeed(dt);
+            Vector3 vel = new Vector3(Mathf.Cos(_heading), Mathf.Sin(_heading), 0f) * _speed;
 
             Vector3 pos = _rb.position;
 
@@ -187,6 +192,17 @@ namespace MetalRaptors
 
         /// <summary>Moves the hard left wall (campaign mode only; it never retreats).</summary>
         public void SetLeftWall(float x) => _wallX = Mathf.Max(_wallX, x);
+
+        /// <summary>Dive-energy speed model (docs/flight-model.md): gravity along the flight
+        /// path builds speed nose-down and sheds it nose-up, drag bleeds the excess, and the
+        /// throttle floor at flySpeed means the plane never stalls.</summary>
+        void UpdateSpeed(float dt)
+        {
+            _speed += -Mathf.Sin(_heading) * _config.diveAcceleration * dt;
+            _speed -= (_speed - _config.flySpeed) * _config.speedDrag * dt;
+            _speed = Mathf.Clamp(_speed, _config.flySpeed,
+                _config.flySpeed * Mathf.Max(1f, _config.maxSpeedMultiplier));
+        }
 
         void ApplyRotation()
         {

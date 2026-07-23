@@ -15,6 +15,9 @@ MonoBehaviour:
   mass: 2.5
   rotationSpeed: 120
   flySpeed: 180
+  diveAcceleration: 90
+  speedDrag: 0.9
+  maxSpeedMultiplier: 1.6
   turnResponsiveness: 5
   health: 100
   damage: 10
