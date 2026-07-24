@@ -453,8 +453,16 @@ namespace MetalRaptors
 
             Explosion.Spawn(transform.position, _bodyRadius > 0f ? _bodyRadius * 2f : 30f);
             if (_smoke != null) _smoke.Clear(); // sweep up the trailing smoke as the fighter blows up
+
+            // Freeze the wreck and drop its bar/collider now so it can't drift, get hit or float a
+            // bar, but leave the model up: the blast starts a beat before the plane is removed, so it
+            // vanishes into the fireball (docs/effects.md).
+            if (_rb != null) { _rb.linearVelocity = Vector3.zero; _rb.angularVelocity = Vector3.zero; }
+            if (_collider != null) _collider.enabled = false;
+            if (_bar != null) Destroy(_bar.gameObject);
+
             OnDestroyed?.Invoke(this);
-            Destroy(gameObject); // OnDestroy takes the health bar with it
+            Destroy(gameObject, Explosion.RemovalDelay);
         }
 
         void OnCollisionEnter(Collision collision)

@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -285,14 +286,19 @@ namespace MetalRaptors
             // LevelController.CheckPlaneScrapes; the only solid thing left to hit is the ground.
             if (collision.gameObject.GetComponentInParent<EnemyController>() != null) return;
 
-            // A shot-down plane goes up in flames when its fall ends.
-            if (_falling)
-            {
-                Explosion.Spawn(transform.position, ExplosionSize);
-                HideModel();
-            }
+            // Any plane that reaches the ground goes up in flames — whether it was shot down
+            // and fell or flew straight into the dirt under control. The blast starts a beat
+            // before the plane is hidden, so it vanishes into the fireball (docs/effects.md).
+            Explosion.Spawn(transform.position, ExplosionSize);
+            StartCoroutine(HideModelAfter(Explosion.RemovalDelay));
 
             OnCrashed?.Invoke();
+        }
+
+        IEnumerator HideModelAfter(float delay)
+        {
+            yield return new WaitForSeconds(delay);
+            HideModel();
         }
 
         /// <summary>Removes the plane from view after it explodes (the body object itself

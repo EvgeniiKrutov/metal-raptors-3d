@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
@@ -185,6 +186,15 @@ namespace MetalRaptors
             _gameOver = true;
             _cube.Stop();
             if (_shooter != null) _shooter.Stop();
+
+            // Freeze immediately, but let the crash explosion play out in full before the fail
+            // screen covers it (docs/effects.md).
+            StartCoroutine(ShowFailScreenAfter(Explosion.Duration));
+        }
+
+        IEnumerator ShowFailScreenAfter(float delay)
+        {
+            yield return new WaitForSeconds(delay);
 
             var canvas = UIFactory.CreateCanvas("Campaign Overlay");
             canvas.sortingOrder = 100;

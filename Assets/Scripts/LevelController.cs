@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -460,6 +461,15 @@ namespace MetalRaptors
             _cube.Stop();
             if (_shooter != null) _shooter.Stop();
             StandDownEnemies();
+
+            // Freeze immediately, but let the crash explosion play out in full before the fail
+            // screen covers it (docs/effects.md).
+            StartCoroutine(ShowFailScreenAfter(Explosion.Duration));
+        }
+
+        IEnumerator ShowFailScreenAfter(float delay)
+        {
+            yield return new WaitForSeconds(delay);
 
             var canvas = NewOverlay(new Color(0.12f, 0f, 0f, 0.82f));
             UIFactory.CreateText(canvas.transform, "MISSION FAILED", 96,
