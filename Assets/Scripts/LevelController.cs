@@ -297,6 +297,9 @@ namespace MetalRaptors
             _halfViewHeight = CameraDistance * Mathf.Tan(_cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
 
             PositionCamera(instant: true);
+
+            if (_level.clouds != null)
+                CloudSystem.Begin(_cam, _level.daytime, _level.weather, _level.clouds, PlayPlaneZ);
         }
 
         // ---------------------------------------------------------------- loop

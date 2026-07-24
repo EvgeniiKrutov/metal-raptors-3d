@@ -115,6 +115,9 @@ namespace MetalRaptors
             _halfViewWidth = _halfViewHeight * _cam.aspect;
 
             PositionCamera(instant: true);
+
+            if (_level.clouds != null)
+                CloudSystem.Begin(_cam, _level.daytime, _level.weather, _level.clouds, PlayPlaneZ);
         }
 
         void LateUpdate()

@@ -19,6 +19,21 @@ namespace MetalRaptors
     /// </summary>
     public enum Weather { Calm }
 
+    /// <summary>Coarse preset for one cloud-layer parameter (see <see cref="CloudsPart"/>).</summary>
+    public enum CloudLevel { Low, Medium, High }
+
+    /// <summary>
+    /// The drifting cloud layer a level flies under, rendered by <see cref="CloudSystem"/>
+    /// (docs/clouds.md). Null on a definition means a cloudless sky; the parameterless part is
+    /// the default look — Medium speed, frequency and size.
+    /// </summary>
+    public class CloudsPart
+    {
+        public CloudLevel speed = CloudLevel.Medium;
+        public CloudLevel frequency = CloudLevel.Medium;
+        public CloudLevel size = CloudLevel.Medium;
+    }
+
     /// <summary>Which ground a level is built on.</summary>
     public enum TerrainKind
     {
@@ -71,6 +86,7 @@ namespace MetalRaptors
         public TerrainPart terrain;
         public Daytime daytime;
         public Weather weather;
+        public CloudsPart clouds;
         public EnemyGroup[] enemies;
     }
 
@@ -90,6 +106,7 @@ namespace MetalRaptors
             daytime = GameManager.Instance != null
                 ? GameManager.Instance.Level1Daytime : Daytime.Midday,
             weather = Weather.Calm,
+            clouds = new CloudsPart(),
             enemies = new[] { new EnemyGroup(PlaneModels.Fokker, 1) },
         };
 

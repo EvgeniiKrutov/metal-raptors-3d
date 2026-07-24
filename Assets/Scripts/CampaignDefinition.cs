@@ -23,6 +23,7 @@ namespace MetalRaptors
         public int seed;
         public Daytime daytime;
         public Weather weather;
+        public CloudsPart clouds;
         public EnemyWave[] waves;
     }
 
@@ -35,6 +36,7 @@ namespace MetalRaptors
             daytime = GameManager.Instance != null
                 ? GameManager.Instance.CampaignDaytime : Daytime.Midday,
             weather = Weather.Calm,
+            clouds = new CloudsPart(),
             waves = new EnemyWave[0],
         };
 

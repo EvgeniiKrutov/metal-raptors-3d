@@ -9,10 +9,12 @@ or materials in the project, no colliders anywhere in the effect.
 ### Structure
 
 One root `Explosion` GameObject carrying 6–7 child blobs. Each blob is a procedurally built
-low-poly rock-like shape: an icosahedron subdivided once (80 faces), every shared vertex
-displaced radially by a random 0.72–1.3×, then vertices split per triangle so
-`RecalculateNormals` gives flat, faceted shading. The mesh has a 0.5 base radius so
-`localScale` reads as diameter, matching Unity's primitive-sphere convention.
+low-poly rock-like shape from the shared `BlobMesh.Build()` builder
+(`Assets/Scripts/BlobMesh.cs`, also used by the cloud layer — see `docs/clouds.md`): an
+icosahedron subdivided once (80 faces), every shared vertex displaced radially by a random
+0.72–1.3×, then vertices split per triangle so `RecalculateNormals` gives flat, faceted
+shading. The mesh has a 0.5 base radius so `localScale` reads as diameter, matching Unity's
+primitive-sphere convention.
 
 Blobs spawn at random offsets inside `0.5 × size` around the impact point with random
 rotations, so the cluster overlaps into one big irregular fireball.
