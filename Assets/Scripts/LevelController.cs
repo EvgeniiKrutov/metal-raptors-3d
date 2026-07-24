@@ -185,9 +185,9 @@ namespace MetalRaptors
         /// plus a <see cref="PlaneShooter"/> that fires from it while F is held.</summary>
         void SetupGuns(PlayerConfig config, GameObject body, Transform model, PlaneModelConfig plane)
         {
-            var muzzle = PlaneFactory.MountMuzzle(body, model, plane);
+            var muzzle = PlaneFactory.MountMuzzle(body, model, plane, out var flashPoint);
             _shooter = body.AddComponent<PlaneShooter>();
-            _shooter.Initialize(config, muzzle, body.GetComponentInChildren<Collider>());
+            _shooter.Initialize(config, muzzle, flashPoint, body.GetComponentInChildren<Collider>());
         }
 
         // ---------------------------------------------------------------- enemies

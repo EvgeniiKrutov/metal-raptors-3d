@@ -1,5 +1,44 @@
 # Effects
 
+## Muzzle flash (`Assets/Scripts/MuzzleFlash.cs`)
+
+Spawned with `MuzzleFlash.Spawn(position, direction, size)` the instant a round is created —
+called from both sides' guns: the player's `PlaneShooter.Fire` (at the cowl flash point, along
+`transform.right`) and the enemy's `EnemyController.UpdateFiring` (at the nose muzzle, along the
+heading). Entirely code-built at runtime, no prefabs; purely cosmetic — no colliders or
+rigidbodies, so it can never brush a plane, soak a bullet, or deal damage.
+
+### Placement
+
+The flash sits at the engine **cowl**, not up at the raised gun. `PlaneFactory.MountMuzzle`
+emits a separate `MuzzleFlashPoint` transform at the same nose X as the gun muzzle but dropped
+to the propeller-hub centre line (it skips the muzzle's `GunHeightAboveHub` lift), so the flash
+reads as bursting from the nose cowling while the bullet still leaves the raised gun. The enemy
+fires from a single nose muzzle on its centreline and flashes there.
+
+### Structure
+
+One root `MuzzleFlash` GameObject, rotated so its local +X points along the firing direction,
+carrying:
+
+- **Core** — one emissive sphere at the cowl, hot near-white `(1, 0.96, 0.75)`, diameter
+  `size × 0.18`.
+- **Spikes** — four thin emissive cubes fanning forward across ±28° around the barrel, flame
+  orange `(1, 0.7, 0.25)`, up to `size × 0.32` long and `size × 0.05` thick. Each spike's
+  length, width and angle are randomised per shot so no two flashes look identical.
+
+`size` is the firing plane's body radius (half its longest renderer extent, ~30 for the
+`onScreenSize = 60` models), so the flash scales to the plane. `PlaneShooter` measures it once
+in `Initialize` the same way `EnemyController` does.
+
+### Animation
+
+The whole effect lives `0.07 s` — a few frames. It pops to full size instantly, then the root's
+scale collapses (`1 − t²`, keeping core and spikes shrinking together) while emission dims
+linearly to zero, so it reads as a quick bright pop rather than a lingering glow. The root
+self-destructs at the end of its life; `OnDestroy` releases the per-piece material instances
+(each piece needs its own material to animate its emission).
+
 ## Explosion (`Assets/Scripts/Explosion.cs`)
 
 Spawned with `Explosion.Spawn(position, size)` — called from `CubeController` (player crash)

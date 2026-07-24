@@ -89,9 +89,9 @@ namespace MetalRaptors
             _cube.Initialize(config, 0f, float.MinValue, float.MaxValue,
                 WorldTop - CubeHalf, 0f, hardLeftWall: true);
 
-            var muzzle = PlaneFactory.MountMuzzle(go, model, planeModel);
+            var muzzle = PlaneFactory.MountMuzzle(go, model, planeModel, out var flashPoint);
             _shooter = go.AddComponent<PlaneShooter>();
-            _shooter.Initialize(config, muzzle, go.GetComponentInChildren<Collider>());
+            _shooter.Initialize(config, muzzle, flashPoint, go.GetComponentInChildren<Collider>());
         }
 
         void SetupCamera()

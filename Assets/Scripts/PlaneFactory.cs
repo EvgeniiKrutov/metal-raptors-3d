@@ -68,11 +68,14 @@ namespace MetalRaptors
 
         /// <summary>
         /// Mounts the machine-gun muzzle just ahead of the propeller disc at Spandau height,
-        /// derived from the prop's bounds (the models have no gun nodes). Must be called while
-        /// the body still has its spawn heading of 0 (identity rotation), so world offsets can
-        /// be stored directly as the muzzle's local position.
+        /// derived from the prop's bounds (the models have no gun nodes). Also emits a
+        /// <paramref name="flashPoint"/> at the same nose but down on the propeller-hub centre
+        /// line — the engine cowl — where the muzzle flash bursts (see docs/effects.md). Must be
+        /// called while the body still has its spawn heading of 0 (identity rotation), so world
+        /// offsets can be stored directly as local positions.
         /// </summary>
-        public static Transform MountMuzzle(GameObject body, Transform model, PlaneModelConfig plane)
+        public static Transform MountMuzzle(GameObject body, Transform model, PlaneModelConfig plane,
+            out Transform flashPoint)
         {
             const float MuzzleClearance = 2f;
             const float GunHeightAboveHub = 2.5f;
@@ -84,12 +87,17 @@ namespace MetalRaptors
                 : new Bounds(body.transform.position, Vector3.one);
             for (int i = 1; i < renderers.Length; i++) bounds.Encapsulate(renderers[i].bounds);
 
+            float noseX = bounds.max.x + MuzzleClearance - body.transform.position.x;
+
             var muzzle = new GameObject("Muzzle").transform;
             muzzle.SetParent(body.transform, false);
-            muzzle.localPosition = new Vector3(
-                bounds.max.x + MuzzleClearance - body.transform.position.x,
-                bounds.center.y + GunHeightAboveHub - body.transform.position.y,
-                0f);
+            muzzle.localPosition = new Vector3(noseX,
+                bounds.center.y + GunHeightAboveHub - body.transform.position.y, 0f);
+
+            flashPoint = new GameObject("MuzzleFlashPoint").transform;
+            flashPoint.SetParent(body.transform, false);
+            flashPoint.localPosition = new Vector3(noseX,
+                bounds.center.y - body.transform.position.y, 0f); // cowl: hub centre, not gun height
             return muzzle;
         }
 

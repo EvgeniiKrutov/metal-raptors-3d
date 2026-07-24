@@ -17,18 +17,23 @@ namespace MetalRaptors
 
         PlayerConfig _config;
         Transform _muzzle;
+        Transform _flashPoint; // where the muzzle flash bursts: the cowl, lower than the gun muzzle
         Collider _planeCollider;
+        float _bodyRadius; // half the plane model's longest extent — scales the muzzle flash
 
         GameObject _bulletTemplate;
         AudioSource _audio;
         AudioClip _shotClip;
         float _cooldown;
 
-        public void Initialize(PlayerConfig config, Transform muzzle, Collider planeCollider)
+        public void Initialize(PlayerConfig config, Transform muzzle, Transform flashPoint,
+            Collider planeCollider)
         {
             _config = config;
             _muzzle = muzzle;
+            _flashPoint = flashPoint != null ? flashPoint : muzzle;
             _planeCollider = planeCollider;
+            _bodyRadius = MeasureBodyRadius();
 
             // Both sides fire the same polished-brass round.
             _bulletTemplate = Bullet.BuildTemplate(Bullet.RoundColor);
@@ -69,7 +74,28 @@ namespace MetalRaptors
             go.GetComponent<Bullet>().Launch(dir, _config.bulletSpeed, _config.damage,
                 _planeCollider);
 
+            MuzzleFlash.Spawn(_flashPoint.position, dir, _bodyRadius);
             if (_shotClip != null) _audio.PlayOneShot(_shotClip, ShotVolume);
+        }
+
+        /// <summary>Half the longest side of the plane model's combined renderer bounds, matching
+        /// <see cref="EnemyController"/>, so the muzzle flash scales to whatever size the model is
+        /// built at. Falls back to the collider bounds, then a sensible constant.</summary>
+        float MeasureBodyRadius()
+        {
+            var rends = GetComponentsInChildren<Renderer>();
+            if (rends.Length > 0)
+            {
+                var b = rends[0].bounds;
+                for (int i = 1; i < rends.Length; i++) b.Encapsulate(rends[i].bounds);
+                return Mathf.Max(b.size.x, b.size.y, b.size.z) * 0.5f;
+            }
+            if (_planeCollider != null)
+            {
+                var s = _planeCollider.bounds.size;
+                return Mathf.Max(s.x, s.y, s.z) * 0.5f;
+            }
+            return 30f;
         }
     }
 }
