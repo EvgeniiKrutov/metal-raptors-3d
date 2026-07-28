@@ -34,3 +34,5 @@ Thumbs.db
 #Private Resources
 /Assets/Resources
 /Assets/Textures
+/Assets/Music
+.claude/settings.local.json
