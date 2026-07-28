@@ -1,0 +1,143 @@
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UI;
+
+namespace MetalRaptors
+{
+    /// <summary>
+    /// A stack of menu entries that owns one moving highlight shared by mouse and keyboard.
+    /// Entries are centred and laid out downward from the panel's top edge. See docs/main-menu.md.
+    /// </summary>
+    public class MenuPanel : IMenuFocusGroup
+    {
+        readonly List<MenuItemView> _focusables = new List<MenuItemView>();
+        readonly RectTransform _root;
+        float _cursor;
+        int _focus = -1;
+
+        public GameObject Root => _root.gameObject;
+
+        public MenuPanel(Transform parent, string name, float top)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+
+            _root = (RectTransform)go.transform;
+            _root.anchorMin = new Vector2(0f, 1f);
+            _root.anchorMax = new Vector2(1f, 1f);
+            _root.pivot = new Vector2(0.5f, 1f);
+            _root.anchoredPosition = new Vector2(0f, top);
+            _root.sizeDelta = new Vector2(0f, 0f);
+        }
+
+        public void AddGap(float pixels) => _cursor -= pixels;
+
+        public Text AddCaption(string caption)
+        {
+            Text text = UIFactory.CreateLabel(_root, caption.ToUpperInvariant(), MenuTheme.CaptionSize,
+                _cursor, MenuTheme.CaptionRowHeight, MenuTheme.Colors.Muted, UIFactory.BoldFont);
+            _cursor -= MenuTheme.CaptionRowHeight + MenuTheme.CaptionToContent;
+            return text;
+        }
+
+        public MenuItemView AddNav(string label, Action onActivate, bool interactable = true)
+        {
+            MenuItemView item = MenuItemView.Create(_root, label, new Vector2(0f, _cursor),
+                MenuTheme.ItemSize, MenuTheme.ItemRowHeight, MenuItemStyle.Nav, interactable);
+
+            if (interactable)
+            {
+                if (onActivate != null) item.Activated += onActivate;
+                Register(item);
+            }
+
+            _cursor -= MenuTheme.ItemRowHeight + MenuTheme.ItemGap;
+            return item;
+        }
+
+        /// <summary>A muted tag ("locked") set just after an entry, on the same baseline.</summary>
+        public void AddTag(MenuItemView item, string tag)
+        {
+            Text label = UIFactory.CreateInlineLabel(_root, tag.ToUpperInvariant(), MenuTheme.CaptionSize,
+                Vector2.zero, MenuTheme.ItemRowHeight, MenuTheme.Colors.Muted, UIFactory.BoldFont);
+
+            Vector2 pos = item.RectTransform.anchoredPosition;
+            label.rectTransform.anchoredPosition =
+                new Vector2(pos.x + item.Width + MenuTheme.TagGap, pos.y);
+        }
+
+        /// <summary>A horizontal run of choices from the panel's left edge, where exactly one is lit accent.</summary>
+        public MenuItemView[] AddOptionRow(string[] labels, int selected, Action<int> onPick)
+        {
+            var items = new MenuItemView[labels.Length];
+
+            for (int i = 0; i < labels.Length; i++)
+            {
+                int index = i;
+                MenuItemView item = MenuItemView.Create(_root, labels[i], new Vector2(0f, _cursor),
+                    MenuTheme.OptionSize, MenuTheme.OptionRowHeight, MenuItemStyle.Option);
+
+                item.SetSelected(i == selected);
+                item.Activated += () =>
+                {
+                    onPick(index);
+                    for (int j = 0; j < items.Length; j++) items[j].SetSelected(j == index);
+                };
+
+                Register(item);
+                items[i] = item;
+            }
+
+            // Widths are only known once the entries exist, so place the run in a second pass.
+            float x = 0f;
+            for (int i = 0; i < items.Length; i++)
+            {
+                items[i].SetX(x);
+                x += items[i].Width + MenuTheme.OptionGap;
+            }
+
+            _cursor -= MenuTheme.OptionRowHeight;
+            return items;
+        }
+
+        void Register(MenuItemView item)
+        {
+            _focusables.Add(item);
+            item.Hovered += Focus;
+        }
+
+        public void Focus(MenuItemView item)
+        {
+            int index = _focusables.IndexOf(item);
+            if (index >= 0) FocusIndex(index);
+        }
+
+        public void FocusFirst() => FocusIndex(0);
+
+        public void MoveFocus(int delta)
+        {
+            if (_focusables.Count == 0) return;
+            int next = _focus < 0 ? 0 : (_focus + delta + _focusables.Count) % _focusables.Count;
+            FocusIndex(next);
+        }
+
+        public void ActivateFocused()
+        {
+            if (_focus >= 0 && _focus < _focusables.Count) _focusables[_focus].Activate();
+        }
+
+        void FocusIndex(int index)
+        {
+            if (_focusables.Count == 0) return;
+            _focus = Mathf.Clamp(index, 0, _focusables.Count - 1);
+            for (int i = 0; i < _focusables.Count; i++) _focusables[i].SetFocused(i == _focus);
+        }
+
+        public void SetActive(bool active)
+        {
+            Root.SetActive(active);
+            if (active) FocusFirst();
+        }
+    }
+}

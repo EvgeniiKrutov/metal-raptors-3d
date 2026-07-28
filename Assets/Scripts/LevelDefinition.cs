@@ -98,8 +98,9 @@ namespace MetalRaptors
     /// </summary>
     public static class Levels
     {
-        /// <summary>Level 1: a lone Fokker over the Verdun battlefield, under the daytime
-        /// picked on the level-select screen (see <see cref="GameManager.Level1Daytime"/>).</summary>
+        /// <summary>Level 1: a lone Fokker over the Verdun battlefield, under
+        /// <see cref="GameManager.Level1Daytime"/> — midday until something sets it again,
+        /// the menu's weather row having gone (see docs/main-menu.md).</summary>
         public static LevelDefinition Level1 => new LevelDefinition
         {
             terrain = new TerrainPart { kind = TerrainKind.Verdun, seed = 1916, width = 2000f },

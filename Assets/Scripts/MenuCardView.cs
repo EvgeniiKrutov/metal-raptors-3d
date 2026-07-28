@@ -1,0 +1,115 @@
+using System;
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
+
+namespace MetalRaptors
+{
+    /// <summary>
+    /// One square card of the career era grid: a white face carrying the era's title and
+    /// years at its foot, framed in accent while highlighted. See docs/main-menu.md.
+    /// </summary>
+    public class MenuCardView : MonoBehaviour, IPointerEnterHandler, IPointerClickHandler
+    {
+        public event Action Activated;
+        public event Action<MenuCardView> Hovered;
+
+        RectTransform _rt;
+        Image _frame;
+        Text _title;
+        bool _focused;
+
+        public bool Interactable { get; private set; }
+
+        public static MenuCardView Create(Transform parent, string title, string years, bool interactable)
+        {
+            var go = new GameObject($"Card ({title})", typeof(RectTransform), typeof(MenuCardView));
+            go.transform.SetParent(parent, false);
+
+            var view = go.GetComponent<MenuCardView>();
+            view.Interactable = interactable;
+
+            // Anchored to the parent's top left: x is the card's own left edge, so the run of
+            // them is laid out rightward from there (same convention as MenuItemView).
+            var rt = (RectTransform)go.transform;
+            rt.anchorMin = new Vector2(0f, 1f);
+            rt.anchorMax = new Vector2(0f, 1f);
+            rt.pivot = new Vector2(0f, 1f);
+            rt.sizeDelta = new Vector2(MenuTheme.CardSize, MenuTheme.CardSize);
+            view._rt = rt;
+
+            view._frame = CreateFrame(rt);
+            CreateFace(rt);
+
+            view._title = UIFactory.CreateBottomLabel(rt, title, MenuTheme.CardTitleSize,
+                MenuTheme.CardPad + MenuTheme.CardYearsRowHeight + MenuTheme.CardTitleToYears,
+                MenuTheme.CardTitleRowHeight, MenuTheme.CardPad, MenuTheme.Colors.Fg, UIFactory.BoldFont);
+
+            UIFactory.CreateBottomLabel(rt, years, MenuTheme.CardYearsSize, MenuTheme.CardPad,
+                MenuTheme.CardYearsRowHeight, MenuTheme.CardPad, MenuTheme.Colors.Muted, UIFactory.MediumFont);
+
+            view.Apply();
+            return view;
+        }
+
+        /// <summary>The highlight ring, drawn under the face and bleeding out past its edges.</summary>
+        static Image CreateFrame(RectTransform parent)
+        {
+            var go = new GameObject("Frame", typeof(Image));
+            go.transform.SetParent(parent, false);
+
+            var img = go.GetComponent<Image>();
+            img.raycastTarget = false;
+
+            var rt = img.rectTransform;
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = new Vector2(-MenuTheme.CardBorder, -MenuTheme.CardBorder);
+            rt.offsetMax = new Vector2(MenuTheme.CardBorder, MenuTheme.CardBorder);
+            return img;
+        }
+
+        /// <summary>The card's own surface, and the only hit box it has.</summary>
+        static void CreateFace(RectTransform parent)
+        {
+            var go = new GameObject("Face", typeof(Image));
+            go.transform.SetParent(parent, false);
+
+            var img = go.GetComponent<Image>();
+            img.color = MenuTheme.CardFace;
+
+            var rt = img.rectTransform;
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+        }
+
+        /// <summary>Moves the card's left edge along the row it shares with its neighbours.</summary>
+        public void SetX(float x) => _rt.anchoredPosition = new Vector2(x, _rt.anchoredPosition.y);
+
+        public void SetFocused(bool focused)
+        {
+            _focused = focused;
+            Apply();
+        }
+
+        public void Activate()
+        {
+            if (Interactable) Activated?.Invoke();
+        }
+
+        void Apply()
+        {
+            MenuPalette palette = MenuTheme.Colors;
+            _title.color = Interactable ? (_focused ? palette.Accent : palette.Fg) : palette.Muted;
+            _frame.color = Interactable ? palette.Accent : palette.Muted;
+            _frame.enabled = _focused;
+        }
+
+        // Locked cards still take the highlight so their era can be read above the row.
+        public void OnPointerEnter(PointerEventData eventData) => Hovered?.Invoke(this);
+
+        public void OnPointerClick(PointerEventData eventData) => Activate();
+    }
+}

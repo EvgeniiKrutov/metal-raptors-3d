@@ -1,4 +1,4 @@
-# Atmospheres (daytimes) and the Level 1 weather selector
+# Atmospheres (daytimes)
 
 ## The sky system
 
@@ -110,23 +110,18 @@ power — under dark-violet air.
 - **Horizon band**: `_HorizonFalloff 2.2` — a restrained band of violet glow low over
   the land, night's version of scattered horizon light.
 
-## Level 1 weather selector
+## Who picks the daytime
 
-The level-select panel (`MainMenuController.BuildLevelPanel`) carries a row of options
-under the LEVEL 1 button — MORNING / MIDDAY / EVENING / NIGHT — labelled "LEVEL 1
-WEATHER". The chosen option is lit warm orange; the rest stay dark.
+Each level's definition does — there is **no weather selector in the menu any more** (see
+docs/main-menu.md):
 
-Flow of the choice:
+- Campaign level 1 is authored at dawn: `CampaignLevels.Level1.daytime = Daytime.Morning`.
+- Challenge level 1 still composes from `GameManager.Level1Daytime`, which nothing writes
+  now, so it flies at its Midday default; level 2 keeps its fixed morning definition.
+- `GameManager.SetLevel1Daytime` / `SetCampaignDaytime` and their PlayerPrefs keys
+  (`mr_level1_daytime`, `mr_campaign_daytime`) are intact, waiting for the selector to
+  return.
 
-- Clicking an option calls `GameManager.SetLevel1Daytime`, which stores it in memory and
-  persists it via PlayerPrefs (`mr_level1_daytime`), like the mech selection.
-- `Levels.Level1` is a property: it composes the definition with
-  `GameManager.Instance.Level1Daytime` (defaulting to Midday when no GameManager exists,
-  e.g. edge cases in tests), so `LevelController` and `ProceduralTerrain` pick up the
-  choice with no extra plumbing.
-- Only Level 1 is affected; Level 2 keeps its fixed morning definition.
-
-`Weather` (the enum) is still calm-only: the selector the player sees as "weather" picks
-the `Daytime` atmosphere. When real weather (storm, mist...) arrives, it plugs into the
-existing `Weather` seam that every sky's `Apply` and the terrain already accept, and the
-selector can grow a second row.
+`Weather` (the enum) is still calm-only: what the player saw as "weather" was the `Daytime`
+atmosphere. When real weather (storm, mist...) arrives, it plugs into the existing
+`Weather` seam that every sky's `Apply` and the terrain already accept.

@@ -1,8 +1,9 @@
 # Campaign mode
 
-An endless side-scrolling flight over streamed terrain. Entry point: main menu → CAMPAIGN →
-LEVEL 1 (scene `CampaignLevel1`, controller `CampaignLevelController`, definition registry
-`CampaignLevels` in `CampaignDefinition.cs`).
+An endless side-scrolling flight over streamed terrain. Entry point: main menu → career →
+World War 1 → start (scene `CampaignLevel1`, controller `CampaignLevelController`, definition
+registry `CampaignLevels` in `CampaignDefinition.cs`). See docs/main-menu.md for the era
+pages that lead here.
 
 ## Rules of the level
 
@@ -15,9 +16,9 @@ LEVEL 1 (scene `CampaignLevel1`, controller `CampaignLevelController`, definitio
   auto-turns the plane — the pilot keeps full control of the heading. Implemented as
   `CubeController.Initialize(..., hardLeftWall: true)` + `SetLeftWall`, which replaces the
   fixed levels' soft `FlightSteering.EdgeSteer` boundaries.
-- The daytime (morning/midday/evening/night) is picked on the campaign menu panel and
-  persisted separately from Air Fights Level 1 (`GameManager.CampaignDaytime`). Sky, fog and
-  ambient reuse the same sky classes as the fixed terrain levels.
+- The daytime is authored on the definition, not picked in the menu: level 1 flies at dawn
+  (`Daytime.Morning`). Sky, fog and ambient reuse the same sky classes as the fixed terrain
+  levels.
 
 ## Streamed terrain (`CampaignTerrain`)
 

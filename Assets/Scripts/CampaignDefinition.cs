@@ -15,7 +15,7 @@ namespace MetalRaptors
 
     /// <summary>
     /// Everything that makes one endless campaign level: the seed the streamed terrain grows
-    /// from, the daytime sky (picked on the campaign panel), the weather, and the distance-keyed
+    /// from, the daytime sky the level is authored in, the weather, and the distance-keyed
     /// enemy waves. <see cref="CampaignLevelController"/> composes the level from these parts.
     /// </summary>
     public class CampaignDefinition
@@ -33,8 +33,7 @@ namespace MetalRaptors
         public static CampaignDefinition Level1 => new CampaignDefinition
         {
             seed = 1917,
-            daytime = GameManager.Instance != null
-                ? GameManager.Instance.CampaignDaytime : Daytime.Midday,
+            daytime = Daytime.Morning,
             weather = Weather.Calm,
             clouds = new CloudsPart(),
             waves = new EnemyWave[0],

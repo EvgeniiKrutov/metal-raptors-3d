@@ -9,24 +9,53 @@ namespace MetalRaptors
     /// <summary>
     /// Helpers for building screen-space uGUI (and a simple 3D placeholder prop) at
     /// runtime, so every scene's UI is created and wired entirely in code — no manual
-    /// editor setup required. Uses the built-in legacy font so there are no font-asset
-    /// dependencies to import.
+    /// editor setup required. Text is rendered in Poppins (see docs/main-menu.md).
     /// </summary>
     public static class UIFactory
     {
-        static Font _font;
+        static Font _regular;
+        static Font _medium;
+        static Font _bold;
 
-        public static Font DefaultFont
+        public static Font DefaultFont => RegularFont;
+
+        public static Font RegularFont
         {
             get
             {
-                if (_font == null)
-                {
-                    _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf")
-                            ?? Resources.GetBuiltinResource<Font>("Arial.ttf");
-                }
-                return _font;
+                if (_regular == null) _regular = LoadFont("Poppins-Regular");
+                return _regular;
             }
+        }
+
+        public static Font MediumFont
+        {
+            get
+            {
+                if (_medium == null) _medium = LoadFont("Poppins-Medium");
+                return _medium;
+            }
+        }
+
+        public static Font BoldFont
+        {
+            get
+            {
+                if (_bold == null) _bold = LoadFont("Poppins-Bold");
+                return _bold;
+            }
+        }
+
+        public static Font FontFor(FontStyle style) =>
+            style == FontStyle.Bold || style == FontStyle.BoldAndItalic ? BoldFont : RegularFont;
+
+        static Font LoadFont(string name)
+        {
+            var font = Resources.Load<Font>(name);
+            if (font != null) return font;
+
+            return Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf")
+                   ?? Resources.GetBuiltinResource<Font>("Arial.ttf");
         }
 
         /// <summary>Creates a full-screen scaling Canvas and guarantees an EventSystem exists.</summary>
@@ -85,10 +114,10 @@ namespace MetalRaptors
             go.transform.SetParent(parent, false);
 
             var text = go.GetComponent<Text>();
-            text.font = DefaultFont;
+            text.font = FontFor(style);
             text.text = content;
             text.fontSize = fontSize;
-            text.fontStyle = style;
+            text.fontStyle = FontStyle.Normal;
             text.alignment = alignment;
             text.color = Color.white;
             text.raycastTarget = false;
@@ -99,6 +128,120 @@ namespace MetalRaptors
             rt.sizeDelta = size;
             rt.anchoredPosition = anchoredPos;
             return text;
+        }
+
+        /// <summary>
+        /// A text row stretched across its parent, hung from the parent's top edge by
+        /// <paramref name="top"/> (negative = downward). For flat menu layouts: the row spans
+        /// the parent, and the text sits against its left edge.
+        /// </summary>
+        public static Text CreateLabel(Transform parent, string content, int fontSize, float top,
+            float rowHeight, Color color, Font font)
+        {
+            Text text = NewLabel(parent, content, fontSize, color, font, TextAnchor.MiddleLeft);
+
+            var rt = text.rectTransform;
+            rt.anchorMin = new Vector2(0f, 1f);
+            rt.anchorMax = new Vector2(1f, 1f);
+            rt.pivot = new Vector2(0.5f, 1f);
+            rt.sizeDelta = new Vector2(0f, rowHeight);
+            rt.anchoredPosition = new Vector2(0f, top);
+            return text;
+        }
+
+        /// <summary>
+        /// A text row hung from the parent's *bottom* edge by <paramref name="bottom"/> (positive
+        /// = upward), inset from both sides by <paramref name="padSide"/> and reading from the
+        /// left inset. For labels sitting in a card's foot.
+        /// </summary>
+        public static Text CreateBottomLabel(Transform parent, string content, int fontSize, float bottom,
+            float rowHeight, float padSide, Color color, Font font)
+        {
+            Text text = NewLabel(parent, content, fontSize, color, font, TextAnchor.MiddleLeft);
+
+            var rt = text.rectTransform;
+            rt.anchorMin = new Vector2(0f, 0f);
+            rt.anchorMax = new Vector2(1f, 0f);
+            rt.pivot = new Vector2(0.5f, 0f);
+            rt.sizeDelta = new Vector2(-2f * padSide, rowHeight);
+            rt.anchoredPosition = new Vector2(0f, bottom);
+            return text;
+        }
+
+        /// <summary>
+        /// A block of wrapped copy of a fixed width against the parent's left edge, hung from its
+        /// top — the one place the menu wraps text instead of overflowing it.
+        /// </summary>
+        public static Text CreateParagraph(Transform parent, string content, int fontSize, float top,
+            float width, float rowHeight, float lineSpacing, Color color, Font font)
+        {
+            Text text = NewLabel(parent, content, fontSize, color, font, TextAnchor.UpperLeft);
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            text.lineSpacing = lineSpacing;
+
+            var rt = text.rectTransform;
+            rt.anchorMin = new Vector2(0f, 1f);
+            rt.anchorMax = new Vector2(0f, 1f);
+            rt.pivot = new Vector2(0f, 1f);
+            rt.sizeDelta = new Vector2(width, rowHeight);
+            rt.anchoredPosition = new Vector2(0f, top);
+            return text;
+        }
+
+        /// <summary>
+        /// Text sized to its own content, placed beside another element: x is measured from the
+        /// parent's left edge and marks the label's left edge.
+        /// </summary>
+        public static Text CreateInlineLabel(Transform parent, string content, int fontSize, Vector2 anchoredPos,
+            float rowHeight, Color color, Font font)
+        {
+            Text text = NewLabel(parent, content, fontSize, color, font, TextAnchor.MiddleLeft);
+
+            var rt = text.rectTransform;
+            rt.anchorMin = new Vector2(0f, 1f);
+            rt.anchorMax = new Vector2(0f, 1f);
+            rt.pivot = new Vector2(0f, 1f);
+            rt.sizeDelta = new Vector2(text.preferredWidth, rowHeight);
+            rt.anchoredPosition = anchoredPos;
+            return text;
+        }
+
+        static Text NewLabel(Transform parent, string content, int fontSize, Color color, Font font,
+            TextAnchor alignment)
+        {
+            var go = new GameObject($"Label ({content})", typeof(Text));
+            go.transform.SetParent(parent, false);
+
+            var text = go.GetComponent<Text>();
+            text.font = font;
+            text.text = content;
+            text.fontSize = fontSize;
+            text.fontStyle = FontStyle.Normal;
+            text.alignment = alignment;
+            text.color = color;
+            text.raycastTarget = false;
+            text.horizontalOverflow = HorizontalWrapMode.Overflow;
+            text.verticalOverflow = VerticalWrapMode.Overflow;
+            return text;
+        }
+
+        /// <summary>Solid rectangle against its parent's left edge, hung from its top (the title's accent rule).</summary>
+        public static Image CreateRule(Transform parent, float top, Vector2 size, Color color)
+        {
+            var go = new GameObject("Rule", typeof(Image));
+            go.transform.SetParent(parent, false);
+
+            var img = go.GetComponent<Image>();
+            img.color = color;
+            img.raycastTarget = false;
+
+            var rt = img.rectTransform;
+            rt.anchorMin = new Vector2(0f, 1f);
+            rt.anchorMax = new Vector2(0f, 1f);
+            rt.pivot = new Vector2(0f, 1f);
+            rt.sizeDelta = size;
+            rt.anchoredPosition = new Vector2(0f, top);
+            return img;
         }
 
         public static Button CreateButton(Transform parent, string label, Vector2 anchoredPos, Action onClick,
@@ -134,10 +277,10 @@ namespace MetalRaptors
             var labelGo = new GameObject("Label", typeof(Text));
             labelGo.transform.SetParent(go.transform, false);
             var text = labelGo.GetComponent<Text>();
-            text.font = DefaultFont;
+            text.font = BoldFont;
             text.text = label;
             text.fontSize = fontSize;
-            text.fontStyle = FontStyle.Bold;
+            text.fontStyle = FontStyle.Normal;
             text.alignment = TextAnchor.MiddleCenter;
             text.color = interactable ? Color.white : new Color(0.5f, 0.5f, 0.5f, 1f);
             text.raycastTarget = false;
