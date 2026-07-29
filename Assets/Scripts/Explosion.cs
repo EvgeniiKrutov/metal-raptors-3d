@@ -2,12 +2,6 @@ using UnityEngine;
 
 namespace MetalRaptors
 {
-    /// <summary>
-    /// A code-built explosion: a cluster of 6-7 low-poly blobs that expand, shrink and vanish
-    /// while their colour runs orange -> warm yellow -> dark grey, plus one of the sibling
-    /// repo's explosion_N.wav clips. Spawn with <see cref="Spawn"/>. No colliders, so the
-    /// effect can never crash the player or soak a bullet. See docs/effects.md.
-    /// </summary>
     public class Explosion : MonoBehaviour
     {
         const int BlobCountMin = 6, BlobCountMax = 7;
@@ -18,7 +12,7 @@ namespace MetalRaptors
         const float StartScale = 0.15f, EndScale = 0.07f;
         const float YellowAt = 0.3f, GreyAt = 0.85f, EmissionOffAt = 0.75f;
         const float EmissionStrength = 2f;
-        const float SoundVolume = 0.55f; // 2D playback; 3D rolloff would mute it at ~420 m
+        const float SoundVolume = 0.55f;
 
         static readonly Color Orange = new Color(1f, 0.45f, 0.08f);
         static readonly Color Yellow = new Color(1f, 0.93f, 0.45f);
@@ -27,12 +21,8 @@ namespace MetalRaptors
         static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
         static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
 
-        /// <summary>Longest a spawned explosion can play — its final blob's delay plus lifetime —
-        /// so a caller can wait for the blast to finish (see docs/effects.md).</summary>
         public static float Duration => MaxDelay + LifeMax;
 
-        /// <summary>How long a downed plane's model stays visible after its explosion is spawned,
-        /// so the blast begins a beat before the plane is removed (see docs/effects.md).</summary>
         public const float RemovalDelay = 0.15f;
 
         struct Blob
@@ -45,7 +35,6 @@ namespace MetalRaptors
         Blob[] _blobs;
         float _age;
 
-        /// <param name="size">Rough size of the thing exploding; scales the whole effect.</param>
         public static void Spawn(Vector3 position, float size)
         {
             var root = new GameObject("Explosion");
@@ -61,7 +50,7 @@ namespace MetalRaptors
                 go.transform.SetParent(root.transform, false);
                 go.transform.localPosition = Random.insideUnitSphere * size * OffsetRadius;
                 go.transform.localRotation = Random.rotation;
-                go.transform.localScale = Vector3.zero; // hidden until its delay elapses
+                go.transform.localScale = Vector3.zero;
 
                 go.AddComponent<MeshFilter>().sharedMesh = BlobMesh.Build();
                 var renderer = go.AddComponent<MeshRenderer>();
@@ -151,7 +140,6 @@ namespace MetalRaptors
             var clip = Resources.Load<AudioClip>($"Sounds/explosion_{Random.Range(1, 4)}");
             if (clip == null) return;
 
-            // Own carrier GameObject so the sound outlives the visual effect.
             var go = new GameObject("ExplosionSound");
             go.transform.position = position;
             var audio = go.AddComponent<AudioSource>();

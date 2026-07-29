@@ -2,14 +2,6 @@ using UnityEngine;
 
 namespace MetalRaptors
 {
-    /// <summary>
-    /// Tunable stats and AI parameters for the enemy fighter, stored as a standalone asset
-    /// (Assets/Resources/EnemyConfig.asset) like <see cref="PlayerConfig"/>. Values are ported
-    /// from the metal-raptors sibling repo (enemies/fighter.json), rescaled to this world the
-    /// same way the player's were: speeds against the live PlayerConfig.asset (player 500 px/s
-    /// -> 180 m/s), distances against the sibling's 3240 px world height -> 700 m here, with
-    /// the ground margins widened to cover this fighter's larger turn radius.
-    /// </summary>
     [CreateAssetMenu(fileName = "EnemyConfig", menuName = "Metal Raptors/Enemy Config")]
     public class EnemyConfig : ScriptableObject
     {

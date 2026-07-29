@@ -4,36 +4,20 @@ using UnityEngine.Rendering.Universal;
 
 namespace MetalRaptors
 {
-    /// <summary>
-    /// The blooming-evening atmosphere for the terrain levels: golden-hour light with the sun
-    /// low by the horizon, warm yellow-orange air, built entirely at runtime like
-    /// <see cref="MorningSky"/> and <see cref="MiddaySky"/>. Design notes: docs/atmospheres.md.
-    /// </summary>
     public static class EveningSky
     {
-        // Fog AND the skybox horizon band: one value, so the fogged terrain edge and the sky
-        // meet with no visible seam. Retune them together or the illusion breaks.
         public static readonly Color HazeColor = new Color(0.82f, 0.63f, 0.48f);
-        // The cloud layer's albedo, so the drifting blobs read as this sky's own clouds rather
-        // than white paper on an orange wall. CloudSystem reads it; see docs/clouds.md.
         public static readonly Color CloudColor = new Color(0.92f, 0.71f, 0.56f);
         static readonly Color ZenithColor = new Color(0.38f, 0.34f, 0.52f);
         static readonly Color SunColor = new Color(1.00f, 0.62f, 0.30f);
         static readonly Color SunLightColor = new Color(1.00f, 0.72f, 0.45f);
-        // Gradient ambient: a magenta-violet sky over warm brown ground, so shaded sides lean
-        // dusk-purple and bounce warm from below instead of going flat grey.
         static readonly Color AmbientSkyColor = new Color(0.58f, 0.38f, 0.66f);
         static readonly Color AmbientEquatorColor = new Color(0.80f, 0.54f, 0.58f);
         static readonly Color AmbientGroundColor = new Color(0.42f, 0.27f, 0.20f);
 
-        // Sun column on screen (left of frame — the setting sun is this sky's centrepiece) and
-        // how far above the map-edge horizon the disc rides; SkyHorizon re-anchors it every
-        // frame, so with the big soft disc the lower rim sits in the haze — a sun mid-set.
         const float SunViewportX = 0.22f;
         const float SunHorizonLift = 0.04f;
 
-        // Light shafts: the longest and strongest of the four skies — dusk is where the low sun
-        // rakes right across the play plane, and the shafts reach furthest across the frame.
         static readonly Color RayColor = new Color(1.00f, 0.70f, 0.42f);
         const float RayIntensity = 0.8f;
         const float RayDensity = 0.85f;
@@ -42,7 +26,6 @@ namespace MetalRaptors
         static readonly Quaternion SunLightRotation = Quaternion.Euler(16f, 20f, 0f);
         const float SunLightIntensity = 1.05f;
 
-        /// <summary>Applies the whole look to the scene rendered by <paramref name="cam"/>.</summary>
         public static void Apply(Camera cam, Weather weather)
         {
             BuildSkybox(cam);
@@ -73,7 +56,7 @@ namespace MetalRaptors
             sky.SetFloat("_HorizonFalloff", 3.5f);
             sky.SetColor("_SunColor", SunColor);
             sky.SetFloat("_SunFalloff", 150f);
-            sky.SetFloat("_SunIntensity", 6f);   // past HDR white, but the disc keeps its edge
+            sky.SetFloat("_SunIntensity", 6f);
             sky.SetFloat("_HaloFalloff", 4.5f);
             sky.SetFloat("_HaloIntensity", 0.4f);
             sky.SetFloat("_Exposure", 1f);
@@ -94,7 +77,7 @@ namespace MetalRaptors
                 light.color = SunLightColor;
                 light.intensity = SunLightIntensity;
                 light.transform.rotation = SunLightRotation;
-                light.shadowNormalBias = 0.5f;   // grazing dusk light: acne without the extra bias
+                light.shadowNormalBias = 0.5f;
                 RenderSettings.sun = light;
                 break;
             }
@@ -105,8 +88,6 @@ namespace MetalRaptors
             var profile = ScriptableObject.CreateInstance<VolumeProfile>();
             profile.name = "Evening Post FX (runtime)";
 
-            // Bloom does most of the softness in the shafts: the pass runs before post, so this
-            // blooms the rays themselves along with the HDR disc.
             var bloom = profile.Add<Bloom>();
             bloom.threshold.Override(1.05f);
             bloom.intensity.Override(1.2f);

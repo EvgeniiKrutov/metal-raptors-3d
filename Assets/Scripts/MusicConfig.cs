@@ -4,7 +4,6 @@ using UnityEngine;
 
 namespace MetalRaptors
 {
-    /// <summary>Data model for one synthesized soundtrack. See docs/music.md.</summary>
     public class MusicConfig
     {
         public const string RetroEngine = "retrowave";
@@ -111,7 +110,6 @@ namespace MetalRaptors
         public float Velocity = 1f;
     }
 
-    /// <summary>Loads music JSON from a Resources/Music folder and caches parsed configs.</summary>
     public static class MusicLibrary
     {
         static readonly Dictionary<string, MusicConfig> Cache = new Dictionary<string, MusicConfig>();

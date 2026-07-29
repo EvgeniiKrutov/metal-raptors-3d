@@ -3,11 +3,6 @@ using UnityEngine;
 
 namespace MetalRaptors
 {
-    /// <summary>
-    /// Shared builder for the low-poly blob mesh used by the code-built volume effects
-    /// (<see cref="Explosion"/>, <see cref="CloudSystem"/>): an icosphere with randomly
-    /// displaced vertices, split per-face for flat shading. See docs/effects.md.
-    /// </summary>
     public static class BlobMesh
     {
         public static Mesh Build()
@@ -43,7 +38,6 @@ namespace MetalRaptors
                 faces.AddRange(new[] { a, ab, ca, b, bc, ab, c, ca, bc, ab, bc, ca });
             }
 
-            // Displace the shared vertices (so faces stay stitched); 0.5 keeps localScale = diameter.
             for (int i = 0; i < baseVerts.Count; i++)
                 baseVerts[i] *= 0.5f * Random.Range(0.72f, 1.3f);
 

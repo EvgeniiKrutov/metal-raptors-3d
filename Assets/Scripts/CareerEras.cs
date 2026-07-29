@@ -1,6 +1,5 @@
 namespace MetalRaptors
 {
-    /// <summary>One era of the career: what its card shows and whether it can be entered.</summary>
     public readonly struct CareerEra
     {
         public readonly string Title;
@@ -17,7 +16,6 @@ namespace MetalRaptors
         }
     }
 
-    /// <summary>The four eras of the career, in the order their cards are laid out.</summary>
     public static class CareerEras
     {
         const string Placeholder =

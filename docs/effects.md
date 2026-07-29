@@ -112,3 +112,100 @@ Replaced the original effect (single emissive orange sphere flash + 8 ballistic 
 cubes) — the grey end-stage of the blobs now serves as the debris/smoke reading. Originally
 only shot-down planes exploded and the fail screen appeared instantly; now every ground
 crash explodes and the fail screen waits for it.
+
+## Guns and rounds (`Bullet.cs`, `PlaneShooter.cs`)
+
+`PlaneShooter` (player) and `EnemyController`'s own firing (enemy) both fire the same brass
+`Bullet` from `Bullet.Build`: a stubby glowing slug, thick enough to read at the camera's
+~420 m distance, dressed as metallic brass with only a faint emission so it looks like a lit
+round rather than a laser bolt. Rounds fly straight at constant speed in the XY play-plane
+and self-destruct on the first real collision (triggers, like the goal sphere, are ignored),
+dealing damage through `IDamageable` if the target implements it — the ground just stops the
+round.
+
+Rounds carry almost no mass (`Bullet.Mass`, near zero) on purpose: a round only needs to
+register the hit, never to physically push anything, so a near-massless round can't transfer
+enough impulse to visibly shake or shove the plane it strikes — a full-mass round at
+`bulletSpeed` would. `Rigidbody.collisionDetectionMode` is set to continuous, since at
+`bulletSpeed` a round can cover several metres per physics step and would otherwise tunnel
+through the ground slab or thin terrain. A round is also ignored against its own shooter's
+collider, so a fresh round can never clip the plane that fired it while turning hard into the
+muzzle's path.
+
+Missed rounds are removed once they leave the camera view — but only *after* they have first
+been seen on camera. Enemy rounds are frequently fired from just off-camera and fly into view
+on their way to the player; culling on "off camera" without that seen-first gate would destroy
+an incoming round before it ever rendered, which is exactly why enemy fire used to appear to
+hit from nowhere. A hard lifetime cap exists underneath as a safety net for a round that never
+re-enters the view at all.
+
+`PlaneShooter` lives on the player's physics body next to `CubeController`, whose yaw makes
+the shooter's own `+X` the flight heading, so rounds always leave along the nose; it is wired
+up (muzzle placement, size) by `LevelController`. Guns on both sides fall silent once the
+level ends (crash or win).
+
+## Propeller (`PropellerSpin.cs`)
+
+Spins the propeller pivot about the plane body's nose axis (`+X`, the same axis
+`CubeController` yaws to the flight heading) at a constant ~2 rev/s — fast enough to look
+alive, slow enough that individual blades still read. The spin axis is read from the body's
+local `+X` every frame (not cached), so it follows the plane through every bank, and the
+rotation is centred on the blade disc's own mesh-bounds hub rather than the pivot's origin, so
+the prop spins in place instead of orbiting an off-centre point. Using the nose direction as
+the spin axis is deliberate and rig-derived, not a guess: every plane is oriented at spawn so
+its nose points along the heading, so the axis holds for any model regardless of how its
+propeller mesh is shaped. An earlier version derived the axis from the blade mesh's shortest
+bounds extent, which assumed a symmetric disc and picked the wrong axis for a flat two-blade
+prop like the Sopwith Camel's, sweeping a visibly slanted cone.
+
+## Scrape shake (`ShakeEffect.cs`)
+
+A short, decaying position-and-roll wobble on the plane *model* only — the physics body flies
+straight on, so the shake sells a scrape without ever moving the collider or the flight path.
+`Play` restarts the shake at full strength and it eases back to a rest pose over a fixed decay
+time. That rest pose is captured lazily on the first `Play`, from whatever orientation/offset
+`LevelController` already built the model at, so the wobble always layers on top of the
+model's real pose instead of overwriting it. The jitter amplitude is kept deliberately small
+(a couple of metres, a few degrees of roll) — the model also carries the plane's collider, so
+a bigger translational jolt could dip it into the ground during a low scrape.
+
+## Damage smoke (`SmokeTrail.cs`)
+
+Armed once a plane's health drops below the shared danger threshold (`CubeController` /
+`EnemyController`, see docs/flight-model.md) and never disarmed — once a plane is hurt enough
+to smoke, it smokes until it's gone. `Arm` is idempotent, so it's safe to call again on every
+subsequent hit. The emitter lives on the plane's physics body (so it always knows the current
+nose axis and emits from the tail, the opposite end) and steadily spawns dark, half-transparent
+cube puffs that tumble, drift backward and slightly upward, shrink, and fade out.
+
+The puffs themselves are spawned in **world space, not parented to the plane** — once born
+they hang in the air and fall behind as the plane flies on, rather than riding along with it.
+Because of that they don't automatically die when the plane does: the emitter keeps a
+live-puff list, and `Clear()` stops emission and destroys every outstanding puff at once. Both
+level controllers call `Clear()` when a plane is destroyed or its model is hidden (so a killed
+plane leaves no smoke hanging in the air), and the emitter also clears itself in `OnDestroy`
+as a backstop, so tearing down the plane `GameObject` takes its trailing smoke with it even
+without an explicit call. Each puff removes itself from the emitter's list as it
+self-destructs, so the list never accumulates destroyed puffs. Like the other cosmetic
+effects, puffs carry no collider and no rigidbody.
+
+## Scrape sparks (`Sparks.cs`)
+
+A small shower of emissive-yellow motes sprayed from the plane's position on a scrape (see
+`CubeController.Scrape`), to sell the metal-on-metal contact — purely cosmetic, no collider or
+rigidbody, so sparks can never brush a plane, soak a bullet, or deal damage themselves. Each
+mote sprays outward in the play plane (Z stays flat, matching everything else in the level),
+decelerates, shrinks to nothing, and cools from bright yellow-orange to a dim ember over its
+short randomised life before self-destructing.
+
+## HUD health bar (`HealthBar.cs`)
+
+Shared by both level controllers: a dark plate, a fill anchored to the left edge that drains
+right-to-left as damage comes in (scaled on X by the health fraction) and shades from green to
+red, plus the number on top.
+
+## `IDamageable`
+
+The contract anything a bullet can hurt implements: `Bullet` looks for it on whatever it hits
+and applies damage through it before self-destructing. Both `CubeController` (player) and
+`EnemyController` (enemy fighters) implement it so gunfire can wear either side's health down.

@@ -5,11 +5,6 @@ using UnityEngine.UI;
 
 namespace MetalRaptors
 {
-    /// <summary>
-    /// One step control of a <see cref="MenuSelectorRow"/>: a triangle that clicks the value
-    /// one place along, and greys out once there is nothing left that way.
-    /// See docs/main-menu.md.
-    /// </summary>
     public class MenuArrowView : MonoBehaviour, IPointerEnterHandler, IPointerClickHandler
     {
         public event Action Clicked;

@@ -5,7 +5,6 @@ using UnityEngine.SceneManagement;
 
 namespace MetalRaptors
 {
-    /// <summary>Persistent soundtrack player driving the menu music and fades. See docs/music.md.</summary>
     public class MusicPlayer : MonoBehaviour
     {
         public static MusicPlayer Instance { get; private set; }
@@ -16,23 +15,19 @@ namespace MetalRaptors
         const float FadeOutSec = 0.8f;
         const double ScheduleDelaySec = 0.1;
 
-        // Start-latency budget (docs/music.md): the intro plays as soon as it is baked, held
-        // back only long enough that the still-rendering loop is predicted to land before the
-        // intro's musical end.
-        const float LoopBakeSafety = 1.3f;    // margin on the predicted loop bake
-        const float HandoffMarginSec = 0.35f; // loop clip must exist this long before it is due
-        const float MaxStartWaitSec = 2.5f;   // never hold the intro back longer than this
-        const double LateLoopDelaySec = 0.05; // the loop missed its slot: in as soon as possible
+        const float LoopBakeSafety = 1.3f;
+        const float HandoffMarginSec = 0.35f;
+        const float MaxStartWaitSec = 2.5f;
+        const double LateLoopDelaySec = 0.05;
 
         static readonly Dictionary<string, RenderedMusic> RenderCache = new Dictionary<string, RenderedMusic>();
 
-        /// <summary>One track being rendered: intro and loop on separate worker threads.</summary>
         class BakeJob
         {
             public string Id;
             public MusicConfig Config;
             public float Fade;
-            public bool Wanted;          // a prewarm bakes into the cache without playing
+            public bool Wanted;
             public Task<MusicBake> Intro;
             public Task<MusicBake> Loop;
             public float StartedAt;
@@ -51,7 +46,7 @@ namespace MetalRaptors
         float _volumeTarget;
         float _fadeSec = 1f;
         bool _stopWhenSilent;
-        double _fadeAfterDsp;   // the ramp waits for scheduled playback, so it is never spent on silence
+        double _fadeAfterDsp;
 
         BakeJob _job;
 
@@ -76,9 +71,6 @@ namespace MetalRaptors
             _introSource = CreateSource(false);
             _loopSource = CreateSource(true);
             SceneManager.sceneLoaded += OnSceneLoaded;
-
-            // Bootstrap runs before the first scene loads, so the bake overlaps the menu's
-            // scene load and UI construction instead of starting after them.
             Prewarm(MenuThemeId);
         }
 
@@ -128,7 +120,6 @@ namespace MetalRaptors
             StartJob(id, fadeSec, wanted: true);
         }
 
-        /// <summary>Bakes a track into the cache without playing it, so a later Play is instant.</summary>
         public void Prewarm(string id)
         {
             if (RenderCache.ContainsKey(id) || (_job != null && _job.Id == id)) return;
@@ -180,7 +171,6 @@ namespace MetalRaptors
             if (job.LoopDone && (job.Intro == null || job.IntroBaked)) _job = null;
         }
 
-        /// <summary>The intro buffer is ready: clip it, and time the loop bake from its cost.</summary>
         void TakeIntro(BakeJob job)
         {
             job.IntroBaked = true;
@@ -198,16 +188,10 @@ namespace MetalRaptors
             job.IntroClip = MusicSynth.ToClip(bake, intro: true, $"{job.Id}-intro");
             job.IntroDuration = bake.IntroDuration;
 
-            // Both halves render the same way, so the intro's measured cost per second of
-            // audio predicts the loop's — on this machine, at this load.
             double rendered = job.IntroSec + (job.Config.IsRetro ? MusicSynthRetro.TailSec : 0.0);
             job.BakeSecPerAudioSec = (Time.realtimeSinceStartup - job.StartedAt) / Mathf.Max((float)rendered, 0.05f);
         }
 
-        /// <summary>
-        /// Starts the intro, delayed only by however long the loop still needs: the loop enters
-        /// on the intro's last beat, so holding the intro back is what keeps that handoff clean.
-        /// </summary>
         void StartIntro(BakeJob job)
         {
             job.IntroStarted = true;
@@ -258,8 +242,6 @@ namespace MetalRaptors
 
             if (job.IntroStarted)
             {
-                // The intro is already playing (or scheduled): slot the loop onto its end. If
-                // the bake overran that moment the loop enters late, under the intro's tail.
                 _loopSource.clip = loopClip;
                 _loopSource.PlayScheduled(System.Math.Max(job.LoopDueDsp,
                     AudioSettings.dspTime + LateLoopDelaySec));
@@ -307,7 +289,7 @@ namespace MetalRaptors
             if (_job != null)
             {
                 _job.Wanted = false;
-                _job.IntroStarted = false; // a later Play re-schedules from the top
+                _job.IntroStarted = false;
             }
         }
 

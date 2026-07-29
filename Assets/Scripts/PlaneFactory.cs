@@ -3,31 +3,14 @@ using UnityEngine.Rendering;
 
 namespace MetalRaptors
 {
-    /// <summary>
-    /// Builds flyable aircraft rigs — the model under a bare physics body — for every level
-    /// type (Air Fights and Campaign). Extracted from LevelController so any controller can
-    /// spawn planes; the mirror/orientation rules are documented in that class's history and
-    /// docs/campaign.md.
-    /// </summary>
     public static class PlaneFactory
     {
-        // Dedicated physics layer for every plane's collider; its self-collisions are switched
-        // off by the level controllers so planes pass through each other (scrapes are detected
-        // by distance instead).
         public const int PlaneLayer = 8;
 
-        // Cosmetic nose-down tilt of the model about the view axis (visual only).
         const float ModelPitchDeg = -10f;
 
         const float FallbackCubeScale = 30f;
 
-        /// <summary>
-        /// Instantiates the aircraft described by <paramref name="plane"/> under
-        /// <paramref name="parent"/> (the physics body): stands it upright per the config,
-        /// scales it to its on-screen size, adds a tight convex collider on the plane layer,
-        /// enables shadows, spins the propeller, and attaches the scrape ShakeEffect. Pass
-        /// <paramref name="mirrored"/> for enemies, which fly left instead of right.
-        /// </summary>
         public static Transform BuildPlaneModel(Transform parent, PlaneModelConfig plane, bool mirrored = false)
         {
             var prefab = Resources.Load<GameObject>(plane.resourceName);
@@ -44,10 +27,6 @@ namespace MetalRaptors
             model.name = mirrored ? $"{plane.resourceName} (enemy)" : plane.resourceName;
             model.transform.SetParent(parent, false);
 
-            // Stand the flat-exported model upright, roll it wheels-down for the right-flying
-            // player (the mirrored enemy gets it from the parent's ~180° heading spin instead),
-            // and dip the nose toward the flight direction. Visual only: the heading is the
-            // parent's rotation.
             Quaternion wheelsDown = (plane.rollWheelsDown && !mirrored)
                 ? Quaternion.Euler(180f, 0f, 0f) : Quaternion.identity;
             float pitch = mirrored ? -ModelPitchDeg : ModelPitchDeg;
@@ -66,14 +45,6 @@ namespace MetalRaptors
             return model.transform;
         }
 
-        /// <summary>
-        /// Mounts the machine-gun muzzle just ahead of the propeller disc at Spandau height,
-        /// derived from the prop's bounds (the models have no gun nodes). Also emits a
-        /// <paramref name="flashPoint"/> at the same nose but down on the propeller-hub centre
-        /// line — the engine cowl — where the muzzle flash bursts (see docs/effects.md). Must be
-        /// called while the body still has its spawn heading of 0 (identity rotation), so world
-        /// offsets can be stored directly as local positions.
-        /// </summary>
         public static Transform MountMuzzle(GameObject body, Transform model, PlaneModelConfig plane,
             out Transform flashPoint)
         {
@@ -87,16 +58,10 @@ namespace MetalRaptors
 
             flashPoint = new GameObject("MuzzleFlashPoint").transform;
             flashPoint.SetParent(body.transform, false);
-            flashPoint.localPosition = nose; // cowl: hub centre, not gun height
+            flashPoint.localPosition = nose;
             return muzzle;
         }
 
-        /// <summary>
-        /// The cowl point in <paramref name="body"/>-local space: on the propeller hub's centre
-        /// line, just ahead of the propeller disc. Where the guns and the night searchlight
-        /// (<see cref="PlaneSearchlight"/>) mount. Must be called while the body still has its
-        /// spawn heading of 0 (identity rotation), so world offsets are local offsets.
-        /// </summary>
         public static Vector3 NoseLocal(GameObject body, Transform model, PlaneModelConfig plane)
         {
             const float MuzzleClearance = 2f;
@@ -112,8 +77,6 @@ namespace MetalRaptors
                 bounds.center.y - body.transform.position.y, 0f);
         }
 
-        /// <summary>Uniformly scales <paramref name="model"/> so the longest side of its combined
-        /// renderer bounds equals <paramref name="targetSize"/>.</summary>
         static void NormalizeSize(Transform model, float targetSize)
         {
             var renderers = model.GetComponentsInChildren<Renderer>();
@@ -127,8 +90,6 @@ namespace MetalRaptors
                 model.localScale *= targetSize / longest;
         }
 
-        /// <summary>A single convex mesh collider from the largest mesh (the fuselage), on the
-        /// plane layer so plane-vs-plane contacts stay off while ground and bullets stay on.</summary>
         static void AddPlaneCollider(Transform model)
         {
             MeshFilter biggest = null;
@@ -154,7 +115,6 @@ namespace MetalRaptors
             else Debug.LogWarning("PlaneFactory: propeller node not found on the plane model.");
         }
 
-        /// <summary>Depth-first search for a descendant transform by name.</summary>
         public static Transform FindDeep(Transform root, string name)
         {
             foreach (var t in root.GetComponentsInChildren<Transform>(true))

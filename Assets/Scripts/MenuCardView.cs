@@ -5,10 +5,6 @@ using UnityEngine.UI;
 
 namespace MetalRaptors
 {
-    /// <summary>
-    /// One square card of the career era grid: a white face carrying the era's title and
-    /// years at its foot, framed in accent while highlighted. See docs/main-menu.md.
-    /// </summary>
     public class MenuCardView : MonoBehaviour, IPointerEnterHandler, IPointerClickHandler
     {
         public event Action Activated;
@@ -29,8 +25,6 @@ namespace MetalRaptors
             var view = go.GetComponent<MenuCardView>();
             view.Interactable = interactable;
 
-            // Anchored to the parent's top left: x is the card's own left edge, so the run of
-            // them is laid out rightward from there (same convention as MenuItemView).
             var rt = (RectTransform)go.transform;
             rt.anchorMin = new Vector2(0f, 1f);
             rt.anchorMax = new Vector2(0f, 1f);
@@ -52,7 +46,6 @@ namespace MetalRaptors
             return view;
         }
 
-        /// <summary>The highlight ring, drawn under the face and bleeding out past its edges.</summary>
         static Image CreateFrame(RectTransform parent)
         {
             var go = new GameObject("Frame", typeof(Image));
@@ -69,7 +62,6 @@ namespace MetalRaptors
             return img;
         }
 
-        /// <summary>The card's own surface, and the only hit box it has.</summary>
         static void CreateFace(RectTransform parent)
         {
             var go = new GameObject("Face", typeof(Image));
@@ -85,7 +77,6 @@ namespace MetalRaptors
             rt.offsetMax = Vector2.zero;
         }
 
-        /// <summary>Moves the card's left edge along the row it shares with its neighbours.</summary>
         public void SetX(float x) => _rt.anchoredPosition = new Vector2(x, _rt.anchoredPosition.y);
 
         public void SetFocused(bool focused)
@@ -107,7 +98,6 @@ namespace MetalRaptors
             _frame.enabled = _focused;
         }
 
-        // Locked cards still take the highlight so their era can be read above the row.
         public void OnPointerEnter(PointerEventData eventData) => Hovered?.Invoke(this);
 
         public void OnPointerClick(PointerEventData eventData) => Activate();

@@ -27,7 +27,6 @@ namespace MetalRaptors
             ColorUtility.TryParseHtmlString(hex, out Color c) ? c : Color.magenta;
     }
 
-    /// <summary>Palettes and metrics of the main-menu look. See docs/main-menu.md.</summary>
     public static class MenuTheme
     {
         static readonly MenuPalette[] Palettes =
@@ -46,8 +45,6 @@ namespace MetalRaptors
         public const float ColumnFraction = 0.4f;
         public const float PadTopFraction = 0.15f;
 
-        // Ragged-left design: the left margin is the edge every screen is composed against,
-        // the right one only keeps stretched rows off the screen edge.
         public const float PadLeft = 120f;
         public const float PadRight = 56f;
 
@@ -66,9 +63,6 @@ namespace MetalRaptors
         public const float OptionRowHeight = 34f;
         public const float OptionGap = 26f;
 
-        // A selector is two columns, each reading from its own left edge: the label, then the
-        // control (triangle, value, triangle). The value column is a fixed width so the right
-        // triangle holds still as the value changes under it.
         public const float SelectorLabelWidth = 190f;
         public const float SelectorValueWidth = 190f;
         public const float SelectorArrowGap = 22f;

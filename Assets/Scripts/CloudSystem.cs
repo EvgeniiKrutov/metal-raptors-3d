@@ -4,40 +4,28 @@ using UnityEngine.Rendering;
 
 namespace MetalRaptors
 {
-    /// <summary>
-    /// The drifting cloud layer for the terrain levels: soft blob-built clouds (same mesh
-    /// family as <see cref="Explosion"/>) riding the play plane from right to left, tinted to
-    /// the level's daytime. Presets come from the level's <see cref="CloudsPart"/>; start
-    /// with <see cref="Begin"/>. Purely visual — no colliders, no shadows. Full design:
-    /// docs/clouds.md.
-    /// </summary>
     public class CloudSystem : MonoBehaviour
     {
         const float MinAltitude = 350f, MaxAltitude = 850f;
-        const float DepthSpread = 60f;   // clouds sit within this of the play plane on Z, so
-                                         // planes pass both in front of and behind them
-        const float WindowMargin = 300f; // beyond the view edges; > any cloud's half-width
+        const float DepthSpread = 60f;
+        const float WindowMargin = 300f;
         const float BaseAlpha = 0.5f;
         const int BlobCountMin = 5, BlobCountMax = 9;
 
-        // Presets indexed by CloudLevel (Low, Medium, High) — see docs/clouds.md.
-        static readonly float[] DriftSpeed = { 6f, 12f, 24f };     // metres/second leftward
-        static readonly float[] Spacing = { 520f, 300f, 160f };    // average metres between clouds
-        static readonly float[] CloudWidth = { 45f, 80f, 130f };   // nominal cloud width, metres
+        static readonly float[] DriftSpeed = { 6f, 12f, 24f };
+        static readonly float[] Spacing = { 520f, 300f, 160f };
+        static readonly float[] CloudWidth = { 45f, 80f, 130f };
 
         static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
         static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
 
-        // How much of the sky's own air colour each daytime lifts its clouds by (indexed by
-        // Daytime). This is what keeps a cloud in the sky's family instead of letting the key
-        // light and ambient grey out its shaded side — see docs/clouds.md.
         static readonly float[] HazeGlow = { 0.30f, 0.22f, 0.40f, 0.55f };
 
         struct Blob
         {
             public Transform tr;
             public Vector3 baseOffset;
-            public Vector2 amplitude, frequency, phase; // slow X/Y hover of the blob in the cloud
+            public Vector2 amplitude, frequency, phase;
         }
 
         class Cloud
@@ -54,14 +42,9 @@ namespace MetalRaptors
         Color _tint, _glow;
         readonly List<Cloud> _clouds = new List<Cloud>();
         float _time;
-        float _nextSpawnU; // conveyor-space X of the next cloud (docs/clouds.md)
+        float _nextSpawnU;
         bool _primed;
 
-        /// <summary>
-        /// Starts the layer over the scene rendered by <paramref name="cam"/>.
-        /// <paramref name="weather"/> is the future modulation seam, as in the sky classes;
-        /// <see cref="Weather.Calm"/> changes nothing.
-        /// </summary>
         public static CloudSystem Begin(Camera cam, Daytime daytime, Weather weather,
             CloudsPart part, float playPlaneZ)
         {
@@ -77,7 +60,6 @@ namespace MetalRaptors
             return sys;
         }
 
-        /// <summary>The cloud albedo, owned by the active sky so the two always match.</summary>
         static Color TintFor(Daytime daytime)
         {
             switch (daytime)
@@ -89,11 +71,6 @@ namespace MetalRaptors
             }
         }
 
-        /// <summary>
-        /// The emissive lift: a fraction of the sky's haze — the same colour the fog and the
-        /// horizon band are — so a cloud's unlit side settles into the air behind it instead of
-        /// falling to grey under the key light.
-        /// </summary>
         static Color GlowFor(Daytime daytime)
         {
             Color haze;
@@ -112,7 +89,6 @@ namespace MetalRaptors
             if (_cam == null) return;
             _time += Time.deltaTime;
 
-            // View half-width at the layer's farthest depth, so the margins cover every cloud.
             float depth = _playPlaneZ + DepthSpread - _cam.transform.position.z;
             float halfW = depth * Mathf.Tan(_cam.fieldOfView * 0.5f * Mathf.Deg2Rad) * _cam.aspect;
             float camX = _cam.transform.position.x;
@@ -121,7 +97,7 @@ namespace MetalRaptors
 
             if (!_primed)
             {
-                _nextSpawnU = left + _speed * _time; // first frame seeds the whole window
+                _nextSpawnU = left + _speed * _time;
                 _primed = true;
             }
 
@@ -177,7 +153,6 @@ namespace MetalRaptors
                     Random.Range(-0.22f, 0.22f),
                     Random.Range(-0.08f, 0.08f)) * width;
                 go.transform.localPosition = offset;
-                // Yaw only: the X/Z stretch below must stay horizontal.
                 go.transform.localRotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
 
                 float s = width * Random.Range(0.35f, 0.55f);
@@ -223,7 +198,7 @@ namespace MetalRaptors
             mat.EnableKeyword("_EMISSION");
             mat.SetColor(EmissionColorId, _glow);
             mat.SetFloat("_Smoothness", 0f);
-            mat.SetFloat("_Surface", 1f); // transparent
+            mat.SetFloat("_Surface", 1f);
             mat.SetOverrideTag("RenderType", "Transparent");
             mat.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha);
             mat.SetFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha);

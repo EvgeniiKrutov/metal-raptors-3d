@@ -5,11 +5,6 @@ using UnityEngine.UI;
 
 namespace MetalRaptors
 {
-    /// <summary>
-    /// Builds the main menu at runtime: a flat text column on the left of the screen, and the
-    /// two full-width career pages (the era cards and the chosen era's entries) it opens.
-    /// See docs/main-menu.md.
-    /// </summary>
     public class MainMenuController : MonoBehaviour
     {
         enum MenuScreen { Home, Eras, Era, Custom }
@@ -71,20 +66,9 @@ namespace MetalRaptors
             if (ReadCancel()) Cancel();
         }
 
-        /// <summary>
-        /// A page hung from the top of the canvas, taking <paramref name="widthFraction"/> of its
-        /// width: 40% for the menu column, all of it for the era cards. Anchored in fractions,
-        /// not reference pixels, so the split holds at any aspect ratio. Its left inset is the
-        /// margin every screen reads from.
-        /// </summary>
         static Transform CreatePage(Transform parent, string name, float widthFraction) =>
             CreateRegion(parent, name, 0f, widthFraction, MenuTheme.PadLeft);
 
-        /// <summary>
-        /// The general form: a band of the canvas from <paramref name="xMin"/> to
-        /// <paramref name="xMax"/>, hung from the same 15% top line. The right band a preview
-        /// card sits in takes no left inset — the column split is already its left edge.
-        /// </summary>
         static Transform CreateRegion(Transform parent, string name, float xMin, float xMax, float padLeft)
         {
             var go = new GameObject(name, typeof(RectTransform));
@@ -99,8 +83,6 @@ namespace MetalRaptors
             return go.transform;
         }
 
-        /// <summary>A screen made of more than one band: an untouched full-canvas holder its
-        /// bands anchor inside, so their fractions still read against the whole width.</summary>
         static Transform CreateScreen(Transform parent, string name)
         {
             var go = new GameObject(name, typeof(RectTransform));
@@ -151,7 +133,6 @@ namespace MetalRaptors
             return panel;
         }
 
-        /// <summary>The era picker: a header reading from the highlighted card, and the card row.</summary>
         GameObject BuildErasPage(Transform parent)
         {
             Transform page = CreatePage(parent, "Career Page", 1f);
@@ -176,11 +157,6 @@ namespace MetalRaptors
             return page.gameObject;
         }
 
-        /// <summary>
-        /// One era's own page — back in the main menu's left column, since it is a list of
-        /// entries and nothing needs the width. Only one era is unlocked, so the title is set
-        /// from whichever card opened the page.
-        /// </summary>
         GameObject BuildEraPage(Transform parent)
         {
             Transform page = CreatePage(parent, "Era Page", MenuTheme.ColumnFraction);
@@ -195,11 +171,6 @@ namespace MetalRaptors
             return page.gameObject;
         }
 
-        /// <summary>
-        /// The custom battle screen: the picks in the column, and the picked map's card in the
-        /// right band where its screenshot will go. Both selectors reset every time the menu is
-        /// built — a custom battle's picks are not settings.
-        /// </summary>
         GameObject BuildCustomPage(Transform parent)
         {
             Transform screen = CreateScreen(parent, "Custom Page");
@@ -233,18 +204,15 @@ namespace MetalRaptors
             _mapPreview.SetTitle(PreviewTitle());
         }
 
-        /// <summary>The card's foot carries both picks, so it reads as the battle about to be flown.</summary>
         string PreviewTitle() =>
             $"{BattleMaps.All[_mapIndex].Name} | {WeatherNames[(int)_daytime]}";
 
-        /// <summary>An endless battle over the picked map, under the picked sky.</summary>
         void StartCustomBattle()
         {
             CustomBattle.Request(BattleMaps.All[_mapIndex], _daytime);
             SceneManager.LoadScene(SceneNames.CampaignLevel1);
         }
 
-        /// <summary>The same endless scene, flown at the era's own authored atmosphere.</summary>
         static void StartCampaign()
         {
             CustomBattle.Clear();
@@ -298,16 +266,11 @@ namespace MetalRaptors
             _customPage.SetActive(screen == MenuScreen.Custom);
         }
 
-        /// <summary>
-        /// Escape goes wherever the screen's own back entry goes — the main list from
-        /// everywhere, since the era picker is a step through career, not a layer to sit in.
-        /// </summary>
         void Cancel()
         {
             if (_screen != MenuScreen.Home || _homePanel != _main) ShowHome(_main);
         }
 
-        /// <summary>Down/up: always the highlight.</summary>
         static int ReadStep()
         {
             Keyboard kb = Keyboard.current;
@@ -322,8 +285,6 @@ namespace MetalRaptors
             return forward ? 1 : -1;
         }
 
-        /// <summary>Right/left: a selector's value where one holds the highlight, the highlight
-        /// itself everywhere else — the era card row reads across, so it takes them too.</summary>
         static int ReadAdjust()
         {
             Keyboard kb = Keyboard.current;

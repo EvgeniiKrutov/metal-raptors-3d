@@ -3,11 +3,6 @@ using UnityEngine.UI;
 
 namespace MetalRaptors
 {
-    /// <summary>
-    /// A card that shows rather than commands: the same white square as a career era card,
-    /// carrying the picked map's name in its foot and holding the space a map screenshot will
-    /// fill. Nothing focuses or clicks it. See docs/main-menu.md.
-    /// </summary>
     public class MenuPreviewCard
     {
         readonly Text _title;

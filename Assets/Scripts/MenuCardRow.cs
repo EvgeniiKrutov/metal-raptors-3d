@@ -4,12 +4,6 @@ using UnityEngine;
 
 namespace MetalRaptors
 {
-    /// <summary>
-    /// A horizontal run of cards centred on its parent, owning one highlight shared by mouse
-    /// and keyboard. Unlike <see cref="MenuPanel"/> the highlight also lands on locked cards —
-    /// they are content, not commands, and the header above the row reads from the highlight.
-    /// See docs/main-menu.md.
-    /// </summary>
     public class MenuCardRow : IMenuFocusGroup
     {
         public event Action<int> FocusChanged;
@@ -41,7 +35,6 @@ namespace MetalRaptors
             return card;
         }
 
-        /// <summary>Lays the finished run out rightward from the row's left edge.</summary>
         public void Layout()
         {
             float pitch = MenuTheme.CardSize + MenuTheme.CardGap;
@@ -54,7 +47,6 @@ namespace MetalRaptors
             FocusIndex(_focus < 0 ? 0 : (_focus + delta + _cards.Count) % _cards.Count);
         }
 
-        /// <summary>The row runs across the screen, so left/right are its focus keys too.</summary>
         public void Adjust(int delta) => MoveFocus(delta);
 
         public void ActivateFocused()

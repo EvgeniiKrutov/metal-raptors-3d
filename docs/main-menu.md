@@ -167,6 +167,24 @@ Daytime.Morning`) and the challenge levels keep their definitions' defaults.
 there, and nothing writes them — the custom battle deliberately goes through the
 memory-only `CustomBattle` instead, so flying one changes no saved setting.
 
+## Garage
+
+The mech-picker scene (`GarageController`), reached from the menu. Sets the camera's clear
+flags to a solid dark colour instead of a full-screen UI background image, so the three
+rotating 3D preview cubes — built as world-space primitives, not sprites — show through
+behind the screen-space overlay UI. The selected cube spins faster and glows
+(`_EmissionColor`); volume controls and the mech pick both write through `GameManager`
+immediately.
+
+## Persistence
+
+`GameManager` bootstraps itself with `RuntimeInitializeOnLoadMethod(BeforeSceneLoad)`, so
+`Instance` exists no matter which scene is pressed Play in first. It carries three kinds of
+cross-scene state, each mirrored to `PlayerPrefs` on every setter and reloaded in `Load()`:
+the selected loadout (mech/colour, chosen in the Garage), audio settings (master volume),
+and progress (which levels are unlocked). The Level 1 / campaign daytime picks above are
+persisted the same way, but nothing in the current menu writes them.
+
 ## Themes
 
 Five palettes live in `MenuTheme.Palettes`, indexed by `MenuThemeId`:
@@ -318,3 +336,17 @@ The three weights are separate assets rather than `FontStyle.Bold` on one file: 
 `Text` fakes bold by smearing the regular outline, so `UIFactory.CreateText` and
 `CreateButton` map the requested `FontStyle` onto the real weight and pass
 `FontStyle.Normal` to the renderer.
+
+## Runtime plumbing
+
+`UIFactory.EnsureEventSystem` creates the `EventSystem` through `InputSystemUIInputModule`,
+not the legacy `StandaloneInputModule` — this project runs the Input System package, so the
+legacy module never receives events. `AssignDefaultActions` wires the default UI input
+actions so pointer clicks work without further setup; `CreateCanvas` calls it before
+building anything else.
+
+`CreatePrimitive3D` tears down a decorative primitive's collider with `DestroyImmediate`,
+not `Destroy`, when `keepCollider` is false — `CreatePrimitive` always attaches one, and a
+plain `Destroy` is deferred to end of frame, leaving the collider live for the rest of it.
+Anything spawned on top of the player that frame (muzzle sparks, the Garage's preview
+cubes) would otherwise register a bogus collision before the object is gone.

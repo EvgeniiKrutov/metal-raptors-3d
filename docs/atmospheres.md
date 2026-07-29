@@ -17,7 +17,10 @@ built entirely at runtime (no material/profile assets): `MorningSky`, `MiddaySky
    moonglow patch so they live only in the dark upper sky).
 2. Linear fog whose colour is exactly the skybox's horizon band (`HazeColor`, the one
    public value per sky — `ProceduralTerrain` reads it), so the land dissolves seamlessly
-   into the sky. Retune fog colour and horizon band together or the seam shows.
+   into the sky. Retune fog colour and horizon band together or the seam shows. The
+   shader's `_BottomColor` (below-horizon fill) matches too, for the same reason — from a
+   high camera the sky past the terrain's far edge is visible, and any tint mismatch there
+   reads as a seam at the map edge.
 3. A directional key light that cannot shine out of the visible sun (that would backlight
    the planes into silhouettes, since the camera looks straight down +Z), so it shines
    into +Z from a plausible angle on the sun's side of the sky.
@@ -49,6 +52,60 @@ same for all — the last ~250 m of land sit in solid haze so the map edge never
 | Midday  | +300 m | clear; haze only toward the horizon |
 | Evening | +260 m | warm haze held back to the far half — the golden air was drowning the land |
 | Night   | +250 m | clear calm air; the distance is lost to darkness, not mist |
+
+## MorningSky design
+
+Foggy dawn: a low sun still off to the side, thick warm haze, cool shade.
+
+- **Palette**: warm haze `(0.90, 0.84, 0.75)` under a muted morning-blue zenith
+  `(0.52, 0.62, 0.76)`; pale gold sun disc and halo; amber key light; cool blue-sky /
+  warm-brown-ground trilight ambient, so shadows lean blue while the land bounces warmth
+  back into them.
+- **Sun placement**: screen column x = 0.80 — right edge, out of the player's sightline —
+  riding `SunHorizonLift = 0.08` above the map-edge horizon via `SkyHorizon` (a sun already
+  risen, unlike the evening's lower, still-setting rim at 0.04). Soft ~6° core
+  (`_SunFalloff 300`, intensity 4.5, well past HDR white so bloom does the glow) with a
+  broad scattered-light halo (`_HaloFalloff 7`, intensity 0.35).
+- **Key light**: `Euler(30, -17, 0)`, intensity 1.25 — can't shine out of the visible sun
+  itself (that would backlight the planes into silhouettes under the top-down camera), so it
+  shines into `+Z` from over the camera's right shoulder, low enough for long morning
+  shadows and on the sun's side of the sky so the angle still feels plausible. Shadow normal
+  bias raised to 0.5 — low, grazing light is prone to acne otherwise.
+- **Post FX**: warm push (white balance +12, a third-of-a-stop exposure lift, saturation
+  +8), wide soft bloom scatter (0.75 — a foggy glow, not neon edges) since the light shafts
+  render before post and bloom along with them.
+- **Light shafts**: intensity 0.85, density 0.85 — shorter and paler than the evening's,
+  since this sun is already risen and sits at the frame's edge rather than raking low across
+  the play plane.
+- **Horizon band**: `_HorizonFalloff 2.5` — wide, since the morning air reads as thick.
+
+## MiddaySky design
+
+Clear noon: a small hard overhead sun, thin pale-blue distance haze, short neutral shadows —
+`MorningSky`'s counterpart, built the same way.
+
+- **Palette**: thin pale-blue haze `(0.78, 0.85, 0.93)` under a deep saturated noon-blue
+  zenith `(0.24, 0.46, 0.82)`; near-white sun disc and neutral daylight key light; trilight
+  ambient graduating from noon-blue sky to dry warm ground.
+- **Sun placement**: a fixed viewport anchor `(0.50, 0.85)` — top-centre of the frame, above
+  the dogfight — rather than glued to the horizon like the low morning/evening suns; only
+  the horizon band tracks the map edge (`SkyHorizon` with `anchorSun` off). Small hard ~4°
+  core (`_SunFalloff 800`, intensity 6, far past HDR white for noon glare) with a tight halo
+  (`_HaloFalloff 14`, intensity 0.22) — clear air scatters far less light than the morning's
+  haze.
+- **Key light**: `Euler(58, 0, 0)`, intensity 1.35 — the steepest and strongest of the four,
+  pouring almost straight down into `+Z` from above and behind the camera for short noon
+  shadows; with the sun dead ahead at the top of the frame the straight-on yaw still feels
+  plausible.
+- **Post FX**: a breath cool (white balance −4, next to the morning's gold), the hardest
+  contrast (+10, letting the overhead light punch), tight bloom scatter (0.6, a glare around
+  the disc rather than the morning's foggy spill), and the lightest vignette (0.15) — noon
+  frames read open.
+- **Light shafts**: intensity 0.45, density 0.65 — barely there; clear noon air scatters
+  little and an overhead sun throws no rake across the play plane, just a short fan close
+  around the disc.
+- **Horizon band**: `_HorizonFalloff 1.8` — the narrowest of the four; clear air lets the
+  blue zenith own most of the sky.
 
 ## EveningSky design
 
@@ -120,6 +177,30 @@ power — under dark-violet air.
   the land, night's version of scattered horizon light.
 - **Player searchlight**: night is the only daytime that mounts one on the player's plane
   (warm cone from the nose, toggled with T, off at spawn) — see docs/searchlight.md.
+
+## Light shafts implementation (`GodRays`)
+
+A fullscreen URP pass (`Hidden/StylizedGodRays`) that radially blurs the depth buffer's sky
+mask outward from the sun's screen position, so the land, trees and planes carve the dark
+gaps that read as light striking from behind them. `GodRays.Attach` hangs one instance per
+camera (re-attaching first disables and destroys any stale instance, so re-applying a sky
+can't stack a second set of shafts) and enqueues its `RayPass` via
+`RenderPipelineManager.beginCameraRendering` — before post-processing, so bloom blows the
+shafts out along with the HDR sun/moon core.
+
+The pass is enqueued per frame from code rather than living on a Renderer Data asset, since
+this project builds its whole rendering setup in code and the shafts belong to whichever sky
+is currently applied. Because reading and writing the same render-graph texture is illegal,
+the pass allocates a fresh intermediate colour target to render into and swaps
+`resources.cameraColor` to it.
+
+Sun tracking runs in `OnBeginCamera` rather than `LateUpdate`, so it always reads the sun
+direction `SkyHorizon` settled on *this* frame rather than the previous one. It re-projects a
+point far down the sun's direction to viewport space (the skybox renders at infinity, so that
+projects to the same screen spot as the disc itself) and fades the shafts out smoothly as the
+sun nears or crosses the view edge, plus a second fade on view alignment (`Vector3.Dot` of the
+camera's forward and the sun direction) — the second fade exists so a fast camera swing can't
+pop the shafts in abruptly as the sun crosses behind the view.
 
 ## Exposure
 

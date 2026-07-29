@@ -4,7 +4,6 @@ using System.Text;
 
 namespace MetalRaptors
 {
-    /// <summary>Minimal JSON reader for the music track files. See docs/music.md.</summary>
     public static class MusicJson
     {
         public static object Parse(string text)

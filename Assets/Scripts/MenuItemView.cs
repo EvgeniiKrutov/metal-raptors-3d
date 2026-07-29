@@ -7,10 +7,6 @@ namespace MetalRaptors
 {
     public enum MenuItemStyle { Nav, Option }
 
-    /// <summary>
-    /// One chrome-less text entry of the menu. Colour and weight follow its
-    /// interactable / focused / selected state — see docs/main-menu.md.
-    /// </summary>
     public class MenuItemView : MonoBehaviour, IPointerEnterHandler, IPointerClickHandler, IMenuFocusable
     {
         public event Action Activated;
@@ -45,15 +41,12 @@ namespace MetalRaptors
             text.verticalOverflow = VerticalWrapMode.Overflow;
             text.raycastTarget = interactable;
 
-            // Anchored to the parent's top left: x is the entry's own left edge, so a lone entry
-            // sits flush at x = 0 and a run of them is laid out rightward from there.
             RectTransform rt = text.rectTransform;
             rt.anchorMin = new Vector2(0f, 1f);
             rt.anchorMax = new Vector2(0f, 1f);
             rt.pivot = new Vector2(0f, 1f);
             rt.anchoredPosition = anchoredPos;
 
-            // Measured in the bold weight so the hit box does not shrink when focus lands on it.
             text.font = UIFactory.BoldFont;
             rt.sizeDelta = new Vector2(text.preferredWidth + 2f, rowHeight);
 
@@ -61,7 +54,6 @@ namespace MetalRaptors
             return view;
         }
 
-        /// <summary>Moves the entry's left edge along the row it shares with its neighbours.</summary>
         public void SetX(float x)
         {
             RectTransform rt = _text.rectTransform;
@@ -85,7 +77,6 @@ namespace MetalRaptors
             if (Interactable) Activated?.Invoke();
         }
 
-        /// <summary>A plain entry has no value to step, so left/right stay navigation keys.</summary>
         public bool Adjust(int delta) => false;
 
         void Apply()

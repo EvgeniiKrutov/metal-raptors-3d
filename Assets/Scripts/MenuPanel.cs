@@ -5,10 +5,6 @@ using UnityEngine.UI;
 
 namespace MetalRaptors
 {
-    /// <summary>
-    /// A stack of menu entries that owns one moving highlight shared by mouse and keyboard.
-    /// Entries are centred and laid out downward from the panel's top edge. See docs/main-menu.md.
-    /// </summary>
     public class MenuPanel : IMenuFocusGroup
     {
         readonly List<IMenuFocusable> _focusables = new List<IMenuFocusable>();
@@ -56,7 +52,6 @@ namespace MetalRaptors
             return item;
         }
 
-        /// <summary>A muted tag ("locked") set just after an entry, on the same baseline.</summary>
         public void AddTag(MenuItemView item, string tag)
         {
             Text label = UIFactory.CreateInlineLabel(_root, tag.ToUpperInvariant(), MenuTheme.CaptionSize,
@@ -67,7 +62,6 @@ namespace MetalRaptors
                 new Vector2(pos.x + item.Width + MenuTheme.TagGap, pos.y);
         }
 
-        /// <summary>A horizontal run of choices from the panel's left edge, where exactly one is lit accent.</summary>
         public MenuItemView[] AddOptionRow(string[] labels, int selected, Action<int> onPick)
         {
             var items = new MenuItemView[labels.Length];
@@ -89,7 +83,6 @@ namespace MetalRaptors
                 items[i] = item;
             }
 
-            // Widths are only known once the entries exist, so place the run in a second pass.
             float x = 0f;
             for (int i = 0; i < items.Length; i++)
             {
@@ -101,10 +94,6 @@ namespace MetalRaptors
             return items;
         }
 
-        /// <summary>
-        /// A value stepped in place by the two triangles either side of it — label left column,
-        /// control right column, both reading from their own left edge.
-        /// </summary>
         public MenuSelectorRow AddSelector(string label, string[] values, int selected, Action<int> onChanged)
         {
             MenuSelectorRow row = MenuSelectorRow.Create(_root, label, values, selected, _cursor, onChanged);
@@ -135,10 +124,6 @@ namespace MetalRaptors
             FocusIndex(next);
         }
 
-        /// <summary>
-        /// Left/right: a selector row spends them on its own value, anything else lets them
-        /// move the highlight as the down/up keys do.
-        /// </summary>
         public void Adjust(int delta)
         {
             if (_focus >= 0 && _focus < _focusables.Count && _focusables[_focus].Adjust(delta)) return;

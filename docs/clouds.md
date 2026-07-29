@@ -40,6 +40,11 @@ night:
 | Evening | apricot (0.98, 0.80, 0.66) |
 | Night   | moonlit slate (0.62, 0.66, 0.82) |
 
+Each material also carries an emissive lift: a fraction of the active sky's `HazeColor` —
+the same colour the fog and horizon band are — scaled per daytime (`HazeGlow`, roughly
+0.2–0.55, highest at night). This is what keeps a cloud's shaded side reading as air rather
+than falling to flat grey under the key light and ambient alone.
+
 ## Placement and motion
 
 Clouds occupy the 350–850 m altitude band and sit on the play plane's depth ± 60 m

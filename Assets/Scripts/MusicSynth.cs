@@ -4,7 +4,6 @@ using UnityEngine;
 
 namespace MetalRaptors
 {
-    /// <summary>A soundtrack baked to clips: an optional one-shot intro and a seamless loop.</summary>
     public class RenderedMusic
     {
         public AudioClip Intro;
@@ -12,7 +11,6 @@ namespace MetalRaptors
         public double IntroDuration;
     }
 
-    /// <summary>Raw sample buffers produced off the main thread. See docs/music.md.</summary>
     public class MusicBake
     {
         public float[] Intro;
@@ -22,7 +20,6 @@ namespace MetalRaptors
         public double IntroDuration;
     }
 
-    /// <summary>Renders a MusicConfig into AudioClips offline. See docs/music.md.</summary>
     public static class MusicSynth
     {
         const float GateRatio = 0.9f;
@@ -40,7 +37,6 @@ namespace MetalRaptors
             return ToClips(config, bake);
         }
 
-        /// <summary>Pure sample math — safe to call from a worker thread.</summary>
         public static MusicBake Bake(MusicConfig config, int rate)
         {
             var loop = BakeSection(config, rate, intro: false);
@@ -55,11 +51,6 @@ namespace MetalRaptors
             return loop;
         }
 
-        /// <summary>
-        /// Bakes one half of a track on its own — the play-once intro or the seamless loop — so
-        /// the two can render on separate threads and the intro can start playing while the
-        /// loop is still being rendered. Returns null when the track has no intro section.
-        /// </summary>
         public static MusicBake BakeSection(MusicConfig config, int rate, bool intro)
         {
             if (config == null || config.Sequence.Count == 0) return null;
@@ -97,7 +88,6 @@ namespace MetalRaptors
                 ? 0
                 : Mathf.Clamp(config.LoopStart, 0, config.Sequence.Count - 1);
 
-        /// <summary>Musical length of a run of sequence entries — the bake-cost estimate's input.</summary>
         public static double SectionSeconds(MusicConfig config, int from, int to)
         {
             if (config == null) return 0;
@@ -110,7 +100,6 @@ namespace MetalRaptors
             return total;
         }
 
-        /// <summary>Wraps baked buffers in AudioClips — must run on the main thread.</summary>
         public static RenderedMusic ToClips(MusicConfig config, MusicBake bake)
         {
             if (bake?.Loop == null) return null;
@@ -123,7 +112,6 @@ namespace MetalRaptors
             };
         }
 
-        /// <summary>Wraps one half of a track in an AudioClip — must run on the main thread.</summary>
         public static AudioClip ToClip(MusicBake bake, bool intro, string name) =>
             bake == null ? null : ToClip(intro ? bake.Intro : bake.Loop, bake, name);
 

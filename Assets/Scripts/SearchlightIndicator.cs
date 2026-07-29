@@ -3,11 +3,6 @@ using UnityEngine.UI;
 
 namespace MetalRaptors
 {
-    /// <summary>
-    /// The HUD readout for the night searchlight (<see cref="PlaneSearchlight"/>): a small plate
-    /// under the health bar that sits dim while the beam is off and lights warm when it is on.
-    /// Built only on night levels, by both level controllers.
-    /// </summary>
     public class SearchlightIndicator
     {
         const float Width = 150f;

@@ -2,22 +2,12 @@ using UnityEngine;
 
 namespace MetalRaptors
 {
-    /// <summary>
-    /// One enemy formation keyed to distance flown: when the player's furthest X passes
-    /// <see cref="distance"/> metres, the wave's groups are due. Configuration only for now —
-    /// no campaign level spawns enemies yet (see docs/campaign.md).
-    /// </summary>
     public class EnemyWave
     {
         public float distance;
         public EnemyGroup[] groups;
     }
 
-    /// <summary>
-    /// Everything that makes one endless campaign level: the seed the streamed terrain grows
-    /// from, the daytime sky the level is authored in, the weather, and the distance-keyed
-    /// enemy waves. <see cref="CampaignLevelController"/> composes the level from these parts.
-    /// </summary>
     public class CampaignDefinition
     {
         public int seed;
@@ -27,7 +17,6 @@ namespace MetalRaptors
         public EnemyWave[] waves;
     }
 
-    /// <summary>Registry of campaign level definitions, mirroring <see cref="Levels"/>.</summary>
     public static class CampaignLevels
     {
         public static CampaignDefinition Level1 => new CampaignDefinition
@@ -39,7 +28,6 @@ namespace MetalRaptors
             waves = new EnemyWave[0],
         };
 
-        /// <summary>A custom battle: the picked map's land under the picked sky, no waves.</summary>
         public static CampaignDefinition Custom(BattleMap map, Daytime daytime) => new CampaignDefinition
         {
             seed = map.Seed,

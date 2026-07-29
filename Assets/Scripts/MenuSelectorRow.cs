@@ -5,11 +5,6 @@ using UnityEngine.UI;
 
 namespace MetalRaptors
 {
-    /// <summary>
-    /// A one-of-many value picked in place: the label in the left column, in the same foreground
-    /// colour as any other entry, and in the right column the value between two triangles that
-    /// step it. The list does not wrap — the triangle at an end greys out. See docs/main-menu.md.
-    /// </summary>
     public class MenuSelectorRow : MonoBehaviour, IPointerEnterHandler, IMenuFocusable
     {
         public event Action<IMenuFocusable> Hovered;
@@ -42,8 +37,6 @@ namespace MetalRaptors
             view._index = Mathf.Clamp(index, 0, values.Length - 1);
             view._onChanged = onChanged;
 
-            // Behind everything so the arrows on top of it still take their own clicks; the
-            // pointer-enter it catches bubbles up to this row.
             CreateHitBox(rt);
 
             UIFactory.CreateInlineLabel(rt, label, MenuTheme.ItemSize, Vector2.zero,
@@ -118,7 +111,6 @@ namespace MetalRaptors
             Apply();
         }
 
-        /// <summary>Nothing to activate: the row *is* its value, stepped with left/right.</summary>
         public void Activate() { }
 
         public bool Adjust(int delta)

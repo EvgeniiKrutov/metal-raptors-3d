@@ -5,14 +5,6 @@ using UnityEngine.Rendering.Universal;
 
 namespace MetalRaptors
 {
-    /// <summary>
-    /// Screen-space sun shafts for every daytime: a fullscreen URP pass, injected before post
-    /// processing so bloom blows the shafts out, that radially blurs the depth buffer's sky mask
-    /// outward from the sun's screen position — the land, the trees and the planes carve the dark
-    /// gaps that read as light striking from behind them. This component rides the camera and
-    /// does the tracking half: it re-projects the visible sun to viewport space every frame and
-    /// hands it to <c>Hidden/StylizedGodRays</c>. Design notes: docs/atmospheres.md.
-    /// </summary>
     [RequireComponent(typeof(Camera))]
     public class GodRays : MonoBehaviour
     {
@@ -33,13 +25,6 @@ namespace MetalRaptors
         float _viewCutoff = -0.1f;
         Vector3 _sunDir = Vector3.forward;
 
-        /// <summary>
-        /// Hangs the shafts on <paramref name="cam"/>, aiming them at the sun
-        /// <paramref name="sky"/> draws. <paramref name="intensity"/> is their brightness,
-        /// <paramref name="density"/> their length along the blur, <paramref name="radialFalloff"/>
-        /// how fast they die off across the frame; the rest shape the accumulation (see the
-        /// shader's properties).
-        /// </summary>
         public static GodRays Attach(Camera cam, Material sky, Color color, float intensity,
             float density = 0.85f, float weight = 0.6f, float decay = 0.97f,
             int samples = 48, float radialFalloff = 1.1f)
@@ -51,8 +36,6 @@ namespace MetalRaptors
                 return null;
             }
 
-            // Re-applying a sky must not stack a second set of shafts on the camera; disabling
-            // first unsubscribes the old one now rather than at end of frame.
             var stale = cam.GetComponent<GodRays>();
             if (stale != null)
             {
@@ -86,8 +69,6 @@ namespace MetalRaptors
             if (_mat != null) Destroy(_mat);
         }
 
-        // Tracking runs here rather than in LateUpdate so it always reads the sun direction
-        // SkyHorizon settled on this frame, not the last one.
         void OnBeginCamera(ScriptableRenderContext context, Camera cam)
         {
             if (cam != _cam || _mat == null || _pass == null) return;
@@ -98,7 +79,6 @@ namespace MetalRaptors
             if (data != null) data.scriptableRenderer.EnqueuePass(_pass);
         }
 
-        /// <summary>xy = the sun's viewport position, z = how visible it is (0 kills the pass).</summary>
         Vector4 TrackSun()
         {
             if (_sky != null)
@@ -107,13 +87,9 @@ namespace MetalRaptors
                 if (skyDir.sqrMagnitude > 0.0001f) _sunDir = skyDir.normalized;
             }
 
-            // The sky renders at infinity, so a point far down the sun's direction projects to
-            // the same screen spot as the disc itself.
             Vector3 vp = _cam.WorldToViewportPoint(_cam.transform.position + _sunDir * 10000f);
             if (vp.z <= 0f) return Vector4.zero;
 
-            // Smooth fade as the sun slides out of frame, plus a second one on view alignment so
-            // a fast camera swing cannot pop the shafts in.
             float dx = Mathf.Max(0f, Mathf.Max(-vp.x, vp.x - 1f));
             float dy = Mathf.Max(0f, Mathf.Max(-vp.y, vp.y - 1f));
             float outside = Mathf.Sqrt(dx * dx + dy * dy);
@@ -125,11 +101,6 @@ namespace MetalRaptors
             return new Vector4(vp.x, vp.y, visibility, 0f);
         }
 
-        /// <summary>
-        /// The fullscreen pass itself, enqueued per frame instead of living on a Renderer Data
-        /// asset — this project builds its rendering in code, and the shafts belong to whichever
-        /// sky is currently applied.
-        /// </summary>
         class RayPass : ScriptableRenderPass
         {
             static readonly int BlitTextureId = Shader.PropertyToID("_BlitTexture");
@@ -154,8 +125,6 @@ namespace MetalRaptors
             public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
             {
                 var resources = frameData.Get<UniversalResourceData>();
-                // Reading and writing one texture is illegal, so the pass needs somewhere else to
-                // land; with no intermediate colour target there is nothing to swap to.
                 if (resources.isActiveTargetBackBuffer) return;
 
                 var desc = renderGraph.GetTextureDesc(resources.cameraColor);

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 
 namespace MetalRaptors
 {
-    /// <summary>Stereo subtractive renderer for tracks declaring "engine": "retrowave". See docs/music.md.</summary>
     public static class MusicSynthRetro
     {
         public const double TailSec = 2.5;

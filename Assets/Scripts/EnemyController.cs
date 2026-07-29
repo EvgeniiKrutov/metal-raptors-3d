@@ -3,71 +3,42 @@ using UnityEngine;
 
 namespace MetalRaptors
 {
-    /// <summary>
-    /// An enemy fighter — a mirrored Fokker Dr.1 (it attacks from the right and flies left) —
-    /// flying the same constant-speed physics as the player's <see cref="CubeController"/>,
-    /// driven by the sibling repo's FighterPlane AI ported 1:1. States:
-    ///
-    ///   * Attack  - chase the player with lead-prediction aim, guns firing when lined up.
-    ///   * Fly     - break away toward high altitude, weaving, before the next attack run.
-    ///   * Evade   - taking a hit knocks it into a corkscrew roll, a jittering dash away from
-    ///               the player, and an unroll back into the attack.
-    ///   * Recover - too close to the ground: abort everything and pull up at 70° until safe.
-    ///   * Return  - drifted off camera: fly straight back toward the player.
-    ///
-    /// The soft side boundaries steer it away from the world edges exactly like the player
-    /// (shared <see cref="FlightSteering"/>), and the same hard ceiling applies. A world-space
-    /// health bar hangs above the plane; at zero health the fighter explodes and is removed
-    /// from the map. Scraping another plane (the player or a wingman) nicks a little health off
-    /// both fighters rather than the old fatal ram — only the ground still downs it outright.
-    /// </summary>
     [RequireComponent(typeof(Rigidbody))]
     public class EnemyController : MonoBehaviour, IDamageable
     {
-        const float ShotVolume = 0.15f;          // half the player's 0.3 — quieter, and further away
-        const float RecoverClimbAngleDeg = 70f;  // sibling RECOVER_CLIMB_ANGLE_DEG
+        const float ShotVolume = 0.15f;
+        const float RecoverClimbAngleDeg = 70f;
 
-        // A plane-to-plane scrape (with the player or another fighter) nicks this much health off
-        // both planes instead of the old ram-kills-both. Planes no longer physically collide —
-        // LevelController disables their mutual collisions and detects the overlap itself — so the
-        // cooldown is what keeps one encounter (several frames of overlap) to a single hit.
         const float CollisionDamage = 10f;
         const float CollisionCooldown = 0.5f;
 
-        // Below this much health the fighter starts trailing damage smoke (see SmokeTrail). Same
-        // threshold the player uses (CubeController.SmokeHealthThreshold), so both smoke when hurt.
         const float SmokeHealthThreshold = 30f;
 
-        // Health bar geometry (metres, world space).
         const float BarWidth = 36f;
         const float BarHeight = 3.2f;
-        const float BarLiftMargin = 8f; // bar centre sits this far above the top of the plane
+        const float BarLiftMargin = 8f;
 
-        /// <summary>Raised once when this fighter is destroyed, however it died.</summary>
         public event Action<EnemyController> OnDestroyed;
 
-        /// <summary>Hit points left; starts at <see cref="EnemyConfig.health"/>.</summary>
         public float CurrentHealth { get; private set; }
 
         enum AiState { Attack, Fly, Evade, Recover, Return }
         enum EvadePhase { Roll, Jitter, Unroll }
 
         EnemyConfig _config;
-        Rigidbody _target;   // the player's physics body
+        Rigidbody _target;
         Rigidbody _rb;
         Collider _collider;
         Camera _cam;
-        float _bodyRadius;   // half the plane model's longest extent — sizes the muzzle, explosion and health bar
+        float _bodyRadius;
 
-        float _heading;         // radians; +Y (up) = π/2 — same convention as CubeController
-        float _angularVelocity; // rad/s, eased toward the desired rate
+        float _heading;
+        float _angularVelocity;
         bool _dead;
-        bool _standDown;        // level over: cease fire and just cruise
+        bool _standDown;
 
-        // World bounds, supplied by LevelController at spawn.
         float _minX, _maxX, _groundY, _ceilingY, _edgeMargin;
 
-        // ---- AI state (sibling FighterPlane fields) ----
         AiState _state = AiState.Attack;
         float _stateTimer;
         EvadePhase _evadePhase;
@@ -79,22 +50,18 @@ namespace MetalRaptors
         float _flyWeaveT;
         float _flyBaseX;
         float _fireCooldown;
-        float _lastCollisionTime = -999f; // last plane-to-plane scrape, for the collision-damage debounce
-        ShakeEffect _shake;               // wobbles the visible model on a scrape; the body flies straight on
-        SmokeTrail _smoke;                // damage smoke, armed once health drops below the danger threshold
+        float _lastCollisionTime = -999f;
+        ShakeEffect _shake;
+        SmokeTrail _smoke;
 
         GameObject _bulletTemplate;
         AudioSource _audio;
         AudioClip _shotClip;
 
-        Transform _bar;          // health-bar root; deliberately NOT a child, so it never rotates
-        Transform _barFillPivot; // sits at the bar's left edge; its X scale is the health fraction
+        Transform _bar;
+        Transform _barFillPivot;
         Renderer _barFill;
 
-        /// <param name="groundY">
-        /// World Y the AI treats as the ground when judging altitude (the terrain's highest
-        /// point when the level is procedural, so the margins hold over every hill).
-        /// </param>
         public void Initialize(EnemyConfig config, Rigidbody target,
             float minX, float maxX, float groundY, float ceilingY, float edgeMargin)
         {
@@ -107,9 +74,8 @@ namespace MetalRaptors
             _edgeMargin = edgeMargin;
 
             CurrentHealth = Mathf.Max(1f, config.health);
-            _stateTimer = config.attackDuration; // sibling opens in ATTACK with a full timer
+            _stateTimer = config.attackDuration;
 
-            // Face the player so the opening move makes sense from any spawn point.
             Vector3 to = (target != null ? target.position : Vector3.zero) - transform.position;
             _heading = Mathf.Atan2(to.y, to.x);
 
@@ -122,18 +88,16 @@ namespace MetalRaptors
             _rb.interpolation = RigidbodyInterpolation.Interpolate;
             _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
 
-            // The plane model hangs off this body, so its convex mesh collider (added by
-            // LevelController.BuildPlaneModel) lives on a child, not on the body itself.
             _collider = GetComponentInChildren<Collider>();
-            _shake = GetComponentInChildren<ShakeEffect>(); // lives on the plane model child
+            _shake = GetComponentInChildren<ShakeEffect>();
             _bodyRadius = MeasureBodyRadius();
-            _smoke = gameObject.AddComponent<SmokeTrail>();  // dormant until armed by low health
-            _bulletTemplate = Bullet.BuildTemplate(Bullet.RoundColor); // same brass as the player's rounds
+            _smoke = gameObject.AddComponent<SmokeTrail>();
+            _bulletTemplate = Bullet.BuildTemplate(Bullet.RoundColor);
 
             _shotClip = Resources.Load<AudioClip>("Sounds/bullet_shot_1");
             _audio = gameObject.AddComponent<AudioSource>();
             _audio.playOnAwake = false;
-            _audio.spatialBlend = 0f; // 2D, same reasoning as PlaneShooter
+            _audio.spatialBlend = 0f;
 
             _cam = Camera.main;
 
@@ -141,10 +105,7 @@ namespace MetalRaptors
             ApplyRotation();
         }
 
-        /// <summary>The level ended (win or crash): cease fire and just cruise around.</summary>
         public void StandDown() => _standDown = true;
-
-        // ---------------------------------------------------------------- flight + AI loop
 
         void FixedUpdate()
         {
@@ -155,7 +116,6 @@ namespace MetalRaptors
             _jitterTimer = Mathf.Max(0f, _jitterTimer - dt);
             _fireCooldown -= dt;
 
-            // ---- State selection (sibling FighterPlane.updateAI) ----
             if (_standDown)
             {
                 if (_state != AiState.Fly) EnterFly(transform.position.x);
@@ -163,7 +123,6 @@ namespace MetalRaptors
             }
             else if (CheckGroundAvoidance())
             {
-                // Recover holds until the pull-up reaches a safe altitude (see TickState).
             }
             else if (!IsOnCamera(transform.position))
             {
@@ -175,23 +134,18 @@ namespace MetalRaptors
                 TickState(dt);
             }
 
-            // ---- Steering: ease toward the AI's heading, but never out of the world ----
             SteerToHeading(ComputeHeading(dt), dt);
 
-            // ---- Constant-speed forward flight, ceiling-clamped like the player ----
             Vector3 vel = new Vector3(Mathf.Cos(_heading), Mathf.Sin(_heading), 0f) * _config.flySpeed;
             Vector3 pos = _rb.position;
             if (pos.y >= _ceilingY && vel.y > 0f) vel.y = 0f;
             _rb.linearVelocity = vel;
             if (pos.y > _ceilingY) { pos.y = _ceilingY; _rb.position = pos; }
 
-            // ---- Guns: the sibling fires in every state except FLY and RETURN ----
             if (!_standDown && _state != AiState.Fly && _state != AiState.Return)
                 UpdateFiring();
         }
 
-        /// <summary>Below the minimum altitude nothing else matters: pull up (sibling
-        /// checkGroundAvoidance).</summary>
         bool CheckGroundAvoidance()
         {
             if (transform.position.y - _groundY >= _config.minAltitudeMargin) return false;
@@ -199,7 +153,6 @@ namespace MetalRaptors
             return true;
         }
 
-        /// <summary>Timed transitions between states (sibling tickState).</summary>
         void TickState(float dt)
         {
             if (_state == AiState.Recover)
@@ -245,7 +198,6 @@ namespace MetalRaptors
 
         void EnterEvade()
         {
-            // Flee heading: straight away from the player (sibling: angle from target to self).
             Vector3 away = transform.position
                          - (_target != null ? _target.position : transform.position - Vector3.right);
             _evadeHeading = Mathf.Atan2(away.y, away.x);
@@ -258,14 +210,12 @@ namespace MetalRaptors
             _state = AiState.Evade;
         }
 
-        /// <summary>Where the AI wants to point right now (sibling computeHeading).</summary>
         float ComputeHeading(float dt)
         {
             switch (_state)
             {
                 case AiState.Recover:
                 {
-                    // Climb hard at 70°, keeping whatever horizontal direction it already had.
                     float climb = RecoverClimbAngleDeg * Mathf.Deg2Rad;
                     return Mathf.Cos(_heading) >= 0f ? climb : Mathf.PI - climb;
                 }
@@ -274,8 +224,6 @@ namespace MetalRaptors
                 {
                     if (_evadePhase == EvadePhase.Roll || _evadePhase == EvadePhase.Unroll)
                     {
-                        // A full 360° corkscrew: demand a heading ~π off to the chosen side and
-                        // count turn progress until the loop closes; the unroll spins it back.
                         float sign = _evadePhase == EvadePhase.Roll ? _evadeRollSign : -_evadeRollSign;
                         _evadeRollAccum += _config.rotationSpeed * Mathf.Deg2Rad * dt;
                         if (_evadeRollAccum >= Mathf.PI * 2f)
@@ -294,8 +242,6 @@ namespace MetalRaptors
                         return _heading + sign * Mathf.PI * 0.9f;
                     }
 
-                    // Jitter phase: dash away from the player, re-rolling a random heading
-                    // offset jitterHz times a second so aimed fire keeps missing.
                     if (_jitterTimer <= 0f)
                     {
                         _jitterOffset = UnityEngine.Random.Range(-1f, 1f)
@@ -307,7 +253,6 @@ namespace MetalRaptors
 
                 case AiState.Fly:
                 {
-                    // Break away high over where the player was, weaving side to side.
                     float targetY = _groundY + (_ceilingY - _groundY) * _config.flyAltitudeFactor;
                     float weaveX = _flyBaseX + Mathf.Sin(_flyWeaveT * Mathf.PI * 2f * _config.weaveHz)
                                              * _config.weaveAmplitude;
@@ -323,9 +268,6 @@ namespace MetalRaptors
             }
         }
 
-        /// <summary>Turn-rate steering toward a heading (sibling steerToHeading +
-        /// applyTurnRate), with the shared soft side boundary overriding the AI near an
-        /// edge exactly as it overrides the player's stick.</summary>
         void SteerToHeading(float targetHeading, float dt)
         {
             float maxRate = _config.rotationSpeed * Mathf.Deg2Rad;
@@ -352,8 +294,6 @@ namespace MetalRaptors
             return Mathf.Atan2(point.y - transform.position.y, point.x - transform.position.x);
         }
 
-        /// <summary>Half the longest side of the plane model's combined renderer bounds, so the
-        /// muzzle, explosion and health bar all scale to whatever size the model is built at.</summary>
         float MeasureBodyRadius()
         {
             var rends = GetComponentsInChildren<Renderer>();
@@ -363,10 +303,6 @@ namespace MetalRaptors
             return Mathf.Max(b.size.x, b.size.y, b.size.z) * 0.5f;
         }
 
-        // ---------------------------------------------------------------- guns
-
-        /// <summary>Fires when the player is on screen, in range, and the nose is within the
-        /// aim threshold of the lead-predicted intercept (sibling updateFiring).</summary>
         void UpdateFiring()
         {
             if (_target == null || !IsOnCamera(_target.position)) return;
@@ -383,9 +319,7 @@ namespace MetalRaptors
             _fireCooldown = Mathf.Max(0.01f, _config.fireRate);
 
             Vector3 dir = new Vector3(Mathf.Cos(_heading), Mathf.Sin(_heading), 0f);
-            // From the plane's nose, clear of its own collider.
             Vector3 muzzle = transform.position + dir * (_bodyRadius + 6f);
-            // Same -90° trick as PlaneShooter: lays the tracer's long axis along the heading.
             var go = Instantiate(_bulletTemplate, muzzle,
                 transform.rotation * Quaternion.Euler(0f, 0f, -90f));
             go.name = "EnemyBullet";
@@ -396,8 +330,6 @@ namespace MetalRaptors
             if (_shotClip != null) _audio.PlayOneShot(_shotClip, ShotVolume);
         }
 
-        /// <summary>Two-pass iterative intercept: aim where the player will be by the time a
-        /// round can get there (sibling predictIntercept).</summary>
         Vector2 PredictIntercept()
         {
             if (_target == null) return transform.position;
@@ -420,44 +352,30 @@ namespace MetalRaptors
             return vp.x > -0.05f && vp.x < 1.05f && vp.y > -0.05f && vp.y < 1.05f;
         }
 
-        // ---------------------------------------------------------------- damage + death
-
         public void TakeDamage(float amount)
         {
             if (_dead) return;
             ApplyDamage(amount);
 
-            // Sibling onDamaged: being *shot* knocks it out of Attack/Fly into the corkscrew
-            // evade. Only gunfire comes through TakeDamage; a plane scrape uses ApplyDamage
-            // directly, so it costs health without jolting the AI out of its run.
             if (!_dead && (_state == AiState.Attack || _state == AiState.Fly)) EnterEvade();
         }
 
-        /// <summary>Subtracts health and refreshes the bar, exploding at zero. No AI reaction —
-        /// the caller decides whether the hit should also provoke an evade.</summary>
         void ApplyDamage(float amount)
         {
             CurrentHealth = Mathf.Max(0f, CurrentHealth - amount);
             UpdateHealthBar();
-            // Badly hurt: start trailing smoke (Arm is idempotent, so calling it on every further
-            // hit is fine). The model's on-screen size is twice its radius, so smoke scales to it.
             if (CurrentHealth < SmokeHealthThreshold && _smoke != null) _smoke.Arm(_bodyRadius * 2f);
             if (CurrentHealth <= 0f) Explode();
         }
 
-        /// <summary>Destroys the fighter in a fireball and removes it from the map — reached at
-        /// zero health (gunfire or a plane scrape that empties the bar) or on a ground crash.</summary>
         public void Explode()
         {
             if (_dead) return;
             _dead = true;
 
             Explosion.Spawn(transform.position, _bodyRadius > 0f ? _bodyRadius * 2f : 30f);
-            if (_smoke != null) _smoke.Clear(); // sweep up the trailing smoke as the fighter blows up
+            if (_smoke != null) _smoke.Clear();
 
-            // Freeze the wreck and drop its bar/collider now so it can't drift, get hit or float a
-            // bar, but leave the model up: the blast starts a beat before the plane is removed, so it
-            // vanishes into the fireball (docs/effects.md).
             if (_rb != null) { _rb.linearVelocity = Vector3.zero; _rb.angularVelocity = Vector3.zero; }
             if (_collider != null) _collider.enabled = false;
             if (_bar != null) Destroy(_bar.gameObject);
@@ -470,23 +388,11 @@ namespace MetalRaptors
         {
             if (_dead) return;
 
-            // Bullets apply their damage via TakeDamage; the impact itself isn't a crash.
             if (collision.gameObject.GetComponent<Bullet>() != null) return;
 
-            // Plane-to-plane contact never reaches here: LevelController disables collisions
-            // between planes and handles the scrape (damage + shake) via its own overlap check.
-            // The only solid thing left to hit is the ground the AI failed to dodge — which kills it.
             Explode();
         }
 
-        /// <summary>
-        /// A plane-to-plane scrape, driven by <see cref="LevelController"/>'s overlap check: nick
-        /// off <see cref="CollisionDamage"/> and shiver the model, at most once per
-        /// <see cref="CollisionCooldown"/> so one encounter is one hit. Returns whether the hit
-        /// actually landed (false while on cooldown or already dead). Uses <see cref="ApplyDamage"/>
-        /// rather than <see cref="TakeDamage"/> so bumping the player is not treated as being shot —
-        /// the fighter keeps flying its current run instead of breaking into an evade.
-        /// </summary>
         public bool Scrape()
         {
             if (_dead) return false;
@@ -498,13 +404,6 @@ namespace MetalRaptors
             return true;
         }
 
-        // ---------------------------------------------------------------- health bar
-
-        /// <summary>
-        /// A world-space bar floating above the cube: a dark backplate and an emissive fill
-        /// whose left-anchored pivot is scaled by the health fraction. The bar lives outside
-        /// the fighter's hierarchy so the cube's banking never tilts it; it just follows.
-        /// </summary>
         void BuildHealthBar()
         {
             _bar = new GameObject("EnemyHealthBar").transform;
@@ -517,7 +416,6 @@ namespace MetalRaptors
 
             _barFillPivot = new GameObject("FillPivot").transform;
             _barFillPivot.SetParent(_bar, false);
-            // Nudged toward the camera (-Z) so the fill always draws in front of the backplate.
             _barFillPivot.localPosition = new Vector3(-BarWidth / 2f, 0f, -0.5f);
 
             var fill = UIFactory.CreatePrimitive3D(PrimitiveType.Cube,
@@ -541,9 +439,8 @@ namespace MetalRaptors
             s.x = frac;
             _barFillPivot.localScale = s;
 
-            // Green at full health through to red near death.
             var color = Color.Lerp(new Color(0.95f, 0.2f, 0.12f), new Color(0.25f, 0.9f, 0.3f), frac);
-            var mat = _barFill.sharedMaterial; // unique per fill, see UIFactory.CreatePrimitive3D
+            var mat = _barFill.sharedMaterial;
             mat.SetColor("_BaseColor", color);
             mat.SetColor("_EmissionColor", color * 2f);
         }

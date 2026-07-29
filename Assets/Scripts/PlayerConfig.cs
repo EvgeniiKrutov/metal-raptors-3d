@@ -2,13 +2,6 @@ using UnityEngine;
 
 namespace MetalRaptors
 {
-    /// <summary>
-    /// Tunable flight parameters for the player plane, stored as a standalone asset
-    /// (Assets/Resources/PlayerConfig.asset) so the numbers live in a separate file and
-    /// can be edited without touching code. Values are ported from the metal-raptors
-    /// sibling repo (player.json + physics.json), with <see cref="flySpeed"/> rescaled
-    /// for this 1000 m world.
-    /// </summary>
     [CreateAssetMenu(fileName = "PlayerConfig", menuName = "Metal Raptors/Player Config")]
     public class PlayerConfig : ScriptableObject
     {

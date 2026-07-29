@@ -6,11 +6,6 @@ using UnityEngine.UI;
 
 namespace MetalRaptors
 {
-    /// <summary>
-    /// Helpers for building screen-space uGUI (and a simple 3D placeholder prop) at
-    /// runtime, so every scene's UI is created and wired entirely in code — no manual
-    /// editor setup required. Text is rendered in Poppins (see docs/main-menu.md).
-    /// </summary>
     public static class UIFactory
     {
         static Font _regular;
@@ -58,7 +53,6 @@ namespace MetalRaptors
                    ?? Resources.GetBuiltinResource<Font>("Arial.ttf");
         }
 
-        /// <summary>Creates a full-screen scaling Canvas and guarantees an EventSystem exists.</summary>
         public static Canvas CreateCanvas(string name = "UI Canvas")
         {
             EnsureEventSystem();
@@ -75,11 +69,6 @@ namespace MetalRaptors
             return canvas;
         }
 
-        /// <summary>
-        /// Creates an EventSystem driven by the new Input System's UI module (this project
-        /// has the Input System package active, so the legacy StandaloneInputModule would
-        /// not work). Default UI input actions are assigned so clicks work immediately.
-        /// </summary>
         public static void EnsureEventSystem()
         {
             if (EventSystem.current != null) return;
@@ -89,7 +78,6 @@ namespace MetalRaptors
             module.AssignDefaultActions();
         }
 
-        /// <summary>Full-screen solid-color background image under the given parent.</summary>
         public static Image CreateBackground(Transform parent, Color color)
         {
             var go = new GameObject("Background", typeof(Image));
@@ -130,11 +118,6 @@ namespace MetalRaptors
             return text;
         }
 
-        /// <summary>
-        /// A text row stretched across its parent, hung from the parent's top edge by
-        /// <paramref name="top"/> (negative = downward). For flat menu layouts: the row spans
-        /// the parent, and the text sits against its left edge.
-        /// </summary>
         public static Text CreateLabel(Transform parent, string content, int fontSize, float top,
             float rowHeight, Color color, Font font)
         {
@@ -149,11 +132,6 @@ namespace MetalRaptors
             return text;
         }
 
-        /// <summary>
-        /// A text row hung from the parent's *bottom* edge by <paramref name="bottom"/> (positive
-        /// = upward), inset from both sides by <paramref name="padSide"/> and reading from the
-        /// left inset. For labels sitting in a card's foot.
-        /// </summary>
         public static Text CreateBottomLabel(Transform parent, string content, int fontSize, float bottom,
             float rowHeight, float padSide, Color color, Font font)
         {
@@ -168,10 +146,6 @@ namespace MetalRaptors
             return text;
         }
 
-        /// <summary>
-        /// A block of wrapped copy of a fixed width against the parent's left edge, hung from its
-        /// top — the one place the menu wraps text instead of overflowing it.
-        /// </summary>
         public static Text CreateParagraph(Transform parent, string content, int fontSize, float top,
             float width, float rowHeight, float lineSpacing, Color color, Font font)
         {
@@ -188,10 +162,6 @@ namespace MetalRaptors
             return text;
         }
 
-        /// <summary>
-        /// Text sized to its own content, placed beside another element: x is measured from the
-        /// parent's left edge and marks the label's left edge.
-        /// </summary>
         public static Text CreateInlineLabel(Transform parent, string content, int fontSize, Vector2 anchoredPos,
             float rowHeight, Color color, Font font)
         {
@@ -225,11 +195,6 @@ namespace MetalRaptors
             return text;
         }
 
-        /// <summary>
-        /// A solid triangle pointing left or right, against its parent's left edge and hung from
-        /// its top — the step controls of <see cref="MenuSelectorRow"/>. The shape is a
-        /// generated sprite rather than a glyph, since Poppins carries no triangle character.
-        /// </summary>
         public static Image CreateTriangle(Transform parent, bool pointsLeft, Vector2 size,
             Vector2 anchoredPos, Color color)
         {
@@ -270,8 +235,6 @@ namespace MetalRaptors
             for (int y = 0; y < size; y++)
             {
                 float v = (y + 0.5f) / size;
-                // Apex on the right at mid height, base down the left edge; mirrored for the
-                // left-pointing one. The signed distance to that edge is the antialias ramp.
                 float span = 1f - Mathf.Abs(2f * v - 1f);
                 for (int x = 0; x < size; x++)
                 {
@@ -294,7 +257,6 @@ namespace MetalRaptors
             return sprite;
         }
 
-        /// <summary>Solid rectangle against its parent's left edge, hung from its top (the title's accent rule).</summary>
         public static Image CreateRule(Transform parent, float top, Vector2 size, Color color)
         {
             var go = new GameObject("Rule", typeof(Image));
@@ -342,7 +304,6 @@ namespace MetalRaptors
 
             if (onClick != null) button.onClick.AddListener(() => onClick());
 
-            // Label as a child stretched to fill the button.
             var labelGo = new GameObject("Label", typeof(Text));
             labelGo.transform.SetParent(go.transform, false);
             var text = labelGo.GetComponent<Text>();
@@ -363,11 +324,6 @@ namespace MetalRaptors
             return button;
         }
 
-        /// <summary>
-        /// Spawns a lit 3D primitive (the "3D object" of our 2.5D scenes) using a URP
-        /// material so it doesn't render magenta, and returns its transform so the caller
-        /// can spin it. Purely a visual placeholder to prove the scene is set up.
-        /// </summary>
         public static Transform CreatePlaceholderProp(PrimitiveType type, Vector3 position, Color color, float scale = 2f)
         {
             var go = GameObject.CreatePrimitive(type);
@@ -387,10 +343,6 @@ namespace MetalRaptors
             return go.transform;
         }
 
-        /// <summary>
-        /// General-purpose lit 3D primitive with a URP material. Optionally makes it glow
-        /// (emissive) and/or strips its collider for purely decorative objects.
-        /// </summary>
         public static GameObject CreatePrimitive3D(PrimitiveType type, Vector3 position, Vector3 scale,
             Color color, bool emissive = false, bool keepCollider = true)
         {
@@ -400,11 +352,6 @@ namespace MetalRaptors
 
             if (!keepCollider)
             {
-                // DestroyImmediate, not Destroy: GameObject.CreatePrimitive attaches a collider,
-                // and a plain Destroy is deferred to end-of-frame — leaving the collider live for
-                // the rest of this frame. For decorative objects spawned on top of the player
-                // (e.g. scrape Sparks), that stray collider triggers a bogus collision before it's
-                // torn down. Removing it now guarantees the object never touches the physics step.
                 var col = go.GetComponent<Collider>();
                 if (col != null) UnityEngine.Object.DestroyImmediate(col);
             }
@@ -427,18 +374,11 @@ namespace MetalRaptors
             return go;
         }
 
-        /// <summary>
-        /// Switches a URP/Lit material into transparent (alpha-blended) surface mode so the
-        /// <c>_BaseColor</c>'s alpha actually shows — the default surface is opaque and ignores it.
-        /// Used by cosmetic effects like the smoke trail that need to draw see-through. Flips the
-        /// Surface, blend, ZWrite and render-queue settings the URP shader keys off, exactly as the
-        /// material inspector's Surface Type = Transparent dropdown would.
-        /// </summary>
         public static void MakeTransparent(Material mat)
         {
             if (mat == null) return;
-            mat.SetFloat("_Surface", 1f); // 0 = Opaque, 1 = Transparent
-            mat.SetFloat("_Blend", 0f);   // 0 = Alpha blend
+            mat.SetFloat("_Surface", 1f);
+            mat.SetFloat("_Blend", 0f);
             mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
             mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
             mat.SetFloat("_ZWrite", 0f);

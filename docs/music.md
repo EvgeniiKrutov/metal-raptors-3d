@@ -59,6 +59,26 @@ A `Play` call for a track still baking is coalesced; `FadeOutAndStop` cancels a 
 start. Rendered clips are cached per track id for the lifetime of the app, so re-entering
 the menu replays the cached bake instantly.
 
+### Start-latency scheduling
+
+`MusicPlayer` starts the intro as soon as it is baked, held back only long enough that the
+still-rendering loop is predicted to land before the intro's musical end — the loop enters
+on the intro's last beat, so holding the intro back is what keeps that handoff clean. The
+prediction comes from the intro's own measured bake-cost-per-second of audio: both halves
+render the same way, so the intro's cost predicts the loop's, on this machine, at this load.
+`LoopBakeSafety` (1.3) adds margin to that prediction, `HandoffMarginSec` (0.35 s) is how
+long before it is due the loop clip must already exist, `MaxStartWaitSec` (2.5 s) caps how
+long the intro is ever held back, and if the loop still misses its slot it is scheduled
+`LateLoopDelaySec` (0.05 s) later — as soon as possible, under the intro's tail.
+
+`Prewarm(id)` bakes a track into the cache without playing it, so a later `Play` is instant.
+`MusicPlayer` calls `Prewarm(MenuThemeId)` from `Awake` (itself invoked from the
+`BeforeSceneLoad` bootstrap), so that bake overlaps the first scene's load and UI
+construction instead of starting only once `Start` requests playback.
+
+The volume ramp does not start ticking until the scheduled playback actually begins, so a
+fade is never spent counting down through silence before the DSP-scheduled start.
+
 ## Menu music
 
 `MusicPlayer` is scene-driven; nothing in any scene references it:

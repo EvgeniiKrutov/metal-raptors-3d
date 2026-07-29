@@ -1,10 +1,5 @@
 namespace MetalRaptors
 {
-    /// <summary>
-    /// Central list of scene names so navigation never relies on magic strings.
-    /// These MUST match the scene file names in Assets/Scenes and the entries
-    /// registered in File &gt; Build Profiles &gt; Scene List.
-    /// </summary>
     public static class SceneNames
     {
         public const string MainMenu = "MainMenu";

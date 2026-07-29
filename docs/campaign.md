@@ -85,3 +85,26 @@ window before enemies can join the campaign. Level 1 ships with an empty wave li
 - `HealthBar` — the HUD health readout used by both level types.
 - `ProceduralTerrain` now exposes its shared ingredients (land layer, grass prototype/detail
   setup, cut-wall mesh + material, crater bowl maths, per-daytime fog) for the streamer.
+
+## Plane rig
+
+Every plane, on both level types, is a bare physics-body `GameObject` that its controller
+(`CubeController` or `EnemyController`) yaws directly to the heading each frame, carrying the
+visible aircraft model as a child (built by `PlaneFactory`). Keeping the model a child rather
+than yawing it directly lets the model's own built-in orientation fix (the stand-up/roll
+correction baked into its export) compose with the heading instead of being overwritten by it.
+See docs/flight-model.md for the collision and damage model shared by both controllers.
+
+On the fixed slab levels (no procedural terrain), a backdrop wall sits a little behind the
+play plane: the main directional light shines into `+Z`, so the wall catches the plane's
+silhouette as a visible drop-shadow. It's purely visual — it receives shadows but casts none,
+and has no collider, since the camera looks straight down `+Z` and would never actually be
+occluded by it.
+
+`PlaneFactory.BuildPlaneModel` reads its per-model rest orientation, scale and propeller node
+names from a `PlaneModelConfig` (`PlaneModels.Fokker` / `.Sopwith`) rather than baking them in
+as constants — different FBX exports can sit at different rest orientations and node names, so
+a differently-exported or brand-new model is a new registry entry, not a code change. The same
+config drives both the upright player and the mirrored enemy; the mirror-specific handling
+(skipping the wheels-down roll, since the enemy's own ~180° heading spin already flips it
+belly-down) stays in `BuildPlaneModel` rather than in the per-plane data.

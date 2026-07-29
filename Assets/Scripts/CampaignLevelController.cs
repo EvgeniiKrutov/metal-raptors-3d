@@ -7,23 +7,16 @@ using UnityEngine.UI;
 
 namespace MetalRaptors
 {
-    /// <summary>
-    /// Controller for the endless campaign levels: the plane flies left to right forever over
-    /// terrain streamed in chunks (<see cref="CampaignTerrain"/>), the camera only ever scrolls
-    /// forward, and a hard wall at the screen's left edge blocks turning back the way the
-    /// ceiling blocks climbing. No enemies spawn yet — the definition's distance-keyed waves
-    /// are configuration only. Full design: docs/campaign.md.
-    /// </summary>
     public class CampaignLevelController : MonoBehaviour
     {
         [Tooltip("Which campaign level this scene represents; everything else comes from its " +
                  "definition in the CampaignLevels registry.")]
         [SerializeField] int levelNumber = 1;
 
-        const float WorldTop = 900f;           // hard ceiling, as in the fixed levels
-        const float CubeHalf = 15f;            // half the plane body's nominal size
-        const float CameraDistance = 420f;     // camera sits this far back on -Z of the play plane
-        const float PlayPlaneZ = 100f;         // flight plane depth into the land (+Z)
+        const float WorldTop = 900f;
+        const float CubeHalf = 15f;
+        const float CameraDistance = 420f;
+        const float PlayPlaneZ = 100f;
         const float CamZ = PlayPlaneZ - CameraDistance;
         const float StartX = 0f;
         const float SpawnY = 150f;
@@ -31,7 +24,7 @@ namespace MetalRaptors
         CampaignDefinition _level;
         CubeController _cube;
         PlaneShooter _shooter;
-        PlaneSearchlight _searchlight; // night levels only; null otherwise
+        PlaneSearchlight _searchlight;
         Transform _cubeTr;
         Camera _cam;
         CampaignTerrain _terrain;
@@ -57,7 +50,7 @@ namespace MetalRaptors
                 : CampaignLevels.ForNumber(levelNumber);
 
             var config = Resources.Load<PlayerConfig>("PlayerConfig");
-            if (config == null) config = ScriptableObject.CreateInstance<PlayerConfig>(); // safety fallback
+            if (config == null) config = ScriptableObject.CreateInstance<PlayerConfig>();
 
             ConfigureShadows();
             _terrain = CampaignTerrain.Begin(_level.seed, _level.daytime, _level.weather,
@@ -67,8 +60,6 @@ namespace MetalRaptors
             BuildHud();
         }
 
-        /// <summary>Same runtime shadow-distance extension as the fixed levels: the camera sits
-        /// far beyond the RP asset's default cutoff, so push it out to keep plane shadows.</summary>
         void ConfigureShadows()
         {
             if (GraphicsSettings.currentRenderPipeline is UniversalRenderPipelineAsset urp)
@@ -88,8 +79,6 @@ namespace MetalRaptors
             _cube.OnCrashed += OnCrashed;
             _cube.OnShotDown += OnShotDown;
 
-            // Heading straight right; no side bounds (the world is endless to the right and the
-            // hard wall guards the left), ceiling clamped for the plane's size.
             _cube.Initialize(config, 0f, float.MinValue, float.MaxValue,
                 WorldTop - CubeHalf, 0f, hardLeftWall: true);
 
@@ -97,8 +86,6 @@ namespace MetalRaptors
             _shooter = go.AddComponent<PlaneShooter>();
             _shooter.Initialize(config, muzzle, flashPoint, go.GetComponentInChildren<Collider>());
 
-            // The night searchlight mounts on the same cowl point as the guns; Mount returns
-            // null on every other daytime, which is also what keeps it off the HUD.
             _searchlight = PlaneSearchlight.Mount(go,
                 PlaneFactory.NoseLocal(go, model, planeModel), _level.daytime);
         }
@@ -109,7 +96,7 @@ namespace MetalRaptors
             if (_cam == null) return;
 
             _cam.orthographic = false;
-            _cam.transform.rotation = Quaternion.identity; // look straight down +Z at the play plane
+            _cam.transform.rotation = Quaternion.identity;
 
             switch (_level.daytime)
             {
@@ -136,8 +123,6 @@ namespace MetalRaptors
             _furthestX = Mathf.Max(_furthestX, _cubeTr.position.x);
             if (_cam != null) PositionCamera(instant: false);
 
-            // The wall rides the camera's left view edge and only ever advances (SetLeftWall
-            // ratchets), so turning back presses the plane against the screen edge.
             if (_cube != null) _cube.SetLeftWall(_camBasePos.x - _halfViewWidth + CubeHalf);
 
             if (_terrain != null) _terrain.UpdateStreaming(_camBasePos.x);
@@ -152,8 +137,6 @@ namespace MetalRaptors
         {
             Vector3 cubePos = _cubeTr.position;
 
-            // Clamp Y as in the fixed levels; X only ever ratchets forward — flying back leaves
-            // the camera (and with it the wall) where it is.
             float minCamY = ProceduralTerrain.CutRevealY + _halfViewHeight;
             float maxCamY = WorldTop - _halfViewHeight;
             if (minCamY > maxCamY) minCamY = maxCamY = WorldTop * 0.5f;
@@ -172,8 +155,6 @@ namespace MetalRaptors
             _cam.transform.position = _camBasePos;
         }
 
-        /// <summary>Waves are configuration only for now: due waves are consumed and noted, and
-        /// actual spawning arrives together with the enemies (docs/campaign.md).</summary>
         void CheckWaves()
         {
             if (_gameOver || _level.waves == null) return;
@@ -184,8 +165,6 @@ namespace MetalRaptors
                 _nextWave++;
             }
         }
-
-        // ---------------------------------------------------------------- outcomes
 
         void OnShotDown()
         {
@@ -199,8 +178,6 @@ namespace MetalRaptors
             _cube.Stop();
             if (_shooter != null) _shooter.Stop();
 
-            // Freeze immediately, but let the crash explosion play out in full before the fail
-            // screen covers it (docs/effects.md).
             StartCoroutine(ShowFailScreenAfter(Explosion.Duration));
         }
 
@@ -222,8 +199,6 @@ namespace MetalRaptors
             UIFactory.CreateButton(canvas.transform, "BACK TO MENU", new Vector2(0, -130f),
                 () => SceneManager.LoadScene(SceneNames.MainMenu));
         }
-
-        // ---------------------------------------------------------------- ui
 
         void BuildHud()
         {

@@ -3,10 +3,6 @@ using UnityEngine.UI;
 
 namespace MetalRaptors
 {
-    /// <summary>
-    /// The player's HUD health readout: a dark plate, a fill that shrinks leftward and shades
-    /// green to red as damage comes in, and the number on top. Shared by the level controllers.
-    /// </summary>
     public class HealthBar
     {
         const float Width = 400f;
@@ -32,7 +28,7 @@ namespace MetalRaptors
             _fill = fillGo.GetComponent<Image>();
             _fill.raycastTarget = false;
             var fillRt = _fill.rectTransform;
-            fillRt.anchorMin = new Vector2(0f, 0.5f); // pinned left so the bar drains right-to-left
+            fillRt.anchorMin = new Vector2(0f, 0.5f);
             fillRt.anchorMax = new Vector2(0f, 0.5f);
             fillRt.pivot = new Vector2(0f, 0.5f);
             fillRt.anchoredPosition = new Vector2(Padding, 0f);

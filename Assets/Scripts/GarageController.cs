@@ -4,12 +4,6 @@ using UnityEngine.UI;
 
 namespace MetalRaptors
 {
-    /// <summary>
-    /// Garage scene: pick one of three differently coloured cubes (shown as live rotating 3D
-    /// previews) and adjust master volume. The chosen cube is persisted via the GameManager,
-    /// and its colour becomes the player cube in Level 1 / Level 2. Includes volume controls
-    /// and a Back-to-Menu button. All UI is built at runtime.
-    /// </summary>
     public class GarageController : MonoBehaviour
     {
         Text _selectedLabel;
@@ -20,8 +14,6 @@ namespace MetalRaptors
 
         void Start()
         {
-            // Use a dark camera clear colour (not a full-screen UI image) so the 3D preview
-            // cubes are visible behind the screen-space overlay UI.
             var cam = Camera.main;
             if (cam != null)
             {
@@ -57,7 +49,6 @@ namespace MetalRaptors
             _previews = new Transform[count];
             _previewRenderers = new Renderer[count];
 
-            // Spread the cubes horizontally in front of the scene camera (world space).
             float spacing = 4f;
             float startX = -spacing * (count - 1) / 2f;
 
@@ -83,7 +74,7 @@ namespace MetalRaptors
 
             for (int i = 0; i < count; i++)
             {
-                int index = i; // capture
+                int index = i;
                 var button = UIFactory.CreateButton(parent, gm.AvailableMechs[i],
                     new Vector2(startX + i * spacing, -60), () => { gm.SetSelectedMech(index); RefreshSelected(); },
                     new Vector2(320, 84));
@@ -137,7 +128,6 @@ namespace MetalRaptors
 
             _selectedLabel.text = $"Selected: {gm.SelectedMech}";
 
-            // Highlight the chosen cube: bigger + glowing, the rest plain.
             if (_previews == null) return;
             for (int i = 0; i < _previews.Length; i++)
             {
