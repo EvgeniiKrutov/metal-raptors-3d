@@ -42,6 +42,8 @@ namespace MetalRaptors
 
         void Update()
         {
+            if (GameMenu.IsOpen) return;
+
             _cooldown -= Time.deltaTime;
 
             var kb = Keyboard.current;

@@ -2,7 +2,6 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace MetalRaptors
@@ -33,6 +32,7 @@ namespace MetalRaptors
         HealthBar _healthBar;
         SearchlightIndicator _lightIndicator;
         Text _distanceText;
+        GameObject _hud;
 
         float _halfViewHeight;
         float _halfViewWidth;
@@ -116,6 +116,16 @@ namespace MetalRaptors
                 CloudSystem.Begin(_cam, _level.daytime, _level.weather, _level.clouds, PlayPlaneZ);
         }
 
+        void Update()
+        {
+            if (_gameOver || GameMenu.IsOpen) return;
+            if (MenuInput.ReadCancel()) GameMenu.Open(GameMenuKind.Pause, Subtitle, _hud);
+        }
+
+        string Subtitle => CustomBattle.Requested
+            ? $"{CustomBattle.Map.Name} | {DaytimeNames.For(_level.daytime)}"
+            : $"level {levelNumber} | {TerrainNames.Verdun}";
+
         void LateUpdate()
         {
             if (_cubeTr == null) return;
@@ -185,24 +195,13 @@ namespace MetalRaptors
         {
             yield return new WaitForSeconds(delay);
 
-            var canvas = UIFactory.CreateCanvas("Campaign Overlay");
-            canvas.sortingOrder = 100;
-            UIFactory.CreateBackground(canvas.transform, new Color(0.12f, 0f, 0f, 0.82f));
-            UIFactory.CreateText(canvas.transform, "MISSION FAILED", 96,
-                new Vector2(0, 200), new Vector2(1400, 170), TextAnchor.MiddleCenter, FontStyle.Bold)
-                .color = new Color(1f, 0.45f, 0.4f);
-            UIFactory.CreateText(canvas.transform, $"DISTANCE FLOWN: {Mathf.FloorToInt(Distance)} m", 40,
-                new Vector2(0, 90), new Vector2(1200, 70)).color = new Color(0.9f, 0.85f, 0.8f);
-
-            UIFactory.CreateButton(canvas.transform, "RETRY", new Vector2(0, -20f),
-                () => SceneManager.LoadScene(SceneManager.GetActiveScene().name));
-            UIFactory.CreateButton(canvas.transform, "BACK TO MENU", new Vector2(0, -130f),
-                () => SceneManager.LoadScene(SceneNames.MainMenu));
+            GameMenu.Open(GameMenuKind.Failed, Subtitle, _hud);
         }
 
         void BuildHud()
         {
             var canvas = UIFactory.CreateCanvas("Campaign HUD");
+            _hud = canvas.gameObject;
 
             UIFactory.CreateText(canvas.transform, $"CAMPAIGN — LEVEL {levelNumber}", 52,
                 new Vector2(0, 480), new Vector2(1000, 90), TextAnchor.MiddleCenter, FontStyle.Bold);

@@ -53,7 +53,7 @@ namespace MetalRaptors
         public const float TitleToBar = 22f;
         public const float BarWidth = 72f;
         public const float BarHeight = 4f;
-        public const float BarToList = 34f;
+        public const float BarToList = TitleToBar;
 
         public const int ItemSize = 30;
         public const float ItemRowHeight = 44f;

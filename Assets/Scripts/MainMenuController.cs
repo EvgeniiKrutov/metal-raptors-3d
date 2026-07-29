@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
@@ -32,16 +31,14 @@ namespace MetalRaptors
         MenuPanel _homePanel;
         MenuScreen _screen;
 
-        static readonly string[] WeatherNames = { "morning", "midday", "evening", "night" };
-
         void Start()
         {
             var canvas = UIFactory.CreateCanvas("MainMenu Canvas");
             UIFactory.CreateBackground(canvas.transform, MenuTheme.Colors.Bg);
 
-            Transform column = CreatePage(canvas.transform, "Menu Column", MenuTheme.ColumnFraction);
+            Transform column = MenuLayout.CreatePage(canvas.transform, "Menu Column", MenuTheme.ColumnFraction);
             _column = column.gameObject;
-            BuildTitle(column, "METAL RAPTORS");
+            MenuLayout.BuildTitle(column, "METAL RAPTORS");
             _main = BuildMainPanel(column);
             _challenges = BuildChallengesPanel(column);
 
@@ -56,54 +53,14 @@ namespace MetalRaptors
         {
             if (_group == null) return;
 
-            int step = ReadStep();
+            int step = MenuInput.ReadStep();
             if (step != 0) _group.MoveFocus(step);
 
-            int adjust = ReadAdjust();
+            int adjust = MenuInput.ReadAdjust();
             if (adjust != 0) _group.Adjust(adjust);
 
-            if (ReadSubmit()) _group.ActivateFocused();
-            if (ReadCancel()) Cancel();
-        }
-
-        static Transform CreatePage(Transform parent, string name, float widthFraction) =>
-            CreateRegion(parent, name, 0f, widthFraction, MenuTheme.PadLeft);
-
-        static Transform CreateRegion(Transform parent, string name, float xMin, float xMax, float padLeft)
-        {
-            var go = new GameObject(name, typeof(RectTransform));
-            go.transform.SetParent(parent, false);
-
-            var rt = (RectTransform)go.transform;
-            rt.anchorMin = new Vector2(xMin, 0f);
-            rt.anchorMax = new Vector2(xMax, 1f - MenuTheme.PadTopFraction);
-            rt.pivot = new Vector2(0.5f, 1f);
-            rt.offsetMin = new Vector2(padLeft, 0f);
-            rt.offsetMax = new Vector2(-MenuTheme.PadRight, 0f);
-            return go.transform;
-        }
-
-        static Transform CreateScreen(Transform parent, string name)
-        {
-            var go = new GameObject(name, typeof(RectTransform));
-            go.transform.SetParent(parent, false);
-
-            var rt = (RectTransform)go.transform;
-            rt.anchorMin = Vector2.zero;
-            rt.anchorMax = Vector2.one;
-            rt.offsetMin = Vector2.zero;
-            rt.offsetMax = Vector2.zero;
-            return go.transform;
-        }
-
-        static Text BuildTitle(Transform page, string title)
-        {
-            Text text = UIFactory.CreateLabel(page, title, MenuTheme.TitleSize, 0f,
-                MenuTheme.TitleRowHeight, MenuTheme.Colors.Fg, UIFactory.BoldFont);
-
-            UIFactory.CreateRule(page, -(MenuTheme.TitleRowHeight + MenuTheme.TitleToBar),
-                new Vector2(MenuTheme.BarWidth, MenuTheme.BarHeight), MenuTheme.Colors.Accent);
-            return text;
+            if (MenuInput.ReadSubmit()) _group.ActivateFocused();
+            if (MenuInput.ReadCancel()) Cancel();
         }
 
         MenuPanel BuildMainPanel(Transform column)
@@ -135,8 +92,8 @@ namespace MetalRaptors
 
         GameObject BuildErasPage(Transform parent)
         {
-            Transform page = CreatePage(parent, "Career Page", 1f);
-            _erasTitle = BuildTitle(page, string.Empty);
+            Transform page = MenuLayout.CreatePage(parent, "Career Page", 1f);
+            _erasTitle = MenuLayout.BuildTitle(page, string.Empty);
 
             _erasDescription = UIFactory.CreateParagraph(page, string.Empty, MenuTheme.DescriptionSize,
                 MenuTheme.ListTop, MenuTheme.DescriptionWidth, MenuTheme.DescriptionRowHeight,
@@ -159,8 +116,8 @@ namespace MetalRaptors
 
         GameObject BuildEraPage(Transform parent)
         {
-            Transform page = CreatePage(parent, "Era Page", MenuTheme.ColumnFraction);
-            _eraTitle = BuildTitle(page, string.Empty);
+            Transform page = MenuLayout.CreatePage(parent, "Era Page", MenuTheme.ColumnFraction);
+            _eraTitle = MenuLayout.BuildTitle(page, string.Empty);
 
             _eraPanel = new MenuPanel(page, "Era Panel", MenuTheme.ListTop);
             _eraPanel.AddNav("start", StartCampaign);
@@ -173,13 +130,13 @@ namespace MetalRaptors
 
         GameObject BuildCustomPage(Transform parent)
         {
-            Transform screen = CreateScreen(parent, "Custom Page");
-            Transform column = CreatePage(screen, "Custom Column", MenuTheme.ColumnFraction);
-            BuildTitle(column, "CUSTOM BATTLE");
+            Transform screen = MenuLayout.CreateScreen(parent, "Custom Page");
+            Transform column = MenuLayout.CreatePage(screen, "Custom Column", MenuTheme.ColumnFraction);
+            MenuLayout.BuildTitle(column, "CUSTOM BATTLE");
 
             _customPanel = new MenuPanel(column, "Custom Panel", MenuTheme.ListTop);
             _customPanel.AddSelector("map", BattleMaps.Names(), _mapIndex, PickMap);
-            _customPanel.AddSelector("weather", WeatherNames, (int)_daytime, PickWeather);
+            _customPanel.AddSelector("weather", DaytimeNames.All, (int)_daytime, PickWeather);
 
             _customPanel.AddGap(MenuTheme.SectionGap);
             _customPanel.AddNav("start level", StartCustomBattle);
@@ -187,7 +144,7 @@ namespace MetalRaptors
             _customPanel.AddGap(MenuTheme.SectionGap);
             _customPanel.AddNav("back to menu", () => ShowHome(_main));
 
-            Transform band = CreateRegion(screen, "Custom Preview", MenuTheme.ColumnFraction, 1f, 0f);
+            Transform band = MenuLayout.CreateRegion(screen, "Custom Preview", MenuTheme.ColumnFraction, 1f, 0f);
             _mapPreview = new MenuPreviewCard(band, PreviewTitle(), Vector2.zero);
             return screen.gameObject;
         }
@@ -205,7 +162,7 @@ namespace MetalRaptors
         }
 
         string PreviewTitle() =>
-            $"{BattleMaps.All[_mapIndex].Name} | {WeatherNames[(int)_daytime]}";
+            $"{BattleMaps.All[_mapIndex].Name} | {DaytimeNames.All[(int)_daytime]}";
 
         void StartCustomBattle()
         {
@@ -269,51 +226,6 @@ namespace MetalRaptors
         void Cancel()
         {
             if (_screen != MenuScreen.Home || _homePanel != _main) ShowHome(_main);
-        }
-
-        static int ReadStep()
-        {
-            Keyboard kb = Keyboard.current;
-            Gamepad pad = Gamepad.current;
-
-            bool forward = (kb != null && kb.downArrowKey.wasPressedThisFrame)
-                           || (pad != null && pad.dpad.down.wasPressedThisFrame);
-            bool back = (kb != null && kb.upArrowKey.wasPressedThisFrame)
-                        || (pad != null && pad.dpad.up.wasPressedThisFrame);
-
-            if (forward == back) return 0;
-            return forward ? 1 : -1;
-        }
-
-        static int ReadAdjust()
-        {
-            Keyboard kb = Keyboard.current;
-            Gamepad pad = Gamepad.current;
-
-            bool forward = (kb != null && kb.rightArrowKey.wasPressedThisFrame)
-                           || (pad != null && pad.dpad.right.wasPressedThisFrame);
-            bool back = (kb != null && kb.leftArrowKey.wasPressedThisFrame)
-                        || (pad != null && pad.dpad.left.wasPressedThisFrame);
-
-            if (forward == back) return 0;
-            return forward ? 1 : -1;
-        }
-
-        static bool ReadSubmit()
-        {
-            Keyboard kb = Keyboard.current;
-            Gamepad pad = Gamepad.current;
-            return (kb != null && (kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame
-                                                                   || kb.spaceKey.wasPressedThisFrame))
-                   || (pad != null && pad.buttonSouth.wasPressedThisFrame);
-        }
-
-        static bool ReadCancel()
-        {
-            Keyboard kb = Keyboard.current;
-            Gamepad pad = Gamepad.current;
-            return (kb != null && kb.escapeKey.wasPressedThisFrame)
-                   || (pad != null && pad.buttonEast.wasPressedThisFrame);
         }
     }
 }

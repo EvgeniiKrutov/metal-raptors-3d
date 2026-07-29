@@ -219,7 +219,9 @@ The level's definition, or the custom battle screen (see docs/main-menu.md):
 - A custom battle flies `CampaignLevels.Custom(map, daytime)` instead, built from whatever
   the menu's weather selector was left on. `CustomBattle` holds that pick in memory only.
 - Challenge level 1 still composes from `GameManager.Level1Daytime`, which nothing writes
-  now, so it flies at its Midday default; level 2 keeps its fixed morning definition.
+  now, so it flies at its Midday default; level 2 keeps its fixed morning definition — and
+  now over Verdun terrain (seed 1916, 2000 wide, same as level 1), not the flat slab, so
+  `TerrainKind.FlatSlab` is currently unused by any level.
 - `GameManager.SetLevel1Daytime` / `SetCampaignDaytime` and their PlayerPrefs keys
   (`mr_level1_daytime`, `mr_campaign_daytime`) are intact but unwritten.
 

@@ -32,6 +32,8 @@ UI — the `MainMenu` scene only holds a camera, a light and the controller obje
 | `IMenuFocusGroup.cs` | What the navigation keys drive (`MenuPanel`, `MenuCardRow`) and, as `IMenuFocusable`, what a panel can highlight. |
 | `CustomBattle.cs` | The maps a custom battle can pick, and the pick itself, read by the endless scene. |
 | `CareerEras.cs` | The four eras: title, years, description, unlocked. |
+| `MenuLayout.cs` | The column/page/band rects and the title + accent rule, shared with the in-level menu. |
+| `MenuInput.cs` | The navigation keys (`ReadStep` / `ReadAdjust` / `ReadSubmit` / `ReadCancel`), shared with the in-level menu. |
 | `MainMenuController.cs` | Composes the column, the career pages, and reads navigation input. |
 | `UIFactory.cs` | `CreateLabel` / `CreateInlineLabel` / `CreateBottomLabel` / `CreateParagraph` / `CreateRule` primitives and the project-wide font lookup. |
 
@@ -205,8 +207,8 @@ Switching is one assignment, `MenuTheme.Active = MenuThemeId.WW2`, made before t
 scene loads. There is no UI for it yet; when `options` becomes real, that is where it
 belongs (persist through `GameManager` / `PlayerPrefs` like the daytime settings).
 
-Only the main menu uses these palettes. The Garage, the HUD and the level screens keep
-their existing dark colours.
+The main menu and the in-level menu (`docs/game-menu.md`) use these palettes. The Garage and
+the HUD keep their existing dark colours.
 
 ## Entry states
 
@@ -268,6 +270,10 @@ viewport is not 16:9:
   cards page passes `1f` to the same `CreatePage` helper, and the one-era page passes
   `ColumnFraction` again;
 * `PadTopFraction = 0.15` — its top edge anchors 15% of the height down.
+
+The accent rule sits in equal air: `BarToList` is declared as `TitleToBar`, so the gap under
+the rule matches the gap over it (22px), and the list starts that much below the rule on
+every screen — the main menu's included.
 
 The two side insets are reference pixels, not fractions, because what sits inside them
 (cards, glyphs) is measured in reference pixels too — a fractional margin would let the

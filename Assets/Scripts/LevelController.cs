@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
-using UnityEngine.SceneManagement;
-using UnityEngine.UI;
 
 namespace MetalRaptors
 {
@@ -52,6 +50,7 @@ namespace MetalRaptors
 
         HealthBar _healthBar;
         SearchlightIndicator _lightIndicator;
+        GameObject _hud;
 
         float _halfViewHeight;
         bool _gameOver;
@@ -219,6 +218,14 @@ namespace MetalRaptors
                 CloudSystem.Begin(_cam, _level.daytime, _level.weather, _level.clouds, PlayPlaneZ);
         }
 
+        void Update()
+        {
+            if (_gameOver || GameMenu.IsOpen) return;
+            if (MenuInput.ReadCancel()) GameMenu.Open(GameMenuKind.Pause, Subtitle, _hud);
+        }
+
+        string Subtitle => $"level {levelNumber} | {TerrainNames.For(_level.terrain.kind)}";
+
         void FixedUpdate()
         {
             if (_gameOver) return;
@@ -323,21 +330,10 @@ namespace MetalRaptors
             if (GameManager.Instance != null)
                 GameManager.Instance.UnlockLevel(levelNumber + 1);
 
-            var canvas = NewOverlay(new Color(0f, 0.08f, 0.02f, 0.8f));
-            UIFactory.CreateText(canvas.transform, "MISSION COMPLETE", 90,
-                new Vector2(0, 200), new Vector2(1400, 160), TextAnchor.MiddleCenter, FontStyle.Bold)
-                .color = new Color(0.6f, 1f, 0.6f);
-
-            float y = 0f;
-            if (levelNumber == 1)
-            {
-                UIFactory.CreateButton(canvas.transform, "NEXT LEVEL", new Vector2(0, y),
-                    () => SceneManager.LoadScene(SceneNames.Level2));
-                y -= 110f;
-            }
-            UIFactory.CreateButton(canvas.transform, "BACK TO MENU", new Vector2(0, y),
-                () => SceneManager.LoadScene(SceneNames.MainMenu));
+            GameMenu.Open(GameMenuKind.Completed, Subtitle, _hud, NextScene);
         }
+
+        string NextScene => levelNumber == 1 ? SceneNames.Level2 : null;
 
         void OnCrashed()
         {
@@ -354,20 +350,13 @@ namespace MetalRaptors
         {
             yield return new WaitForSeconds(delay);
 
-            var canvas = NewOverlay(new Color(0.12f, 0f, 0f, 0.82f));
-            UIFactory.CreateText(canvas.transform, "MISSION FAILED", 96,
-                new Vector2(0, 200), new Vector2(1400, 170), TextAnchor.MiddleCenter, FontStyle.Bold)
-                .color = new Color(1f, 0.45f, 0.4f);
-
-            UIFactory.CreateButton(canvas.transform, "RETRY", new Vector2(0, 0f),
-                () => SceneManager.LoadScene(SceneManager.GetActiveScene().name));
-            UIFactory.CreateButton(canvas.transform, "BACK TO MENU", new Vector2(0, -110f),
-                () => SceneManager.LoadScene(SceneNames.MainMenu));
+            GameMenu.Open(GameMenuKind.Failed, Subtitle, _hud);
         }
 
         void BuildHud()
         {
             var canvas = UIFactory.CreateCanvas($"Level{levelNumber} HUD");
+            _hud = canvas.gameObject;
 
             UIFactory.CreateText(canvas.transform, $"LEVEL {levelNumber}", 52,
                 new Vector2(0, 480), new Vector2(1000, 90), TextAnchor.MiddleCenter, FontStyle.Bold);
@@ -392,14 +381,6 @@ namespace MetalRaptors
                 _lightIndicator.Set(_searchlight.IsOn);
             if (_cube == null || _healthBar == null) return;
             _healthBar.Set(_cube.CurrentHealth, _cube.MaxHealth);
-        }
-
-        Canvas NewOverlay(Color dimColor)
-        {
-            var canvas = UIFactory.CreateCanvas($"Level{levelNumber} Overlay");
-            canvas.sortingOrder = 100;
-            UIFactory.CreateBackground(canvas.transform, dimColor);
-            return canvas;
         }
     }
 }

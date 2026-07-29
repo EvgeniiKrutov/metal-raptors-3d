@@ -99,12 +99,13 @@ than blinking out the instant the effect appears. This applies to both sides:
   and collider immediately — so it can't drift, be hit again, or leave a floating bar — then
   removes the whole object with `Destroy(gameObject, RemovalDelay)`.
 
-For all fail cases the fail screen ("MISSION FAILED") is delayed until the blast finishes:
-`LevelController` / `CampaignLevelController` freeze the plane and stand down the enemies
-immediately, then wait `Explosion.Duration` (final blob delay + lifetime ≈ 2.3 s) via a
-coroutine before drawing the overlay, so the player watches the explosion play out first.
-`Explosion.Duration` is the single source of truth for that wait. Winning a level is not a
-crash and its overlay is still immediate.
+For all fail cases the fail screen (`GameMenuKind.Failed`, see `docs/game-menu.md`) is delayed
+until the blast finishes: `LevelController` / `CampaignLevelController` freeze the plane and
+stand down the enemies immediately, then wait `Explosion.Duration` (final blob delay +
+lifetime ≈ 2.3 s) via a coroutine before opening the menu, so the player watches the explosion
+play out first. `Explosion.Duration` is the single source of truth for that wait — the menu's
+own `Time.timeScale = 0` only lands after it, so it never freezes the explosion mid-blast.
+Winning a level is not a crash and its screen is still immediate.
 
 ### History
 

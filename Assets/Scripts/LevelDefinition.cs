@@ -4,6 +4,14 @@ namespace MetalRaptors
 {
     public enum Daytime { Morning, Midday, Evening, Night }
 
+    public static class DaytimeNames
+    {
+        public static readonly string[] All = { "morning", "midday", "evening", "night" };
+
+        public static string For(Daytime daytime) =>
+            All[Mathf.Clamp((int)daytime, 0, All.Length - 1)];
+    }
+
     public enum Weather { Calm }
 
     public enum CloudLevel { Low, Medium, High }
@@ -26,6 +34,15 @@ namespace MetalRaptors
         public TerrainKind kind;
         public int seed;
         public float width = 1500f;
+    }
+
+    public static class TerrainNames
+    {
+        public const string Verdun = "verdun";
+        public const string FlatSlab = "flat slab";
+
+        public static string For(TerrainKind kind) =>
+            kind == TerrainKind.Verdun ? Verdun : FlatSlab;
     }
 
     public class EnemyGroup
@@ -63,7 +80,7 @@ namespace MetalRaptors
 
         public static readonly LevelDefinition Level2 = new LevelDefinition
         {
-            terrain = new TerrainPart { kind = TerrainKind.FlatSlab, width = 1500f },
+            terrain = new TerrainPart { kind = TerrainKind.Verdun, seed = 1916, width = 2000f },
             daytime = Daytime.Morning,
             weather = Weather.Calm,
             enemies = new[] { new EnemyGroup(PlaneModels.Fokker, 1) },

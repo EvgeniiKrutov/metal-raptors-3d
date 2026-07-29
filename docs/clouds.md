@@ -10,7 +10,8 @@ touch gameplay.
 `CloudSystem.Begin(cam, daytime, weather, cloudsPart, playPlaneZ)` is called from
 `LevelController` and `CampaignLevelController` at the end of camera setup whenever the
 level's definition carries a non-null `CloudsPart`. Currently that is fixed Level 1 (Verdun)
-and campaign Level 1; the FlatSlab placeholder level stays cloudless (`clouds = null`).
+and campaign Level 1; Level 2 stays cloudless (`clouds = null`) even though it now flies the
+same Verdun terrain.
 `weather` is the same future modulation seam the sky classes take — `Calm` changes nothing.
 
 ## Structure
