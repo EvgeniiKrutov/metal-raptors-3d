@@ -1,5 +1,7 @@
 # Effects
 
+The player plane's night searchlight has its own page: docs/searchlight.md.
+
 ## Muzzle flash (`Assets/Scripts/MuzzleFlash.cs`)
 
 Spawned with `MuzzleFlash.Spawn(position, direction, size)` the instant a round is created —

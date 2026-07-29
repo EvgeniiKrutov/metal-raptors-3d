@@ -31,12 +31,14 @@ namespace MetalRaptors
         CampaignDefinition _level;
         CubeController _cube;
         PlaneShooter _shooter;
+        PlaneSearchlight _searchlight; // night levels only; null otherwise
         Transform _cubeTr;
         Camera _cam;
         CampaignTerrain _terrain;
         Transform _ceilingBar;
 
         HealthBar _healthBar;
+        SearchlightIndicator _lightIndicator;
         Text _distanceText;
 
         float _halfViewHeight;
@@ -94,6 +96,11 @@ namespace MetalRaptors
             var muzzle = PlaneFactory.MountMuzzle(go, model, planeModel, out var flashPoint);
             _shooter = go.AddComponent<PlaneShooter>();
             _shooter.Initialize(config, muzzle, flashPoint, go.GetComponentInChildren<Collider>());
+
+            // The night searchlight mounts on the same cowl point as the guns; Mount returns
+            // null on every other daytime, which is also what keeps it off the HUD.
+            _searchlight = PlaneSearchlight.Mount(go,
+                PlaneFactory.NoseLocal(go, model, planeModel), _level.daytime);
         }
 
         void SetupCamera()
@@ -230,6 +237,8 @@ namespace MetalRaptors
                 new Vector2(0, -500), new Vector2(1600, 50));
 
             _healthBar = new HealthBar(canvas.transform, new Vector2(-660f, 480f));
+            if (_searchlight != null)
+                _lightIndicator = new SearchlightIndicator(canvas.transform, new Vector2(-785f, 435f));
             _distanceText = UIFactory.CreateText(canvas.transform, "0 m", 40,
                 new Vector2(660f, 480f), new Vector2(500, 60), TextAnchor.MiddleRight, FontStyle.Bold);
             UpdateHud();
@@ -237,6 +246,8 @@ namespace MetalRaptors
 
         void UpdateHud()
         {
+            if (_lightIndicator != null && _searchlight != null)
+                _lightIndicator.Set(_searchlight.IsOn);
             if (_cube != null && _healthBar != null)
                 _healthBar.Set(_cube.CurrentHealth, _cube.MaxHealth);
             if (_distanceText != null)

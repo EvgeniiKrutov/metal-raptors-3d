@@ -72,6 +72,7 @@ namespace MetalRaptors
 
         CubeController _cube;
         PlaneShooter _shooter;
+        PlaneSearchlight _searchlight; // night levels only; null otherwise
         Transform _cubeTr;
         Camera _cam;
 
@@ -79,6 +80,7 @@ namespace MetalRaptors
         readonly List<EnemyController> _enemies = new List<EnemyController>();
 
         HealthBar _healthBar;
+        SearchlightIndicator _lightIndicator;
 
         float _halfViewHeight;   // half the world height visible on screen (for camera clamping)
         bool _gameOver;
@@ -179,6 +181,11 @@ namespace MetalRaptors
             _cube.Initialize(config, 0f, MinX, MaxX, WorldTop - CubeHalf, EdgeMargin);
 
             SetupGuns(config, go, plane, planeModel);
+
+            // The night searchlight mounts on the same cowl point as the guns; Mount returns
+            // null on every other daytime, which is also what keeps it off the HUD.
+            _searchlight = PlaneSearchlight.Mount(go,
+                PlaneFactory.NoseLocal(go, plane, planeModel), _level.daytime);
         }
 
         /// <summary>Mounts the machine guns: the muzzle (see <see cref="PlaneFactory.MountMuzzle"/>)
@@ -503,11 +510,15 @@ namespace MetalRaptors
                 new Vector2(0, -500), new Vector2(1600, 50));
 
             _healthBar = new HealthBar(canvas.transform, new Vector2(-660f, 480f));
+            if (_searchlight != null)
+                _lightIndicator = new SearchlightIndicator(canvas.transform, new Vector2(-785f, 435f));
             UpdateHealthHud();
         }
 
         void UpdateHealthHud()
         {
+            if (_lightIndicator != null && _searchlight != null)
+                _lightIndicator.Set(_searchlight.IsOn);
             if (_cube == null || _healthBar == null) return;
             _healthBar.Set(_cube.CurrentHealth, _cube.MaxHealth);
         }

@@ -118,6 +118,8 @@ power — under dark-violet air.
   unreadable rather than nocturnal.
 - **Horizon band**: `_HorizonFalloff 2.2` — a restrained band of violet glow low over
   the land, night's version of scattered horizon light.
+- **Player searchlight**: night is the only daytime that mounts one on the player's plane
+  (warm cone from the nose, toggled with T, off at spawn) — see docs/searchlight.md.
 
 ## Exposure
 
