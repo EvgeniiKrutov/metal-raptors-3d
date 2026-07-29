@@ -19,6 +19,8 @@ namespace MetalRaptors
         GameObject _eraPage;
         GameObject _customPage;
 
+        MenuPlaneView _planeView;
+
         Text _erasTitle;
         Text _erasDescription;
         Text _eraTitle;
@@ -35,6 +37,7 @@ namespace MetalRaptors
         {
             var canvas = UIFactory.CreateCanvas("MainMenu Canvas");
             UIFactory.CreateBackground(canvas.transform, MenuTheme.Colors.Bg);
+            _planeView = MenuPlaneView.Build(canvas.transform, PlaneModels.Sopwith);
 
             Transform column = MenuLayout.CreatePage(canvas.transform, "Menu Column", MenuTheme.ColumnFraction);
             _column = column.gameObject;
@@ -221,6 +224,7 @@ namespace MetalRaptors
             _erasPage.SetActive(screen == MenuScreen.Eras);
             _eraPage.SetActive(screen == MenuScreen.Era);
             _customPage.SetActive(screen == MenuScreen.Custom);
+            _planeView.SetActive(screen == MenuScreen.Home);
         }
 
         void Cancel()

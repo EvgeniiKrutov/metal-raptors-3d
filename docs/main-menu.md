@@ -29,6 +29,7 @@ UI — the `MainMenu` scene only holds a camera, a light and the controller obje
 | `MenuSelectorRow.cs` | A value stepped in place: label column, then two triangles either side of the value. |
 | `MenuArrowView.cs` | One triangle of a selector — clicks a step, greys out at the end of the list. |
 | `MenuPreviewCard.cs` | A card that only shows: the picked map's square, its name in the foot, no focus and no click. |
+| `MenuPlaneView.cs` | The flying plane in the main list's right band: its own camera, render texture and mouse-driven flight. |
 | `IMenuFocusGroup.cs` | What the navigation keys drive (`MenuPanel`, `MenuCardRow`) and, as `IMenuFocusable`, what a panel can highlight. |
 | `CustomBattle.cs` | The maps a custom battle can pick, and the pick itself, read by the endless scene. |
 | `CareerEras.cs` | The four eras: title, years, description, unlocked. |
@@ -45,7 +46,7 @@ UI — the `MainMenu` scene only holds a camera, a light and the controller obje
 │  METAL RAPTORS          │                           │
 │  ───                    │       (left empty)        │  ← 72×4 accent rule
 │                         │                           │
-│  career                 │      → era cards page     │
+│  career                 │      the flying plane     │
 │  challenges             │      (muted, no click)    │
 │  custom battle          │      → custom battle page │
 │  online battles         │      (muted, no click)    │
@@ -53,6 +54,9 @@ UI — the `MainMenu` scene only holds a camera, a light and the controller obje
 └─────────────────────────┴───────────────────────────┘
  ↑ 120px left margin — the edge every row on every screen starts on
 ```
+
+The right band is no longer empty on the main list — it carries the plane preview below.
+`career` still opens the era cards page, `custom battle` the custom battle page.
 
 `challenges` is muted for now — the panel below is built and reachable in one edit
 (`BuildMainPanel` passes `interactable: false`), so this is what it opens when it comes
@@ -73,6 +77,62 @@ measured width — both sit on the left edge's run.
 
 `level 2` stays muted and unclickable, tagged `LOCKED`, until `GameManager.IsLevelUnlocked(2)`
 returns true.
+
+## Plane preview
+
+The main list's right band holds the player's plane, flying nose-right and hanging in one
+place. It is built by `MenuPlaneView` and shown on the **home screen only** (the main list
+and challenges) — every other screen hides it, the custom battle band belonging to the map
+preview card and the era cards page taking the whole canvas.
+
+The band is the right `1 - ColumnFraction` of the canvas, full screen height (`0` to `1`) so
+the plane has the whole vertical run of the window to move in. It has no left inset — the
+column boundary itself is the band's left edge — and keeps `MenuTheme.PadRight` (56px) on
+the right only. It is a `RawImage` created straight after the background image, so it sits
+under every page in the canvas' draw order.
+
+### How it is drawn
+
+The overlay canvas paints over any world geometry, so the plane cannot simply be put in the
+scene behind the background image. Instead `MenuPlaneView` owns:
+
+* a **camera of its own** rendering into a `RenderTexture` sized to the band's pixel rect
+  (`rect × Canvas.scaleFactor`, rebuilt whenever that changes, so a window resize re-frames
+  rather than stretches). It clears to `MenuTheme.Colors.Bg`, the same colour as the flat
+  background — the band reads as part of the page, not as a picture pasted onto it;
+* a **plane rig parked at y 5000**, far from anything else a scene may hold. The scene's own
+  directional light lights it; nothing else is in the camera's view.
+
+The camera sits ~20° off the side and 8° above (`ViewYawDeg` / `ViewPitchDeg`) — a slight 3/4
+view, so the model reads as a 3D object and the bank shows wings and belly. Its distance is
+solved from the band's aspect so the plane fills `FillWidth` (100%) of the visible width,
+never less than `FillHeight` (95%) of the height; the framing therefore survives any window
+shape. That framed height is then widened again by `VerticalMarginFraction` — headroom equal
+to the rise and bob's combined travel range plus a small safety pad — so swinging the cursor
+to the top or bottom of the screen never pushes the model past the top or bottom of the
+frame.
+
+The plane body is a **root** object, not a child of the rig, because `PropellerSpin` takes
+its spin axis from `transform.root.right` — under a rig it would keep spinning about the
+world axis while the plane yaws.
+
+### Flight
+
+The cursor drives it, anywhere on the screen, through `Mathf.SmoothDamp` on every channel —
+that is what keeps the motion floaty instead of snapping to the pointer:
+
+| Input | Effect | Extent |
+| --- | --- | --- |
+| cursor y | rise/fall + a little nose pitch | ±12% of the visible height, ±10° |
+| cursor x | roll (belly / wings) + a little yaw | ±35°, ±12° |
+
+The angles are bounded, so it never rolls past a bank into a barrel roll, and it always
+eases back to level when the cursor returns to the middle. On top of that a permanent idle
+layer — a two-frequency sine bob (±2% of the height) and a 3° sway — keeps it airborne when
+the mouse is parked.
+
+The plane does not fire in the menu — no muzzle is mounted and `PlaneShooter` is never
+attached, unlike the in-level plane.
 
 ## Career
 
