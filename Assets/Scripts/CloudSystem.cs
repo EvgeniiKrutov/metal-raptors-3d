@@ -26,6 +26,12 @@ namespace MetalRaptors
         static readonly float[] CloudWidth = { 45f, 80f, 130f };   // nominal cloud width, metres
 
         static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+        static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
+
+        // How much of the sky's own air colour each daytime lifts its clouds by (indexed by
+        // Daytime). This is what keeps a cloud in the sky's family instead of letting the key
+        // light and ambient grey out its shaded side — see docs/clouds.md.
+        static readonly float[] HazeGlow = { 0.30f, 0.22f, 0.40f, 0.55f };
 
         struct Blob
         {
@@ -45,7 +51,7 @@ namespace MetalRaptors
         Camera _cam;
         float _playPlaneZ;
         float _speed, _spacing, _width;
-        Color _tint;
+        Color _tint, _glow;
         readonly List<Cloud> _clouds = new List<Cloud>();
         float _time;
         float _nextSpawnU; // conveyor-space X of the next cloud (docs/clouds.md)
@@ -67,18 +73,38 @@ namespace MetalRaptors
             sys._spacing = Spacing[(int)part.frequency];
             sys._width = CloudWidth[(int)part.size];
             sys._tint = TintFor(daytime);
+            sys._glow = GlowFor(daytime);
             return sys;
         }
 
+        /// <summary>The cloud albedo, owned by the active sky so the two always match.</summary>
         static Color TintFor(Daytime daytime)
         {
             switch (daytime)
             {
-                case Daytime.Midday: return new Color(0.97f, 0.98f, 1.00f);
-                case Daytime.Evening: return new Color(0.98f, 0.80f, 0.66f);
-                case Daytime.Night: return new Color(0.62f, 0.66f, 0.82f);
-                default: return new Color(0.97f, 0.92f, 0.84f); // Morning
+                case Daytime.Midday: return MiddaySky.CloudColor;
+                case Daytime.Evening: return EveningSky.CloudColor;
+                case Daytime.Night: return NightSky.CloudColor;
+                default: return MorningSky.CloudColor;
             }
+        }
+
+        /// <summary>
+        /// The emissive lift: a fraction of the sky's haze — the same colour the fog and the
+        /// horizon band are — so a cloud's unlit side settles into the air behind it instead of
+        /// falling to grey under the key light.
+        /// </summary>
+        static Color GlowFor(Daytime daytime)
+        {
+            Color haze;
+            switch (daytime)
+            {
+                case Daytime.Midday: haze = MiddaySky.HazeColor; break;
+                case Daytime.Evening: haze = EveningSky.HazeColor; break;
+                case Daytime.Night: haze = NightSky.HazeColor; break;
+                default: haze = MorningSky.HazeColor; break;
+            }
+            return haze * HazeGlow[(int)daytime];
         }
 
         void LateUpdate()
@@ -194,6 +220,8 @@ namespace MetalRaptors
             Color c = _tint;
             c.a = BaseAlpha * Random.Range(0.88f, 1.12f);
             mat.SetColor(BaseColorId, c);
+            mat.EnableKeyword("_EMISSION");
+            mat.SetColor(EmissionColorId, _glow);
             mat.SetFloat("_Smoothness", 0f);
             mat.SetFloat("_Surface", 1f); // transparent
             mat.SetOverrideTag("RenderType", "Transparent");

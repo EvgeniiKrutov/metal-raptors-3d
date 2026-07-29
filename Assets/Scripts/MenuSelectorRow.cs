@@ -1,0 +1,132 @@
+using System;
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
+
+namespace MetalRaptors
+{
+    /// <summary>
+    /// A one-of-many value picked in place: the label in the left column, in the same foreground
+    /// colour as any other entry, and in the right column the value between two triangles that
+    /// step it. The list does not wrap — the triangle at an end greys out. See docs/main-menu.md.
+    /// </summary>
+    public class MenuSelectorRow : MonoBehaviour, IPointerEnterHandler, IMenuFocusable
+    {
+        public event Action<IMenuFocusable> Hovered;
+
+        string[] _values;
+        Action<int> _onChanged;
+        Text _value;
+        MenuArrowView _left;
+        MenuArrowView _right;
+        int _index;
+        bool _focused;
+
+        public int Index => _index;
+
+        public static MenuSelectorRow Create(Transform parent, string label, string[] values,
+            int index, float top, Action<int> onChanged)
+        {
+            var go = new GameObject($"Selector ({label})", typeof(RectTransform), typeof(MenuSelectorRow));
+            go.transform.SetParent(parent, false);
+
+            var rt = (RectTransform)go.transform;
+            rt.anchorMin = new Vector2(0f, 1f);
+            rt.anchorMax = new Vector2(0f, 1f);
+            rt.pivot = new Vector2(0f, 1f);
+            rt.sizeDelta = new Vector2(MenuTheme.SelectorRowWidth, MenuTheme.ItemRowHeight);
+            rt.anchoredPosition = new Vector2(0f, top);
+
+            var view = go.GetComponent<MenuSelectorRow>();
+            view._values = values;
+            view._index = Mathf.Clamp(index, 0, values.Length - 1);
+            view._onChanged = onChanged;
+
+            // Behind everything so the arrows on top of it still take their own clicks; the
+            // pointer-enter it catches bubbles up to this row.
+            CreateHitBox(rt);
+
+            UIFactory.CreateInlineLabel(rt, label, MenuTheme.ItemSize, Vector2.zero,
+                MenuTheme.ItemRowHeight, MenuTheme.Colors.Fg, UIFactory.MediumFont);
+
+            float arrowY = -0.5f * (MenuTheme.ItemRowHeight - MenuTheme.SelectorArrowSize.y);
+            float valueX = MenuTheme.SelectorLabelWidth + MenuTheme.SelectorArrowSize.x
+                           + MenuTheme.SelectorArrowGap;
+
+            view._left = MenuArrowView.Create(rt, true,
+                new Vector2(MenuTheme.SelectorLabelWidth, arrowY));
+            view._right = MenuArrowView.Create(rt, false,
+                new Vector2(valueX + MenuTheme.SelectorValueWidth + MenuTheme.SelectorArrowGap, arrowY));
+
+            view._left.Clicked += () => view.Step(-1);
+            view._right.Clicked += () => view.Step(1);
+            view._left.Hovered += view.RaiseHovered;
+            view._right.Hovered += view.RaiseHovered;
+
+            view._value = UIFactory.CreateInlineLabel(rt, values[view._index], MenuTheme.ItemSize,
+                new Vector2(valueX, 0f), MenuTheme.ItemRowHeight, MenuTheme.Colors.Fg, UIFactory.MediumFont);
+            view._value.rectTransform.sizeDelta =
+                new Vector2(MenuTheme.SelectorValueWidth, MenuTheme.ItemRowHeight);
+
+            view.Apply();
+            return view;
+        }
+
+        static void CreateHitBox(RectTransform parent)
+        {
+            var go = new GameObject("Hit Box", typeof(Image));
+            go.transform.SetParent(parent, false);
+
+            var img = go.GetComponent<Image>();
+            img.color = Color.clear;
+
+            var rt = img.rectTransform;
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+        }
+
+        void Step(int delta)
+        {
+            int next = Mathf.Clamp(_index + delta, 0, _values.Length - 1);
+            RaiseHovered();
+            if (next == _index) return;
+
+            _index = next;
+            Apply();
+            _onChanged?.Invoke(_index);
+        }
+
+        void RaiseHovered() => Hovered?.Invoke(this);
+
+        void Apply()
+        {
+            MenuPalette palette = MenuTheme.Colors;
+
+            _value.text = _values[_index];
+            _value.color = _focused ? palette.Accent : palette.Fg;
+            _value.font = _focused ? UIFactory.BoldFont : UIFactory.MediumFont;
+
+            _left.SetState(_index > 0, _focused);
+            _right.SetState(_index < _values.Length - 1, _focused);
+        }
+
+        public void SetFocused(bool focused)
+        {
+            _focused = focused;
+            Apply();
+        }
+
+        /// <summary>Nothing to activate: the row *is* its value, stepped with left/right.</summary>
+        public void Activate() { }
+
+        public bool Adjust(int delta)
+        {
+            Step(delta);
+            return true;
+        }
+
+        public void OnPointerEnter(PointerEventData eventData) => RaiseHovered();
+    }
+}

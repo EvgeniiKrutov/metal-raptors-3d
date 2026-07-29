@@ -43,35 +43,71 @@ namespace MetalRaptors
         /// <summary>Pure sample math — safe to call from a worker thread.</summary>
         public static MusicBake Bake(MusicConfig config, int rate)
         {
+            var loop = BakeSection(config, rate, intro: false);
+            if (loop == null) return null;
+
+            var intro = BakeSection(config, rate, intro: true);
+            if (intro != null)
+            {
+                loop.Intro = intro.Intro;
+                loop.IntroDuration = intro.IntroDuration;
+            }
+            return loop;
+        }
+
+        /// <summary>
+        /// Bakes one half of a track on its own — the play-once intro or the seamless loop — so
+        /// the two can render on separate threads and the intro can start playing while the
+        /// loop is still being rendered. Returns null when the track has no intro section.
+        /// </summary>
+        public static MusicBake BakeSection(MusicConfig config, int rate, bool intro)
+        {
             if (config == null || config.Sequence.Count == 0) return null;
 
+            int loopStart = LoopStartIndex(config);
+            if (intro && loopStart <= 0) return null;
+
+            int from = intro ? 0 : loopStart;
+            int to = intro ? loopStart : config.Sequence.Count;
             var durations = PatternDurations(config);
-            int loopStart = Mathf.Clamp(config.LoopStart, 0, config.Sequence.Count - 1);
             var bake = new MusicBake { Rate = rate, Channels = config.IsRetro ? 2 : 1 };
 
+            float[] samples;
+            double lengthSec;
             if (config.IsRetro)
+                samples = MusicSynthRetro.Render(config, from, to, rate, durations, !intro, out lengthSec);
+            else
+                samples = RenderSection(config, from, to, rate, durations, BuildNoise(rate), out lengthSec);
+
+            if (samples == null) return null;
+            if (intro)
             {
-                if (loopStart > 0)
-                {
-                    bake.Intro = MusicSynthRetro.Render(config, 0, loopStart, rate, durations, false,
-                        out double introDuration);
-                    bake.IntroDuration = introDuration;
-                }
-                bake.Loop = MusicSynthRetro.Render(config, loopStart, config.Sequence.Count, rate, durations, true,
-                    out _);
+                bake.Intro = samples;
+                bake.IntroDuration = lengthSec;
             }
             else
             {
-                float[] noise = BuildNoise(rate);
-                if (loopStart > 0)
-                {
-                    bake.Intro = RenderSection(config, 0, loopStart, rate, durations, noise, out double introDuration);
-                    bake.IntroDuration = introDuration;
-                }
-                bake.Loop = RenderSection(config, loopStart, config.Sequence.Count, rate, durations, noise, out _);
+                bake.Loop = samples;
             }
+            return bake;
+        }
 
-            return bake.Loop != null ? bake : null;
+        public static int LoopStartIndex(MusicConfig config) =>
+            config == null || config.Sequence.Count == 0
+                ? 0
+                : Mathf.Clamp(config.LoopStart, 0, config.Sequence.Count - 1);
+
+        /// <summary>Musical length of a run of sequence entries — the bake-cost estimate's input.</summary>
+        public static double SectionSeconds(MusicConfig config, int from, int to)
+        {
+            if (config == null) return 0;
+            var durations = PatternDurations(config);
+            double total = 0;
+            for (int i = from; i < to && i < config.Sequence.Count; i++)
+            {
+                if (durations.TryGetValue(config.Sequence[i], out double duration)) total += duration;
+            }
+            return total;
         }
 
         /// <summary>Wraps baked buffers in AudioClips — must run on the main thread.</summary>
@@ -86,6 +122,10 @@ namespace MetalRaptors
                 IntroDuration = bake.IntroDuration,
             };
         }
+
+        /// <summary>Wraps one half of a track in an AudioClip — must run on the main thread.</summary>
+        public static AudioClip ToClip(MusicBake bake, bool intro, string name) =>
+            bake == null ? null : ToClip(intro ? bake.Intro : bake.Loop, bake, name);
 
         static AudioClip ToClip(float[] samples, MusicBake bake, string name)
         {

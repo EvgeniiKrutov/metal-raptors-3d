@@ -50,7 +50,9 @@ namespace MetalRaptors
 
         void Start()
         {
-            _level = CampaignLevels.ForNumber(levelNumber);
+            _level = CustomBattle.Requested
+                ? CampaignLevels.Custom(CustomBattle.Map, CustomBattle.Daytime)
+                : CampaignLevels.ForNumber(levelNumber);
 
             var config = Resources.Load<PlayerConfig>("PlayerConfig");
             if (config == null) config = ScriptableObject.CreateInstance<PlayerConfig>(); // safety fallback

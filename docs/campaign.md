@@ -1,9 +1,9 @@
 # Campaign mode
 
-An endless side-scrolling flight over streamed terrain. Entry point: main menu → career →
-World War 1 → start (scene `CampaignLevel1`, controller `CampaignLevelController`, definition
-registry `CampaignLevels` in `CampaignDefinition.cs`). See docs/main-menu.md for the era
-pages that lead here.
+An endless side-scrolling flight over streamed terrain. Entry points: main menu → career →
+World War 1 → start, and main menu → custom battle → start (scene `CampaignLevel1`,
+controller `CampaignLevelController`, definition registry `CampaignLevels` in
+`CampaignDefinition.cs`). See docs/main-menu.md for the pages that lead here.
 
 ## Rules of the level
 
@@ -16,9 +16,13 @@ pages that lead here.
   auto-turns the plane — the pilot keeps full control of the heading. Implemented as
   `CubeController.Initialize(..., hardLeftWall: true)` + `SetLeftWall`, which replaces the
   fixed levels' soft `FlightSteering.EdgeSteer` boundaries.
-- The daytime is authored on the definition, not picked in the menu: level 1 flies at dawn
-  (`Daytime.Morning`). Sky, fog and ambient reuse the same sky classes as the fixed terrain
-  levels.
+- The daytime is authored on the definition: level 1 flies at dawn (`Daytime.Morning`). Sky,
+  fog and ambient reuse the same sky classes as the fixed terrain levels.
+- A **custom battle** is the one exception. When `CustomBattle.Requested` is set (the menu's
+  custom battle screen did it), the controller builds
+  `CampaignLevels.Custom(map, daytime)` — the picked map's seed under the picked sky — in
+  place of the authored definition. Career's start clears the request first, so the two
+  entry points never bleed into each other.
 
 ## Streamed terrain (`CampaignTerrain`)
 

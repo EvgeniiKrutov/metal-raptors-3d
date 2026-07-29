@@ -225,6 +225,75 @@ namespace MetalRaptors
             return text;
         }
 
+        /// <summary>
+        /// A solid triangle pointing left or right, against its parent's left edge and hung from
+        /// its top — the step controls of <see cref="MenuSelectorRow"/>. The shape is a
+        /// generated sprite rather than a glyph, since Poppins carries no triangle character.
+        /// </summary>
+        public static Image CreateTriangle(Transform parent, bool pointsLeft, Vector2 size,
+            Vector2 anchoredPos, Color color)
+        {
+            var go = new GameObject(pointsLeft ? "Triangle (left)" : "Triangle (right)", typeof(Image));
+            go.transform.SetParent(parent, false);
+
+            var img = go.GetComponent<Image>();
+            img.sprite = TriangleSprite(pointsLeft);
+            img.color = color;
+
+            var rt = img.rectTransform;
+            rt.anchorMin = new Vector2(0f, 1f);
+            rt.anchorMax = new Vector2(0f, 1f);
+            rt.pivot = new Vector2(0f, 1f);
+            rt.sizeDelta = size;
+            rt.anchoredPosition = anchoredPos;
+            return img;
+        }
+
+        static Sprite _triangleLeft;
+        static Sprite _triangleRight;
+
+        static Sprite TriangleSprite(bool pointsLeft)
+        {
+            if (pointsLeft && _triangleLeft != null) return _triangleLeft;
+            if (!pointsLeft && _triangleRight != null) return _triangleRight;
+
+            const int size = 64;
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            {
+                name = pointsLeft ? "Triangle Left" : "Triangle Right",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+                hideFlags = HideFlags.HideAndDontSave,
+            };
+
+            var pixels = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                float v = (y + 0.5f) / size;
+                // Apex on the right at mid height, base down the left edge; mirrored for the
+                // left-pointing one. The signed distance to that edge is the antialias ramp.
+                float span = 1f - Mathf.Abs(2f * v - 1f);
+                for (int x = 0; x < size; x++)
+                {
+                    float u = (x + 0.5f) / size;
+                    if (pointsLeft) u = 1f - u;
+
+                    float alpha = Mathf.Clamp01((span - u) * size * 0.5f);
+                    pixels[y * size + x] = new Color32(255, 255, 255, (byte)(alpha * 255f));
+                }
+            }
+
+            tex.SetPixels32(pixels);
+            tex.Apply();
+
+            Sprite sprite = Sprite.Create(tex, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f));
+            sprite.hideFlags = HideFlags.HideAndDontSave;
+
+            if (pointsLeft) _triangleLeft = sprite;
+            else _triangleRight = sprite;
+            return sprite;
+        }
+
         /// <summary>Solid rectangle against its parent's left edge, hung from its top (the title's accent rule).</summary>
         public static Image CreateRule(Transform parent, float top, Vector2 size, Color color)
         {

@@ -54,6 +54,9 @@ namespace MetalRaptors
             FocusIndex(_focus < 0 ? 0 : (_focus + delta + _cards.Count) % _cards.Count);
         }
 
+        /// <summary>The row runs across the screen, so left/right are its focus keys too.</summary>
+        public void Adjust(int delta) => MoveFocus(delta);
+
         public void ActivateFocused()
         {
             if (_focus >= 0 && _focus < _cards.Count) _cards[_focus].Activate();

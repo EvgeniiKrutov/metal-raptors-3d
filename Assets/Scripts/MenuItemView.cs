@@ -11,10 +11,10 @@ namespace MetalRaptors
     /// One chrome-less text entry of the menu. Colour and weight follow its
     /// interactable / focused / selected state — see docs/main-menu.md.
     /// </summary>
-    public class MenuItemView : MonoBehaviour, IPointerEnterHandler, IPointerClickHandler
+    public class MenuItemView : MonoBehaviour, IPointerEnterHandler, IPointerClickHandler, IMenuFocusable
     {
         public event Action Activated;
-        public event Action<MenuItemView> Hovered;
+        public event Action<IMenuFocusable> Hovered;
 
         Text _text;
         MenuItemStyle _style;
@@ -84,6 +84,9 @@ namespace MetalRaptors
         {
             if (Interactable) Activated?.Invoke();
         }
+
+        /// <summary>A plain entry has no value to step, so left/right stay navigation keys.</summary>
+        public bool Adjust(int delta) => false;
 
         void Apply()
         {

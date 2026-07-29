@@ -171,7 +171,7 @@ namespace MetalRaptors
             switch (daytime)
             {
                 case Daytime.Midday: haze = MiddaySky.HazeColor; startOffset = 300f; break;
-                case Daytime.Evening: haze = EveningSky.HazeColor; startOffset = 100f; break;
+                case Daytime.Evening: haze = EveningSky.HazeColor; startOffset = 120f; break;
                 case Daytime.Night: haze = NightSky.HazeColor; startOffset = 250f; break;
                 default: haze = MorningSky.HazeColor; startOffset = 80f; break;
             }

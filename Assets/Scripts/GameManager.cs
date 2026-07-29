@@ -6,7 +6,7 @@ namespace MetalRaptors
     /// Persistent game state that survives scene loads (DontDestroyOnLoad).
     ///
     /// Holds three kinds of cross-scene data, matching the design:
-    ///   * Selected loadout  - the mech chosen in the Garage, read in Battlefield/levels.
+    ///   * Selected loadout  - the mech chosen in the Garage, read in the levels.
     ///                         Kept in memory + remembered via PlayerPrefs.
     ///   * Audio settings    - master volume, applied to the AudioListener + persisted.
     ///   * Progress / unlocks- which levels are unlocked, persisted via PlayerPrefs.
@@ -18,7 +18,7 @@ namespace MetalRaptors
     {
         public static GameManager Instance { get; private set; }
 
-        // ---- Loadout (selected in the Garage, read in Battlefield/levels) ----
+        // ---- Loadout (selected in the Garage, read in the levels) ----
         public readonly string[] AvailableMechs = { "Raptor MK-I", "Raptor MK-II", "Raptor MK-III" };
 
         // Each mech is a differently coloured cube; the chosen colour flies in the levels.

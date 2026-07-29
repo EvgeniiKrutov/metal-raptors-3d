@@ -11,7 +11,7 @@ namespace MetalRaptors
     /// </summary>
     public class MenuPanel : IMenuFocusGroup
     {
-        readonly List<MenuItemView> _focusables = new List<MenuItemView>();
+        readonly List<IMenuFocusable> _focusables = new List<IMenuFocusable>();
         readonly RectTransform _root;
         float _cursor;
         int _focus = -1;
@@ -101,13 +101,26 @@ namespace MetalRaptors
             return items;
         }
 
-        void Register(MenuItemView item)
+        /// <summary>
+        /// A value stepped in place by the two triangles either side of it — label left column,
+        /// control right column, both reading from their own left edge.
+        /// </summary>
+        public MenuSelectorRow AddSelector(string label, string[] values, int selected, Action<int> onChanged)
+        {
+            MenuSelectorRow row = MenuSelectorRow.Create(_root, label, values, selected, _cursor, onChanged);
+            Register(row);
+
+            _cursor -= MenuTheme.ItemRowHeight + MenuTheme.ItemGap;
+            return row;
+        }
+
+        void Register(IMenuFocusable item)
         {
             _focusables.Add(item);
             item.Hovered += Focus;
         }
 
-        public void Focus(MenuItemView item)
+        public void Focus(IMenuFocusable item)
         {
             int index = _focusables.IndexOf(item);
             if (index >= 0) FocusIndex(index);
@@ -120,6 +133,16 @@ namespace MetalRaptors
             if (_focusables.Count == 0) return;
             int next = _focus < 0 ? 0 : (_focus + delta + _focusables.Count) % _focusables.Count;
             FocusIndex(next);
+        }
+
+        /// <summary>
+        /// Left/right: a selector row spends them on its own value, anything else lets them
+        /// move the highlight as the down/up keys do.
+        /// </summary>
+        public void Adjust(int delta)
+        {
+            if (_focus >= 0 && _focus < _focusables.Count && _focusables[_focus].Adjust(delta)) return;
+            MoveFocus(delta);
         }
 
         public void ActivateFocused()

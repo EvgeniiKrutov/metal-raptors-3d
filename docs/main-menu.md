@@ -26,7 +26,11 @@ UI — the `MainMenu` scene only holds a camera, a light and the controller obje
 | `MenuPanel.cs` | A stack of entries with one shared highlight driven by mouse *and* keyboard. |
 | `MenuCardView.cs` | One square era card: white face, title and years in its foot, accent frame while highlighted. |
 | `MenuCardRow.cs` | A run of cards with one shared highlight; raises `FocusChanged` for the header above it. |
-| `IMenuFocusGroup.cs` | What the navigation keys drive — implemented by both `MenuPanel` and `MenuCardRow`. |
+| `MenuSelectorRow.cs` | A value stepped in place: label column, then two triangles either side of the value. |
+| `MenuArrowView.cs` | One triangle of a selector — clicks a step, greys out at the end of the list. |
+| `MenuPreviewCard.cs` | A card that only shows: the picked map's square, its name in the foot, no focus and no click. |
+| `IMenuFocusGroup.cs` | What the navigation keys drive (`MenuPanel`, `MenuCardRow`) and, as `IMenuFocusable`, what a panel can highlight. |
+| `CustomBattle.cs` | The maps a custom battle can pick, and the pick itself, read by the endless scene. |
 | `CareerEras.cs` | The four eras: title, years, description, unlocked. |
 | `MainMenuController.cs` | Composes the column, the career pages, and reads navigation input. |
 | `UIFactory.cs` | `CreateLabel` / `CreateInlineLabel` / `CreateBottomLabel` / `CreateParagraph` / `CreateRule` primitives and the project-wide font lookup. |
@@ -40,15 +44,17 @@ UI — the `MainMenu` scene only holds a camera, a light and the controller obje
 │  ───                    │       (left empty)        │  ← 72×4 accent rule
 │                         │                           │
 │  career                 │      → era cards page     │
-│  challenges             │      → challenges panel   │
-│  custom battle          │      → Battlefield scene  │
+│  challenges             │      (muted, no click)    │
+│  custom battle          │      → custom battle page │
 │  online battles         │      (muted, no click)    │
 │  options                │      (muted, no click)    │
 └─────────────────────────┴───────────────────────────┘
  ↑ 120px left margin — the edge every row on every screen starts on
 ```
 
-`challenges` replaces the list rather than expanding it. The title and its accent rule stay
+`challenges` is muted for now — the panel below is built and reachable in one edit
+(`BuildMainPanel` passes `interactable: false`), so this is what it opens when it comes
+back. It replaces the list rather than expanding it: the title and its accent rule stay
 put; only the column below them swaps.
 
 ```
@@ -112,15 +118,54 @@ column, where the entries belong.
 * `start` becomes `continue` once campaign progress is tracked; `level select` is drawn
   muted until there is more than one level to pick.
 
+## Custom battle
+
+One endless battle composed by hand: pick the map, pick the sky, fly it. Its screen is the
+column plus one card in the right band — the first screen to use both halves.
+
+```
+   ┌────────── 40% ──────────┬───────────────────────────┐
+   │  CUSTOM BATTLE          │  ┌───────────┐            │
+   │  ───                    │  │           │            │
+   │  map      ◀ verdun  ▶   │  │           │            │  ← the map's preview,
+   │  weather  ◀ morning ▶   │  │           │            │    empty until its
+   │                         │  │verdun | morning│       │    screenshot lands
+   │  start                  │  └───────────┘            │  → CampaignLevel1, endless
+   │                         │                           │
+   │  back                   │                           │  → main list
+   └─────────────────────────┴───────────────────────────┘
+```
+
+* A selector row is two columns, each reading from its own left edge: the label, then the
+  control. The value column is a fixed `SelectorValueWidth`, so the right triangle holds
+  still while the value changes under it.
+* The labels (`map`, `weather`) are `Fg`, the same weight and colour as `start` and `back`
+  — they name rows the player acts on, so they read as entries, not as captions.
+* The list does **not** wrap. The triangle at either end greys out — both of the map row's
+  do, Verdun being the only map so far.
+* `map` picks a `BattleMap` from `BattleMaps.All` (name + terrain seed); `weather` picks a
+  `Daytime`, in the enum's own order. Neither is persisted: a custom battle's picks are not
+  settings, so the screen opens on verdun/morning every time the menu is built.
+* `start` fills in `CustomBattle` and loads the endless `CampaignLevel1` scene, where
+  `CampaignLevelController` builds `CampaignLevels.Custom(map, daytime)` instead of the
+  authored level. Career's own `start` calls `CustomBattle.Clear()` first, so an era keeps
+  its authored atmosphere after a custom battle has been flown.
+* The preview card is a `MenuPreviewCard` — the era card's white square and foot label
+  without the frame, the hit box or the focus. Its upper two thirds are where the map's
+  screenshot goes.
+* The card's foot carries **both** picks, `map | weather` (`verdun | morning`), rebuilt by
+  `MainMenuController.PreviewTitle` from either selector — so the card states the whole
+  battle about to be flown, not just the land.
+
 ## Weather
 
-The menu no longer offers a weather (daytime) row. Levels carry their own atmosphere
-instead: career level 1 is authored at dawn (`CampaignLevels.Level1.daytime =
+Only the custom battle screen picks a sky. Everywhere else levels carry their own
+atmosphere: career level 1 is authored at dawn (`CampaignLevels.Level1.daytime =
 Daytime.Morning`) and the challenge levels keep their definitions' defaults.
 
 `GameManager.SetCampaignDaytime` / `SetLevel1Daytime` and their PlayerPrefs keys are still
-there, and nothing writes them now — the plumbing waits for the selector to come back
-(likely under `options`, or per-era once eras have their own weather).
+there, and nothing writes them — the custom battle deliberately goes through the
+memory-only `CustomBattle` instead, so flying one changes no saved setting.
 
 ## Themes
 
@@ -156,8 +201,12 @@ or changes size.
 | **Option** (a row of choices) | `Muted` medium | `Fg` medium | `Accent` bold | — |
 
 Selected beats focused for options, so a chosen value stays accent-lit while the highlight
-moves over its neighbours. No screen uses the Option style at the moment — the weather
-row that did is gone (see *Weather*) and `MenuPanel.AddOptionRow` waits for the next one.
+moves over its neighbours. No screen uses the Option style at the moment — the weather row
+that did is now a selector instead, and `MenuPanel.AddOptionRow` waits for the next one.
+
+A selector row follows the Nav rule on its value (`Fg`, `Accent` bold while focused) and
+its label stays `Muted`. Its triangles are `Fg`, `Accent` while the row holds the highlight,
+and `Muted` once there is nothing left that way.
 
 A card is the same idea in two parts: its title is `Fg`, `Accent` when highlighted, `Muted`
 when locked; its years stay `Muted`; and a 4px frame — `Accent`, or `Muted` when locked —
@@ -171,11 +220,16 @@ highlighted entry:
 
 * hovering an entry moves the focus to it (the focus does **not** clear on pointer exit —
   the template always shows one focused entry);
-* `↓`/`→` and d-pad down/right step forward, `↑`/`←` and d-pad up/left step back, wrapping
-  at both ends;
+* `↓` and d-pad down step forward, `↑` and d-pad up step back, wrapping at both ends;
+* `→`/`←` go to the focused entry first (`IMenuFocusable.Adjust`): a selector row spends
+  them on its own value and keeps the highlight, everything else lets them move the
+  highlight as `↓`/`↑` do. The card row reads across the screen, so they move it too;
 * `Enter`, `Space` or gamepad south activates the focused entry;
 * `Escape` or gamepad east goes where the screen's own `back` goes — the main list, from
   challenges, from the era cards and from an era's page alike.
+
+A selector row's hit box is its whole row (label included), since the row *is* the control;
+its triangles sit on top of that box and take their own clicks.
 
 In a panel, disabled entries are never registered, so the highlight skips them entirely. A
 card row is the exception: locked cards do take the highlight, because they are content —
@@ -206,6 +260,11 @@ card row overflow at an extreme aspect ratio:
   together, on every screen, because they all take it from `CreatePage`;
 * `PadRight = 56` — no content is right-aligned, so this only keeps stretched rows off the
   screen edge.
+
+The custom battle screen is two bands inside one full-canvas holder, so both still measure
+their fractions against the whole width: the column (`0 → ColumnFraction`, inset by
+`PadLeft`) and the preview band (`ColumnFraction → 1`, no left inset — the split is already
+its left edge, and the card hangs at the band's top corner).
 
 Everything inside is a reference pixel against the canvas' 1920×1080. The proportions come
 from the template's computed values at a 1920-wide viewport, but every text metric is

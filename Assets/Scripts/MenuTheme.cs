@@ -66,6 +66,17 @@ namespace MetalRaptors
         public const float OptionRowHeight = 34f;
         public const float OptionGap = 26f;
 
+        // A selector is two columns, each reading from its own left edge: the label, then the
+        // control (triangle, value, triangle). The value column is a fixed width so the right
+        // triangle holds still as the value changes under it.
+        public const float SelectorLabelWidth = 190f;
+        public const float SelectorValueWidth = 190f;
+        public const float SelectorArrowGap = 22f;
+        public static readonly Vector2 SelectorArrowSize = new Vector2(18f, 20f);
+
+        public static float SelectorRowWidth =>
+            SelectorLabelWidth + 2f * (SelectorArrowSize.x + SelectorArrowGap) + SelectorValueWidth;
+
         public const int CaptionSize = 14;
         public const float CaptionRowHeight = 20f;
         public const float CaptionToContent = 12f;

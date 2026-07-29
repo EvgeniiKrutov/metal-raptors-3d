@@ -20,10 +20,23 @@ namespace MetalRaptors
         // Fog AND the skybox horizon band: one value, so the fogged terrain edge and the sky
         // meet with no visible seam. Retune them together or the illusion breaks.
         public static readonly Color HazeColor = new Color(0.90f, 0.84f, 0.75f);
+        // The cloud layer's albedo — warm cream, the morning's own light. CloudSystem reads it.
+        public static readonly Color CloudColor = new Color(1.00f, 0.94f, 0.86f);
         static readonly Color ZenithColor = new Color(0.52f, 0.62f, 0.76f);  // muted morning blue
         static readonly Color SunColor = new Color(1.00f, 0.88f, 0.66f);     // pale gold disc + halo
         static readonly Color SunLightColor = new Color(1.00f, 0.84f, 0.64f);// amber key light
-        static readonly Color AmbientColor = new Color(0.62f, 0.66f, 0.74f); // cool fill -> blue-ish shadows
+        // Gradient ambient: cool blue sky over warm brown ground, so shadows lean blue and the
+        // land bounces warmth back up into them.
+        static readonly Color AmbientSkyColor = new Color(0.56f, 0.67f, 0.90f);
+        static readonly Color AmbientEquatorColor = new Color(0.84f, 0.80f, 0.80f);
+        static readonly Color AmbientGroundColor = new Color(0.38f, 0.31f, 0.25f);
+
+        // Light shafts through the dawn mist: shorter and paler than the evening's, since this
+        // sun is already risen and sits off at the frame's edge.
+        static readonly Color RayColor = new Color(1.00f, 0.88f, 0.68f);
+        const float RayIntensity = 0.85f;
+        const float RayDensity = 0.85f;
+        const float RayFalloff = 1.1f;
 
         // Sun column on screen (0..1 across; right edge, out of the dogfight's sightline) and
         // how far above the map-edge horizon the disc rides, as a viewport fraction. SkyHorizon
@@ -50,8 +63,10 @@ namespace MetalRaptors
             TuneSunLight();
             BuildPostFx(cam);
 
-            RenderSettings.ambientMode = AmbientMode.Flat;
-            RenderSettings.ambientLight = AmbientColor;
+            RenderSettings.ambientMode = AmbientMode.Trilight;
+            RenderSettings.ambientSkyColor = AmbientSkyColor;
+            RenderSettings.ambientEquatorColor = AmbientEquatorColor;
+            RenderSettings.ambientGroundColor = AmbientGroundColor;
         }
 
         static void BuildSkybox(Camera cam)
@@ -77,7 +92,7 @@ namespace MetalRaptors
             sky.SetFloat("_HorizonFalloff", 2.5f);   // wide horizon band — the air is thick
             sky.SetColor("_SunColor", SunColor);
             sky.SetFloat("_SunFalloff", 300f);       // soft ~6 degree core, not a hard disc
-            sky.SetFloat("_SunIntensity", 1.4f);     // just past HDR white — glows without glare
+            sky.SetFloat("_SunIntensity", 4.5f);     // well past HDR white — bloom does the glow
             sky.SetFloat("_HaloFalloff", 7f);        // broad scattered-light patch around it
             sky.SetFloat("_HaloIntensity", 0.35f);
             sky.SetFloat("_Exposure", 1f);
@@ -87,6 +102,8 @@ namespace MetalRaptors
 
             // Horizon band + sun glued to the map's fogged far edge (see docs/atmospheres.md).
             SkyHorizon.Attach(cam, sky, SunViewportX, SunHorizonLift, anchorSun: true);
+            GodRays.Attach(cam, sky, RayColor, RayIntensity,
+                density: RayDensity, radialFalloff: RayFalloff);
         }
 
         /// <summary>Warms and lowers the scene's directional light into the morning key.</summary>
@@ -98,6 +115,7 @@ namespace MetalRaptors
                 light.color = SunLightColor;
                 light.intensity = SunLightIntensity;
                 light.transform.rotation = SunLightRotation;
+                light.shadowNormalBias = 0.5f;   // low light, grazing angles: keeps acne off
                 RenderSettings.sun = light;
                 break;
             }
@@ -112,24 +130,32 @@ namespace MetalRaptors
             var profile = ScriptableObject.CreateInstance<VolumeProfile>();
             profile.name = "Morning Post FX (runtime)";
 
+            // The shafts are drawn before post, so this blooms them along with the HDR disc —
+            // that spill is most of their softness.
             var bloom = profile.Add<Bloom>();
-            bloom.threshold.Override(0.85f);
-            bloom.intensity.Override(0.7f);
-            bloom.scatter.Override(0.7f);    // wide soft spill — foggy glow, not neon edges
+            bloom.threshold.Override(0.9f);
+            bloom.intensity.Override(1.2f);
+            bloom.scatter.Override(0.75f);   // wide soft spill — foggy glow, not neon edges
 
             var whiteBalance = profile.Add<WhiteBalance>();
             whiteBalance.temperature.Override(12f);  // push the frame gently toward gold
 
             var grade = profile.Add<ColorAdjustments>();
+            grade.postExposure.Override(0.40f);  // a third of a stop up: dawn, not a dim dawn
             grade.saturation.Override(8f);
             grade.contrast.Override(6f);
 
+            var splitToning = profile.Add<SplitToning>();
+            splitToning.shadows.Override(new Color(0.34f, 0.28f, 0.58f));
+            splitToning.highlights.Override(new Color(1.00f, 0.70f, 0.34f));
+            splitToning.balance.Override(-15f);
+
             var vignette = profile.Add<Vignette>();
-            vignette.intensity.Override(0.22f);
+            vignette.intensity.Override(0.20f);
             vignette.smoothness.Override(0.4f);
 
             var tonemapping = profile.Add<Tonemapping>();
-            tonemapping.mode.Override(TonemappingMode.Neutral); // rolls off the sun's HDR core
+            tonemapping.mode.Override(TonemappingMode.ACES); // filmic roll-off on the HDR core
 
             var go = new GameObject("Morning Post FX");
             var volume = go.AddComponent<Volume>();
