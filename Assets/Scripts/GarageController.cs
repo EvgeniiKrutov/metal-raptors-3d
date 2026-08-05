@@ -6,162 +6,140 @@ namespace MetalRaptors
 {
     public class GarageController : MonoBehaviour
     {
-        Text _selectedLabel;
-        Text _volumeLabel;
+        MenuPanel _panel;
+        MenuItemView _selectItem;
+        MenuBadge _typeBadge;
+        MenuStatRow _country;
+        MenuStatRow[] _bars;
 
-        Transform[] _previews;
-        Renderer[] _previewRenderers;
+        MenuArrowView _left;
+        MenuArrowView _right;
+
+        GaragePlaneView _planeView;
+        Text _title;
+        Text _description;
+
+        int _index;
+
+        PlaneModelConfig Plane => PlaneModels.All[_index];
 
         void Start()
         {
-            var cam = Camera.main;
-            if (cam != null)
-            {
-                cam.clearFlags = CameraClearFlags.SolidColor;
-                cam.backgroundColor = new Color(0.06f, 0.07f, 0.09f, 1f);
-            }
+            _index = GameManager.Instance != null ? GameManager.Instance.SelectedPlaneIndex : 0;
 
             var canvas = UIFactory.CreateCanvas("Garage Canvas");
+            UIFactory.CreateBackground(canvas.transform, MenuTheme.Colors.Bg);
+            _planeView = GaragePlaneView.Build(canvas.transform, Plane);
 
-            UIFactory.CreateText(canvas.transform, "GARAGE", 84,
-                new Vector2(0, 380), new Vector2(900, 140), TextAnchor.MiddleCenter, FontStyle.Bold);
+            Transform screen = MenuLayout.CreateScreen(canvas.transform, "Garage Screen");
+            Transform column = MenuLayout.CreateRegion(screen, "Garage Column", 0f,
+                MenuTheme.ColumnFraction, MenuTheme.GaragePadLeft);
 
-            _selectedLabel = UIFactory.CreateText(canvas.transform, "", 40,
-                new Vector2(0, 250), new Vector2(1200, 60));
+            _title = MenuLayout.BuildTitle(column, string.Empty);
+            BuildPanel(column);
+            BuildArrows(screen);
 
-            BuildCubePreviews();
-            BuildSelectButtons(canvas.transform);
-            BuildVolumeControls(canvas.transform);
+            _description = UIFactory.CreateCenteredParagraph(canvas.transform, string.Empty,
+                MenuTheme.DescriptionSize, MenuTheme.GarageDescriptionBottom,
+                MenuTheme.GarageDescriptionWidth, MenuTheme.GarageDescriptionRowHeight,
+                MenuTheme.DescriptionLineSpacing, MenuTheme.Colors.Muted, UIFactory.MediumFont);
 
-            UIFactory.CreateButton(canvas.transform, "BACK TO MENU", new Vector2(0, -430),
-                () => SceneManager.LoadScene(SceneNames.MainMenu));
-
-            RefreshSelected();
-            RefreshVolume();
+            _panel.FocusFirst();
+            Refresh();
         }
 
-        void BuildCubePreviews()
+        void BuildPanel(Transform column)
         {
-            var gm = GameManager.Instance;
-            if (gm == null) return;
+            _panel = new MenuPanel(column, "Garage Panel", MenuTheme.ListTop);
 
-            int count = gm.CubeColors.Length;
-            _previews = new Transform[count];
-            _previewRenderers = new Renderer[count];
+            _typeBadge = _panel.AddBadge();
+            _country = _panel.AddStatText();
 
-            float spacing = 4f;
-            float startX = -spacing * (count - 1) / 2f;
+            _bars = new MenuStatRow[PlaneStatBars.All.Length];
+            for (int i = 0; i < _bars.Length; i++)
+                _bars[i] = _panel.AddStatBar(PlaneStatBars.All[i].label);
 
-            for (int i = 0; i < count; i++)
-            {
-                var go = UIFactory.CreatePrimitive3D(PrimitiveType.Cube,
-                    new Vector3(startX + i * spacing, 2.4f, 0f), Vector3.one * 1.8f,
-                    gm.CubeColors[i], emissive: false, keepCollider: false);
-                go.name = $"Preview Cube {i}";
-                _previews[i] = go.transform;
-                _previewRenderers[i] = go.GetComponent<Renderer>();
-            }
+            _panel.AddGap(MenuTheme.SectionGap);
+            _selectItem = _panel.AddNav("select plane", SelectPlane);
         }
 
-        void BuildSelectButtons(Transform parent)
+        void BuildArrows(Transform screen)
         {
-            var gm = GameManager.Instance;
-            if (gm == null) return;
+            _left = CreateArrow(screen, true, 0f, MenuTheme.GarageArrowInset);
+            _right = CreateArrow(screen, false, 1f,
+                -(MenuTheme.GarageArrowInset + MenuTheme.GarageArrowSize.x));
 
-            int count = gm.AvailableMechs.Length;
-            float spacing = 360f;
-            float startX = -spacing * (count - 1) / 2f;
+            _left.Clicked += () => Step(-1);
+            _right.Clicked += () => Step(1);
 
-            for (int i = 0; i < count; i++)
-            {
-                int index = i;
-                var button = UIFactory.CreateButton(parent, gm.AvailableMechs[i],
-                    new Vector2(startX + i * spacing, -60), () => { gm.SetSelectedMech(index); RefreshSelected(); },
-                    new Vector2(320, 84));
-                TintButton(button, gm.CubeColors[i]);
-            }
+            _left.Hovered += () => _left.SetState(true, true);
+            _left.Exited += () => _left.SetState(true, false);
+            _right.Hovered += () => _right.SetState(true, true);
+            _right.Exited += () => _right.SetState(true, false);
         }
 
-        void BuildVolumeControls(Transform parent)
+        static MenuArrowView CreateArrow(Transform parent, bool pointsLeft, float anchorX, float offsetX)
         {
-            _volumeLabel = UIFactory.CreateText(parent, "", 34,
-                new Vector2(0, -230), new Vector2(600, 50));
+            MenuArrowView view = MenuArrowView.Create(parent, pointsLeft, Vector2.zero,
+                MenuTheme.GarageArrowSize);
 
-            UIFactory.CreateButton(parent, "-", new Vector2(-160, -310),
-                () => ChangeVolume(-0.1f), new Vector2(120, 84));
-            UIFactory.CreateButton(parent, "+", new Vector2(160, -310),
-                () => ChangeVolume(0.1f), new Vector2(120, 84));
-        }
+            RectTransform rt = view.RectTransform;
+            rt.anchorMin = new Vector2(anchorX, 0.5f);
+            rt.anchorMax = new Vector2(anchorX, 0.5f);
+            rt.pivot = new Vector2(0f, 0.5f);
+            rt.anchoredPosition = new Vector2(offsetX, 0f);
 
-        static void TintButton(Button button, Color color)
-        {
-            var normal = color * 0.7f; normal.a = 1f;
-            var pressed = color * 0.5f; pressed.a = 1f;
-
-            var cb = button.colors;
-            cb.normalColor = normal;
-            cb.highlightedColor = color;
-            cb.pressedColor = pressed;
-            cb.selectedColor = normal;
-            button.colors = cb;
-            var img = button.targetGraphic as Image;
-            if (img != null) img.color = cb.normalColor;
+            view.SetState(true, false);
+            return view;
         }
 
         void Update()
         {
-            if (_previews == null) return;
+            int adjust = MenuInput.ReadAdjust();
+            if (adjust != 0) Step(adjust);
 
-            int selected = GameManager.Instance != null ? GameManager.Instance.SelectedMechIndex : 0;
-            for (int i = 0; i < _previews.Length; i++)
+            int step = MenuInput.ReadStep();
+            if (step != 0) _panel.MoveFocus(step);
+
+            if (MenuInput.ReadSubmit()) _panel.ActivateFocused();
+            if (MenuInput.ReadCancel()) SceneManager.LoadScene(SceneNames.MainMenu);
+        }
+
+        void Step(int delta)
+        {
+            int count = PlaneModels.All.Length;
+            _index = ((_index + delta) % count + count) % count;
+            Refresh();
+        }
+
+        void SelectPlane()
+        {
+            if (GameManager.Instance != null) GameManager.Instance.SetSelectedPlane(_index);
+            _planeView.PlaySpinUp();
+            Refresh();
+        }
+
+        void Refresh()
+        {
+            PlaneModelConfig plane = Plane;
+
+            _title.text = plane.displayName.ToUpperInvariant();
+            _description.text = plane.description;
+            _typeBadge.Set(plane.type.label, plane.type.color);
+            _country.SetValue(plane.country);
+
+            for (int i = 0; i < _bars.Length; i++)
             {
-                if (_previews[i] == null) continue;
-                float speed = i == selected ? 90f : 35f;
-                _previews[i].Rotate(new Vector3(20f, speed, 0f) * Time.deltaTime);
+                PlaneStatBar bar = PlaneStatBars.All[i];
+                _bars[i].SetFill(bar.read(plane.stats) / bar.ceiling);
             }
-        }
 
-        void RefreshSelected()
-        {
-            var gm = GameManager.Instance;
-            if (gm == null) return;
+            _planeView.SetPlane(plane);
 
-            _selectedLabel.text = $"Selected: {gm.SelectedMech}";
-
-            if (_previews == null) return;
-            for (int i = 0; i < _previews.Length; i++)
-            {
-                bool isSel = i == gm.SelectedMechIndex;
-                if (_previews[i] != null)
-                    _previews[i].localScale = Vector3.one * (isSel ? 2.6f : 1.8f);
-
-                var r = _previewRenderers[i];
-                if (r == null) continue;
-                var mat = r.material;
-                if (isSel)
-                {
-                    mat.EnableKeyword("_EMISSION");
-                    mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
-                    mat.SetColor("_EmissionColor", gm.CubeColors[i] * 1.4f);
-                }
-                else
-                {
-                    mat.SetColor("_EmissionColor", Color.black);
-                }
-            }
-        }
-
-        void ChangeVolume(float delta)
-        {
-            if (GameManager.Instance == null) return;
-            GameManager.Instance.SetMasterVolume(GameManager.Instance.MasterVolume + delta);
-            RefreshVolume();
-        }
-
-        void RefreshVolume()
-        {
-            if (GameManager.Instance != null)
-                _volumeLabel.text = $"Master Volume: {Mathf.RoundToInt(GameManager.Instance.MasterVolume * 100)}%";
+            bool selected = GameManager.Instance != null
+                            && GameManager.Instance.SelectedPlaneIndex == _index;
+            _selectItem.SetLabel(selected ? "selected" : "select plane");
+            _selectItem.SetInteractable(!selected);
         }
     }
 }

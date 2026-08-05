@@ -54,6 +54,24 @@ namespace MetalRaptors
             return view;
         }
 
+        public void SetLabel(string label)
+        {
+            _text.text = label;
+
+            RectTransform rt = _text.rectTransform;
+            _text.font = UIFactory.BoldFont;
+            rt.sizeDelta = new Vector2(_text.preferredWidth + 2f, rt.sizeDelta.y);
+
+            Apply();
+        }
+
+        public void SetInteractable(bool interactable)
+        {
+            Interactable = interactable;
+            _text.raycastTarget = interactable;
+            Apply();
+        }
+
         public void SetX(float x)
         {
             RectTransform rt = _text.rectTransform;

@@ -47,6 +47,7 @@ namespace MetalRaptors
 
         EnemyConfig _enemyConfig;
         readonly List<EnemyController> _enemies = new List<EnemyController>();
+        SoundSystem _sound;
 
         HealthBar _healthBar;
         SearchlightIndicator _lightIndicator;
@@ -72,6 +73,7 @@ namespace MetalRaptors
             SpawnEnemies();
             DisablePlanePlaneCollisions();
             BuildHud();
+            _sound = SoundSystem.Begin(_cube, _enemies);
         }
 
         void ConfigureShadows()
@@ -113,13 +115,14 @@ namespace MetalRaptors
             var go = new GameObject("PlayerPlane");
             go.transform.position = new Vector3(MinX + EdgeMargin, 150f, PlayPlaneZ);
 
-            var planeModel = PlaneModels.Sopwith;
+            var planeModel = GameManager.CurrentPlane;
             var plane = PlaneFactory.BuildPlaneModel(go.transform, planeModel);
 
             _cube = go.AddComponent<CubeController>();
             _cubeTr = go.transform;
             _cube.OnCrashed += OnCrashed;
             _cube.OnShotDown += OnShotDown;
+            _cube.OnDamaged += OnPlayerDamaged;
 
             _cube.Initialize(config, 0f, MinX, MaxX, WorldTop - CubeHalf, EdgeMargin);
 
@@ -317,6 +320,12 @@ namespace MetalRaptors
         void OnShotDown()
         {
             if (_shooter != null) _shooter.Stop();
+            if (_sound != null) _sound.EnterGameOver();
+        }
+
+        void OnPlayerDamaged()
+        {
+            if (_sound != null) _sound.ReportPlayerDamaged();
         }
 
         void WinLevel()
@@ -326,6 +335,7 @@ namespace MetalRaptors
             _cube.Stop();
             if (_shooter != null) _shooter.Stop();
             StandDownEnemies();
+            if (_sound != null) _sound.EnterGameOver();
 
             if (GameManager.Instance != null)
                 GameManager.Instance.UnlockLevel(levelNumber + 1);
@@ -342,6 +352,7 @@ namespace MetalRaptors
             _cube.Stop();
             if (_shooter != null) _shooter.Stop();
             StandDownEnemies();
+            if (_sound != null) _sound.EnterGameOver();
 
             StartCoroutine(ShowFailScreenAfter(Explosion.Duration));
         }
@@ -361,8 +372,7 @@ namespace MetalRaptors
             UIFactory.CreateText(canvas.transform, $"LEVEL {levelNumber}", 52,
                 new Vector2(0, 480), new Vector2(1000, 90), TextAnchor.MiddleCenter, FontStyle.Bold);
 
-            string mech = GameManager.Instance != null ? GameManager.Instance.SelectedMech : "Unknown";
-            UIFactory.CreateText(canvas.transform, $"Piloting: {mech}", 30,
+            UIFactory.CreateText(canvas.transform, $"Piloting: {GameManager.CurrentPlane.displayName}", 30,
                 new Vector2(0, 420), new Vector2(1200, 50));
 
             UIFactory.CreateText(canvas.transform,

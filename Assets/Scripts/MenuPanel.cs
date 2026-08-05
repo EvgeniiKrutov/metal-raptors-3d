@@ -37,6 +37,27 @@ namespace MetalRaptors
             return text;
         }
 
+        public MenuStatRow AddStatBar(string label)
+        {
+            MenuStatRow row = MenuStatRow.CreateBar(_root, label, _cursor);
+            _cursor -= MenuStatRow.BarHeight + MenuTheme.StatRowGap;
+            return row;
+        }
+
+        public MenuStatRow AddStatText()
+        {
+            MenuStatRow row = MenuStatRow.CreateBareValue(_root, _cursor);
+            _cursor -= MenuStatRow.BareValueHeight + MenuTheme.StatRowGap;
+            return row;
+        }
+
+        public MenuBadge AddBadge()
+        {
+            MenuBadge badge = MenuBadge.Create(_root, _cursor);
+            _cursor -= MenuTheme.BadgeHeight + MenuTheme.BadgeToContent;
+            return badge;
+        }
+
         public MenuItemView AddNav(string label, Action onActivate, bool interactable = true)
         {
             MenuItemView item = MenuItemView.Create(_root, label, new Vector2(0f, _cursor),

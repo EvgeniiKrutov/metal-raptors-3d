@@ -77,6 +77,28 @@ namespace MetalRaptors
         public const float SectionGap = 32f;
         public const float TagGap = 16f;
 
+        public const float StatBarWidth = 460f;
+        public const float StatBarHeight = 10f;
+        public const int StatCaptionSize = 20;
+        public const float StatCaptionRowHeight = 26f;
+        public const float StatCaptionToValue = 8f;
+        public const int StatValueSize = 22;
+        public const float StatValueRowHeight = 28f;
+        public const float StatRowGap = 18f;
+
+        public const int BadgeSize = 15;
+        public const float BadgeHeight = 28f;
+        public const float BadgePadX = 14f;
+        public const float BadgeToContent = 16f;
+
+        public const float GaragePadLeft = 200f;
+
+        public static readonly Vector2 GarageArrowSize = new Vector2(30f, 38f);
+        public const float GarageArrowInset = 44f;
+        public const float GarageDescriptionWidth = 1080f;
+        public const float GarageDescriptionBottom = 168f;
+        public const float GarageDescriptionRowHeight = 96f;
+
         public const int DescriptionSize = 20;
         public const float DescriptionWidth = 940f;
         public const float DescriptionRowHeight = 124f;

@@ -29,7 +29,9 @@ UI — the `MainMenu` scene only holds a camera, a light and the controller obje
 | `MenuSelectorRow.cs` | A value stepped in place: label column, then two triangles either side of the value. |
 | `MenuArrowView.cs` | One triangle of a selector — clicks a step, greys out at the end of the list. |
 | `MenuPreviewCard.cs` | A card that only shows: the picked map's square, its name in the foot, no focus and no click. |
-| `MenuPlaneView.cs` | The flying plane in the main list's right band: its own camera, render texture and mouse-driven flight. |
+| `MenuPlaneView.cs` | The flying plane in the main list's right band: the shared preview rig plus mouse-driven flight. |
+| `PlanePreviewRig.cs` | The preview band itself — its camera, render texture and framing — shared with the garage. |
+| `MenuStatRow.cs` | One garage stat row: a caption over a bar, or a caption over a text value. |
 | `IMenuFocusGroup.cs` | What the navigation keys drive (`MenuPanel`, `MenuCardRow`) and, as `IMenuFocusable`, what a panel can highlight. |
 | `CustomBattle.cs` | The maps a custom battle can pick, and the pick itself, read by the endless scene. |
 | `CareerEras.cs` | The four eras: title, years, description, unlocked. |
@@ -49,6 +51,7 @@ UI — the `MainMenu` scene only holds a camera, a light and the controller obje
 │  career                 │      the flying plane     │
 │  challenges             │      (muted, no click)    │
 │  custom battle          │      → custom battle page │
+│  garage                 │      → Garage scene       │
 │  online battles         │      (muted, no click)    │
 │  options                │      (muted, no click)    │
 └─────────────────────────┴───────────────────────────┘
@@ -57,6 +60,10 @@ UI — the `MainMenu` scene only holds a camera, a light and the controller obje
 
 The right band is no longer empty on the main list — it carries the plane preview below.
 `career` still opens the era cards page, `custom battle` the custom battle page.
+
+`garage` sits with the entries that actually do something, above the two muted ones, and
+loads the `Garage` scene (`docs/garage.md`). It is a **main-menu-only** entry — the in-level
+menu does not carry it, because the plane cannot be changed mid-flight.
 
 `challenges` is muted for now — the panel below is built and reachable in one edit
 (`BuildMainPanel` passes `interactable: false`), so this is what it opens when it comes
@@ -80,9 +87,10 @@ returns true.
 
 ## Plane preview
 
-The main list's right band holds the player's plane, flying nose-right and hanging in one
-place. It is built by `MenuPlaneView` and shown on the **home screen only** (the main list
-and challenges) — every other screen hides it, the custom battle band belonging to the map
+The main list's right band holds the player's plane — **whichever plane is selected in the
+garage** (`GameManager.CurrentPlane`) — flying nose-right and hanging in one place. It is
+built by `MenuPlaneView` and shown on the **home screen only** (the main list and
+challenges) — every other screen hides it, the custom battle band belonging to the map
 preview card and the era cards page taking the whole canvas.
 
 The band is the right `1 - ColumnFraction` of the canvas, full screen height (`0` to `1`) so
@@ -94,7 +102,8 @@ under every page in the canvas' draw order.
 ### How it is drawn
 
 The overlay canvas paints over any world geometry, so the plane cannot simply be put in the
-scene behind the background image. Instead `MenuPlaneView` owns:
+scene behind the background image. Instead `PlanePreviewRig` — shared with the garage's
+parked plane, which needs the same trick with a different pose (`docs/garage.md`) — owns:
 
 * a **camera of its own** rendering into a `RenderTexture` sized to the band's pixel rect
   (`rect × Canvas.scaleFactor`, rebuilt whenever that changes, so a window resize re-frames
@@ -231,21 +240,24 @@ memory-only `CustomBattle` instead, so flying one changes no saved setting.
 
 ## Garage
 
-The mech-picker scene (`GarageController`), reached from the menu. Sets the camera's clear
-flags to a solid dark colour instead of a full-screen UI background image, so the three
-rotating 3D preview cubes — built as world-space primitives, not sprites — show through
-behind the screen-space overlay UI. The selected cube spins faster and glows
-(`_EmissionColor`); volume controls and the mech pick both write through `GameManager`
-immediately.
+The plane picker (`GarageController`), reached from `garage` in the main list and nowhere
+else — **`docs/garage.md` is the page for it**. It is the menu's own design applied to a
+whole screen: the column carries the plane's name, its stats as bars and `select plane`,
+the right band carries the plane itself parked on the ground, triangles at the page edges
+switch between the two planes, and a centred paragraph sits under both.
+
+The pick writes through `GameManager.SetSelectedPlane` and is read back everywhere as
+`GameManager.CurrentPlane` — the menu's flying plane and the player's plane in every level
+are both built from it.
 
 ## Persistence
 
 `GameManager` bootstraps itself with `RuntimeInitializeOnLoadMethod(BeforeSceneLoad)`, so
 `Instance` exists no matter which scene is pressed Play in first. It carries three kinds of
 cross-scene state, each mirrored to `PlayerPrefs` on every setter and reloaded in `Load()`:
-the selected loadout (mech/colour, chosen in the Garage), audio settings (master volume),
-and progress (which levels are unlocked). The Level 1 / campaign daytime picks above are
-persisted the same way, but nothing in the current menu writes them.
+the selected plane (`mr_selected_plane`, chosen in the Garage), audio settings (master
+volume), and progress (which levels are unlocked). The Level 1 / campaign daytime picks
+above are persisted the same way, but nothing in the current menu writes them.
 
 ## Themes
 
@@ -259,16 +271,19 @@ Five palettes live in `MenuTheme.Palettes`, indexed by `MenuThemeId`:
 | `ColdWar` | concrete & steel teal | `#D9DEE0` | `#4E7C8A` |
 | `Modern` | HUD white & jet blue | `#EDEFF2` | `#3B7BB8` |
 
-Each carries six tokens — `Bg`, `Fg`, `Muted`, `Accent`, `Panel`, `Border`. `Panel` and
-`Border` are unused by the current flat design and are kept so a future boxed control
+Each carries six tokens — `Bg`, `Fg`, `Muted`, `Accent`, `Panel`, `Border`. `Border` is the
+garage's stat bar track; `Panel` is unused by the current flat design and is kept so a
+future boxed control
 (a dropdown, a slider) inherits the right colours.
 
 Switching is one assignment, `MenuTheme.Active = MenuThemeId.WW2`, made before the menu
 scene loads. There is no UI for it yet; when `options` becomes real, that is where it
 belongs (persist through `GameManager` / `PlayerPrefs` like the daytime settings).
 
-The main menu and the in-level menu (`docs/game-menu.md`) use these palettes. The Garage and
-the HUD keep their existing dark colours.
+The main menu, the garage (`docs/garage.md`) and the in-level menu (`docs/game-menu.md`) all
+use these palettes — the garage takes `Border` for its stat bar tracks and `Accent` for
+their fill, the first screen to use `Border` at all. Only the HUD keeps its own dark
+colours.
 
 ## Entry states
 

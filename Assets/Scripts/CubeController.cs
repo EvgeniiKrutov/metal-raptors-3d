@@ -12,9 +12,17 @@ namespace MetalRaptors
 
         public event Action OnShotDown;
 
+        public event Action OnDamaged;
+
         public float CurrentHealth { get; private set; }
 
         public float MaxHealth { get; private set; }
+
+        public float Heading => _heading;
+
+        public float AngularVelocity => _angularVelocity;
+
+        public float MaxTurnRate => _config != null ? _config.rotationSpeed * Mathf.Deg2Rad : 0f;
 
         const float FallGravity = 150f;
         const float FallInitialDrop = 25f;
@@ -150,6 +158,7 @@ namespace MetalRaptors
         {
             if (!_active || _falling) return;
             CurrentHealth = Mathf.Max(0f, CurrentHealth - amount);
+            OnDamaged?.Invoke();
             if (CurrentHealth < SmokeHealthThreshold && _smoke != null) _smoke.Arm(ExplosionSize);
             if (CurrentHealth <= 0f) BeginFall();
         }

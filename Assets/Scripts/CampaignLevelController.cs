@@ -28,6 +28,7 @@ namespace MetalRaptors
         Camera _cam;
         CampaignTerrain _terrain;
         Transform _ceilingBar;
+        SoundSystem _sound;
 
         HealthBar _healthBar;
         SearchlightIndicator _lightIndicator;
@@ -58,6 +59,7 @@ namespace MetalRaptors
             SpawnPlayer(config);
             SetupCamera();
             BuildHud();
+            _sound = SoundSystem.Begin(_cube, null);
         }
 
         void ConfigureShadows()
@@ -71,13 +73,14 @@ namespace MetalRaptors
             var go = new GameObject("PlayerPlane");
             go.transform.position = new Vector3(StartX, SpawnY, PlayPlaneZ);
 
-            var planeModel = PlaneModels.Sopwith;
+            var planeModel = GameManager.CurrentPlane;
             var model = PlaneFactory.BuildPlaneModel(go.transform, planeModel);
 
             _cube = go.AddComponent<CubeController>();
             _cubeTr = go.transform;
             _cube.OnCrashed += OnCrashed;
             _cube.OnShotDown += OnShotDown;
+            _cube.OnDamaged += OnPlayerDamaged;
 
             _cube.Initialize(config, 0f, float.MinValue, float.MaxValue,
                 WorldTop - CubeHalf, 0f, hardLeftWall: true);
@@ -179,6 +182,12 @@ namespace MetalRaptors
         void OnShotDown()
         {
             if (_shooter != null) _shooter.Stop();
+            if (_sound != null) _sound.EnterGameOver();
+        }
+
+        void OnPlayerDamaged()
+        {
+            if (_sound != null) _sound.ReportPlayerDamaged();
         }
 
         void OnCrashed()
@@ -187,6 +196,7 @@ namespace MetalRaptors
             _gameOver = true;
             _cube.Stop();
             if (_shooter != null) _shooter.Stop();
+            if (_sound != null) _sound.EnterGameOver();
 
             StartCoroutine(ShowFailScreenAfter(Explosion.Duration));
         }

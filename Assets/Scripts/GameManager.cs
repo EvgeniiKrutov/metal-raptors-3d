@@ -6,18 +6,13 @@ namespace MetalRaptors
     {
         public static GameManager Instance { get; private set; }
 
-        public readonly string[] AvailableMechs = { "Raptor MK-I", "Raptor MK-II", "Raptor MK-III" };
+        public int SelectedPlaneIndex { get; private set; }
 
-        public readonly Color[] CubeColors =
-        {
-            new Color(0.85f, 0.25f, 0.20f),
-            new Color(0.30f, 0.78f, 0.35f),
-            new Color(0.25f, 0.50f, 0.92f),
-        };
+        public PlaneModelConfig SelectedPlane =>
+            PlaneModels.All[Mathf.Clamp(SelectedPlaneIndex, 0, PlaneModels.All.Length - 1)];
 
-        public int SelectedMechIndex { get; private set; }
-        public string SelectedMech => AvailableMechs[Mathf.Clamp(SelectedMechIndex, 0, AvailableMechs.Length - 1)];
-        public Color SelectedColor => CubeColors[Mathf.Clamp(SelectedMechIndex, 0, CubeColors.Length - 1)];
+        public static PlaneModelConfig CurrentPlane =>
+            Instance != null ? Instance.SelectedPlane : PlaneModels.All[0];
 
         public float MasterVolume { get; private set; } = 1f;
 
@@ -29,7 +24,7 @@ namespace MetalRaptors
 
         const string PrefVolume = "mr_master_volume";
         const string PrefUnlocked = "mr_highest_unlocked_level";
-        const string PrefMech = "mr_selected_mech";
+        const string PrefPlane = "mr_selected_plane";
         const string PrefLevel1Daytime = "mr_level1_daytime";
         const string PrefCampaignDaytime = "mr_campaign_daytime";
 
@@ -55,10 +50,10 @@ namespace MetalRaptors
             ApplyAudio();
         }
 
-        public void SetSelectedMech(int index)
+        public void SetSelectedPlane(int index)
         {
-            SelectedMechIndex = Mathf.Clamp(index, 0, AvailableMechs.Length - 1);
-            PlayerPrefs.SetInt(PrefMech, SelectedMechIndex);
+            SelectedPlaneIndex = Mathf.Clamp(index, 0, PlaneModels.All.Length - 1);
+            PlayerPrefs.SetInt(PrefPlane, SelectedPlaneIndex);
             PlayerPrefs.Save();
         }
 
@@ -100,7 +95,8 @@ namespace MetalRaptors
         {
             MasterVolume = PlayerPrefs.GetFloat(PrefVolume, 1f);
             HighestUnlockedLevel = PlayerPrefs.GetInt(PrefUnlocked, 1);
-            SelectedMechIndex = PlayerPrefs.GetInt(PrefMech, 0);
+            SelectedPlaneIndex = Mathf.Clamp(PlayerPrefs.GetInt(PrefPlane, 0),
+                0, PlaneModels.All.Length - 1);
             int daytime = PlayerPrefs.GetInt(PrefLevel1Daytime, (int)Daytime.Midday);
             Level1Daytime = System.Enum.IsDefined(typeof(Daytime), daytime)
                 ? (Daytime)daytime : Daytime.Midday;

@@ -22,6 +22,8 @@ namespace MetalRaptors
 
         public float CurrentHealth { get; private set; }
 
+        public bool IsAlive => !_dead;
+
         enum AiState { Attack, Fly, Evade, Recover, Return }
         enum EvadePhase { Roll, Jitter, Unroll }
 

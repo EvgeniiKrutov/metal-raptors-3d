@@ -37,7 +37,7 @@ namespace MetalRaptors
         {
             var canvas = UIFactory.CreateCanvas("MainMenu Canvas");
             UIFactory.CreateBackground(canvas.transform, MenuTheme.Colors.Bg);
-            _planeView = MenuPlaneView.Build(canvas.transform, PlaneModels.Sopwith);
+            _planeView = MenuPlaneView.Build(canvas.transform, GameManager.CurrentPlane);
 
             Transform column = MenuLayout.CreatePage(canvas.transform, "Menu Column", MenuTheme.ColumnFraction);
             _column = column.gameObject;
@@ -72,6 +72,7 @@ namespace MetalRaptors
             panel.AddNav("career", ShowEras);
             panel.AddNav("challenges", null, interactable: false);
             panel.AddNav("custom battle", ShowCustom);
+            panel.AddNav("garage", () => SceneManager.LoadScene(SceneNames.Garage));
             panel.AddNav("online battles", null, interactable: false);
             panel.AddNav("options", null, interactable: false);
             return panel;

@@ -162,6 +162,22 @@ namespace MetalRaptors
             return text;
         }
 
+        public static Text CreateCenteredParagraph(Transform parent, string content, int fontSize,
+            float bottom, float width, float rowHeight, float lineSpacing, Color color, Font font)
+        {
+            Text text = NewLabel(parent, content, fontSize, color, font, TextAnchor.LowerCenter);
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            text.lineSpacing = lineSpacing;
+
+            var rt = text.rectTransform;
+            rt.anchorMin = new Vector2(0.5f, 0f);
+            rt.anchorMax = new Vector2(0.5f, 0f);
+            rt.pivot = new Vector2(0.5f, 0f);
+            rt.sizeDelta = new Vector2(width, rowHeight);
+            rt.anchoredPosition = new Vector2(0f, bottom);
+            return text;
+        }
+
         public static Text CreateInlineLabel(Transform parent, string content, int fontSize, Vector2 anchoredPos,
             float rowHeight, Color color, Font font)
         {
