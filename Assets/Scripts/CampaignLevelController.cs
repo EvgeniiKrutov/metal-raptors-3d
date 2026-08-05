@@ -58,6 +58,7 @@ namespace MetalRaptors
                 CameraDistance, PlayPlaneZ, StartX);
             SpawnPlayer(config);
             SetupCamera();
+            Battlefield.Begin(_cam, _halfViewWidth, _level.seed, _terrain.InCrater);
             BuildHud();
             _sound = SoundSystem.Begin(_cube, null);
         }

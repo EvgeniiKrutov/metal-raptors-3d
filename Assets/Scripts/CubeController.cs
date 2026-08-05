@@ -189,6 +189,11 @@ namespace MetalRaptors
                 (UnityEngine.Random.value < 0.5f ? -1f : 1f) * 2.5f);
         }
 
+        void OnTriggerEnter(Collider other)
+        {
+            if (other.gameObject.layer == BattlefieldProps.Layer) Scrape();
+        }
+
         void OnCollisionEnter(Collision collision)
         {
             if (!_active) return;

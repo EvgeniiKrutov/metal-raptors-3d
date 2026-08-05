@@ -1,6 +1,8 @@
 # Effects
 
 The player plane's night searchlight has its own page: docs/searchlight.md.
+The ambient Verdun ground life — random shell blasts, burning smoke columns and
+infantry squads — has its own page: docs/battlefield.md.
 
 ## Muzzle flash (`Assets/Scripts/MuzzleFlash.cs`)
 
@@ -198,6 +200,26 @@ rigidbody, so sparks can never brush a plane, soak a bullet, or deal damage them
 mote sprays outward in the play plane (Z stays flat, matching everything else in the level),
 decelerates, shrinks to nothing, and cools from bright yellow-orange to a dim ember over its
 short randomised life before self-destructing.
+
+### Stripping the primitive collider
+
+`UIFactory.CreatePrimitive3D(..., keepCollider: false)` is what makes all of this
+collider-free, and *how* it strips matters. `GameObject.CreatePrimitive` always attaches one,
+and the strip used to be a `DestroyImmediate` — which Unity **refuses to run inside a physics
+trigger or contact callback**, throwing instead. Anything spawned from one of those callbacks
+therefore kept its collider.
+
+That is not hypothetical: with `CubeController.Scrape` reachable from `OnTriggerEnter` (a plane
+clipping a tree — see `docs/battlefield.md`), all 14 spark cubes kept their `BoxCollider` and
+appeared as static colliders at the plane's own position. The plane rammed its own sparks, was
+held in mid-air by them, and `OnCollisionEnter` read that as a crash: explosion, level over.
+`Explosion.Spawn` had the same exposure, since it is called from `OnCollisionEnter`.
+
+The strip now **disables the collider first, then `Destroy`s it**. Disabling takes it out of the
+physics scene immediately and is legal in any context; the deferred `Destroy` only tidies up the
+component. `Destroy` alone would not do — it leaves the collider live for the rest of the frame,
+which is exactly the window that crashed the plane. `BattlefieldPeople.AddSegment` builds its
+figures from primitives too and now disables the same way.
 
 ## HUD health bar (`HealthBar.cs`)
 

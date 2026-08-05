@@ -43,7 +43,14 @@ namespace MetalRaptors
 
         readonly SortedDictionary<int, Chunk> _chunks = new SortedDictionary<int, Chunk>();
         readonly List<int> _removeScratch = new List<int>();
+        readonly List<CraterSpec> _craterScratch = new List<CraterSpec>();
         bool _building;
+
+        public bool InCrater(float worldX, float z)
+        {
+            CratersForRange(worldX - MaxCraterReach, worldX + MaxCraterReach, _craterScratch);
+            return InCrater(worldX, z, _craterScratch);
+        }
 
         public static CampaignTerrain Begin(int seed, Daytime daytime, Weather weather,
             float cameraDistance, float playPlaneZ, float startCamX)
@@ -222,6 +229,13 @@ namespace MetalRaptors
         List<CraterSpec> CratersForRange(float xMin, float xMax)
         {
             var list = new List<CraterSpec>();
+            CratersForRange(xMin, xMax, list);
+            return list;
+        }
+
+        void CratersForRange(float xMin, float xMax, List<CraterSpec> list)
+        {
+            list.Clear();
             int c0 = Mathf.FloorToInt(xMin / CellSize);
             int c1 = Mathf.FloorToInt(xMax / CellSize);
 
@@ -263,7 +277,6 @@ namespace MetalRaptors
                     });
                 }
             }
-            return list;
         }
 
         static int CountForDensity(System.Random rng, float expected)
@@ -347,7 +360,6 @@ namespace MetalRaptors
             terrain.materialTemplate = _terrainMat;
             terrain.heightmapPixelError = 2f;
             terrain.basemapDistance = Depth * 4f;
-            terrain.drawInstanced = true;
             terrain.groupingID = 1;
             terrain.allowAutoConnect = true;
             terrain.detailObjectDistance = ProceduralTerrain.GrassViewDistance;

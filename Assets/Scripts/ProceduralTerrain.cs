@@ -37,8 +37,8 @@ namespace MetalRaptors
         static readonly Color GrassHealthy = new Color(0.47f, 0.39f, 0.27f);
         static readonly Color GrassDry = new Color(0.40f, 0.32f, 0.22f);
 
-        public static void Build(int seed, float width, float cameraDistance, float playPlaneZ,
-            Daytime daytime, Weather weather)
+        public static System.Func<float, float, bool> Build(int seed, float width,
+            float cameraDistance, float playPlaneZ, Daytime daytime, Weather weather)
         {
             var rng = new System.Random(seed);
             var root = new GameObject("Battlefield Land");
@@ -68,7 +68,6 @@ namespace MetalRaptors
                 terrain.materialTemplate = terrainMat;
                 terrain.heightmapPixelError = 2f;
                 terrain.basemapDistance = Depth * 4f;
-                terrain.drawInstanced = true;
                 terrain.groupingID = 1;
                 terrain.allowAutoConnect = true;
                 terrain.detailObjectDistance = GrassViewDistance;
@@ -84,6 +83,9 @@ namespace MetalRaptors
             }
 
             ApplyFog(daytime, cameraDistance, playPlaneZ);
+
+            return (x, z) => InCrater(
+                new Vector2(Mathf.Repeat(x + width / 2f, width), z), craters, width);
         }
 
         internal static float FogEndDistance(float cameraDistance, float playPlaneZ)

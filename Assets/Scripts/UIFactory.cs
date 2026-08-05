@@ -369,7 +369,11 @@ namespace MetalRaptors
             if (!keepCollider)
             {
                 var col = go.GetComponent<Collider>();
-                if (col != null) UnityEngine.Object.DestroyImmediate(col);
+                if (col != null)
+                {
+                    col.enabled = false;
+                    UnityEngine.Object.Destroy(col);
+                }
             }
 
             var renderer = go.GetComponent<Renderer>();

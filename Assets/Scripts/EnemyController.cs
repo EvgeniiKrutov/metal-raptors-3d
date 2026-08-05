@@ -386,6 +386,11 @@ namespace MetalRaptors
             Destroy(gameObject, Explosion.RemovalDelay);
         }
 
+        void OnTriggerEnter(Collider other)
+        {
+            if (other.gameObject.layer == BattlefieldProps.Layer) Scrape();
+        }
+
         void OnCollisionEnter(Collision collision)
         {
             if (_dead) return;

@@ -54,9 +54,11 @@ namespace MetalRaptors
         GameObject _hud;
 
         float _halfViewHeight;
+        float _halfViewWidth;
         bool _gameOver;
         float _camShake;
         Vector3 _camBasePos;
+        System.Func<float, float, bool> _inCrater;
         readonly List<EnemyController> _scrapeScratch = new List<EnemyController>();
 
         void Start()
@@ -71,6 +73,8 @@ namespace MetalRaptors
             SpawnPlayer(config);
             SetupCamera();
             SpawnEnemies();
+            if (VerdunLand)
+                Battlefield.Begin(_cam, _halfViewWidth, _level.terrain.seed, MinX, MaxX, _inCrater);
             DisablePlanePlaneCollisions();
             BuildHud();
             _sound = SoundSystem.Begin(_cube, _enemies);
@@ -88,7 +92,7 @@ namespace MetalRaptors
         {
             if (VerdunLand)
             {
-                ProceduralTerrain.Build(_level.terrain.seed, WorldWidth,
+                _inCrater = ProceduralTerrain.Build(_level.terrain.seed, WorldWidth,
                     CameraDistance, PlayPlaneZ, _level.daytime, _level.weather);
             }
             else
@@ -164,7 +168,7 @@ namespace MetalRaptors
 
         Vector3 RandomEnemySpawn(float aiGroundY)
         {
-            float halfViewWidth = _halfViewHeight * (_cam != null ? _cam.aspect : 16f / 9f);
+            float halfViewWidth = _cam != null ? _halfViewWidth : _halfViewHeight * (16f / 9f);
             float camX = _cam != null ? _cam.transform.position.x : 0f;
 
             float minY = aiGroundY + _enemyConfig.safeAltitudeMargin;
@@ -214,6 +218,7 @@ namespace MetalRaptors
             }
 
             _halfViewHeight = CameraDistance * Mathf.Tan(_cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
+            _halfViewWidth = _halfViewHeight * _cam.aspect;
 
             PositionCamera(instant: true);
 
