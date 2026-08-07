@@ -26,7 +26,6 @@ namespace MetalRaptors
         TerrainLayer _landLayer;
         Material _terrainMat;
         Material _wallMat;
-        DetailPrototype _grassPrototype;
 
         class Chunk
         {
@@ -70,8 +69,6 @@ namespace MetalRaptors
             streamer._landLayer = ProceduralTerrain.CreateLandLayer();
             streamer._terrainMat = new Material(Shader.Find("Universal Render Pipeline/Terrain/Lit"));
             streamer._wallMat = ProceduralTerrain.CutWallMaterial();
-            streamer._grassPrototype = ProceduralTerrain.CreateGrassPrototype(
-                ProceduralTerrain.GrassBladesTexture(new System.Random(seed)));
 
             ProceduralTerrain.ApplyFog(daytime, cameraDistance, playPlaneZ);
 
@@ -157,14 +154,14 @@ namespace MetalRaptors
             for (int ix = 0; ix < Res; ix++)
                 cutLine[ix] = heights[0, ix] * ProceduralTerrain.HeightScale;
 
-            var data = new TerrainData();
+            var data = ProceduralTerrain.NewTerrainData();
             data.heightmapResolution = Res;
             data.size = new Vector3(ChunkLength, ProceduralTerrain.HeightScale, Depth);
             yield return null;
             data.SetHeights(0, 0, heights);
             yield return null;
             ProceduralTerrain.PaintTerrain(data, _landLayer);
-            ProceduralTerrain.SetupGrassDetail(data, _grassPrototype, GrassDetailRes);
+            ProceduralTerrain.SetupGrassDetail(data, GrassDetailRes);
             yield return null;
 
             foreach (var step in PlantGrass(data, index, craters))

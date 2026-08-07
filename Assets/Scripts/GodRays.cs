@@ -113,6 +113,7 @@ namespace MetalRaptors
             {
                 _material = material;
                 renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
+                requiresIntermediateTexture = true;
                 ConfigureInput(ScriptableRenderPassInput.Depth);
             }
 
@@ -139,6 +140,7 @@ namespace MetalRaptors
 
                     builder.UseTexture(passData.source, AccessFlags.Read);
                     builder.UseTexture(resources.cameraDepthTexture, AccessFlags.Read);
+                    builder.UseAllGlobalTextures(true);
                     builder.SetRenderAttachment(destination, 0, AccessFlags.Write);
 
                     builder.SetRenderFunc(static (PassData data, RasterGraphContext context) =>

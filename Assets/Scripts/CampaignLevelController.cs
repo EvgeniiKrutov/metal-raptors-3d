@@ -19,6 +19,8 @@ namespace MetalRaptors
         const float CamZ = PlayPlaneZ - CameraDistance;
         const float StartX = 0f;
         const float SpawnY = 150f;
+        const float CamShakeMagnitude = 7f;
+        const float CamShakeDuration = 0.3f;
 
         CampaignDefinition _level;
         CubeController _cube;
@@ -38,6 +40,7 @@ namespace MetalRaptors
         float _halfViewHeight;
         float _halfViewWidth;
         Vector3 _camBasePos;
+        float _camShake;
         bool _gameOver;
         float _furthestX = StartX;
         int _nextWave;
@@ -82,6 +85,7 @@ namespace MetalRaptors
             _cube.OnCrashed += OnCrashed;
             _cube.OnShotDown += OnShotDown;
             _cube.OnDamaged += OnPlayerDamaged;
+            _cube.OnScraped += OnPlayerScraped;
 
             _cube.Initialize(config, 0f, float.MinValue, float.MaxValue,
                 WorldTop - CubeHalf, 0f, hardLeftWall: true);
@@ -135,6 +139,8 @@ namespace MetalRaptors
             if (_cubeTr == null) return;
 
             _furthestX = Mathf.Max(_furthestX, _cubeTr.position.x);
+            if (_camShake > 0f)
+                _camShake = Mathf.Max(0f, _camShake - Time.deltaTime / CamShakeDuration);
             if (_cam != null) PositionCamera(instant: false);
 
             if (_cube != null) _cube.SetLeftWall(_camBasePos.x - _halfViewWidth + CubeHalf);
@@ -166,7 +172,14 @@ namespace MetalRaptors
                 float x = Mathf.Max(_camBasePos.x, Mathf.Lerp(_camBasePos.x, cubePos.x, t));
                 _camBasePos = new Vector3(x, Mathf.Lerp(_camBasePos.y, targetY, t), CamZ);
             }
-            _cam.transform.position = _camBasePos;
+
+            Vector3 pos = _camBasePos;
+            if (_camShake > 0f)
+            {
+                Vector2 j = Random.insideUnitCircle * (CamShakeMagnitude * _camShake);
+                pos += new Vector3(j.x, j.y, 0f);
+            }
+            _cam.transform.position = pos;
         }
 
         void CheckWaves()
@@ -190,6 +203,8 @@ namespace MetalRaptors
         {
             if (_sound != null) _sound.ReportPlayerDamaged();
         }
+
+        void OnPlayerScraped() => _camShake = 1f;
 
         void OnCrashed()
         {

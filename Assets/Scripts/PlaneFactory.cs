@@ -102,10 +102,21 @@ namespace MetalRaptors
             }
             if (biggest == null) return;
 
+            biggest.gameObject.layer = PlaneLayer;
+
+            if (!biggest.sharedMesh.isReadable)
+            {
+                Debug.LogWarning($"PlaneFactory: {biggest.sharedMesh.name} is not Read/Write enabled; " +
+                                 "falling back to a box hitbox.");
+                var box = biggest.gameObject.AddComponent<BoxCollider>();
+                box.center = biggest.sharedMesh.bounds.center;
+                box.size = biggest.sharedMesh.bounds.size;
+                return;
+            }
+
             var col = biggest.gameObject.AddComponent<MeshCollider>();
             col.sharedMesh = biggest.sharedMesh;
             col.convex = true;
-            biggest.gameObject.layer = PlaneLayer;
         }
 
         static void StartPropeller(Transform model, PlaneModelConfig plane)

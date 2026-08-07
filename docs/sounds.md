@@ -15,7 +15,7 @@ scene has no enemies yet.
 ## Clips
 
 Copied from `metal-raptors/public/sounds` into `Assets/Resources/Sounds`:
-`engine_idle`, `engine_throttle_1`, `engine_throttle_2`, `engine_stutter`,
+`engine_idle`, `engine_throttle_1`, `engine_stutter`,
 `ambient_wind`. Note that `/Assets/Resources` is gitignored, so these files —
 like the existing bullet and explosion clips — are not tracked by the repo.
 

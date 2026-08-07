@@ -172,6 +172,15 @@ model's real pose instead of overwriting it. The jitter amplitude is kept delibe
 (a couple of metres, a few degrees of roll) — the model also carries the plane's collider, so
 a bigger translational jolt could dip it into the ground during a low scrape.
 
+The player's scrape also shakes the **camera**, which is a separate mechanism living in the
+level controllers: `CubeController.Scrape` raises `OnScraped` whenever it actually applies (so
+the 0.5 s cooldown gates both shakes together), and each controller answers by setting
+`_camShake = 1f`, which decays over 0.3 s and offsets the camera by up to 7 units in XY. The
+offset is applied to `_cam.transform.position` only, never to `_camBasePos` — that base
+position is what terrain streaming and the campaign's left wall are measured from, and a
+jittering base would drag the world around with the shake. Every scrape source reaches it:
+enemies, trees and burned houses alike.
+
 ## Damage smoke (`SmokeTrail.cs`)
 
 Armed once a plane's health drops below the shared danger threshold (`CubeController` /

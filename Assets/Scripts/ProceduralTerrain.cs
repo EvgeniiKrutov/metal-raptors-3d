@@ -24,6 +24,9 @@ namespace MetalRaptors
         internal const float WallBottomY = -120f;
         internal const float WallSeamLift = 3f;
 
+        public const string GrassTemplateResource = "GrassTerrainTemplate";
+        public const int GrassTextureSeed = 1917;
+
         const int GrassDetailRes = 1024;
         internal const int GrassDetailPatch = 32;
         internal const float GrassSpacing = 4.5f;
@@ -37,6 +40,8 @@ namespace MetalRaptors
         static readonly Color GrassHealthy = new Color(0.47f, 0.39f, 0.27f);
         static readonly Color GrassDry = new Color(0.40f, 0.32f, 0.22f);
 
+        static TerrainData _grassTemplate;
+
         public static System.Func<float, float, bool> Build(int seed, float width,
             float cameraDistance, float playPlaneZ, Daytime daytime, Weather weather)
         {
@@ -45,7 +50,7 @@ namespace MetalRaptors
 
             float[,] heights01 = GenerateHeights(rng, width, out float[] cutLine, out List<Vector3> craters);
 
-            var data = new TerrainData();
+            var data = NewTerrainData();
             data.heightmapResolution = Res;
             data.size = new Vector3(width, HeightScale, Depth);
             data.SetHeights(0, 0, heights01);
@@ -86,6 +91,20 @@ namespace MetalRaptors
 
             return (x, z) => InCrater(
                 new Vector2(Mathf.Repeat(x + width / 2f, width), z), craters, width);
+        }
+
+        public static TerrainData NewTerrainData()
+        {
+            if (_grassTemplate == null) _grassTemplate = Resources.Load<TerrainData>(GrassTemplateResource);
+
+            if (_grassTemplate == null)
+            {
+                Debug.LogWarning($"ProceduralTerrain: Resources/{GrassTemplateResource} is missing; "
+                                 + "grass will not render in a standalone player.");
+                return new TerrainData();
+            }
+
+            return Object.Instantiate(_grassTemplate);
         }
 
         internal static float FogEndDistance(float cameraDistance, float playPlaneZ)
@@ -298,7 +317,7 @@ namespace MetalRaptors
             return tex;
         }
 
-        internal static DetailPrototype CreateGrassPrototype(Texture2D bladesTexture)
+        public static DetailPrototype CreateGrassPrototype(Texture2D bladesTexture)
         {
             return new DetailPrototype
             {
@@ -313,9 +332,14 @@ namespace MetalRaptors
             };
         }
 
-        internal static void SetupGrassDetail(TerrainData data, DetailPrototype prototype, int detailRes)
+        public static void SetupGrassDetail(TerrainData data, int detailRes)
         {
-            data.detailPrototypes = new[] { prototype };
+            if (data.detailPrototypes == null || data.detailPrototypes.Length == 0)
+                data.detailPrototypes = new[]
+                {
+                    CreateGrassPrototype(GrassBladesTexture(new System.Random(GrassTextureSeed))),
+                };
+
             data.SetDetailResolution(detailRes, GrassDetailPatch);
             data.SetDetailScatterMode(DetailScatterMode.InstanceCountMode);
 
@@ -327,7 +351,7 @@ namespace MetalRaptors
 
         static void PlantGrass(System.Random rng, TerrainData data, float width, List<Vector3> craters)
         {
-            SetupGrassDetail(data, CreateGrassPrototype(GrassBladesTexture(rng)), GrassDetailRes);
+            SetupGrassDetail(data, GrassDetailRes);
 
             var layer = new int[GrassDetailRes, GrassDetailRes];
             foreach (var p in PoissonDiskPoints(rng, width, Depth, GrassSpacing, GrassPoissonTries))
@@ -430,7 +454,7 @@ namespace MetalRaptors
             return points;
         }
 
-        internal static Texture2D GrassBladesTexture(System.Random rng)
+        public static Texture2D GrassBladesTexture(System.Random rng)
         {
             const int W = 64, H = 128;
             var tex = new Texture2D(W, H, TextureFormat.RGBA32, true)

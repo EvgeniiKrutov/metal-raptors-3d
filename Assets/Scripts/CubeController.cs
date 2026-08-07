@@ -14,6 +14,8 @@ namespace MetalRaptors
 
         public event Action OnDamaged;
 
+        public event Action OnScraped;
+
         public float CurrentHealth { get; private set; }
 
         public float MaxHealth { get; private set; }
@@ -172,6 +174,7 @@ namespace MetalRaptors
             TakeDamage(CollisionDamage);
             if (_shake != null) _shake.Play();
             Sparks.Spawn(transform.position, ExplosionSize);
+            OnScraped?.Invoke();
             return true;
         }
 

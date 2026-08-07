@@ -183,8 +183,8 @@ the same spot, and a level replays identically.
 
 | Grid | Cell | Result |
 | --- | --- | --- |
-| Trees | 70 | ~10 on screen |
-| Houses | 750 | ~1 on screen |
+| Trees | 58 | ~12 on screen |
+| Houses | 620 | ~1 on screen |
 
 **Houses are updated first**, because a tree candidate that falls inside a house
 footprint is dropped — the one overlap the two grids can produce on their own.
@@ -223,6 +223,15 @@ relative sizes. Trees land around 45–65 units tall, near the plane's own 60-un
 length; houses around 70–90 wide. Deliberately larger than life, so they read at
 the camera's 420-unit standoff.
 
+Trees get one extra factor on top: a **depth boost** of
+`1 + InverseLerp(200, 700, z) × 0.5 × rand`. It is zero in front of `z = 200` and
+reaches at most +50 % at the back of the map, with the amount drawn per tree — so
+the far band gets a mix of ordinary and noticeably taller trees rather than a
+uniformly scaled-up row. Perspective shrinks a tree at `z = 700` to roughly half
+the on-screen size it has in the flight lane, and this puts some of that back
+without touching the trees the player actually flies through. `MaxPropRadius`
+(the lookup reach used by `Nearest`) is 75 to cover the widest boosted tree.
+
 Bounds are measured once per model and cached: the model is instantiated 5000
 units below the world **with `StandUp` already applied**, its renderer bounds are
 combined, and the probe is destroyed. The stored bounds are then shifted so
@@ -243,11 +252,20 @@ a plane flies through it and comes out the other side, exactly as it does when i
 scrapes an enemy. Hitting one is not a crash:
 
 - `CubeController.OnTriggerEnter` calls the existing `Scrape()` — 10 damage out
-  of the player's 100, the model's `ShakeEffect`, and a burst of `Sparks`, all
-  behind `Scrape`'s own 0.5 s cooldown.
+  of the player's 100, the model's `ShakeEffect`, a burst of `Sparks` and a
+  camera shake, all behind `Scrape`'s own 0.5 s cooldown.
 - `EnemyController.OnTriggerEnter` does the same through its own `Scrape()`
   (damage and shake; sparks are a player-only flourish here, as they already are
   for plane-on-plane scrapes).
+
+The camera shake is not the prop system's own doing: a successful
+`CubeController.Scrape()` raises `OnScraped`, and both level controllers set
+`_camShake = 1f` from it (7-unit jitter decaying over 0.3 s). That is the same
+shake `LevelController` already ran for plane-on-plane scrapes — it used to be
+driven from `CheckPlaneScrapes` by hand, and now comes from the event for both
+causes, so a tree, a house or an enemy all shake the view identically.
+`CampaignLevelController` had no camera shake at all before and now carries the
+same state and decay.
 
 Both handlers gate on `other.gameObject.layer == BattlefieldProps.Layer`, so
 nothing else in the scene can drive them. The trigger fires on the aircraft's
@@ -344,7 +362,7 @@ naturally over the crater rims it walks across.
 
 ### Bounded maps vs scrollers
 
-Squad count comes from a fixed spacing (one squad per 290 units, capped at 14),
+Squad count comes from a fixed spacing (one squad per 235 units, capped at 18),
 so roughly three squads are visible at any time on either kind of map.
 
 **Bounded maps** (`LevelController`, width 2000) are populated across their whole

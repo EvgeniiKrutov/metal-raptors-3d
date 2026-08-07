@@ -127,6 +127,7 @@ namespace MetalRaptors
             _cube.OnCrashed += OnCrashed;
             _cube.OnShotDown += OnShotDown;
             _cube.OnDamaged += OnPlayerDamaged;
+            _cube.OnScraped += OnPlayerScraped;
 
             _cube.Initialize(config, 0f, MinX, MaxX, WorldTop - CubeHalf, EdgeMargin);
 
@@ -269,9 +270,8 @@ namespace MetalRaptors
                     if (enemy == null) continue;
                     if (((Vector2)enemy.transform.position - playerPos).sqrMagnitude > reachSq) continue;
 
-                    bool playerHit = _cube.Scrape();
+                    _cube.Scrape();
                     enemy.Scrape();
-                    if (playerHit) _camShake = 1f;
                 }
             }
 
@@ -332,6 +332,8 @@ namespace MetalRaptors
         {
             if (_sound != null) _sound.ReportPlayerDamaged();
         }
+
+        void OnPlayerScraped() => _camShake = 1f;
 
         void WinLevel()
         {

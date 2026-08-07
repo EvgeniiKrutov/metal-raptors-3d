@@ -8,8 +8,8 @@ namespace MetalRaptors
     {
         public const int Layer = 9;
 
-        const float TreeCellSize = 70f;
-        const float HouseCellSize = 750f;
+        const float TreeCellSize = 58f;
+        const float HouseCellSize = 620f;
         const float StreamMargin = 500f;
 
         const float ZMin = 20f, ZMax = 700f;
@@ -18,7 +18,9 @@ namespace MetalRaptors
         const float TreeOversize = 1.5f;
         const float HouseOversize = 1.5f;
         const float SizeJitter = 0.25f;
-        const float MaxPropRadius = 60f;
+        const float TreeDepthNear = 200f;
+        const float TreeDepthBoost = 0.5f;
+        const float MaxPropRadius = 75f;
 
         const float MaxSlopeDeg = 35f;
         const float SlopeStep = 6f;
@@ -116,6 +118,7 @@ namespace MetalRaptors
                 string model = models[rng.Next(models.Length)];
                 float yaw = (float)rng.NextDouble() * 360f;
                 float size = 1f + ((float)rng.NextDouble() * 2f - 1f) * SizeJitter;
+                if (tree) size *= 1f + DepthBoost(z) * (float)rng.NextDouble();
 
                 if (!_field.SampleGround(x, z, out float y)) continue;
 
@@ -228,6 +231,9 @@ namespace MetalRaptors
             bounds.center += offset;
             return bounds;
         }
+
+        static float DepthBoost(float z) =>
+            Mathf.InverseLerp(TreeDepthNear, ZMax, z) * TreeDepthBoost;
 
         float SlopeDeg(float x, float z, float y)
         {

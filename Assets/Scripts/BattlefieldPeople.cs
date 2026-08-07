@@ -6,8 +6,8 @@ namespace MetalRaptors
 {
     public class BattlefieldPeople : MonoBehaviour
     {
-        const float GroupSpacing = 290f;
-        const int MaxGroups = 14;
+        const float GroupSpacing = 235f;
+        const int MaxGroups = 18;
         const int GroupSizeMin = 4, GroupSizeMax = 8;
 
         const float ZMin = 40f, ZMax = 700f;

@@ -30,7 +30,6 @@ namespace MetalRaptors
         static readonly string[] ThrottleClipPaths =
         {
             "Sounds/engine_throttle_1",
-            "Sounds/engine_throttle_2",
         };
 
         struct Ramp
