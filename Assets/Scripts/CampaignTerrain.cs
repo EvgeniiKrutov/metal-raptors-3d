@@ -5,83 +5,70 @@ using UnityEngine.Rendering;
 
 namespace MetalRaptors
 {
-    public class CampaignTerrain : MonoBehaviour
+    public abstract class CampaignTerrain : MonoBehaviour
     {
         public const float ChunkLength = 512f;
-        const int Res = 257;
-        const float XStep = ChunkLength / (Res - 1);
-        const float Depth = ProceduralTerrain.Depth;
-        const float ZStep = Depth / (Res - 1);
-        const int GrassDetailRes = 512;
-        const float CellSize = 128f;
-        const float MaxCraterReach = 150f;
+        protected const int Res = 257;
+        protected const float XStep = ChunkLength / (Res - 1);
+        protected const float Depth = ProceduralTerrain.Depth;
+        protected const float ZStep = Depth / (Res - 1);
         const double BuildBudgetMs = 3.0;
-        const int RowsPerStep = 16;
 
-        int _seed;
+        protected int _seed;
         float _keepBehind, _keepAhead;
-
-        float _r1, _r2, _r3, _ox1, _oz1, _ox2, _oz2;
-
-        TerrainLayer _landLayer;
         Material _terrainMat;
-        Material _wallMat;
 
         class Chunk
         {
             public GameObject root;
             public Terrain terrain;
             public TerrainData data;
-            public Mesh wallMesh;
-        }
-
-        struct CraterSpec
-        {
-            public float x, z, radius, depth, rim, rimSigma, influence, bareRadius;
+            public List<Mesh> meshes;
         }
 
         readonly SortedDictionary<int, Chunk> _chunks = new SortedDictionary<int, Chunk>();
         readonly List<int> _removeScratch = new List<int>();
-        readonly List<CraterSpec> _craterScratch = new List<CraterSpec>();
         bool _building;
 
-        public bool InCrater(float worldX, float z)
+        protected abstract float HeightScale { get; }
+        protected abstract float TerrainY { get; }
+        protected abstract float MinHeight { get; }
+        protected abstract float MaxHeight { get; }
+        protected virtual float DetailDistance => ProceduralTerrain.GrassViewDistance;
+
+        protected abstract void Prepare(Daytime daytime, Weather weather,
+            float cameraDistance, float playPlaneZ);
+        protected abstract IEnumerator FillHeights(float[,] metres, int index);
+        protected abstract void PaintChunk(TerrainData data, int index);
+        protected abstract IEnumerable<object> Decorate(TerrainData data, int index);
+        protected abstract void AddChunkMeshes(int index, Transform root, float[] cutLine,
+            List<Mesh> owned);
+
+        public virtual bool InCrater(float worldX, float z) => false;
+
+        public static CampaignTerrain Begin(TerrainKind kind, int seed, Daytime daytime,
+            Weather weather, float cameraDistance, float playPlaneZ, float startCamX)
         {
-            CratersForRange(worldX - MaxCraterReach, worldX + MaxCraterReach, _craterScratch);
-            return InCrater(worldX, z, _craterScratch);
-        }
+            bool coast = kind == TerrainKind.Flanders;
+            var go = new GameObject(coast ? "Flanders Coast" : "Campaign Land");
+            CampaignTerrain land = coast
+                ? (CampaignTerrain)go.AddComponent<FlandersTerrain>()
+                : go.AddComponent<VerdunTerrain>();
 
-        public static CampaignTerrain Begin(int seed, Daytime daytime, Weather weather,
-            float cameraDistance, float playPlaneZ, float startCamX)
-        {
-            var streamer = new GameObject("Campaign Land").AddComponent<CampaignTerrain>();
-            streamer._seed = seed;
+            land._seed = seed;
+            land._terrainMat = new Material(Shader.Find("Universal Render Pipeline/Terrain/Lit"));
+            land.Prepare(daytime, weather, cameraDistance, playPlaneZ);
 
-            var rng = new System.Random(seed);
-            streamer._r1 = Offset(rng);
-            streamer._r2 = Offset(rng);
-            streamer._r3 = Offset(rng);
-            streamer._ox1 = Offset(rng);
-            streamer._oz1 = Offset(rng);
-            streamer._ox2 = Offset(rng);
-            streamer._oz2 = Offset(rng);
+            float keep = ProceduralTerrain.FogEndDistance(cameraDistance, playPlaneZ);
+            land._keepBehind = keep + ChunkLength * 0.5f;
+            land._keepAhead = keep + ChunkLength * 1.5f;
 
-            streamer._landLayer = ProceduralTerrain.CreateLandLayer();
-            streamer._terrainMat = new Material(Shader.Find("Universal Render Pipeline/Terrain/Lit"));
-            streamer._wallMat = ProceduralTerrain.CutWallMaterial();
-
-            ProceduralTerrain.ApplyFog(daytime, cameraDistance, playPlaneZ);
-
-            float fogEnd = ProceduralTerrain.FogEndDistance(cameraDistance, playPlaneZ);
-            streamer._keepBehind = fogEnd + ChunkLength * 0.5f;
-            streamer._keepAhead = fogEnd + ChunkLength * 1.5f;
-
-            foreach (int i in streamer.MissingChunks(startCamX))
+            foreach (int i in land.MissingChunks(startCamX))
             {
-                var steps = streamer.BuildChunk(i);
+                var steps = land.BuildChunk(i);
                 while (steps.MoveNext()) { }
             }
-            return streamer;
+            return land;
         }
 
         public void UpdateStreaming(float camX)
@@ -127,220 +114,40 @@ namespace MetalRaptors
 
         IEnumerator BuildChunk(int index)
         {
-            float x0 = index * ChunkLength;
-            var craters = CratersForRange(x0 - MaxCraterReach, x0 + ChunkLength + MaxCraterReach);
+            var metres = new float[Res, Res];
 
-            var heights = new float[Res, Res];
-            for (int iz = 0; iz < Res; iz += RowsPerStep)
-            {
-                FillRows(heights, index, iz, Mathf.Min(Res, iz + RowsPerStep));
-                yield return null;
-            }
+            var fill = FillHeights(metres, index);
+            while (fill.MoveNext()) yield return null;
 
-            foreach (var c in craters)
-            {
-                StampCrater(heights, index, c);
-                yield return null;
-            }
-
+            float low = MinHeight, high = MaxHeight;
             for (int iz = 0; iz < Res; iz++)
                 for (int ix = 0; ix < Res; ix++)
-                    heights[iz, ix] = Mathf.Clamp(heights[iz, ix],
-                        ProceduralTerrain.MinHeight, ProceduralTerrain.MaxHeight)
-                        / ProceduralTerrain.HeightScale;
+                    metres[iz, ix] = Mathf.Clamp(metres[iz, ix], low, high);
             yield return null;
 
             var cutLine = new float[Res];
-            for (int ix = 0; ix < Res; ix++)
-                cutLine[ix] = heights[0, ix] * ProceduralTerrain.HeightScale;
+            for (int ix = 0; ix < Res; ix++) cutLine[ix] = metres[0, ix];
+
+            float scale = HeightScale;
+            float baseY = TerrainY;
+            for (int iz = 0; iz < Res; iz++)
+                for (int ix = 0; ix < Res; ix++)
+                    metres[iz, ix] = (metres[iz, ix] - baseY) / scale;
+            yield return null;
 
             var data = ProceduralTerrain.NewTerrainData();
             data.heightmapResolution = Res;
-            data.size = new Vector3(ChunkLength, ProceduralTerrain.HeightScale, Depth);
+            data.size = new Vector3(ChunkLength, scale, Depth);
             yield return null;
-            data.SetHeights(0, 0, heights);
+            data.SetHeights(0, 0, metres);
             yield return null;
-            ProceduralTerrain.PaintTerrain(data, _landLayer);
-            ProceduralTerrain.SetupGrassDetail(data, GrassDetailRes);
+            PaintChunk(data, index);
             yield return null;
 
-            foreach (var step in PlantGrass(data, index, craters))
+            foreach (var step in Decorate(data, index))
                 yield return step;
 
             AssembleChunk(index, data, cutLine);
-        }
-
-        void FillRows(float[,] heights, int chunkIndex, int izFrom, int izTo)
-        {
-            for (int iz = izFrom; iz < izTo; iz++)
-            {
-                float z = Depth * iz / (Res - 1);
-                float zEff = Mathf.Max(z, ProceduralTerrain.FrontStrip);
-                float depthRamp = Mathf.SmoothStep(0f, 1f,
-                    Mathf.InverseLerp(ProceduralTerrain.FrontStrip, 220f, zEff));
-
-                for (int ix = 0; ix < Res; ix++)
-                {
-                    float x = WorldX(chunkIndex, ix);
-
-                    float h = ProceduralTerrain.BaseLevel;
-                    h += (Mathf.PerlinNoise(x / 950f + _r1, 0.5f) - 0.5f) * 2f * 10f;
-                    h += (Mathf.PerlinNoise(x / 430f + _r2, 0.5f) - 0.5f) * 2f * 6f;
-                    h += (Mathf.PerlinNoise(x / 175f + _r3, 0.5f) - 0.5f) * 2f * 3.5f;
-
-                    h += (Mathf.PerlinNoise(x / 170f + _ox1, zEff / 170f + _oz1) - 0.5f) * 2f * 10f * depthRamp;
-                    h += (Mathf.PerlinNoise(x / 30f + _ox2, zEff / 30f + _oz2) - 0.5f) * 2f * 1.6f;
-
-                    heights[iz, ix] = h;
-                }
-            }
-        }
-
-        static float WorldX(int chunkIndex, int ix) => ((long)chunkIndex * (Res - 1) + ix) * XStep;
-
-        static void StampCrater(float[,] heights, int chunkIndex, CraterSpec c)
-        {
-            float chunkX0 = chunkIndex * ChunkLength;
-            if (c.x + c.influence < chunkX0 || c.x - c.influence > chunkX0 + ChunkLength) return;
-
-            int ixMin = Mathf.Max(0, Mathf.FloorToInt((c.x - c.influence - chunkX0) / XStep));
-            int ixMax = Mathf.Min(Res - 1, Mathf.CeilToInt((c.x + c.influence - chunkX0) / XStep));
-            int izMin = c.z - c.influence < ProceduralTerrain.FrontStrip
-                ? 0 : Mathf.FloorToInt((c.z - c.influence) / ZStep);
-            int izMax = Mathf.Min(Res - 1, Mathf.CeilToInt((c.z + c.influence) / ZStep));
-
-            for (int iz = izMin; iz <= izMax; iz++)
-            {
-                float dz = Mathf.Max(Depth * iz / (Res - 1), ProceduralTerrain.FrontStrip) - c.z;
-
-                for (int ix = ixMin; ix <= ixMax; ix++)
-                {
-                    float dx = WorldX(chunkIndex, ix) - c.x;
-                    float r = Mathf.Sqrt(dx * dx + dz * dz);
-                    if (r > c.influence) continue;
-                    heights[iz, ix] += ProceduralTerrain.CraterDelta(r, c.radius, c.depth, c.rim, c.rimSigma);
-                }
-            }
-        }
-
-        List<CraterSpec> CratersForRange(float xMin, float xMax)
-        {
-            var list = new List<CraterSpec>();
-            CratersForRange(xMin, xMax, list);
-            return list;
-        }
-
-        void CratersForRange(float xMin, float xMax, List<CraterSpec> list)
-        {
-            list.Clear();
-            int c0 = Mathf.FloorToInt(xMin / CellSize);
-            int c1 = Mathf.FloorToInt(xMax / CellSize);
-
-            for (int cell = c0; cell <= c1; cell++)
-            {
-                var shellRng = new System.Random(Hash(_seed, cell, 1));
-                int shells = CountForDensity(shellRng, ProceduralTerrain.CratersPerMetre * CellSize);
-                for (int i = 0; i < shells; i++)
-                {
-                    float cx = (cell + (float)shellRng.NextDouble()) * CellSize;
-                    float cz = Mathf.Lerp(10f, Depth - 40f, (float)shellRng.NextDouble());
-                    float radius = Mathf.Lerp(12f, 42f, (float)shellRng.NextDouble());
-                    float depth = radius * Mathf.Lerp(0.22f, 0.30f, (float)shellRng.NextDouble());
-                    list.Add(new CraterSpec
-                    {
-                        x = cx, z = cz, radius = radius, depth = depth,
-                        rim = depth * 0.35f, rimSigma = radius * 0.35f,
-                        influence = radius * 1.8f,
-                        bareRadius = radius * ProceduralTerrain.CraterBareRadii,
-                    });
-                }
-
-                var mineRng = new System.Random(Hash(_seed, cell, 2));
-                int mines = CountForDensity(mineRng, ProceduralTerrain.MinesPerMetre * CellSize);
-                for (int i = 0; i < mines; i++)
-                {
-                    float cx = (cell + (float)mineRng.NextDouble()) * CellSize;
-                    float cz = Mathf.Lerp(10f, Depth - 40f, (float)mineRng.NextDouble());
-                    float radius = Mathf.Lerp(40f, 80f, (float)mineRng.NextDouble());
-                    float u = (float)mineRng.NextDouble();
-                    float depth = radius * Mathf.Lerp(ProceduralTerrain.MineDepthShallow,
-                        ProceduralTerrain.MineDepthDeep, 1f - u * u);
-                    list.Add(new CraterSpec
-                    {
-                        x = cx, z = cz, radius = radius, depth = depth,
-                        rim = depth * 0.45f, rimSigma = radius * 0.3f,
-                        influence = radius * 1.7f,
-                        bareRadius = radius * ProceduralTerrain.CraterBareRadii,
-                    });
-                }
-            }
-        }
-
-        static int CountForDensity(System.Random rng, float expected)
-        {
-            int count = (int)expected;
-            if (rng.NextDouble() < expected - count) count++;
-            return count;
-        }
-
-        static int Hash(int seed, int cell, int salt)
-        {
-            unchecked
-            {
-                int h = seed;
-                h = h * 486187739 + cell;
-                h = h * 486187739 + salt;
-                h ^= h >> 13;
-                h *= 1274126177;
-                h ^= h >> 16;
-                return h;
-            }
-        }
-
-        static float Offset(System.Random rng) => (float)(rng.NextDouble() * 1000.0 + 100.0);
-
-        IEnumerable<object> PlantGrass(TerrainData data, int index, List<CraterSpec> craters)
-        {
-            int cols = Mathf.Max(1, Mathf.RoundToInt(ChunkLength / ProceduralTerrain.GrassSpacing));
-            int rows = Mathf.Max(1, Mathf.RoundToInt(Depth / ProceduralTerrain.GrassSpacing));
-            float cellX = ChunkLength / cols;
-            float cellZ = Depth / rows;
-            float x0 = index * ChunkLength;
-
-            var rng = new System.Random(Hash(_seed, index, 3));
-            var layer = new int[GrassDetailRes, GrassDetailRes];
-
-            for (int row = 0; row < rows; row++)
-            {
-                for (int col = 0; col < cols; col++)
-                {
-                    float lx = Mathf.Min((col + (float)rng.NextDouble()) * cellX, ChunkLength);
-                    float lz = Mathf.Min((row + (float)rng.NextDouble()) * cellZ, Depth);
-
-                    if (InCrater(x0 + lx, lz, craters)) continue;
-                    float xNorm = lx / ChunkLength, zNorm = lz / Depth;
-                    if (data.GetSteepness(xNorm, zNorm) > ProceduralTerrain.GrassMaxSlopeDeg) continue;
-
-                    int ix = Mathf.Min(GrassDetailRes - 1, (int)(xNorm * GrassDetailRes));
-                    int iz = Mathf.Min(GrassDetailRes - 1, (int)(zNorm * GrassDetailRes));
-                    layer[iz, ix]++;
-                }
-                if (row % 40 == 39) yield return null;
-            }
-
-            data.SetDetailLayer(0, 0, 0, layer);
-        }
-
-        static bool InCrater(float worldX, float z, List<CraterSpec> craters)
-        {
-            float zEff = Mathf.Max(z, ProceduralTerrain.FrontStrip);
-            foreach (var c in craters)
-            {
-                float dx = c.x - worldX;
-                float dz = zEff - c.z;
-                if (dx * dx + dz * dz < c.bareRadius * c.bareRadius) return true;
-            }
-            return false;
         }
 
         void AssembleChunk(int index, TerrainData data, float[] cutLine)
@@ -352,30 +159,39 @@ namespace MetalRaptors
             var tGo = Terrain.CreateTerrainGameObject(data);
             tGo.name = "Terrain";
             tGo.transform.SetParent(root.transform);
-            tGo.transform.position = new Vector3(x0, 0f, 0f);
+            tGo.transform.position = new Vector3(x0, TerrainY, 0f);
             var terrain = tGo.GetComponent<Terrain>();
             terrain.materialTemplate = _terrainMat;
             terrain.heightmapPixelError = 2f;
             terrain.basemapDistance = Depth * 4f;
             terrain.groupingID = 1;
             terrain.allowAutoConnect = true;
-            terrain.detailObjectDistance = ProceduralTerrain.GrassViewDistance;
+            terrain.detailObjectDistance = DetailDistance;
             terrain.detailObjectDensity = 1f;
 
-            var wallMesh = ProceduralTerrain.BuildCutWallMesh(cutLine, ChunkLength);
-            var wGo = new GameObject("Cut Wall", typeof(MeshFilter), typeof(MeshRenderer));
-            wGo.transform.SetParent(root.transform);
-            wGo.transform.position = new Vector3(x0 + ChunkLength / 2f, 0f, 0f);
-            wGo.GetComponent<MeshFilter>().sharedMesh = wallMesh;
-            var mr = wGo.GetComponent<MeshRenderer>();
-            mr.sharedMaterial = _wallMat;
-            mr.shadowCastingMode = ShadowCastingMode.Off;
+            var owned = new List<Mesh>();
+            AddChunkMeshes(index, root.transform, cutLine, owned);
 
-            _chunks[index] = new Chunk { root = root, terrain = terrain, data = data, wallMesh = wallMesh };
+            _chunks[index] = new Chunk { root = root, terrain = terrain, data = data, meshes = owned };
 
             LinkNeighbors(index - 1);
             LinkNeighbors(index);
             LinkNeighbors(index + 1);
+        }
+
+        protected static void AddMesh(Transform parent, string name, Mesh mesh, Material material,
+            Vector3 position, List<Mesh> owned)
+        {
+            if (mesh == null) return;
+
+            var go = new GameObject(name, typeof(MeshFilter), typeof(MeshRenderer));
+            go.transform.SetParent(parent);
+            go.transform.position = position;
+            go.GetComponent<MeshFilter>().sharedMesh = mesh;
+            var mr = go.GetComponent<MeshRenderer>();
+            mr.sharedMaterial = material;
+            mr.shadowCastingMode = ShadowCastingMode.Off;
+            owned.Add(mesh);
         }
 
         void LinkNeighbors(int index)
@@ -391,20 +207,51 @@ namespace MetalRaptors
             if (!_chunks.TryGetValue(index, out var chunk)) return;
             _chunks.Remove(index);
             Destroy(chunk.root);
-            Destroy(chunk.data);
-            Destroy(chunk.wallMesh);
+            DisposeChunk(chunk);
             LinkNeighbors(index - 1);
             LinkNeighbors(index + 1);
         }
 
+        static void DisposeChunk(Chunk chunk)
+        {
+            Destroy(chunk.data);
+            foreach (var mesh in chunk.meshes) Destroy(mesh);
+            chunk.meshes.Clear();
+        }
+
         void OnDestroy()
         {
-            foreach (var kv in _chunks)
-            {
-                Destroy(kv.Value.data);
-                Destroy(kv.Value.wallMesh);
-            }
+            foreach (var kv in _chunks) DisposeChunk(kv.Value);
             _chunks.Clear();
+        }
+
+        protected static float WorldX(int chunkIndex, int ix) =>
+            ((long)chunkIndex * (Res - 1) + ix) * XStep;
+
+        protected static int CountForDensity(System.Random rng, float expected)
+        {
+            int count = (int)expected;
+            if (rng.NextDouble() < expected - count) count++;
+            return count;
+        }
+
+        protected static float Offset(System.Random rng) => (float)(rng.NextDouble() * 1000.0 + 100.0);
+
+        protected static float Range(System.Random rng, float min, float max) =>
+            Mathf.Lerp(min, max, (float)rng.NextDouble());
+
+        protected static int Hash(int seed, int cell, int salt)
+        {
+            unchecked
+            {
+                int h = seed;
+                h = h * 486187739 + cell;
+                h = h * 486187739 + salt;
+                h ^= h >> 13;
+                h *= 1274126177;
+                h ^= h >> 16;
+                return h;
+            }
         }
     }
 }

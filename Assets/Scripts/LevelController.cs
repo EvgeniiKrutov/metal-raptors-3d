@@ -15,7 +15,7 @@ namespace MetalRaptors
 
         LevelDefinition _level;
 
-        const float WorldHeight = 900f;
+        const float WorldHeight = 650f;
         const float GroundY = 0f;
         const float WorldTop = WorldHeight;
         const float SkyHeadroom = 400f;

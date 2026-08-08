@@ -4,17 +4,23 @@ namespace MetalRaptors
     {
         public readonly string Name;
         public readonly int Seed;
+        public readonly TerrainKind Terrain;
 
-        public BattleMap(string name, int seed)
+        public BattleMap(string name, int seed, TerrainKind terrain)
         {
             Name = name;
             Seed = seed;
+            Terrain = terrain;
         }
     }
 
     public static class BattleMaps
     {
-        public static readonly BattleMap[] All = { new BattleMap("verdun", 1917) };
+        public static readonly BattleMap[] All =
+        {
+            new BattleMap(TerrainNames.Verdun, 1917, TerrainKind.Verdun),
+            new BattleMap(TerrainNames.Flanders, 1918, TerrainKind.Flanders),
+        };
 
         public static string[] Names()
         {

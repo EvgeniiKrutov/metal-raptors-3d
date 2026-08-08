@@ -6,6 +6,13 @@ Each `Daytime` value in `LevelDefinition.cs` maps to one self-contained static s
 built entirely at runtime (no material/profile assets): `MorningSky`, `MiddaySky`,
 `EveningSky`, `NightSky`. Each class owns four ingredients that only work together:
 
+> Flanders Coast has its own set of four, as `CoastSky` — one class with a palette table
+> rather than four classes, since its daytimes differ only in numbers. It follows the same
+> recipe with a colder, greyer, less saturated palette, a much longer fog reach, and its
+> horizon at eye level rather than on a map edge (`SkyHorizon.AtEyeLevel`). Its table also
+> owns that map's sea colour.
+> See docs/flanders-coast.md.
+
 1. A gradient skybox (`Custom/GradientSkybox` in `Assets/Resources/Shaders`) with a
    two-part sun (HDR core + atmospheric halo), anchored to a fixed viewport spot — the
    camera never rotates, so a skybox direction is effectively a fixed point on screen.
@@ -20,7 +27,8 @@ built entirely at runtime (no material/profile assets): `MorningSky`, `MiddaySky
    into the sky. Retune fog colour and horizon band together or the seam shows. The
    shader's `_BottomColor` (below-horizon fill) matches too, for the same reason — from a
    high camera the sky past the terrain's far edge is visible, and any tint mismatch there
-   reads as a seam at the map edge.
+   reads as a seam at the map edge. A flat colour is only ever *most* of the sky, though:
+   see *Aerial perspective* for the pass that closes the rest of the gap.
 3. A directional key light that cannot shine out of the visible sun (that would backlight
    the planes into silhouettes, since the camera looks straight down +Z), so it shines
    into +Z from a plausible angle on the sun's side of the sky.
@@ -34,10 +42,25 @@ level — screen centre under this never-rotating camera — while the map's fog
 appears lower, and lower still the higher the player flies. `SkyHorizon` (a runtime
 component each sky attaches in `BuildSkybox`) closes that gap every frame:
 
-- It computes the direction from the camera to the far-edge line (terrain mean height
-  `ProceduralTerrain.BaseLevel` at z = `ProceduralTerrain.Depth`) and writes its y into
-  the shader's `_HorizonLevel`, which recentres the gradient's horizon band on that line.
-  Fog colour equals the band colour, so land and sky stay one seamless surface.
+- It computes the **slope** from the camera to the far-edge line (by default terrain mean
+  height `ProceduralTerrain.BaseLevel` at z = `ProceduralTerrain.Depth`; `Attach` takes an
+  explicit `edgeY`/`edgeZ` for maps whose visible edge is elsewhere) and writes it into the
+  shader's `_HorizonSlope`, which recentres the gradient's horizon band on that line. Fog
+  colour equals the band colour, so land and sky stay one seamless surface.
+- `AtEyeLevel` is the other mode: `_HorizonSlope = 0` and the sun anchored at viewport
+  centre. It exists for the coast, and the difference is not cosmetic — see
+  *The horizon is a plane, not a cone* in docs/flanders-coast.md. Use it for any map whose
+  far surface is meant to read as unbounded; use `Attach` where the ground genuinely ends.
+
+**A slope, not a view-direction Y.** `_HorizonSlope` is the band plane's `dy/dz`, and the
+shader's height term is `d.y − slope · d.z`. That is a *plane* through the eye, so its zero
+set projects to a straight, level screen line, exactly like the map's far edge — which is
+itself a straight world line at constant y and z. The parameter used to be a view-direction
+Y (`_HorizonLevel`), which describes a *cone* around vertical: it sags toward the frame
+edges, by 13 % of the frame height at the flight ceiling on Verdun. The land edge stayed
+straight while the band curved away from it, so the two crossed and the map edge drew itself
+as a hard line down both sides of the screen. Zero means eye level in either formulation, so
+the coast is unaffected; only the anchored maps change, and they change by becoming correct.
 - With `anchorSun` on (morning, evening) it also re-aims `_SunDirection` so the sun rides
   a fixed viewport fraction (`SunHorizonLift`) above the visible map edge — dawning or
   setting at the actual horizon, not the eye-level one behind it. Midday's overhead sun
@@ -52,6 +75,51 @@ same for all — the last ~250 m of land sit in solid haze so the map edge never
 | Midday  | +300 m | clear; haze only toward the horizon |
 | Evening | +260 m | warm haze held back to the far half — the golden air was drowning the land |
 | Night   | +250 m | clear calm air; the distance is lost to darkness, not mist |
+
+## Aerial perspective (`AerialHaze`)
+
+Matching the fog colour to the horizon band gets the land *most* of the way into the sky, and
+"most" is what shows. Unity's linear fog blends every fragment toward a single constant
+colour, but the sky over that fragment is not a constant: the gradient skybox also carries
+the sun's core and its wide atmospheric halo, and fog knows nothing about either. Where the
+land is fully fogged it is exactly `HazeColor`, while the sky right above it is
+`HazeColor + halo` — so the map's far edge draws itself as a brightness step, brightest
+in the sun's screen column. On a morning coast that step is about **30 %**, which is not a
+subtle seam; it is the edge of the world, drawn with a ruler.
+
+`AerialHaze` is a fullscreen pass that adds back precisely the missing term:
+
+```
+scene += fogWeight * (skyColor(viewRay) - fogColor)
+```
+
+Since URP already wrote `lerp(scene, fogColor, w)`, this turns it into
+`lerp(scene, skyColor, w)`. At full fog the land becomes **pixel-identical to the sky it is
+hiding**, so the far edge cannot be seen at any camera height, at any sun position, on any
+map — not hidden, but arithmetically absent. This is ordinary aerial perspective: haze takes
+the colour of the light scattered through it, which near a low sun means the sun's glow.
+
+Mechanics:
+
+- The sky is evaluated by `Assets/Shaders/GradientSky.hlsl`, shared verbatim with
+  `GradientSkybox.shader`, so the two cannot drift apart. Stars are the one term left out —
+  they are masked off the horizon band anyway, and fogged land is always below it.
+- Sky pixels are skipped (they already *are* the sky; adding the difference again would
+  double the halo), as are pixels in front of the fog start.
+- The addition is clamped to a brightening. Geometry only projects above the horizon band
+  when it is close enough for fog to be near zero, and an additive pass cannot subtract from
+  an unsigned colour target.
+- `Blend One One`, so it never reads the colour target and needs no intermediate copy. It
+  runs at `BeforeRenderingTransparents` — after the opaques and the skybox, before the
+  clouds, and before `GodRays`.
+- The per-pixel fog weight is rebuilt from `RenderSettings` each frame (`LinearEyeDepth`
+  against `fogStartDistance`/`fogEndDistance`), so it tracks whatever the sky set, and the
+  pass disables itself when fog is off or non-linear. All the sky parameters are copied from
+  the live skybox material each frame, so `SkyHorizon`'s moving sun and horizon are followed
+  automatically.
+
+Every sky attaches one in `BuildSkybox`, next to `GodRays`, which is what makes it apply to
+both maps and all four daytimes without a per-level switch.
 
 ## MorningSky design
 

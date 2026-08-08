@@ -14,6 +14,7 @@ controllers start it once the camera exists:
 - `LevelController` — only when `VerdunLand`, seeded from `_level.terrain.seed`,
   and passing the level's `MinX`/`MaxX`. The flat-slab terrain gets nothing.
 - `CampaignLevelController` — always, seeded from `_level.seed`, with no bounds.
+  On Flanders Coast it calls `BeginCoast` instead (see *Coast mode* below).
 
 `Begin` needs the camera's half view width because everything streams around the
 camera, and needs the map bounds because bounded and endless maps populate
@@ -21,6 +22,38 @@ themselves differently (see *Bounded maps vs scrollers* below). Both controllers
 now keep the half view width in a `_halfViewWidth` field
 (`LevelController.RandomEnemySpawn` reads the same field instead of recomputing
 it). Passing no bounds means `±infinity`, which is what `Bounded` tests.
+
+## Coast mode
+
+`Battlefield.BeginCoast(cam, halfViewWidth, seed, seaLevel, waterFromZ)` is the Flanders Coast
+entry point (docs/flanders-coast.md). It builds the same coordinator with three switches
+thrown:
+
+- **`_populate = false`** — neither `BattlefieldProps` nor `BattlefieldPeople` is started, so
+  the map carries blasts and smoke columns and nothing else. There is no crater test either:
+  the only thing that consumed it was the scenery.
+- **`_seaLevel`** — a world Y (elsewhere `−infinity`, which is what makes every test below a
+  no-op on Verdun) that the blast and column code compare sampled ground against.
+- **`_waterFromZ`** — the Z the sea mesh actually begins at (elsewhere `+infinity`). Water is
+  a region, not a height: the coast's foreground is dry land whose crater floors sit below
+  `_seaLevel`, so a height test alone would splash on dry ground.
+
+A shell that lands at `z >= _waterFromZ` on ground below `_seaLevel` throws a `WaterSplash` at
+the surface instead of a dirt `GroundBlast`, and kills nobody.
+
+**The sea blast stream** is a second, independent timer that only runs when `_waterFromZ` is
+finite. Every 2.0–3.8 s it drops a splash at `z` 340–1080 across ±1.7 view widths, sized
+60–130. It samples no ground at all — everything in that band is open water by construction —
+which is also why it can reach past the 700-unit limit the land stream is bounded by.
+
+Smoke columns take their `z` band from `_smokeZMin`/`_smokeZMax`, 140–380 inland and 100–190 on
+the coast, where anything further back is beach or water.
+
+A smoke column needs ground at least `DryClearance` (2 units) above the water, and a cell tries
+**three** hashed candidate spots before writing itself off as empty. The extra draws come from
+the same per-cell `System.Random`, so a site is still in the same place every pass; a candidate
+whose ground is not streamed in yet still leaves the cell undecided rather than falling through
+to the next one, so the choice never depends on streaming timing.
 
 ## Crater lookup
 

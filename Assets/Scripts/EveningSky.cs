@@ -67,6 +67,7 @@ namespace MetalRaptors
             SkyHorizon.Attach(cam, sky, SunViewportX, SunHorizonLift, anchorSun: true);
             GodRays.Attach(cam, sky, RayColor, RayIntensity,
                 density: RayDensity, radialFalloff: RayFalloff);
+            AerialHaze.Attach(cam, sky);
         }
 
         static void TuneSunLight()

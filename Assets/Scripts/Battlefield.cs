@@ -11,16 +11,29 @@ namespace MetalRaptors
         const float BlastSpread = 1.15f;
         const float BlastKillRadii = 1f;
 
+        const float SeaBlastIntervalMin = 2.0f, SeaBlastIntervalMax = 3.8f;
+        const float SeaBlastZMin = 420f, SeaBlastZMax = 1080f;
+        const float SeaBlastSizeMin = 60f, SeaBlastSizeMax = 130f;
+        const float SeaBlastSpread = 1.7f;
+
         const float SmokeCellSize = 600f;
         const float SmokeCellChance = 0.75f;
         const float SmokeZMin = 140f, SmokeZMax = 380f;
+        const float CoastSmokeZMin = 100f, CoastSmokeZMax = 220f;
         const float SmokeMargin = 500f;
+        const float DryClearance = 2f;
+        const int SmokeSiteTries = 3;
 
         Camera _cam;
         float _halfViewWidth;
         float _minX, _maxX;
         int _seed;
         float _blastTimer;
+        float _seaTimer;
+        float _seaLevel = float.NegativeInfinity;
+        float _waterFromZ = float.PositiveInfinity;
+        float _smokeZMin = SmokeZMin, _smokeZMax = SmokeZMax;
+        bool _populate = true;
 
         readonly List<Terrain> _terrains = new List<Terrain>();
         readonly Dictionary<int, SmokeColumn> _columns = new Dictionary<int, SmokeColumn>();
@@ -40,7 +53,34 @@ namespace MetalRaptors
             System.Func<float, float, bool> inCrater)
             => Begin(cam, halfViewWidth, seed, float.NegativeInfinity, float.PositiveInfinity, inCrater);
 
+        public static Battlefield BeginCoast(Camera cam, float halfViewWidth, int seed,
+            float seaLevel, float waterFromZ)
+        {
+            var field = Create(cam, halfViewWidth, seed,
+                float.NegativeInfinity, float.PositiveInfinity, null);
+            if (field == null) return null;
+
+            field._seaLevel = seaLevel;
+            field._waterFromZ = waterFromZ;
+            field._smokeZMin = CoastSmokeZMin;
+            field._smokeZMax = CoastSmokeZMax;
+            field._seaTimer = Random.Range(0f, SeaBlastIntervalMax);
+            field._populate = false;
+            field.Populate();
+            return field;
+        }
+
         public static Battlefield Begin(Camera cam, float halfViewWidth, int seed,
+            float minX, float maxX, System.Func<float, float, bool> inCrater)
+        {
+            var field = Create(cam, halfViewWidth, seed, minX, maxX, inCrater);
+            if (field == null) return null;
+
+            field.Populate();
+            return field;
+        }
+
+        static Battlefield Create(Camera cam, float halfViewWidth, int seed,
             float minX, float maxX, System.Func<float, float, bool> inCrater)
         {
             if (cam == null) return null;
@@ -53,12 +93,17 @@ namespace MetalRaptors
             field._seed = seed;
             field._inCrater = inCrater;
             field._blastTimer = Random.Range(0f, BlastIntervalMax);
-
-            field.RefreshTerrains();
-            field.UpdateColumns(field.CameraX);
-            field._props = BattlefieldProps.Begin(field, seed);
-            field._people = BattlefieldPeople.Begin(field);
             return field;
+        }
+
+        void Populate()
+        {
+            RefreshTerrains();
+            UpdateColumns(CameraX);
+            if (!_populate) return;
+
+            _props = BattlefieldProps.Begin(this, _seed);
+            _people = BattlefieldPeople.Begin(this);
         }
 
         public bool InCrater(float x, float z) => _inCrater != null && _inCrater(x, z);
@@ -92,6 +137,7 @@ namespace MetalRaptors
             float camX = _cam.transform.position.x;
             UpdateColumns(camX);
             TickBlasts(camX);
+            TickSeaBlasts(camX);
             if (_props != null) _props.Tick(camX);
             if (_people != null) _people.Tick(camX, Time.deltaTime);
         }
@@ -109,10 +155,31 @@ namespace MetalRaptors
             if (!SampleGround(x, z, out float y)) return;
 
             float size = Random.Range(BlastSizeMin, BlastSizeMax);
-            var position = new Vector3(x, y, z);
 
+            if (z >= _waterFromZ && y < _seaLevel)
+            {
+                WaterSplash.Spawn(new Vector3(x, _seaLevel, z), size, _cam.transform.position);
+                return;
+            }
+
+            var position = new Vector3(x, y, z);
             GroundBlast.Spawn(position, size, _cam.transform.position);
             if (_people != null) _people.KillWithin(position, size * BlastKillRadii);
+        }
+
+        void TickSeaBlasts(float camX)
+        {
+            if (float.IsInfinity(_waterFromZ)) return;
+
+            _seaTimer -= Time.deltaTime;
+            if (_seaTimer > 0f) return;
+            _seaTimer = Random.Range(SeaBlastIntervalMin, SeaBlastIntervalMax);
+
+            float x = camX + Random.Range(-1f, 1f) * _halfViewWidth * SeaBlastSpread;
+            float z = Random.Range(SeaBlastZMin, SeaBlastZMax);
+            float size = Random.Range(SeaBlastSizeMin, SeaBlastSizeMax);
+
+            WaterSplash.Spawn(new Vector3(x, _seaLevel, z), size, _cam.transform.position);
         }
 
         void UpdateColumns(float camX)
@@ -137,14 +204,24 @@ namespace MetalRaptors
 
                 int hash = Hash(_seed, cell);
                 var rng = new System.Random(hash);
-                bool wanted = rng.NextDouble() <= SmokeCellChance;
-                float x = (cell + (float)rng.NextDouble()) * SmokeCellSize;
-                float z = Mathf.Lerp(SmokeZMin, SmokeZMax, (float)rng.NextDouble());
 
-                if (!wanted) { _columns[cell] = null; continue; }
-                if (!SampleGround(x, z, out float y)) continue;
+                if (rng.NextDouble() > SmokeCellChance) { _columns[cell] = null; continue; }
 
-                _columns[cell] = SmokeColumn.Begin(transform, new Vector3(x, y, z), hash);
+                bool placed = false, retry = false;
+                for (int attempt = 0; attempt < SmokeSiteTries; attempt++)
+                {
+                    float x = (cell + (float)rng.NextDouble()) * SmokeCellSize;
+                    float z = Mathf.Lerp(_smokeZMin, _smokeZMax, (float)rng.NextDouble());
+
+                    if (!SampleGround(x, z, out float y)) { retry = true; break; }
+                    if (y < _seaLevel + DryClearance) continue;
+
+                    _columns[cell] = SmokeColumn.Begin(transform, new Vector3(x, y, z), hash);
+                    placed = true;
+                    break;
+                }
+
+                if (!placed && !retry) _columns[cell] = null;
             }
         }
 

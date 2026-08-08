@@ -9,9 +9,15 @@ touch gameplay.
 
 `CloudSystem.Begin(cam, daytime, weather, cloudsPart, playPlaneZ)` is called from
 `LevelController` and `CampaignLevelController` at the end of camera setup whenever the
-level's definition carries a non-null `CloudsPart`. Currently that is fixed Level 1 (Verdun)
-and campaign Level 1; Level 2 stays cloudless (`clouds = null`) even though it now flies the
-same Verdun terrain.
+level's definition carries a non-null `CloudsPart`. Currently that is fixed Level 1 (Verdun),
+campaign Level 1 (Verdun) and campaign Level 2 (Flanders Coast); the fixed Level 2 stays
+cloudless (`clouds = null`) even though it now flies the same Verdun terrain.
+
+A second `Begin` overload takes the **tint and glow colours directly** instead of a
+`Daytime`. The daytime form computes them from the four inland sky classes and delegates to
+it; Flanders Coast passes `CoastSky`'s own colours the same way, so a map with its own
+atmosphere does not need a new branch inside the cloud system
+(docs/flanders-coast.md).
 `weather` is the same future modulation seam the sky classes take — `Calm` changes nothing.
 
 ## Structure

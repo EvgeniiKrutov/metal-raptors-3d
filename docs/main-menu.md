@@ -166,11 +166,22 @@ column, where the entries belong.
    ┌───── 40% ─────┬──────────────────────────────────────┐
    │  WORLD WAR 1  │                                      │
    │  ───          │                                      │
-   │  start        │            (left empty)              │  → CampaignLevel1 scene
-   │  level select │                                      │    (muted, no click)
+   │  start        │            (left empty)              │  → level 1, endless
+   │  level select │                                      │  → the level list below
    │               │                                      │
    │  back         │                                      │  → main list
    └───────────────┴──────────────────────────────────────┘
+                          ↓  level select
+   ┌───── 40% ─────────────┬──────────────────────────────┐
+   │  WORLD WAR 1          │                              │
+   │  ───                  │                              │
+   │  LEVEL SELECT         │                              │
+   │                       │        (left empty)          │
+   │  level 1   VERDUN     │                              │  → level 1
+   │  level 2   FLANDERS…  │                              │  → level 2
+   │                       │                              │
+   │  back                 │                              │  → the era's page
+   └───────────────────────┴──────────────────────────────┘
 ```
 
 * The header is one title + one paragraph, rewritten from whichever card holds the
@@ -186,8 +197,16 @@ column, where the entries belong.
 * The era cards page has **no back entry** — `Escape` is the way back to the main list.
 * `back` on an era's page returns to the **main list**, not to the cards: picking an era is
   a step on the way into career, not a layer worth landing on again.
-* `start` becomes `continue` once campaign progress is tracked; `level select` is drawn
-  muted until there is more than one level to pick.
+* `start` becomes `continue` once campaign progress is tracked. `level select` swaps the
+  column's panel in place, exactly as `challenges` swaps the main list — the era title and
+  its accent rule stay put. Its rows carry the map name as a tag, the same `AddTag` the
+  `LOCKED` marker uses, so a row states both the level and the land it flies.
+* Nothing on this page is locked: both levels are reachable straight away, since the campaign
+  has no completion condition yet.
+* Both entries go through `CampaignRun.Request(n)` before loading `CampaignLevel1` — the one
+  endless scene serves every level (docs/campaign.md). `start` is `level 1` by another name.
+* `back` on the level list returns to the era's page, and `Escape` does the same, one layer
+  at a time.
 
 ## Custom battle
 
@@ -212,11 +231,14 @@ column plus one card in the right band — the first screen to use both halves.
   still while the value changes under it.
 * The labels (`map`, `weather`) are `Fg`, the same weight and colour as `start` and `back`
   — they name rows the player acts on, so they read as entries, not as captions.
-* The list does **not** wrap. The triangle at either end greys out — both of the map row's
-  do, Verdun being the only map so far.
-* `map` picks a `BattleMap` from `BattleMaps.All` (name + terrain seed); `weather` picks a
-  `Daytime`, in the enum's own order. Neither is persisted: a custom battle's picks are not
-  settings, so the screen opens on verdun/morning every time the menu is built.
+* The list does **not** wrap. The triangle at either end greys out.
+* `map` picks a `BattleMap` from `BattleMaps.All` — **verdun** and **flanders**, each a name,
+  a terrain seed and a `TerrainKind`; `weather` picks a `Daytime`, in the enum's own order.
+  Neither is persisted: a custom battle's picks are not settings, so the screen opens on
+  verdun/morning every time the menu is built.
+* Flanders Coast is listed as `flanders` rather than its full name so it fits the 190px
+  `SelectorValueWidth` that `verdun` was sized against; the full name is what career's level
+  list tags its row with.
 * `start` fills in `CustomBattle` and loads the endless `CampaignLevel1` scene, where
   `CampaignLevelController` builds `CampaignLevels.Custom(map, daytime)` instead of the
   authored level. Career's own `start` calls `CustomBattle.Clear()` first, so an era keeps

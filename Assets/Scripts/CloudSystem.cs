@@ -47,6 +47,10 @@ namespace MetalRaptors
 
         public static CloudSystem Begin(Camera cam, Daytime daytime, Weather weather,
             CloudsPart part, float playPlaneZ)
+            => Begin(cam, TintFor(daytime), GlowFor(daytime), part, playPlaneZ);
+
+        public static CloudSystem Begin(Camera cam, Color tint, Color glow,
+            CloudsPart part, float playPlaneZ)
         {
             var go = new GameObject("Clouds");
             var sys = go.AddComponent<CloudSystem>();
@@ -55,8 +59,8 @@ namespace MetalRaptors
             sys._speed = DriftSpeed[(int)part.speed];
             sys._spacing = Spacing[(int)part.frequency];
             sys._width = CloudWidth[(int)part.size];
-            sys._tint = TintFor(daytime);
-            sys._glow = GlowFor(daytime);
+            sys._tint = tint;
+            sys._glow = glow;
             return sys;
         }
 

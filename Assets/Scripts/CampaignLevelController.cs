@@ -8,11 +8,7 @@ namespace MetalRaptors
 {
     public class CampaignLevelController : MonoBehaviour
     {
-        [Tooltip("Which campaign level this scene represents; everything else comes from its " +
-                 "definition in the CampaignLevels registry.")]
-        [SerializeField] int levelNumber = 1;
-
-        const float WorldTop = 900f;
+        const float WorldTop = 650f;
         const float CubeHalf = 15f;
         const float CameraDistance = 420f;
         const float PlayPlaneZ = 100f;
@@ -22,13 +18,20 @@ namespace MetalRaptors
         const float CamShakeMagnitude = 7f;
         const float CamShakeDuration = 0.3f;
 
+        const float DitchSplashSize = 75f;
+        const float SinkSpeed = 26f;
+        const float SinkDriftKeep = 0.15f;
+        const float SinkDuration = 2f;
+
         CampaignDefinition _level;
+        int _levelNumber;
         CubeController _cube;
         PlaneShooter _shooter;
         PlaneSearchlight _searchlight;
         Transform _cubeTr;
         Camera _cam;
         CampaignTerrain _terrain;
+        SeaSurface _sea;
         Transform _ceilingBar;
         SoundSystem _sound;
 
@@ -47,21 +50,35 @@ namespace MetalRaptors
 
         float Distance => Mathf.Max(0f, _furthestX - StartX);
 
+        bool Coast => _level.terrain == TerrainKind.Flanders;
+
         void Start()
         {
+            _levelNumber = CampaignRun.Level;
             _level = CustomBattle.Requested
                 ? CampaignLevels.Custom(CustomBattle.Map, CustomBattle.Daytime)
-                : CampaignLevels.ForNumber(levelNumber);
+                : CampaignLevels.ForNumber(_levelNumber);
 
             var config = Resources.Load<PlayerConfig>("PlayerConfig");
             if (config == null) config = ScriptableObject.CreateInstance<PlayerConfig>();
 
             ConfigureShadows();
-            _terrain = CampaignTerrain.Begin(_level.seed, _level.daytime, _level.weather,
-                CameraDistance, PlayPlaneZ, StartX);
+            _terrain = CampaignTerrain.Begin(_level.terrain, _level.seed, _level.daytime,
+                _level.weather, CameraDistance, PlayPlaneZ, StartX);
             SpawnPlayer(config);
             SetupCamera();
-            Battlefield.Begin(_cam, _halfViewWidth, _level.seed, _terrain.InCrater);
+
+            if (Coast)
+            {
+                _sea = SeaSurface.Begin(_cam, _level.daytime);
+                Battlefield.BeginCoast(_cam, _halfViewWidth, _level.seed,
+                    SeaSurface.Level, SeaSurface.NearEdge);
+            }
+            else
+            {
+                Battlefield.Begin(_cam, _halfViewWidth, _level.seed, _terrain.InCrater);
+            }
+
             BuildHud();
             _sound = SoundSystem.Begin(_cube, null);
         }
@@ -106,21 +123,33 @@ namespace MetalRaptors
             _cam.orthographic = false;
             _cam.transform.rotation = Quaternion.identity;
 
-            switch (_level.daytime)
+            if (Coast)
             {
-                case Daytime.Midday: MiddaySky.Apply(_cam, _level.weather); break;
-                case Daytime.Evening: EveningSky.Apply(_cam, _level.weather); break;
-                case Daytime.Night: NightSky.Apply(_cam, _level.weather); break;
-                default: MorningSky.Apply(_cam, _level.weather); break;
+                CoastSky.Apply(_cam, _level.daytime, _level.weather);
             }
-            _cam.farClipPlane = 2200f;
+            else
+            {
+                switch (_level.daytime)
+                {
+                    case Daytime.Midday: MiddaySky.Apply(_cam, _level.weather); break;
+                    case Daytime.Evening: EveningSky.Apply(_cam, _level.weather); break;
+                    case Daytime.Night: NightSky.Apply(_cam, _level.weather); break;
+                    default: MorningSky.Apply(_cam, _level.weather); break;
+                }
+            }
+            _cam.farClipPlane = 2600f;
 
             _halfViewHeight = CameraDistance * Mathf.Tan(_cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
             _halfViewWidth = _halfViewHeight * _cam.aspect;
 
             PositionCamera(instant: true);
 
-            if (_level.clouds != null)
+            if (_level.clouds == null) return;
+
+            if (Coast)
+                CloudSystem.Begin(_cam, CoastSky.CloudColor(_level.daytime),
+                    CoastSky.CloudGlow(_level.daytime), _level.clouds, PlayPlaneZ);
+            else
                 CloudSystem.Begin(_cam, _level.daytime, _level.weather, _level.clouds, PlayPlaneZ);
         }
 
@@ -130,9 +159,18 @@ namespace MetalRaptors
             if (MenuInput.ReadCancel()) GameMenu.Open(GameMenuKind.Pause, Subtitle, _hud);
         }
 
+        string MapName => TerrainNames.For(_level.terrain);
+
         string Subtitle => CustomBattle.Requested
             ? $"{CustomBattle.Map.Name} | {DaytimeNames.For(_level.daytime)}"
-            : $"level {levelNumber} | {TerrainNames.Verdun}";
+            : $"level {_levelNumber} | {MapName}";
+
+        string HudTitle => CustomBattle.Requested
+            ? $"CUSTOM BATTLE — {MapName.ToUpperInvariant()}"
+            : $"CAMPAIGN — LEVEL {_levelNumber}";
+
+        string HudHint => "A / D to steer  •  F to fire  •  no turning back  •  "
+            + "don't hit the ground";
 
         void LateUpdate()
         {
@@ -148,6 +186,9 @@ namespace MetalRaptors
             if (_terrain != null) _terrain.UpdateStreaming(_camBasePos.x);
             if (_ceilingBar != null)
                 _ceilingBar.position = new Vector3(_camBasePos.x, WorldTop, PlayPlaneZ);
+
+            if (!_gameOver && _sea != null && PlayPlaneZ >= SeaSurface.NearEdge
+                && _cubeTr.position.y <= SeaSurface.Level) Ditch();
 
             UpdateHud();
             CheckWaves();
@@ -193,6 +234,21 @@ namespace MetalRaptors
             }
         }
 
+        void Ditch()
+        {
+            _gameOver = true;
+
+            Vector3 pos = _cubeTr.position;
+            WaterSplash.Spawn(new Vector3(pos.x, SeaSurface.Level, pos.z), DitchSplashSize,
+                _cam != null ? _cam.transform.position : pos);
+
+            _cube.Sink(SinkSpeed, SinkDriftKeep);
+            if (_shooter != null) _shooter.Stop();
+            if (_sound != null) _sound.EnterGameOver();
+
+            StartCoroutine(ShowFailScreenAfter(SinkDuration));
+        }
+
         void OnShotDown()
         {
             if (_shooter != null) _shooter.Stop();
@@ -229,11 +285,10 @@ namespace MetalRaptors
             var canvas = UIFactory.CreateCanvas("Campaign HUD");
             _hud = canvas.gameObject;
 
-            UIFactory.CreateText(canvas.transform, $"CAMPAIGN — LEVEL {levelNumber}", 52,
+            UIFactory.CreateText(canvas.transform, HudTitle, 52,
                 new Vector2(0, 480), new Vector2(1000, 90), TextAnchor.MiddleCenter, FontStyle.Bold);
 
-            UIFactory.CreateText(canvas.transform,
-                "A / D to steer  •  F to fire  •  no turning back  •  don't hit the ground", 28,
+            UIFactory.CreateText(canvas.transform, HudHint, 28,
                 new Vector2(0, -500), new Vector2(1600, 50));
 
             _healthBar = new HealthBar(canvas.transform, new Vector2(-660f, 480f));

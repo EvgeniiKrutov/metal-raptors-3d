@@ -27,6 +27,7 @@ namespace MetalRaptors
     {
         FlatSlab,
         Verdun,
+        Flanders,
     }
 
     public class TerrainPart
@@ -39,10 +40,19 @@ namespace MetalRaptors
     public static class TerrainNames
     {
         public const string Verdun = "verdun";
+        public const string Flanders = "flanders";
+        public const string FlandersFull = "flanders coast";
         public const string FlatSlab = "flat slab";
 
-        public static string For(TerrainKind kind) =>
-            kind == TerrainKind.Verdun ? Verdun : FlatSlab;
+        public static string For(TerrainKind kind)
+        {
+            switch (kind)
+            {
+                case TerrainKind.Verdun: return Verdun;
+                case TerrainKind.Flanders: return Flanders;
+                default: return FlatSlab;
+            }
+        }
     }
 
     public class EnemyGroup

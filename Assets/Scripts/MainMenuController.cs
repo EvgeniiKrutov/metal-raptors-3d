@@ -11,6 +11,7 @@ namespace MetalRaptors
         MenuPanel _main;
         MenuPanel _challenges;
         MenuPanel _eraPanel;
+        MenuPanel _levelsPanel;
         MenuPanel _customPanel;
         MenuCardRow _eras;
 
@@ -125,11 +126,30 @@ namespace MetalRaptors
 
             _eraPanel = new MenuPanel(page, "Era Panel", MenuTheme.ListTop);
             _eraPanel.AddNav("start", StartCampaign);
-            _eraPanel.AddNav("level select", null, interactable: false);
+            _eraPanel.AddNav("level select", ShowLevels);
 
             _eraPanel.AddGap(MenuTheme.SectionGap);
             _eraPanel.AddNav("back", () => ShowHome(_main));
+
+            _levelsPanel = BuildLevelsPanel(page);
             return page.gameObject;
+        }
+
+        MenuPanel BuildLevelsPanel(Transform page)
+        {
+            var panel = new MenuPanel(page, "Levels Panel", MenuTheme.ListTop);
+            panel.AddCaption("level select");
+
+            foreach (CampaignLevelEntry level in CampaignLevelList.All)
+            {
+                int number = level.Number;
+                MenuItemView item = panel.AddNav(level.Label, () => StartCampaignLevel(number));
+                panel.AddTag(item, level.MapName);
+            }
+
+            panel.AddGap(MenuTheme.SectionGap);
+            panel.AddNav("back", ShowEraPanel);
+            return panel;
         }
 
         GameObject BuildCustomPage(Transform parent)
@@ -174,9 +194,12 @@ namespace MetalRaptors
             SceneManager.LoadScene(SceneNames.CampaignLevel1);
         }
 
-        static void StartCampaign()
+        static void StartCampaign() => StartCampaignLevel(CampaignRun.FirstLevel);
+
+        static void StartCampaignLevel(int number)
         {
             CustomBattle.Clear();
+            CampaignRun.Request(number);
             SceneManager.LoadScene(SceneNames.CampaignLevel1);
         }
 
@@ -207,8 +230,21 @@ namespace MetalRaptors
         {
             SetScreen(MenuScreen.Era);
             _eraTitle.text = CareerEras.All[index].Title;
+            ShowEraPanel();
+        }
+
+        void ShowEraPanel()
+        {
+            _levelsPanel.SetActive(false);
             _eraPanel.SetActive(true);
             _group = _eraPanel;
+        }
+
+        void ShowLevels()
+        {
+            _eraPanel.SetActive(false);
+            _levelsPanel.SetActive(true);
+            _group = _levelsPanel;
         }
 
         void ShowCustom()
@@ -230,6 +266,11 @@ namespace MetalRaptors
 
         void Cancel()
         {
+            if (_screen == MenuScreen.Era && _group == _levelsPanel)
+            {
+                ShowEraPanel();
+                return;
+            }
             if (_screen != MenuScreen.Home || _homePanel != _main) ShowHome(_main);
         }
     }

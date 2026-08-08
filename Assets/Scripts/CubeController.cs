@@ -96,6 +96,19 @@ namespace MetalRaptors
             }
         }
 
+        public void Sink(float speed, float driftKeep)
+        {
+            _active = false;
+            _falling = false;
+            if (_smoke != null) _smoke.Clear();
+            if (_rb == null) return;
+
+            _rb.useGravity = false;
+            Vector3 v = _rb.linearVelocity;
+            _rb.linearVelocity = new Vector3(v.x * driftKeep, -speed, 0f);
+            _rb.angularVelocity = Vector3.zero;
+        }
+
         void FixedUpdate()
         {
             if (!_active || _config == null) return;
