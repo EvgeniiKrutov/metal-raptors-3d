@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace MetalRaptors
@@ -86,5 +87,22 @@ namespace MetalRaptors
         };
 
         public static readonly PlaneModelConfig[] All = { Sopwith, Fokker };
+
+        public static PlaneModelConfig ById(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return null;
+
+            foreach (PlaneModelConfig plane in All)
+            {
+                if (string.Equals(plane.resourceName, id, StringComparison.OrdinalIgnoreCase))
+                    return plane;
+
+                int cut = plane.resourceName.IndexOf('_');
+                if (cut > 0 && string.Equals(plane.resourceName.Substring(0, cut), id,
+                        StringComparison.OrdinalIgnoreCase))
+                    return plane;
+            }
+            return null;
+        }
     }
 }

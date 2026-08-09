@@ -1,0 +1,93 @@
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace MetalRaptors
+{
+    public class CampaignEnemies
+    {
+        const float SpawnAhead = 110f;
+        const float SpawnStagger = 90f;
+        const float WindowMargin = 70f;
+        const float EdgeMargin = 90f;
+        const float CeilingPad = 120f;
+
+        readonly List<EnemyController> _live = new List<EnemyController>();
+        readonly EnemyConfig _config;
+        readonly Rigidbody _player;
+        readonly float _groundY;
+        readonly float _worldTop;
+
+        float _minX;
+        float _maxX;
+
+        public int AliveCount => _live.Count;
+
+        public IReadOnlyList<EnemyController> Live => _live;
+
+        public CampaignEnemies(Rigidbody player, float groundY, float worldTop)
+        {
+            _player = player;
+            _groundY = groundY;
+            _worldTop = worldTop;
+
+            _config = Resources.Load<EnemyConfig>("EnemyConfig");
+            if (_config == null) _config = ScriptableObject.CreateInstance<EnemyConfig>();
+        }
+
+        public void SetWindow(float camX, float halfViewWidth)
+        {
+            _minX = camX - halfViewWidth + WindowMargin;
+            _maxX = camX + halfViewWidth - WindowMargin;
+
+            for (int i = _live.Count - 1; i >= 0; i--)
+            {
+                if (_live[i] == null)
+                {
+                    _live.RemoveAt(i);
+                    continue;
+                }
+                _live[i].SetBounds(_minX, _maxX);
+            }
+        }
+
+        public void Spawn(EnemyGroup[] groups, float camX, float halfViewWidth)
+        {
+            if (groups == null) return;
+
+            SetWindow(camX, halfViewWidth);
+
+            int index = 0;
+            foreach (EnemyGroup group in groups)
+                for (int i = 0; i < group.count; i++, index++)
+                {
+                    var go = new GameObject("Enemy");
+                    go.transform.position = SpawnPoint(camX, halfViewWidth, index);
+                    PlaneFactory.BuildPlaneModel(go.transform, group.plane, mirrored: true);
+
+                    var enemy = go.AddComponent<EnemyController>();
+                    enemy.Initialize(_config, _player, _minX, _maxX, _groundY,
+                        _worldTop - group.plane.onScreenSize / 2f, EdgeMargin);
+                    enemy.OnDestroyed += OnDestroyed;
+                    _live.Add(enemy);
+                }
+        }
+
+        public void StandDown()
+        {
+            foreach (EnemyController enemy in _live)
+                if (enemy != null) enemy.StandDown();
+        }
+
+        Vector3 SpawnPoint(float camX, float halfViewWidth, int index)
+        {
+            float minY = _groundY + _config.safeAltitudeMargin;
+            float maxY = Mathf.Max(minY, _worldTop - CeilingPad);
+            float z = _player != null ? _player.position.z : 0f;
+
+            return new Vector3(camX + halfViewWidth + SpawnAhead + index * SpawnStagger,
+                Random.Range(minY, maxY), z);
+        }
+
+        void OnDestroyed(EnemyController enemy) => _live.Remove(enemy);
+    }
+}

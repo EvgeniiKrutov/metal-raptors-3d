@@ -2,12 +2,6 @@ using UnityEngine;
 
 namespace MetalRaptors
 {
-    public class EnemyWave
-    {
-        public float distance;
-        public EnemyGroup[] groups;
-    }
-
     public class CampaignDefinition
     {
         public int seed;
@@ -15,7 +9,7 @@ namespace MetalRaptors
         public Daytime daytime;
         public Weather weather;
         public CloudsPart clouds;
-        public EnemyWave[] waves;
+        public string script;
     }
 
     public static class CampaignLevels
@@ -27,7 +21,7 @@ namespace MetalRaptors
             daytime = Daytime.Morning,
             weather = Weather.Calm,
             clouds = new CloudsPart(),
-            waves = new EnemyWave[0],
+            script = "level1",
         };
 
         public static CampaignDefinition Level2 => new CampaignDefinition
@@ -37,7 +31,6 @@ namespace MetalRaptors
             daytime = Daytime.Morning,
             weather = Weather.Calm,
             clouds = new CloudsPart(),
-            waves = new EnemyWave[0],
         };
 
         public static CampaignDefinition Custom(BattleMap map, Daytime daytime) => new CampaignDefinition
@@ -47,7 +40,6 @@ namespace MetalRaptors
             daytime = daytime,
             weather = Weather.Calm,
             clouds = new CloudsPart(),
-            waves = new EnemyWave[0],
         };
 
         public static CampaignDefinition ForNumber(int number)

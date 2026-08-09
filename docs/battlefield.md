@@ -295,7 +295,7 @@ The camera shake is not the prop system's own doing: a successful
 `CubeController.Scrape()` raises `OnScraped`, and both level controllers set
 `_camShake = 1f` from it (7-unit jitter decaying over 0.3 s). That is the same
 shake `LevelController` already ran for plane-on-plane scrapes — it used to be
-driven from `CheckPlaneScrapes` by hand, and now comes from the event for both
+driven from the scrape sweep by hand, and now comes from the event for both
 causes, so a tree, a house or an enemy all shake the view identically.
 `CampaignLevelController` had no camera shake at all before and now carries the
 same state and decay.

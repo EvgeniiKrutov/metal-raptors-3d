@@ -75,26 +75,38 @@ down.
 
 ## Collision & damage (plane-to-plane scrapes)
 
-Planes never physically collide with each other. `LevelController` (and
-`CampaignLevelController`) disable self-collision on the shared plane physics
-layer, because two script-driven rigidbodies that overwrite their own
-velocity every step can never settle a real contact — they'd jam and judder.
-This replaces an earlier per-pair `Physics.IgnoreCollision` that could be
-defeated by the timing of runtime-created colliders, which was letting
-contacts through and ram-exploding both planes.
+Planes never physically collide with each other. Both level controllers call
+`PlaneScrapes.DisablePlanePlaneCollisions` on startup to disable self-collision
+on the shared plane physics layer, because two script-driven rigidbodies that
+overwrite their own velocity every step can never settle a real contact —
+they'd jam and judder. This replaces an earlier per-pair
+`Physics.IgnoreCollision` that could be defeated by the timing of
+runtime-created colliders, which was letting contacts through and ram-exploding
+both planes.
 
-In its place, `LevelController.CheckPlaneScrapes` runs every physics step: any
-two planes whose small fuselage hitboxes overlap (radius far smaller than the
-~60 m model span, so only a real fuselage overlap counts — a wingtip clipping
-a tail slips past) take a scrape via `CubeController.Scrape` /
+Both halves — the layer opt-out and the scrape sweep below — live in the shared
+static `PlaneScrapes` helper precisely because they are one mechanism: a
+controller that sets up one without the other falls back to real physics
+contacts, and `EnemyController.OnCollisionEnter` then ram-explodes every
+fighter the player touches. `CampaignLevelController` had exactly that gap
+(neither half wired up) while `LevelController` carried a private copy of both,
+so campaign and custom battles ram-killed enemies on contact while the player
+flew on unscathed — the player's own handler already skipped `EnemyController`
+contacts. Note the layer opt-out is global Unity state that survives scene
+loads, so playing a skirmish first used to mask the campaign bug.
+
+`PlaneScrapes.Check` runs every physics step from each controller's
+`FixedUpdate`: any two planes whose small fuselage hitboxes overlap (radius far
+smaller than the ~60 m model span, so only a real fuselage overlap counts — a
+wingtip clipping a tail slips past) take a scrape via `CubeController.Scrape` /
 `EnemyController.Scrape`, which shaves off a fixed amount of health on both
-planes and shivers the model, gated by a per-plane cooldown so one encounter
-(which can span several frames of overlap) is a single hit. A scrape the
-player is part of also kicks the camera with a short, decaying jitter applied
-on top of the normal follow smoothing (kept separate so the jitter can't feed
-back into the follow itself). Ground contact is a separate path
-(`OnCollisionEnter`): bullets never reach it (they already apply damage via
-`TakeDamage`), and plane-plane contact normally can't reach it either since
+planes, shivers the model and throws sparks, gated by a per-plane cooldown so
+one encounter (which can span several frames of overlap) is a single hit. A
+scrape the player is part of also kicks the camera with a short, decaying
+jitter applied on top of the normal follow smoothing (kept separate so the
+jitter can't feed back into the follow itself). Ground contact is a separate
+path (`OnCollisionEnter`): bullets never reach it (they already apply damage
+via `TakeDamage`), and plane-plane contact normally can't reach it either since
 collisions are disabled — but the handler swallows a stray contact
 defensively so it can never fail the level on its own.
 

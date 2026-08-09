@@ -31,7 +31,8 @@ and what extra meshes ride along with it).
 
 ## Rules of the level
 
-- The plane flies left to right forever; there is no win condition yet. Touching the ground
+- The plane flies left to right; a level ends when its script says so (docs/campaign-scripts.md),
+  and a level with no script flies forever. Touching the ground
   fails the run and the overlay shows the distance flown (RETRY / BACK TO MENU). Scoring is a
   separate future feature — nothing is persisted. On Flanders Coast, touching the *water*
   fails the run too, but by sinking rather than exploding (docs/flanders-coast.md).
@@ -98,13 +99,14 @@ way. Each frame the streamer drops chunks behind `camX − (fogEnd + 0.5·chunk)
 builds missing ones up to `camX + (fogEnd + 1.5·chunk)`. Removal destroys the chunk's
 `TerrainData` and wall mesh explicitly — they are assets, not scene objects.
 
-## Enemy configuration (not yet spawned)
+## Level scripts, dialogue and enemy waves
 
-`CampaignDefinition.waves` is a list of `EnemyWave { distance, EnemyGroup[] }`: at N metres
-flown, those formations become due. `CampaignLevelController.CheckWaves` already consumes the
-list in order (logging each due wave), but **spawning is intentionally not implemented** —
-the existing `EnemyController` AI assumes fixed world bounds and needs adapting to a moving
-window before enemies can join the campaign. Level 1 ships with an empty wave list.
+`CampaignDefinition.script` names a text script that drives the level's pacing — dialogue at
+the bottom of the screen, timed pauses, enemy waves, and the win condition. Level 1 runs
+`level1`; level 2 and custom battles have none and stay endless. See
+docs/campaign-scripts.md for the file format, the dialogue bar, and how the enemy AI was
+adapted to a forward-scrolling world, and docs/campaign-ww1-scenario.md for the WW1 era's
+plot, cast, loading-screen text and every radio line (story only — none of it is wired up).
 
 ## Shared pieces extracted in this change
 

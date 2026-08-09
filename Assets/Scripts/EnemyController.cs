@@ -109,6 +109,12 @@ namespace MetalRaptors
 
         public void StandDown() => _standDown = true;
 
+        public void SetBounds(float minX, float maxX)
+        {
+            _minX = minX;
+            _maxX = maxX;
+        }
+
         void FixedUpdate()
         {
             if (_dead || _config == null) return;
@@ -407,7 +413,11 @@ namespace MetalRaptors
             _lastCollisionTime = Time.time;
 
             ApplyDamage(CollisionDamage);
-            if (!_dead && _shake != null) _shake.Play();
+            if (!_dead)
+            {
+                if (_shake != null) _shake.Play();
+                Sparks.Spawn(transform.position, _bodyRadius > 0f ? _bodyRadius * 2f : 30f);
+            }
             return true;
         }
 

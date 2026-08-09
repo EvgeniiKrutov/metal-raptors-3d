@@ -18,7 +18,8 @@ namespace MetalRaptors
         bool _closable;
         int _openedFrame;
 
-        public static GameMenu Open(GameMenuKind kind, string subtitle, GameObject hud, string nextScene = null)
+        public static GameMenu Open(GameMenuKind kind, string subtitle, GameObject hud,
+            string nextScene = null, Action beforeNext = null)
         {
             if (Current != null) return Current;
 
@@ -27,11 +28,12 @@ namespace MetalRaptors
 
             var menu = canvas.gameObject.AddComponent<GameMenu>();
             Current = menu;
-            menu.Build(canvas, kind, subtitle, hud, nextScene);
+            menu.Build(canvas, kind, subtitle, hud, nextScene, beforeNext);
             return menu;
         }
 
-        void Build(Canvas canvas, GameMenuKind kind, string subtitle, GameObject hud, string nextScene)
+        void Build(Canvas canvas, GameMenuKind kind, string subtitle, GameObject hud, string nextScene,
+            Action beforeNext)
         {
             _hud = hud;
             _closable = kind == GameMenuKind.Pause;
@@ -58,7 +60,9 @@ namespace MetalRaptors
             if (kind == GameMenuKind.Completed)
             {
                 bool hasNext = !string.IsNullOrEmpty(nextScene);
-                _panel.AddNav("next level", hasNext ? (Action)(() => Load(nextScene)) : null, hasNext);
+                _panel.AddNav("next level", hasNext
+                    ? (Action)(() => { beforeNext?.Invoke(); Load(nextScene); })
+                    : null, hasNext);
             }
 
             _panel.AddNav("options", null, interactable: false);

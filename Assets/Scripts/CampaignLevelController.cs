@@ -6,7 +6,7 @@ using UnityEngine.UI;
 
 namespace MetalRaptors
 {
-    public class CampaignLevelController : MonoBehaviour
+    public class CampaignLevelController : MonoBehaviour, ICampaignScriptHost
     {
         const float WorldTop = 650f;
         const float CubeHalf = 15f;
@@ -38,7 +38,12 @@ namespace MetalRaptors
         HealthBar _healthBar;
         SearchlightIndicator _lightIndicator;
         Text _distanceText;
+        Text _hintText;
         GameObject _hud;
+
+        CampaignEnemies _enemies;
+        CampaignScriptRunner _runner;
+        DialogueBar _dialogue;
 
         float _halfViewHeight;
         float _halfViewWidth;
@@ -46,9 +51,12 @@ namespace MetalRaptors
         float _camShake;
         bool _gameOver;
         float _furthestX = StartX;
-        int _nextWave;
 
         float Distance => Mathf.Max(0f, _furthestX - StartX);
+
+        public bool IsOver => _gameOver;
+
+        public int EnemiesAlive => _enemies != null ? _enemies.AliveCount : 0;
 
         bool Coast => _level.terrain == TerrainKind.Flanders;
 
@@ -79,9 +87,26 @@ namespace MetalRaptors
                 Battlefield.Begin(_cam, _halfViewWidth, _level.seed, _terrain.InCrater);
             }
 
+            PlaneScrapes.DisablePlanePlaneCollisions();
             BuildHud();
             _sound = SoundSystem.Begin(_cube, null);
+            BeginScript();
         }
+
+        void BeginScript()
+        {
+            if (CustomBattle.Requested || string.IsNullOrEmpty(_level.script)) return;
+
+            CampaignScript script = CampaignScript.Load(_level.script);
+            if (script == null) return;
+
+            _enemies = new CampaignEnemies(_cube.GetComponent<Rigidbody>(), AiGroundY, WorldTop);
+            _dialogue = new DialogueBar(_hud.transform,
+                _hintText != null ? _hintText.gameObject : null);
+            _runner = CampaignScriptRunner.Begin(gameObject, script, this, _dialogue);
+        }
+
+        float AiGroundY => Coast ? SeaSurface.Level : ProceduralTerrain.MaxHeight;
 
         void ConfigureShadows()
         {
@@ -159,6 +184,12 @@ namespace MetalRaptors
             if (MenuInput.ReadCancel()) GameMenu.Open(GameMenuKind.Pause, Subtitle, _hud);
         }
 
+        void FixedUpdate()
+        {
+            if (_gameOver) return;
+            PlaneScrapes.Check(_cube, _cubeTr, _enemies != null ? _enemies.Live : null);
+        }
+
         string MapName => TerrainNames.For(_level.terrain);
 
         string Subtitle => CustomBattle.Requested
@@ -191,7 +222,7 @@ namespace MetalRaptors
                 && _cubeTr.position.y <= SeaSurface.Level) Ditch();
 
             UpdateHud();
-            CheckWaves();
+            if (_enemies != null) _enemies.SetWindow(_camBasePos.x, _halfViewWidth);
         }
 
         void PositionCamera(bool instant)
@@ -223,20 +254,39 @@ namespace MetalRaptors
             _cam.transform.position = pos;
         }
 
-        void CheckWaves()
+        public void SpawnWave(EnemyGroup[] groups)
         {
-            if (_gameOver || _level.waves == null) return;
-            while (_nextWave < _level.waves.Length && Distance >= _level.waves[_nextWave].distance)
-            {
-                Debug.Log($"CampaignLevelController: wave at {_level.waves[_nextWave].distance} m " +
-                          "due — enemy spawning not implemented yet.");
-                _nextWave++;
-            }
+            if (_gameOver || _enemies == null) return;
+            _enemies.Spawn(groups, _camBasePos.x, _halfViewWidth);
+        }
+
+        public void CompleteLevel()
+        {
+            if (_gameOver) return;
+            _gameOver = true;
+
+            _cube.Stop();
+            if (_shooter != null) _shooter.Stop();
+            if (_enemies != null) _enemies.StandDown();
+            if (_dialogue != null) _dialogue.Hide();
+            if (_sound != null) _sound.EnterGameOver();
+
+            bool hasNext = _levelNumber < CampaignRun.LastLevel;
+            GameMenu.Open(GameMenuKind.Completed, Subtitle, _hud,
+                hasNext ? SceneNames.CampaignLevel1 : null,
+                hasNext ? (System.Action)(() => CampaignRun.Request(_levelNumber + 1)) : null);
+        }
+
+        void StopScript()
+        {
+            if (_runner != null) _runner.Stop();
+            if (_enemies != null) _enemies.StandDown();
         }
 
         void Ditch()
         {
             _gameOver = true;
+            StopScript();
 
             Vector3 pos = _cubeTr.position;
             WaterSplash.Spawn(new Vector3(pos.x, SeaSurface.Level, pos.z), DitchSplashSize,
@@ -251,6 +301,7 @@ namespace MetalRaptors
 
         void OnShotDown()
         {
+            StopScript();
             if (_shooter != null) _shooter.Stop();
             if (_sound != null) _sound.EnterGameOver();
         }
@@ -266,6 +317,7 @@ namespace MetalRaptors
         {
             if (_gameOver) return;
             _gameOver = true;
+            StopScript();
             _cube.Stop();
             if (_shooter != null) _shooter.Stop();
             if (_sound != null) _sound.EnterGameOver();
@@ -288,7 +340,7 @@ namespace MetalRaptors
             UIFactory.CreateText(canvas.transform, HudTitle, 52,
                 new Vector2(0, 480), new Vector2(1000, 90), TextAnchor.MiddleCenter, FontStyle.Bold);
 
-            UIFactory.CreateText(canvas.transform, HudHint, 28,
+            _hintText = UIFactory.CreateText(canvas.transform, HudHint, 28,
                 new Vector2(0, -500), new Vector2(1600, 50));
 
             _healthBar = new HealthBar(canvas.transform, new Vector2(-660f, 480f));

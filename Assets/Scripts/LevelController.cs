@@ -30,8 +30,6 @@ namespace MetalRaptors
         const float CubeScale = 30f;
         const float CubeHalf = CubeScale / 2f;
 
-        const float PlaneHitboxRadius = 15f;
-
         const float CamShakeMagnitude = 7f;
         const float CamShakeDuration = 0.3f;
         const float CameraDistance = 420f;
@@ -59,7 +57,6 @@ namespace MetalRaptors
         float _camShake;
         Vector3 _camBasePos;
         System.Func<float, float, bool> _inCrater;
-        readonly List<EnemyController> _scrapeScratch = new List<EnemyController>();
 
         void Start()
         {
@@ -75,7 +72,7 @@ namespace MetalRaptors
             SpawnEnemies();
             if (VerdunLand)
                 Battlefield.Begin(_cam, _halfViewWidth, _level.terrain.seed, MinX, MaxX, _inCrater);
-            DisablePlanePlaneCollisions();
+            PlaneScrapes.DisablePlanePlaneCollisions();
             BuildHud();
             _sound = SoundSystem.Begin(_cube, _enemies);
         }
@@ -238,7 +235,7 @@ namespace MetalRaptors
         void FixedUpdate()
         {
             if (_gameOver) return;
-            CheckPlaneScrapes();
+            PlaneScrapes.Check(_cube, _cubeTr, _enemies);
         }
 
         void LateUpdate()
@@ -246,47 +243,6 @@ namespace MetalRaptors
             if (_cam != null && _cubeTr != null) PositionCamera(instant: false);
             if (_camShake > 0f) _camShake = Mathf.Max(0f, _camShake - Time.deltaTime / CamShakeDuration);
             UpdateHealthHud();
-        }
-
-        void DisablePlanePlaneCollisions()
-        {
-            Physics.IgnoreLayerCollision(PlaneFactory.PlaneLayer, PlaneFactory.PlaneLayer, true);
-        }
-
-        void CheckPlaneScrapes()
-        {
-            float reach = PlaneHitboxRadius * 2f;
-            float reachSq = reach * reach;
-
-            _scrapeScratch.Clear();
-            foreach (var enemy in _enemies)
-                if (enemy != null) _scrapeScratch.Add(enemy);
-
-            if (_cube != null && _cube.CurrentHealth > 0f && _cubeTr != null)
-            {
-                Vector2 playerPos = _cubeTr.position;
-                foreach (var enemy in _scrapeScratch)
-                {
-                    if (enemy == null) continue;
-                    if (((Vector2)enemy.transform.position - playerPos).sqrMagnitude > reachSq) continue;
-
-                    _cube.Scrape();
-                    enemy.Scrape();
-                }
-            }
-
-            for (int i = 0; i < _scrapeScratch.Count; i++)
-                for (int j = i + 1; j < _scrapeScratch.Count; j++)
-                {
-                    var a = _scrapeScratch[i];
-                    var b = _scrapeScratch[j];
-                    if (a == null || b == null) continue;
-                    if (((Vector2)a.transform.position - (Vector2)b.transform.position).sqrMagnitude > reachSq)
-                        continue;
-
-                    a.Scrape();
-                    b.Scrape();
-                }
         }
 
         void PositionCamera(bool instant)
