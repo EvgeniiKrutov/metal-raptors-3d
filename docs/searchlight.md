@@ -95,7 +95,8 @@ ground.
 ## HUD
 
 `SearchlightIndicator` (`Assets/Scripts/SearchlightIndicator.cs`) — a 150×30 plate reading
-`LIGHT  T` under the health bar at `(-785, 435)`, dim grey `(0.55, 0.55, 0.62)` when off and warm
+`LIGHT  T` under the health bar at `(-719, 425)`, to the right of the bomb square that now holds
+the left end of that row (docs/bombs.md), dim grey `(0.55, 0.55, 0.62)` when off and warm
 `(1, 0.85, 0.45)` when on. Refreshed from `PlaneSearchlight.IsOn` in each controller's HUD
 update. The bottom control-hint line is deliberately left alone.
 

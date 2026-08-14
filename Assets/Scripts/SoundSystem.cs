@@ -20,6 +20,11 @@ namespace MetalRaptors
         const float TurnRateThreshold = 0.4f;
         const float ClimbAngleDeg = 30f;
 
+        const float BoostVolume = 0.3f;
+        const float BoostPitch = 1.35f;
+        const float BoostDuck = 0.35f;
+        const float BoostFadeSeconds = 0.18f;
+
         const float EnemyFadeStartDistance = 320f;
         const float EnemyFadeEndDistance = 900f;
         const int MaxAudibleEnemies = 3;
@@ -119,10 +124,13 @@ namespace MetalRaptors
             readonly CubeController _plane;
             readonly AudioSource _idle;
             readonly AudioSource _throttle;
+            readonly AudioSource _boost;
 
             Ramp _idleLevel;
             Ramp _throttleLevel;
+            Ramp _boostLevel;
             bool _revving;
+            bool _boosting;
             float _grace;
 
             public PlayerEngineVoice(GameObject host, CubeController plane)
@@ -130,12 +138,23 @@ namespace MetalRaptors
                 _plane = plane;
                 _idle = CreateLoop(host, "Sounds/engine_idle");
                 _throttle = CreateLoop(host, RandomThrottleClip());
+                _boost = CreateLoop(host, ThrottleClipPaths[0]);
+                if (_boost != null) _boost.pitch = BoostPitch;
                 _idleLevel.Jump(1f);
                 _throttleLevel.Jump(0f);
+                _boostLevel.Jump(0f);
             }
 
             protected override void Advance(float dt)
             {
+                bool boosting = _plane != null && _plane.Boosting;
+                if (boosting != _boosting)
+                {
+                    _boosting = boosting;
+                    _boostLevel.Set(boosting ? 1f : 0f, BoostFadeSeconds);
+                }
+                _boostLevel.Tick(dt);
+
                 if (IsManeuvering())
                 {
                     _grace = ThrottleGraceSeconds;
@@ -179,14 +198,19 @@ namespace MetalRaptors
             protected override void Apply()
             {
                 float bed = Envelope.Value * Attenuation * PauseGain;
-                if (_idle != null) _idle.volume = IdleVolume * bed * _idleLevel.Value;
-                if (_throttle != null) _throttle.volume = ThrottleVolume * bed * _throttleLevel.Value;
+                float duck = Mathf.Lerp(1f, BoostDuck, _boostLevel.Value);
+
+                if (_idle != null) _idle.volume = IdleVolume * bed * _idleLevel.Value * duck;
+                if (_throttle != null)
+                    _throttle.volume = ThrottleVolume * bed * _throttleLevel.Value * duck;
+                if (_boost != null) _boost.volume = BoostVolume * bed * _boostLevel.Value;
             }
 
             public override void Dispose()
             {
                 if (_idle != null) UnityEngine.Object.Destroy(_idle);
                 if (_throttle != null) UnityEngine.Object.Destroy(_throttle);
+                if (_boost != null) UnityEngine.Object.Destroy(_boost);
             }
         }
 
@@ -238,28 +262,36 @@ namespace MetalRaptors
         AudioSource _wind;
         AudioSource _stutter;
 
+        bool _armed;
         bool _gameOver;
         bool _paused;
         bool _windStopped;
         Ramp _pauseGain;
 
-        public static SoundSystem Begin(CubeController player, IReadOnlyList<EnemyController> enemies)
+        public static SoundSystem Begin(CubeController player, IReadOnlyList<EnemyController> enemies,
+            bool silent = false)
         {
             var go = new GameObject("SoundSystem");
             var system = go.AddComponent<SoundSystem>();
-            system.Init(player, enemies);
+            system._player = player;
+            system._playerTr = player != null ? player.transform : null;
+            system._enemies = enemies;
+            system._pauseGain.Jump(1f);
+
+            if (!silent) system.Arm();
             return system;
         }
 
-        void Init(CubeController player, IReadOnlyList<EnemyController> enemies)
+        public void Arm()
         {
-            _player = player;
-            _playerTr = player != null ? player.transform : null;
-            _enemies = enemies;
+            if (_armed) return;
+            _armed = true;
+            Init();
+        }
 
-            _pauseGain.Jump(1f);
-
-            if (player != null) _playerVoice = new PlayerEngineVoice(gameObject, player);
+        void Init()
+        {
+            if (_player != null) _playerVoice = new PlayerEngineVoice(gameObject, _player);
 
             _wind = gameObject.AddComponent<AudioSource>();
             _wind.clip = Resources.Load<AudioClip>("Sounds/ambient_wind");
@@ -307,6 +339,8 @@ namespace MetalRaptors
 
         void Update()
         {
+            if (!_armed) return;
+
             float dt = Time.unscaledDeltaTime;
 
             if (_gameOver && GameMenu.IsOpen) StopWind();

@@ -19,11 +19,12 @@ namespace MetalRaptors
         public float bulletSpeed = 400f;
 
         [Header("Flight (fighter.json flight)")]
-        [Tooltip("Constant flight speed in m/s (sibling 350 px/s, player-relative -> 130).")]
-        public float flySpeed = 130f;
+        [Tooltip("Constant flight speed in m/s. Below the player's 180 cruise so a player " +
+                 "who commits to running away can still break contact.")]
+        public float flySpeed = 150f;
 
-        [Tooltip("Maximum turn rate in degrees/second (sibling 150, player-relative -> 100).")]
-        public float rotationSpeed = 100f;
+        [Tooltip("Maximum turn rate in degrees/second.")]
+        public float rotationSpeed = 105f;
 
         [Tooltip("Mass; lighter than the player so turns bite faster (sibling: 1.5).")]
         public float mass = 1.5f;
@@ -49,15 +50,16 @@ namespace MetalRaptors
         public float safeAltitudeMargin = 260f;
 
         [Header("Attack / fly-away cycle (ai.attack, ai.fly)")]
-        [Tooltip("Seconds spent chasing and shooting before breaking away (sibling: 3 s).")]
-        public float attackDuration = 3f;
+        [Tooltip("Seconds spent chasing and shooting before breaking away.")]
+        public float attackDuration = 3.5f;
 
-        [Tooltip("Seconds spent flying away before attacking again (sibling: 2 s).")]
-        public float flyDuration = 2f;
+        [Tooltip("Seconds spent flying away before attacking again.")]
+        public float flyDuration = 1.6f;
 
-        [Tooltip("Break-away climb altitude as a fraction of the world height (sibling " +
-                 "targetYFactor 0.2 from the top = 0.8 of the height from the ground).")]
-        public float flyAltitudeFactor = 0.8f;
+        [Tooltip("Metres above the player the break-away aims for. Relative to the player " +
+                 "rather than to the world so the fighter perches just above the fight " +
+                 "instead of climbing out of it.")]
+        public float flyPerchHeight = 90f;
 
         [Tooltip("Horizontal weave amplitude in metres while breaking away (sibling: 120 px).")]
         public float weaveAmplitude = 45f;
@@ -65,15 +67,37 @@ namespace MetalRaptors
         [Tooltip("Weave frequency in Hz while breaking away (sibling: 0.4).")]
         public float weaveHz = 0.4f;
 
-        [Header("Evasion when hit (ai.evasion)")]
-        [Tooltip("Seconds the jitter phase of an evade lasts (sibling: 2 s).")]
-        public float evadeDuration = 2f;
+        [Header("Evasion")]
+        [Tooltip("Seconds one break-and-jink evade lasts.")]
+        public float evadeDuration = 1.3f;
 
-        [Tooltip("Random heading jitter amplitude in degrees while fleeing (sibling: 1.1 rad = 63°).")]
-        public float jitterAmplitude = 63f;
+        [Tooltip("Seconds of attacking that must pass after an evade before the fighter " +
+                 "will break off again. Stops a steady stream of hits from pinning it in " +
+                 "evasion for the whole fight.")]
+        public float evadeCooldown = 3f;
 
-        [Tooltip("How many times per second the jitter heading re-rolls (sibling: 16).")]
-        public float jitterHz = 16f;
+        [Tooltip("How far off the line away from the player the break turn goes, in degrees. " +
+                 "0 would run straight down the attacker's gunsight; ~65° crosses it.")]
+        public float evadeBreakAngle = 65f;
+
+        [Tooltip("Random heading jitter amplitude in degrees while breaking away.")]
+        public float jitterAmplitude = 45f;
+
+        [Tooltip("How many times per second the jitter heading re-rolls.")]
+        public float jitterHz = 9f;
+
+        [Header("Threat reaction (evading player fire)")]
+        [Tooltip("The player has to be inside this many metres to count as a threat.")]
+        public float threatRange = 420f;
+
+        [Tooltip("How close the player's nose has to point at the fighter, in degrees, " +
+                 "for their guns to count as tracking it.")]
+        public float threatCone = 18f;
+
+        [Tooltip("How far behind the fighter the player has to be, in degrees off its nose, " +
+                 "before it breaks. Above 90° only a genuine tail chase provokes an evade — " +
+                 "a head-on merge is fought, not dodged.")]
+        public float threatTailAngle = 95f;
 
         [Header("Body (legacy)")]
         [Tooltip("Unused: the enemy is now the Fokker Dr.1 model, sized to the player's plane. " +

@@ -42,6 +42,8 @@ namespace MetalRaptors
         BattlefieldProps _props;
         System.Func<float, float, bool> _inCrater;
 
+        public static Battlefield Current { get; private set; }
+
         public float HalfViewWidth => _halfViewWidth;
         public float CameraX => _cam != null ? _cam.transform.position.x : 0f;
         public float MinX => _minX;
@@ -93,6 +95,8 @@ namespace MetalRaptors
             field._seed = seed;
             field._inCrater = inCrater;
             field._blastTimer = Random.Range(0f, BlastIntervalMax);
+
+            Current = field;
             return field;
         }
 
@@ -107,6 +111,11 @@ namespace MetalRaptors
         }
 
         public bool InCrater(float x, float z) => _inCrater != null && _inCrater(x, z);
+
+        public void KillPeopleWithin(Vector3 centre, float radius)
+        {
+            if (_people != null) _people.KillWithin(centre, radius);
+        }
 
         public bool SampleGround(float x, float z, out float y)
         {

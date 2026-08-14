@@ -158,6 +158,7 @@ namespace MetalRaptors
 
             var tGo = Terrain.CreateTerrainGameObject(data);
             tGo.name = "Terrain";
+            tGo.layer = ProceduralTerrain.GroundLayer;
             tGo.transform.SetParent(root.transform);
             tGo.transform.position = new Vector3(x0, TerrainY, 0f);
             var terrain = tGo.GetComponent<Terrain>();

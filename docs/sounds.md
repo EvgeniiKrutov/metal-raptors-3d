@@ -12,6 +12,21 @@ destroyed. `LevelController` passes its live enemy list (the same `List` instanc
 it mutates, read every frame); `CampaignLevelController` passes `null` — that
 scene has no enemies yet.
 
+## Arming
+
+`Begin(..., silent: true)` builds the system but creates **no sources at all** and
+skips its whole `Update`; `Arm()` builds them and starts the clocks. This is how a
+campaign level stays silent behind its briefing page: the world, the plane and the
+HUD are all constructed under `Time.timeScale = 0` while the player reads, and
+starting the engine there would have it droning under a static page (the system
+runs on *unscaled* time, so freezing the game would not have muted it). The
+campaign controller passes `silent: HasBriefing` and arms the system from the
+briefing's dismissal callback, at the black frame of the fade
+(docs/level-briefing.md). A custom battle and the standalone Level 1/2 scenes have
+no briefing to dismiss and start armed, as before.
+
+Arming is one-way and idempotent; nothing ever puts the system back to silent.
+
 ## Clips
 
 Copied from `metal-raptors/public/sounds` into `Assets/Resources/Sounds`:
@@ -25,7 +40,8 @@ close enough to the revs layer that the crossfade is not heard as a dip.
 
 ## Player engine
 
-Two looping voices, idle and throttle (revs), crossfaded over 0.7 s in both
+Three looping voices: idle, throttle (revs) and boost. Idle and throttle are
+crossfaded over 0.7 s in both
 directions — longer than the 2D 0.3 s, again to hide the seam. The plane is
 considered to be working the engine when either
 
@@ -36,11 +52,37 @@ considered to be working the engine when either
 Once maneuvering stops, a 0.3 s grace period runs before dropping back to idle,
 so rapid stick work does not chatter between the two loops.
 
+### High revs (boost)
+
+The third voice is the **same `engine_throttle_1` clip at 1.35× pitch**, not a
+separate recording — pitching the loop we already load is what a hard-running
+engine sounds like, and it costs no new asset in a gitignored folder. It fades in
+over 0.18 s whenever `CubeController.Boosting` is true and out again when the R
+boost ends (docs/boost.md), at base volume 0.3.
+
+While it is up, idle and throttle duck to **35%** so the high revs sit on top
+without the engine dropping out from under them. The duck multiplies the shared
+bed, so pause, spawn and retire fades still compose on it, and the idle/revs
+maneuver logic is untouched — boosting into a hard turn still selects the revs
+layer, just quieter.
+
+`Boosting` follows the boost's *target* factor rather than the eased one, so the
+sound lands on the keypress instead of ramping in behind the speed. It also means
+the layer cuts on the frame the boost expires, while the plane is still slowing
+down — which reads as the engine being pulled back, and is the reason the fade
+out exists at all.
+
+An earlier air brake ducked these same layers by `BrakeAmount`; both the brake
+and the duck are gone (docs/flight-model.md).
+
 Deviation from 2D: the crossfade runs both levels simultaneously instead of
 fading the new layer in first and the old one out afterwards, and the throttle
 source keeps looping silently at level 0 instead of being stopped, which avoids
-a restart pop. The revs clip is picked at random from the two throttle files each
-time revving starts (2D only ever used clip 1).
+a restart pop. The revs clip is picked at random from `ThrottleClipPaths` each
+time a voice is built; only `engine_throttle_1` is in that list today, so the
+random pick is a no-op until a second file is copied in. The boost layer always
+takes clip 1 explicitly, so its pitched-up loop cannot end up being a different
+recording from the bed underneath it.
 
 ## Enemy engines
 

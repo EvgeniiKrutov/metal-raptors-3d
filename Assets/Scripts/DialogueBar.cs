@@ -27,15 +27,13 @@ namespace MetalRaptors
         readonly GameObject _row;
         readonly Text _name;
         readonly Text _text;
-        readonly GameObject _hidden;
 
         string _line = string.Empty;
         float _shown;
         bool _open;
 
-        public DialogueBar(Transform parent, GameObject hiddenWhileTalking = null)
+        public DialogueBar(Transform parent)
         {
-            _hidden = hiddenWhileTalking;
             _bars = CinematicBars.Create(parent);
 
             _row = new GameObject("Radio Line", typeof(RectTransform));
@@ -67,7 +65,6 @@ namespace MetalRaptors
         {
             _open = true;
             _bars.Raise();
-            if (_hidden != null) _hidden.SetActive(false);
         }
 
         public void Show(CampaignSpeaker speaker, string message)
@@ -107,7 +104,6 @@ namespace MetalRaptors
             ClearLine();
             _open = false;
             _bars.Lower();
-            if (_hidden != null) _hidden.SetActive(true);
         }
 
         void Paint(int count)

@@ -24,7 +24,11 @@ namespace MetalRaptors
 
         public float AngularVelocity => _angularVelocity;
 
-        public float MaxTurnRate => _config != null ? _config.rotationSpeed * Mathf.Deg2Rad : 0f;
+        public float MaxTurnRate => _config != null
+            ? _config.rotationSpeed * Mathf.Deg2Rad * _boost
+            : 0f;
+
+        public bool Boosting => _boostTarget > 1f;
 
         const float ExplosionSize = 60f;
 
@@ -32,6 +36,12 @@ namespace MetalRaptors
         const float CollisionCooldown = 0.5f;
 
         const float SmokeHealthThreshold = 30f;
+
+        const float BoostResponse = 3.5f;
+        const float BoostSnap = 0.001f;
+
+        const float GroundProbe = 500f;
+        const float GroundSkim = 14f;
 
         PlayerConfig _config;
         Rigidbody _rb;
@@ -48,6 +58,10 @@ namespace MetalRaptors
         float _lastCollisionTime = -999f;
 
         float _minX, _maxX, _worldWidth, _ceilingY, _edgeMargin;
+
+        float _boost = 1f;
+        float _boostTarget = 1f;
+        bool _cinematic;
 
         bool _hardLeftWall;
         float _wallX = float.NegativeInfinity;
@@ -123,11 +137,15 @@ namespace MetalRaptors
                 return;
             }
 
+            _boost = Mathf.Abs(_boostTarget - _boost) < BoostSnap
+                ? _boostTarget
+                : _boost + (_boostTarget - _boost) * (1f - Mathf.Exp(-BoostResponse * dt));
+
             var kb = _controlled ? Keyboard.current : null;
             bool left  = kb != null && (kb.aKey.isPressed || kb.leftArrowKey.isPressed);
             bool right = kb != null && (kb.dKey.isPressed || kb.rightArrowKey.isPressed);
 
-            float maxRate = _config.rotationSpeed * Mathf.Deg2Rad;
+            float maxRate = MaxTurnRate;
             float desiredRate = (left ? maxRate : 0f) - (right ? maxRate : 0f);
 
             if (!_hardLeftWall)
@@ -151,18 +169,56 @@ namespace MetalRaptors
             bool clamped = false;
             if (pos.y > _ceilingY) { pos.y = _ceilingY; clamped = true; }
             if (_hardLeftWall && pos.x < _wallX) { pos.x = _wallX; clamped = true; }
+
+            if (_cinematic && GroundUnder(pos, out float deck) && pos.y < deck)
+            {
+                pos.y = deck;
+                clamped = true;
+                if (vel.y < 0f)
+                {
+                    vel.y = 0f;
+                    _rb.linearVelocity = vel;
+                }
+                Scrape();
+            }
+
             if (clamped) _rb.position = pos;
+        }
+
+        static bool GroundUnder(Vector3 pos, out float deck)
+        {
+            bool hit = Physics.Raycast(pos + Vector3.up * GroundProbe, Vector3.down,
+                out RaycastHit info, GroundProbe * 2f, 1 << ProceduralTerrain.GroundLayer,
+                QueryTriggerInteraction.Ignore);
+
+            deck = hit ? info.point.y + GroundSkim : 0f;
+            return hit;
         }
 
         public void SetLeftWall(float x) => _wallX = Mathf.Max(_wallX, x);
 
+        public void SetBoost(bool on) => _boostTarget = on && _config != null
+            ? Mathf.Max(1f, _config.boostMultiplier)
+            : 1f;
+
+        public void SetCinematic(bool value)
+        {
+            if (_cinematic == value) return;
+
+            _cinematic = value;
+            PlaneScrapes.SetGroundCollisions(!value);
+        }
+
         void UpdateSpeed(float dt)
         {
             _speed += -Mathf.Sin(_heading) * _config.diveAcceleration * dt;
-            _speed -= (_speed - _config.flySpeed) * _config.speedDrag * dt;
-            _speed = Mathf.Clamp(_speed, _config.flySpeed,
-                _config.flySpeed * Mathf.Max(1f, _config.maxSpeedMultiplier));
+            _speed -= (_speed - CruiseSpeed) * _config.speedDrag * dt;
+
+            _speed = Mathf.Clamp(_speed, CruiseSpeed,
+                CruiseSpeed * Mathf.Max(1f, _config.maxSpeedMultiplier));
         }
+
+        float CruiseSpeed => _config.flySpeed * _boost;
 
         void ApplyRotation()
         {
@@ -184,9 +240,12 @@ namespace MetalRaptors
             if (Time.time - _lastCollisionTime < CollisionCooldown) return false;
             _lastCollisionTime = Time.time;
 
-            TakeDamage(CollisionDamage);
+            if (!_cinematic)
+            {
+                TakeDamage(CollisionDamage);
+                Sparks.Spawn(transform.position, ExplosionSize);
+            }
             if (_shake != null) _shake.Play();
-            Sparks.Spawn(transform.position, ExplosionSize);
             OnScraped?.Invoke();
             return true;
         }
@@ -213,7 +272,11 @@ namespace MetalRaptors
 
             if (collision.gameObject.GetComponent<Bullet>() != null) return;
 
+            if (collision.gameObject.GetComponent<Bomb>() != null) return;
+
             if (collision.gameObject.GetComponentInParent<EnemyController>() != null) return;
+
+            if (_cinematic) { Scrape(); return; }
 
             Explosion.Spawn(transform.position, ExplosionSize);
             StartCoroutine(HideModelAfter(Explosion.RemovalDelay));

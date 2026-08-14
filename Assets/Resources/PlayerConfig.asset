@@ -23,3 +23,9 @@ MonoBehaviour:
   damage: 10
   fireRate: 0.2
   bulletSpeed: 400
+  bombDamage: 60
+  bombBlastRadius: 90
+  bombCooldown: 5
+  boostMultiplier: 1.3
+  boostDuration: 3
+  boostCooldown: 8

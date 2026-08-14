@@ -6,6 +6,8 @@ namespace MetalRaptors
 {
     public static class ProceduralTerrain
     {
+        public const int GroundLayer = 11;
+
         public const float Depth = 800f;
         internal const float HeightScale = 90f;
         public const float BaseLevel = 30f;
@@ -67,6 +69,7 @@ namespace MetalRaptors
 
                 var tGo = Terrain.CreateTerrainGameObject(data);
                 tGo.name = $"Terrain (tile {tile})";
+                tGo.layer = GroundLayer;
                 tGo.transform.SetParent(root.transform);
                 tGo.transform.position = new Vector3(x0, 0f, 0f);
                 var terrain = tGo.GetComponent<Terrain>();

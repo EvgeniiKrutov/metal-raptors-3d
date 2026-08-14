@@ -19,8 +19,7 @@ namespace MetalRaptors
         const float CamShakeDuration = 0.3f;
 
         const float TaskLeft = -860f;
-        const float TaskTop = 447f;
-        const float TaskTopUnderLight = 406f;
+        const float TaskTop = 321f;
 
         const float DitchSplashSize = 75f;
         const float SinkSpeed = 26f;
@@ -31,6 +30,8 @@ namespace MetalRaptors
         int _levelNumber;
         CubeController _cube;
         PlaneShooter _shooter;
+        PlaneBomber _bomber;
+        PlaneBoost _boost;
         PlaneSearchlight _searchlight;
         Transform _cubeTr;
         Camera _cam;
@@ -41,9 +42,11 @@ namespace MetalRaptors
 
         HealthBar _healthBar;
         SearchlightIndicator _lightIndicator;
+        CooldownSquare _bombSquare;
+        CooldownSquare _boostSquare;
         Text _distanceText;
-        Text _hintText;
         GameObject _hud;
+        HudCurtain _curtain;
 
         CampaignEnemies _enemies;
         CampaignScriptRunner _runner;
@@ -95,24 +98,34 @@ namespace MetalRaptors
             }
 
             PlaneScrapes.DisablePlanePlaneCollisions();
+            PlaneScrapes.SetGroundCollisions(true);
             BuildHud();
-            _sound = SoundSystem.Begin(_cube, null);
+            _sound = SoundSystem.Begin(_cube, null, silent: HasBriefing);
             BeginIntro();
             ShowBriefing();
         }
+
+        bool HasBriefing => !CustomBattle.Requested && !string.IsNullOrEmpty(_level.title);
 
         bool IntroActive => _intro != null && _intro.Active;
 
         void BeginIntro()
         {
-            _intro = LevelIntro.Begin(gameObject, _cube, _shooter, StartX, _halfViewWidth, BeginScript);
+            _intro = LevelIntro.Begin(gameObject, _cube, _shooter, _bomber, _boost, StartX,
+                _halfViewWidth, BeginScript);
         }
 
         void ShowBriefing()
         {
-            if (CustomBattle.Requested) return;
+            if (!HasBriefing) return;
 
-            LevelBriefing.Open($"LEVEL {_levelNumber}", _level.title, _level.dateline, _level.lore, _hud);
+            LevelBriefing.Open($"LEVEL {_levelNumber}", _level.title, _level.dateline, _level.lore,
+                _hud, ArmSound);
+        }
+
+        void ArmSound()
+        {
+            if (_sound != null) _sound.Arm();
         }
 
         void BeginScript()
@@ -123,12 +136,13 @@ namespace MetalRaptors
             if (script == null) return;
 
             _enemies = new CampaignEnemies(_cube.GetComponent<Rigidbody>(), AiGroundY, WorldTop);
-            _dialogue = new DialogueBar(_hud.transform,
-                _hintText != null ? _hintText.gameObject : null);
+            _dialogue = new DialogueBar(_hud.transform);
             _runner = CampaignScriptRunner.Begin(gameObject, script, this, _dialogue);
         }
 
         float AiGroundY => Coast ? SeaSurface.Level : ProceduralTerrain.MaxHeight;
+
+        bool Cinematic => IntroActive || CinematicBars.AnyShowing;
 
         void ConfigureShadows()
         {
@@ -155,8 +169,17 @@ namespace MetalRaptors
                 WorldTop - CubeHalf, 0f, hardLeftWall: true);
 
             var muzzle = PlaneFactory.MountMuzzle(go, model, planeModel, out var flashPoint);
+            var hitbox = go.GetComponentInChildren<Collider>();
+
             _shooter = go.AddComponent<PlaneShooter>();
-            _shooter.Initialize(config, muzzle, flashPoint, go.GetComponentInChildren<Collider>());
+            _shooter.Initialize(config, muzzle, flashPoint, hitbox);
+
+            _bomber = go.AddComponent<PlaneBomber>();
+            _bomber.Initialize(config, hitbox);
+            _bomber.OnDetonated += OnBombDetonated;
+
+            _boost = go.AddComponent<PlaneBoost>();
+            _boost.Initialize(config, _cube, model);
 
             _searchlight = PlaneSearchlight.Mount(go,
                 PlaneFactory.NoseLocal(go, model, planeModel), _level.daytime);
@@ -222,8 +245,8 @@ namespace MetalRaptors
             ? $"CUSTOM BATTLE — {MapName.ToUpperInvariant()}"
             : $"CAMPAIGN — LEVEL {_levelNumber}";
 
-        string HudHint => "A / D to steer  •  F to fire  •  no turning back  •  "
-            + "don't hit the ground";
+        string HudHint => "A / D to steer  •  F to fire  •  H to bomb  •  R to boost  •  "
+            + "no turning back  •  don't hit the ground";
 
         void LateUpdate()
         {
@@ -237,11 +260,14 @@ namespace MetalRaptors
             if (_cube != null && !IntroActive)
                 _cube.SetLeftWall(_camBasePos.x - _halfViewWidth + CubeHalf);
 
+            if (_cube != null) _cube.SetCinematic(Cinematic);
+            if (_curtain != null) _curtain.Set(!Cinematic);
+
             if (_terrain != null) _terrain.UpdateStreaming(_camBasePos.x);
             if (_ceilingBar != null)
                 _ceilingBar.position = new Vector3(_camBasePos.x, WorldTop, PlayPlaneZ);
 
-            if (!_gameOver && _sea != null && PlayPlaneZ >= SeaSurface.NearEdge
+            if (!_gameOver && !Cinematic && _sea != null && PlayPlaneZ >= SeaSurface.NearEdge
                 && _cubeTr.position.y <= SeaSurface.Level) Ditch();
 
             UpdateHud();
@@ -289,6 +315,7 @@ namespace MetalRaptors
 
             if (_task != null) Destroy(_task.gameObject);
             _task = LevelTask.Create(_hud.transform, _taskCorner, text);
+            if (_curtain != null) _curtain.Adopt(_task.gameObject);
         }
 
         public float CompleteTask()
@@ -303,7 +330,7 @@ namespace MetalRaptors
             _gameOver = true;
 
             _cube.Stop();
-            if (_shooter != null) _shooter.Stop();
+            StopWeapons();
             if (_enemies != null) _enemies.StandDown();
             if (_dialogue != null) _dialogue.Hide();
             if (_sound != null) _sound.EnterGameOver();
@@ -330,7 +357,7 @@ namespace MetalRaptors
                 _cam != null ? _cam.transform.position : pos);
 
             _cube.Sink(SinkSpeed, SinkDriftKeep);
-            if (_shooter != null) _shooter.Stop();
+            StopWeapons();
             if (_sound != null) _sound.EnterGameOver();
 
             StartCoroutine(ShowFailScreenAfter(SinkDuration));
@@ -339,7 +366,7 @@ namespace MetalRaptors
         void OnShotDown()
         {
             StopScript();
-            if (_shooter != null) _shooter.Stop();
+            StopWeapons();
             if (_sound != null) _sound.EnterGameOver();
         }
 
@@ -350,13 +377,29 @@ namespace MetalRaptors
 
         void OnPlayerScraped() => _camShake = 1f;
 
+        void OnBombDetonated(Vector3 position, float radius)
+        {
+            float reach = radius * Bomb.ShakeRadii;
+            float distance = new Vector2(position.x - _camBasePos.x,
+                position.y - _camBasePos.y).magnitude;
+
+            _camShake = Mathf.Max(_camShake, 1f - Mathf.Clamp01(distance / reach));
+        }
+
+        void StopWeapons()
+        {
+            if (_shooter != null) _shooter.Stop();
+            if (_bomber != null) _bomber.Stop();
+            if (_boost != null) _boost.Stop();
+        }
+
         void OnCrashed()
         {
             if (_gameOver) return;
             _gameOver = true;
             StopScript();
             _cube.Stop();
-            if (_shooter != null) _shooter.Stop();
+            StopWeapons();
             if (_sound != null) _sound.EnterGameOver();
 
             StartCoroutine(ShowFailScreenAfter(Explosion.Duration));
@@ -377,17 +420,22 @@ namespace MetalRaptors
             UIFactory.CreateText(canvas.transform, HudTitle, 52,
                 new Vector2(0, 480), new Vector2(1000, 90), TextAnchor.MiddleCenter, FontStyle.Bold);
 
-            _hintText = UIFactory.CreateText(canvas.transform, HudHint, 28,
+            UIFactory.CreateText(canvas.transform, HudHint, 28,
                 new Vector2(0, -500), new Vector2(1600, 50));
 
             _healthBar = new HealthBar(canvas.transform, new Vector2(-660f, 480f));
+            _bombSquare = new CooldownSquare(canvas.transform, new Vector2(-832f, 425f), "H",
+                CooldownSquare.BombTint);
+            _boostSquare = new CooldownSquare(canvas.transform, new Vector2(-832f, 361f), "R",
+                CooldownSquare.BoostTint);
             if (_searchlight != null)
-                _lightIndicator = new SearchlightIndicator(canvas.transform, new Vector2(-785f, 435f));
+                _lightIndicator = new SearchlightIndicator(canvas.transform, new Vector2(-719f, 425f));
             _distanceText = UIFactory.CreateText(canvas.transform, "0 m", 40,
                 new Vector2(660f, 480f), new Vector2(500, 60), TextAnchor.MiddleRight, FontStyle.Bold);
 
-            _taskCorner = new Vector2(TaskLeft,
-                _lightIndicator != null ? TaskTopUnderLight : TaskTop);
+            _taskCorner = new Vector2(TaskLeft, TaskTop);
+            _curtain = HudCurtain.Attach(_hud);
+            _curtain.Set(false);
             UpdateHud();
         }
 
@@ -395,6 +443,10 @@ namespace MetalRaptors
         {
             if (_lightIndicator != null && _searchlight != null)
                 _lightIndicator.Set(_searchlight.IsOn);
+            if (_bombSquare != null && _bomber != null)
+                _bombSquare.Set(_bomber.Charge, _bomber.IsReady);
+            if (_boostSquare != null && _boost != null)
+                _boostSquare.Set(_boost.Charge, _boost.IsReady || _boost.IsRunning);
             if (_cube != null && _healthBar != null)
                 _healthBar.Set(_cube.CurrentHealth, _cube.MaxHealth);
             if (_distanceText != null)

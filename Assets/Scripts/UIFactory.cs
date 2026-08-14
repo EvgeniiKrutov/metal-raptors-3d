@@ -274,6 +274,32 @@ namespace MetalRaptors
             return sprite;
         }
 
+        static Sprite _solid;
+
+        public static Sprite SolidSprite()
+        {
+            if (_solid != null) return _solid;
+
+            const int size = 4;
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            {
+                name = "Solid",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+                hideFlags = HideFlags.HideAndDontSave,
+            };
+
+            var pixels = new Color32[size * size];
+            for (int i = 0; i < pixels.Length; i++) pixels[i] = new Color32(255, 255, 255, 255);
+
+            tex.SetPixels32(pixels);
+            tex.Apply();
+
+            _solid = Sprite.Create(tex, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f));
+            _solid.hideFlags = HideFlags.HideAndDontSave;
+            return _solid;
+        }
+
         static readonly Dictionary<int, Sprite> Rings = new Dictionary<int, Sprite>();
 
         public static Sprite RingSprite(float thickness)

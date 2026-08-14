@@ -77,6 +77,27 @@ namespace MetalRaptors
                 bounds.center.y - body.transform.position.y, 0f);
         }
 
+        public static void WingTipsLocal(GameObject body, Transform model,
+            out Vector3 near, out Vector3 far)
+        {
+            var renderers = model.GetComponentsInChildren<Renderer>();
+            if (renderers.Length == 0)
+            {
+                near = far = Vector3.zero;
+                return;
+            }
+
+            Bounds bounds = renderers[0].bounds;
+            for (int i = 1; i < renderers.Length; i++) bounds.Encapsulate(renderers[i].bounds);
+
+            Vector3 origin = body.transform.position;
+            float x = bounds.center.x - origin.x;
+            float y = bounds.center.y - origin.y;
+
+            near = new Vector3(x, y, bounds.min.z - origin.z);
+            far = new Vector3(x, y, bounds.max.z - origin.z);
+        }
+
         static void NormalizeSize(Transform model, float targetSize)
         {
             var renderers = model.GetComponentsInChildren<Renderer>();

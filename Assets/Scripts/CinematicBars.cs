@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -11,6 +12,8 @@ namespace MetalRaptors
         const int SortingOrder = 150;
 
         static readonly Color Ink = new Color(0f, 0f, 0f, 1f);
+
+        static readonly List<CinematicBars> Live = new List<CinematicBars>();
 
         RectTransform _top;
         RectTransform _bottom;
@@ -39,6 +42,20 @@ namespace MetalRaptors
             return bars;
         }
 
+        public static bool AnyShowing
+        {
+            get
+            {
+                for (int i = Live.Count - 1; i >= 0; i--)
+                {
+                    CinematicBars bars = Live[i];
+                    if (bars == null) { Live.RemoveAt(i); continue; }
+                    if (bars._slide > 0f || bars._target > 0f) return true;
+                }
+                return false;
+            }
+        }
+
         public RectTransform Bottom => _bottom;
 
         public bool IsIn => _slide >= 1f;
@@ -46,6 +63,10 @@ namespace MetalRaptors
         public void Raise() => _target = 1f;
 
         public void Lower() => _target = 0f;
+
+        void OnEnable() => Live.Add(this);
+
+        void OnDisable() => Live.Remove(this);
 
         void Update()
         {

@@ -25,9 +25,20 @@ drop straight into the flight as before.
 
 Its own canvas at sorting order 300 — above the HUD, below the screen fade (1000) — filled opaquely
 with the active menu palette (docs/main-menu.md), so it reads as one of the game's menus rather than
-an overlay on the level behind it. Everything is centred on the 1920×1080 reference resolution:
-caption at +272, title at +196 (62 pt bold), dateline at +130, a 96×4 accent rule at +86, the lore
-block hanging from +34 at 1120 px wide with 1.5 line spacing, and the prompt at −336.
+an overlay on the level behind it. Everything is centred on the 1920×1080 reference resolution.
+
+The block is **top-weighted**: caption at +452, title at +376 (62 pt bold), dateline at +310, a
+96×4 accent rule at +266, and the lore hanging from +214 at 1120 px wide with 1.5 line spacing.
+That puts the caption's top edge 70 px below the screen's, which is the padding — the page is not
+flush to the edge, it just no longer floats in the middle with the lore running down into the
+prompt.
+
+The prompt does not sit at a fixed height. Lore text has `verticalOverflow = Overflow`, so it
+renders past its rect and a constant would eventually be overrun by a long briefing — which is
+exactly what used to happen. `BuildLore` returns its measured bottom (`LoreTop − preferredHeight`)
+and the prompt is placed at `min(−400, bottom − 56)`, floored at −470 so it can never leave the
+screen. With today's two-paragraph bodies the −400 default wins; a longer one pushes the prompt
+down instead of colliding with the text. The blinking cursor follows the prompt's row.
 
 The lore appears whole. Only the in-flight radio lines type themselves out
 (docs/campaign-scripts.md).
@@ -50,10 +61,18 @@ HUD and the script runner are all built behind it. Opening the page hides the HU
 dialogue reveal both run on scaled time, and physics does not step, so nothing has happened when the
 player finally looks up.
 
+The level is also **silent** behind the page: `SoundSystem` is begun with `silent: true` and holds
+every source until `Open`'s `onDismissed` callback arms it at the black frame of the closing fade
+(docs/sounds.md). Freezing time would not have done it — the sound system runs on unscaled time —
+and an engine droning under a static briefing page reads as a bug.
+
 Any keyboard key, any face button or start on a pad, or a left click continues (`MenuInput.ReadAnyKey`).
 Input is ignored while the screen fade is running, so the keypress that started the level from the
 menu cannot fall through into it. Continuing fades to black (`ScreenFade.Swap`), restores the time
-scale and the HUD at the black frame, and destroys the canvas.
+scale and the HUD object at the black frame, fires `onDismissed`, and destroys the canvas. Note
+that restoring the HUD *object* is not the same as showing the HUD: the campaign controller's
+`HudCurtain` has its contents hidden for the fly-in and the opening conversation
+(docs/level-intro.md), so the page hands over to an empty frame.
 
 `LevelBriefing.IsOpen` is checked wherever `GameMenu.IsOpen` already was — the controller (Escape
 cannot open the pause menu underneath the briefing), `PlaneShooter` and `PlaneSearchlight` (the key

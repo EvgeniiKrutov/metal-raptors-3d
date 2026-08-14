@@ -39,6 +39,8 @@ namespace MetalRaptors
 
         CubeController _cube;
         PlaneShooter _shooter;
+        PlaneBomber _bomber;
+        PlaneBoost _boost;
         PlaneSearchlight _searchlight;
         Transform _cubeTr;
         Camera _cam;
@@ -49,6 +51,8 @@ namespace MetalRaptors
 
         HealthBar _healthBar;
         SearchlightIndicator _lightIndicator;
+        CooldownSquare _bombSquare;
+        CooldownSquare _boostSquare;
         GameObject _hud;
 
         float _halfViewHeight;
@@ -73,6 +77,7 @@ namespace MetalRaptors
             if (VerdunLand)
                 Battlefield.Begin(_cam, _halfViewWidth, _level.terrain.seed, MinX, MaxX, _inCrater);
             PlaneScrapes.DisablePlanePlaneCollisions();
+            PlaneScrapes.SetGroundCollisions(true);
             BuildHud();
             _sound = SoundSystem.Begin(_cube, _enemies);
         }
@@ -94,10 +99,11 @@ namespace MetalRaptors
             }
             else
             {
-                UIFactory.CreatePrimitive3D(PrimitiveType.Cube,
+                var flat = UIFactory.CreatePrimitive3D(PrimitiveType.Cube,
                     new Vector3(0f, GroundY - 10f, 0f),
                     new Vector3(WorldWidth + 200f, 20f, 400f),
                     new Color(0.20f, 0.22f, 0.16f));
+                flat.layer = ProceduralTerrain.GroundLayer;
 
                 const float backdropBottomY = -100f;
                 float backdropTopY = WorldTop + SkyHeadroom;
@@ -137,8 +143,17 @@ namespace MetalRaptors
         void SetupGuns(PlayerConfig config, GameObject body, Transform model, PlaneModelConfig plane)
         {
             var muzzle = PlaneFactory.MountMuzzle(body, model, plane, out var flashPoint);
+            var hitbox = body.GetComponentInChildren<Collider>();
+
             _shooter = body.AddComponent<PlaneShooter>();
-            _shooter.Initialize(config, muzzle, flashPoint, body.GetComponentInChildren<Collider>());
+            _shooter.Initialize(config, muzzle, flashPoint, hitbox);
+
+            _bomber = body.AddComponent<PlaneBomber>();
+            _bomber.Initialize(config, hitbox);
+            _bomber.OnDetonated += OnBombDetonated;
+
+            _boost = body.AddComponent<PlaneBoost>();
+            _boost.Initialize(config, _cube, model);
         }
 
         void SpawnEnemies()
@@ -288,7 +303,7 @@ namespace MetalRaptors
 
         void OnShotDown()
         {
-            if (_shooter != null) _shooter.Stop();
+            StopWeapons();
             if (_sound != null) _sound.EnterGameOver();
         }
 
@@ -299,12 +314,28 @@ namespace MetalRaptors
 
         void OnPlayerScraped() => _camShake = 1f;
 
+        void OnBombDetonated(Vector3 position, float radius)
+        {
+            float reach = radius * Bomb.ShakeRadii;
+            float distance = new Vector2(position.x - _camBasePos.x,
+                position.y - _camBasePos.y).magnitude;
+
+            _camShake = Mathf.Max(_camShake, 1f - Mathf.Clamp01(distance / reach));
+        }
+
+        void StopWeapons()
+        {
+            if (_shooter != null) _shooter.Stop();
+            if (_bomber != null) _bomber.Stop();
+            if (_boost != null) _boost.Stop();
+        }
+
         void WinLevel()
         {
             if (_gameOver) return;
             _gameOver = true;
             _cube.Stop();
-            if (_shooter != null) _shooter.Stop();
+            StopWeapons();
             StandDownEnemies();
             if (_sound != null) _sound.EnterGameOver();
 
@@ -321,7 +352,7 @@ namespace MetalRaptors
             if (_gameOver) return;
             _gameOver = true;
             _cube.Stop();
-            if (_shooter != null) _shooter.Stop();
+            StopWeapons();
             StandDownEnemies();
             if (_sound != null) _sound.EnterGameOver();
 
@@ -347,12 +378,17 @@ namespace MetalRaptors
                 new Vector2(0, 420), new Vector2(1200, 50));
 
             UIFactory.CreateText(canvas.transform,
-                "A / D to steer  •  F to fire  •  destroy the enemy  •  don't hit the ground", 28,
+                "A / D to steer  •  F to fire  •  H to bomb  •  R to boost  •  "
+                + "destroy the enemy  •  don't hit the ground", 28,
                 new Vector2(0, -500), new Vector2(1600, 50));
 
             _healthBar = new HealthBar(canvas.transform, new Vector2(-660f, 480f));
+            _bombSquare = new CooldownSquare(canvas.transform, new Vector2(-832f, 425f), "H",
+                CooldownSquare.BombTint);
+            _boostSquare = new CooldownSquare(canvas.transform, new Vector2(-832f, 361f), "R",
+                CooldownSquare.BoostTint);
             if (_searchlight != null)
-                _lightIndicator = new SearchlightIndicator(canvas.transform, new Vector2(-785f, 435f));
+                _lightIndicator = new SearchlightIndicator(canvas.transform, new Vector2(-719f, 425f));
             UpdateHealthHud();
         }
 
@@ -360,6 +396,10 @@ namespace MetalRaptors
         {
             if (_lightIndicator != null && _searchlight != null)
                 _lightIndicator.Set(_searchlight.IsOn);
+            if (_bombSquare != null && _bomber != null)
+                _bombSquare.Set(_bomber.Charge, _bomber.IsReady);
+            if (_boostSquare != null && _boost != null)
+                _boostSquare.Set(_boost.Charge, _boost.IsReady || _boost.IsRunning);
             if (_cube == null || _healthBar == null) return;
             _healthBar.Set(_cube.CurrentHealth, _cube.MaxHealth);
         }

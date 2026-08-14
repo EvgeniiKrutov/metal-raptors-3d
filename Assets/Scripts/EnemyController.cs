@@ -8,6 +8,10 @@ namespace MetalRaptors
     {
         const float ShotVolume = 0.15f;
         const float RecoverClimbAngleDeg = 70f;
+        const float CeilingMargin = 130f;
+        const float ReturnSpeedFactor = 1.35f;
+        const float BreakRoomCap = 300f;
+        const float BreakRoomTie = 60f;
 
         const float CollisionDamage = 10f;
         const float CollisionCooldown = 0.5f;
@@ -29,7 +33,6 @@ namespace MetalRaptors
         public float ModelSize => _bodyRadius > 0f ? _bodyRadius * 2f : 30f;
 
         enum AiState { Attack, Fly, Evade, Recover, Return }
-        enum EvadePhase { Roll, Jitter, Unroll }
 
         EnemyConfig _config;
         Rigidbody _target;
@@ -50,10 +53,8 @@ namespace MetalRaptors
 
         AiState _state = AiState.Attack;
         float _stateTimer;
-        EvadePhase _evadePhase;
         float _evadeHeading;
-        float _evadeRollSign = 1f;
-        float _evadeRollAccum;
+        float _evadeCooldown;
         float _jitterTimer;
         float _jitterOffset;
         float _flyWeaveT;
@@ -137,6 +138,7 @@ namespace MetalRaptors
 
             _stateTimer = Mathf.Max(0f, _stateTimer - dt);
             _jitterTimer = Mathf.Max(0f, _jitterTimer - dt);
+            _evadeCooldown = Mathf.Max(0f, _evadeCooldown - dt);
             _fireCooldown -= dt;
 
             if (_standDown)
@@ -157,9 +159,10 @@ namespace MetalRaptors
                 TickState(dt);
             }
 
-            SteerToHeading(ComputeHeading(dt), dt);
+            SteerToHeading(Contain(ComputeHeading()), dt);
 
-            Vector3 vel = new Vector3(Mathf.Cos(_heading), Mathf.Sin(_heading), 0f) * _config.flySpeed;
+            float speed = _config.flySpeed * (_state == AiState.Return ? ReturnSpeedFactor : 1f);
+            Vector3 vel = new Vector3(Mathf.Cos(_heading), Mathf.Sin(_heading), 0f) * speed;
             Vector3 pos = _rb.position;
             if (pos.y >= _ceilingY && vel.y > 0f) vel.y = 0f;
             _rb.linearVelocity = vel;
@@ -192,9 +195,22 @@ namespace MetalRaptors
                 return;
             }
 
+            if (_state == AiState.Evade)
+            {
+                if (_stateTimer <= 0f)
+                {
+                    _evadeCooldown = _config.evadeCooldown;
+                    EnterAttack();
+                }
+                return;
+            }
+
             if (_state == AiState.Attack && _stateTimer <= 0f)
             {
-                EnterFly(_target != null ? _target.position.x : transform.position.x);
+                if (TargetDistance() <= _config.maxFireRange)
+                    EnterFly(_target != null ? _target.position.x : transform.position.x);
+                else
+                    EnterAttack();
                 return;
             }
 
@@ -204,10 +220,10 @@ namespace MetalRaptors
                 return;
             }
 
-            if (_state == AiState.Evade && _evadePhase == EvadePhase.Jitter && _stateTimer <= 0f)
+            if (_evadeCooldown <= 0f && UnderThreat())
             {
-                _evadePhase = EvadePhase.Unroll;
-                _evadeRollAccum = 0f;
+                EnterEvade();
+                return;
             }
 
             if (_state == AiState.Fly) _flyWeaveT += dt;
@@ -231,17 +247,66 @@ namespace MetalRaptors
         {
             Vector3 away = transform.position
                          - (_target != null ? _target.position : transform.position - Vector3.right);
-            _evadeHeading = Mathf.Atan2(away.y, away.x);
-            _evadePhase = EvadePhase.Roll;
-            _evadeRollSign = UnityEngine.Random.value < 0.5f ? 1f : -1f;
-            _evadeRollAccum = 0f;
+            float awayHeading = Mathf.Atan2(away.y, away.x);
+            float breakAngle = _config.evadeBreakAngle * Mathf.Deg2Rad;
+
+            float high = awayHeading + breakAngle;
+            float low = awayHeading - breakAngle;
+            float roomUp = Mathf.Max(0f, _ceilingY - CeilingMargin - transform.position.y);
+            float roomDown = Mathf.Max(0f,
+                transform.position.y - (_groundY + _config.safeAltitudeMargin));
+
+            float highRoom = BreakRoom(high, roomUp, roomDown);
+            float lowRoom = BreakRoom(low, roomUp, roomDown);
+
+            _evadeHeading = Mathf.Abs(highRoom - lowRoom) < BreakRoomTie
+                ? (UnityEngine.Random.value < 0.5f ? high : low)
+                : (highRoom > lowRoom ? high : low);
+
             _jitterTimer = 0f;
             _jitterOffset = 0f;
             _stateTimer = _config.evadeDuration;
             _state = AiState.Evade;
         }
 
-        float ComputeHeading(float dt)
+        static float BreakRoom(float heading, float roomUp, float roomDown)
+        {
+            return Mathf.Min(Mathf.Sin(heading) > 0f ? roomUp : roomDown, BreakRoomCap);
+        }
+
+        bool UnderThreat()
+        {
+            if (_target == null) return false;
+
+            Vector2 toTarget = (Vector2)_target.position - (Vector2)transform.position;
+            float distance = toTarget.magnitude;
+            if (distance < 1f || distance > _config.threatRange) return false;
+
+            Vector2 aim = _target.linearVelocity;
+            if (aim.sqrMagnitude < 1f) return false;
+            if (Vector2.Angle(aim, -toTarget) > _config.threatCone) return false;
+
+            var nose = new Vector2(Mathf.Cos(_heading), Mathf.Sin(_heading));
+            return Vector2.Angle(nose, toTarget) > _config.threatTailAngle;
+        }
+
+        float TargetDistance()
+        {
+            return _target != null
+                ? Vector2.Distance(transform.position, _target.position)
+                : float.MaxValue;
+        }
+
+        float Contain(float heading)
+        {
+            return FlightSteering.Contain(heading, _rb.position,
+                _minX, _maxX, _edgeMargin,
+                _groundY + _config.safeAltitudeMargin,
+                _config.safeAltitudeMargin - _config.minAltitudeMargin,
+                _ceilingY, CeilingMargin);
+        }
+
+        float ComputeHeading()
         {
             switch (_state)
             {
@@ -253,26 +318,6 @@ namespace MetalRaptors
 
                 case AiState.Evade:
                 {
-                    if (_evadePhase == EvadePhase.Roll || _evadePhase == EvadePhase.Unroll)
-                    {
-                        float sign = _evadePhase == EvadePhase.Roll ? _evadeRollSign : -_evadeRollSign;
-                        _evadeRollAccum += _config.rotationSpeed * Mathf.Deg2Rad * dt;
-                        if (_evadeRollAccum >= Mathf.PI * 2f)
-                        {
-                            if (_evadePhase == EvadePhase.Roll)
-                            {
-                                _evadePhase = EvadePhase.Jitter;
-                                _evadeRollAccum = 0f;
-                            }
-                            else
-                            {
-                                EnterAttack();
-                                return HeadingTo(PredictIntercept());
-                            }
-                        }
-                        return _heading + sign * Mathf.PI * 0.9f;
-                    }
-
                     if (_jitterTimer <= 0f)
                     {
                         _jitterOffset = UnityEngine.Random.Range(-1f, 1f)
@@ -284,7 +329,11 @@ namespace MetalRaptors
 
                 case AiState.Fly:
                 {
-                    float targetY = _groundY + (_ceilingY - _groundY) * _config.flyAltitudeFactor;
+                    float floor = _groundY + _config.safeAltitudeMargin;
+                    float roof = Mathf.Max(floor, _ceilingY - CeilingMargin);
+                    float perch = (_target != null ? _target.position.y : transform.position.y)
+                                + _config.flyPerchHeight;
+                    float targetY = Mathf.Clamp(perch, floor, roof);
                     float weaveX = _flyBaseX + Mathf.Sin(_flyWeaveT * Mathf.PI * 2f * _config.weaveHz)
                                              * _config.weaveAmplitude;
                     return HeadingTo(new Vector2(weaveX, targetY));
@@ -305,9 +354,6 @@ namespace MetalRaptors
             float error = Mathf.DeltaAngle(_heading * Mathf.Rad2Deg, targetHeading * Mathf.Rad2Deg)
                         * Mathf.Deg2Rad;
             float desiredRate = Mathf.Clamp(dt > 0f ? error / dt : 0f, -maxRate, maxRate);
-
-            desiredRate = FlightSteering.EdgeSteer(_rb.position.x, _heading,
-                _minX, _maxX, _edgeMargin, maxRate, desiredRate);
 
             float approach = 1f - Mathf.Exp(-(_config.turnResponsiveness / _rb.mass) * dt);
             _angularVelocity += (desiredRate - _angularVelocity) * approach;
@@ -338,8 +384,7 @@ namespace MetalRaptors
         {
             if (_target == null || !IsOnCamera(_target.position)) return;
 
-            if (Vector2.Distance(transform.position, _target.position) > _config.maxFireRange)
-                return;
+            if (TargetDistance() > _config.maxFireRange) return;
 
             Vector2 aim = PredictIntercept();
             float aimErrorDeg = Mathf.Abs(Mathf.DeltaAngle(_heading * Mathf.Rad2Deg,
@@ -388,7 +433,8 @@ namespace MetalRaptors
             if (_dead || _falling) return;
             ApplyDamage(amount);
 
-            if (!_falling && (_state == AiState.Attack || _state == AiState.Fly)) EnterEvade();
+            if (!_falling && _evadeCooldown <= 0f
+                && (_state == AiState.Attack || _state == AiState.Fly)) EnterEvade();
         }
 
         void ApplyDamage(float amount)
@@ -456,6 +502,8 @@ namespace MetalRaptors
             if (_dead) return;
 
             if (collision.gameObject.GetComponent<Bullet>() != null) return;
+
+            if (collision.gameObject.GetComponent<Bomb>() != null) return;
 
             Explode();
         }

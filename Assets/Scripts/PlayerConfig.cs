@@ -45,5 +45,26 @@ namespace MetalRaptors
         [Tooltip("Bullet speed in metres/second. Keep it well above flySpeed so rounds " +
                  "visibly pull away from the plane.")]
         public float bulletSpeed = 400f;
+
+        [Tooltip("Damage at the dead centre of a bomb blast, falling off linearly to zero at " +
+                 "bombBlastRadius (see docs/bombs.md). Hurts the player's own plane too.")]
+        public float bombDamage = 60f;
+
+        [Tooltip("Radius of the bomb blast in metres. Everything damageable inside it is hit, " +
+                 "scaled by its distance from the centre.")]
+        public float bombBlastRadius = 90f;
+
+        [Tooltip("Time in seconds before H can drop another bomb.")]
+        public float bombCooldown = 5f;
+
+        [Tooltip("Multiplier applied to both the turn rate and the speed while the R boost " +
+                 "runs (see docs/boost.md).")]
+        public float boostMultiplier = 1.3f;
+
+        [Tooltip("Seconds the R boost runs for.")]
+        public float boostDuration = 3f;
+
+        [Tooltip("Seconds before R can be used again, counted from the moment the boost ends.")]
+        public float boostCooldown = 8f;
     }
 }

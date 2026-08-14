@@ -9,6 +9,8 @@ namespace MetalRaptors
         public const float Level = 22f;
         public const float NearEdge = 170f;
 
+        public static SeaSurface Current { get; private set; }
+
         const float HalfWidth = 1850f;
         const float ColStep = 65f;
         const float ShoreRowStep = 22f;
@@ -48,6 +50,8 @@ namespace MetalRaptors
             var sea = go.AddComponent<SeaSurface>();
             sea._cam = cam;
             sea.Build(daytime);
+
+            Current = sea;
             return sea;
         }
 

@@ -113,7 +113,9 @@ so a conversation plays as one shot instead of flickering.
 
 `DialogueBar` owns the `CinematicBars` instance, which is nested in the HUD canvas, so the
 pause/fail/completed overlay hides the whole thing along with the rest of the HUD. While a line is
-up, the HUD's control hint (which sits at the same screen edge) is hidden and restored afterwards.
+up the HUD itself is hidden, the ground cannot kill the player, and neither the bomb nor the boost
+can be used — see "Cutscene mode" in docs/level-intro.md. The dialogue does not implement any of
+that itself; the controller reads `CinematicBars.AnyShowing` each frame.
 
 ### Typewriter reveal
 
@@ -140,8 +142,8 @@ snatched away the instant it appears.
 One objective at a time, under the health bar in the top-left corner of the HUD: a stylised
 checkbox followed by the objective in 26 pt bold, both on the same translucent black plate the
 health bar and the light indicator use, sized to the text. It sits at x −860 (the HUD's left
-column) and at y 447, or y 406 on levels that carry the searchlight indicator, so it always hangs
-one 14 px gap below whatever is above it.
+column) and at y 321, below the bomb and boost squares, which are always present (docs/bombs.md,
+docs/boost.md) — so the column above it never changes height and the task never moves.
 
 The checkbox is a **round** 22 px ring with a 1.5 px stroke, drawn from a procedural sprite
 (`UIFactory.RingSprite`) rather than assembled from rectangles: a 128×128 antialiased annulus
@@ -193,8 +195,11 @@ the controller also calls `Stop()` explicitly so a `wait` in flight can't outliv
 `EnemyController`'s AI was written for the fixed levels' static `MinX`/`MaxX` world bounds. In the
 campaign the world scrolls forever, so `CampaignEnemies` re-points those bounds at the camera's
 view window every `LateUpdate` (`EnemyController.SetBounds`, ±70 m inside the visible edges). The
-existing `FlightSteering.EdgeSteer` then keeps the dogfight inside the frame no matter how far the
-player has flown, and an enemy can never be left behind.
+AI's `FlightSteering.Contain` boundary then keeps the dogfight inside the frame no matter how far
+the player has flown, and an enemy can never be left behind. A moving window makes the containment
+choice matter more than it does in the fixed levels: the bounds hug the visible edges, so a
+fighter is in a boundary band often, and the old rate-forcing `EdgeSteer` could park it nose-up
+against the frame indefinitely (see docs/flight-model.md).
 
 Waves spawn off-screen ahead of the player (camera edge + 110 m, each further plane 90 m behind the
 last, so a group arrives strung out rather than as one clump) at a random altitude between the

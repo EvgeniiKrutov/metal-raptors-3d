@@ -14,6 +14,12 @@ namespace MetalRaptors
             Physics.IgnoreLayerCollision(PlaneFactory.PlaneLayer, PlaneFactory.PlaneLayer, true);
         }
 
+        public static void SetGroundCollisions(bool enabled)
+        {
+            Physics.IgnoreLayerCollision(PlaneFactory.PlaneLayer, ProceduralTerrain.GroundLayer,
+                !enabled);
+        }
+
         public static void Check(CubeController player, Transform playerTr,
             IReadOnlyList<EnemyController> enemies)
         {

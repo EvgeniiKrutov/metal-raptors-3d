@@ -315,7 +315,9 @@ Props sit on **layer 9**, and `Begin` calls
 are, so shots pass straight through trees and houses, the same as they pass
 through infantry. Plane colliders are on layer 8 (`PlaneFactory.PlaneLayer`),
 which still meets 9 — the layer matrix gates trigger events just as it gates
-collisions.
+collisions. Props are unaffected by the cutscene ground toggle, which only moves
+8 vs **11** (the terrain's own layer, docs/level-intro.md): a tree is still
+scraped during a radio line, it just costs no health.
 
 The prop itself is never damaged: it does not fall, burn or disappear, and ground
 blasts leave it standing. Enemy AI does not steer around props either — an enemy

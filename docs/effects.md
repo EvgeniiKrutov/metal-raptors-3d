@@ -3,6 +3,8 @@
 The player plane's night searchlight has its own page: docs/searchlight.md.
 The ambient Verdun ground life — random shell blasts, burning smoke columns and
 infantry squads — has its own page: docs/battlefield.md.
+The player's bombs — release, ballistic fall and area blast — have their own page:
+docs/bombs.md.
 
 ## Muzzle flash (`Assets/Scripts/MuzzleFlash.cs`)
 

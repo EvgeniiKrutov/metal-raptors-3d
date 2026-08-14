@@ -31,5 +31,29 @@ namespace MetalRaptors
             float delta = Mathf.DeltaAngle(heading * Mathf.Rad2Deg, target * Mathf.Rad2Deg);
             return Mathf.Sign(delta);
         }
+
+        const float PushWeight = 2f;
+
+        public static float Contain(float heading, Vector2 pos,
+            float minX, float maxX, float sideMargin,
+            float floorY, float floorMargin,
+            float ceilingY, float ceilingMargin)
+        {
+            float push = Band(minX + sideMargin - pos.x, sideMargin)
+                       - Band(pos.x - (maxX - sideMargin), sideMargin);
+            float lift = Band(floorY - pos.y, floorMargin)
+                       - Band(pos.y - (ceilingY - ceilingMargin), ceilingMargin);
+
+            if (push == 0f && lift == 0f) return heading;
+
+            var dir = new Vector2(Mathf.Cos(heading) + push * PushWeight,
+                                  Mathf.Sin(heading) + lift * PushWeight);
+            return dir.sqrMagnitude > 1e-6f ? Mathf.Atan2(dir.y, dir.x) : heading;
+        }
+
+        static float Band(float penetration, float width)
+        {
+            return width > 0f ? Mathf.Clamp01(penetration / width) : 0f;
+        }
     }
 }

@@ -12,6 +12,8 @@ namespace MetalRaptors
 
         CubeController _plane;
         PlaneShooter _shooter;
+        PlaneBomber _bomber;
+        PlaneBoost _boost;
         Transform _tr;
         Action _onCue;
         float _cueX;
@@ -21,13 +23,15 @@ namespace MetalRaptors
         public bool Active => _active;
 
         public static LevelIntro Begin(GameObject owner, CubeController plane, PlaneShooter shooter,
-            float holdX, float halfViewWidth, Action onCue)
+            PlaneBomber bomber, PlaneBoost boost, float holdX, float halfViewWidth, Action onCue)
         {
             if (plane == null) return null;
 
             var intro = owner.AddComponent<LevelIntro>();
             intro._plane = plane;
             intro._shooter = shooter;
+            intro._bomber = bomber;
+            intro._boost = boost;
             intro._tr = plane.transform;
             intro._onCue = onCue;
             intro._cueX = holdX - halfViewWidth * CueFraction;
@@ -38,6 +42,8 @@ namespace MetalRaptors
 
             plane.SetControlled(false);
             if (shooter != null) shooter.Stop();
+            if (bomber != null) bomber.Stop();
+            if (boost != null) boost.Stop();
 
             intro.StartCoroutine(intro.Run());
             return intro;
@@ -60,6 +66,8 @@ namespace MetalRaptors
             _active = false;
             if (_plane != null) _plane.SetControlled(true);
             if (_shooter != null) _shooter.Resume();
+            if (_bomber != null) _bomber.Resume();
+            if (_boost != null) _boost.Resume();
             Destroy(this);
         }
     }

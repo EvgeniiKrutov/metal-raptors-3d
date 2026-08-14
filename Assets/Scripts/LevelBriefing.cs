@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -10,19 +11,21 @@ namespace MetalRaptors
         const int SortingOrder = 300;
 
         const int CaptionSize = 22;
-        const float CaptionY = 272f;
+        const float CaptionY = 452f;
         const int TitleSize = 62;
-        const float TitleY = 196f;
+        const float TitleY = 376f;
         const int DatelineSize = 22;
-        const float DatelineY = 130f;
-        const float RuleY = 86f;
+        const float DatelineY = 310f;
+        const float RuleY = 266f;
         const int LoreSize = 26;
-        const float LoreTop = 34f;
+        const float LoreTop = 214f;
         const float LoreWidth = 1120f;
-        const float LoreHeight = 300f;
+        const float LoreHeight = 520f;
         const float LoreLineSpacing = 1.5f;
         const int PromptSize = 24;
-        const float PromptY = -336f;
+        const float PromptY = -400f;
+        const float PromptGap = 56f;
+        const float PromptFloor = -470f;
 
         const float CaretGap = 12f;
         const float CaretWidth = 12f;
@@ -37,20 +40,27 @@ namespace MetalRaptors
         static LevelBriefing Current;
 
         GameObject _hud;
+        Action _onDismissed;
         Image _caret;
         float _blink;
         int _openedFrame;
         bool _closing;
 
-        public static void Open(string caption, string title, string dateline, string lore, GameObject hud)
+        public static void Open(string caption, string title, string dateline, string lore,
+            GameObject hud, Action onDismissed = null)
         {
-            if (IsOpen || string.IsNullOrEmpty(title)) return;
+            if (IsOpen || string.IsNullOrEmpty(title))
+            {
+                onDismissed?.Invoke();
+                return;
+            }
 
             Canvas canvas = UIFactory.CreateCanvas("Level Briefing");
             canvas.sortingOrder = SortingOrder;
 
             var briefing = canvas.gameObject.AddComponent<LevelBriefing>();
             Current = briefing;
+            briefing._onDismissed = onDismissed;
             briefing.Build(canvas, caption, title, dateline, lore, hud);
         }
 
@@ -71,9 +81,12 @@ namespace MetalRaptors
             Centered(page, title, TitleSize, TitleY, colors.Fg, UIFactory.BoldFont);
             Centered(page, dateline, DatelineSize, DatelineY, colors.Muted, UIFactory.RegularFont);
             BuildRule(page, colors.Accent);
-            BuildLore(page, lore, colors.Fg);
-            BuildPrompt(page, colors.Muted, colors.Accent);
+            float loreBottom = BuildLore(page, lore, colors.Fg);
+            BuildPrompt(page, PromptRow(loreBottom), colors.Muted, colors.Accent);
         }
+
+        static float PromptRow(float loreBottom) => Mathf.Max(PromptFloor,
+            Mathf.Min(PromptY, loreBottom - PromptGap));
 
         static Text Centered(Transform parent, string content, int fontSize, float y, Color color, Font font)
         {
@@ -98,7 +111,7 @@ namespace MetalRaptors
             rt.anchoredPosition = new Vector2(0f, RuleY);
         }
 
-        static void BuildLore(Transform parent, string lore, Color color)
+        static float BuildLore(Transform parent, string lore, Color color)
         {
             Text text = UIFactory.CreateText(parent, lore, LoreSize, Vector2.zero,
                 new Vector2(LoreWidth, LoreHeight), TextAnchor.UpperCenter);
@@ -110,11 +123,13 @@ namespace MetalRaptors
             var rt = text.rectTransform;
             rt.pivot = new Vector2(0.5f, 1f);
             rt.anchoredPosition = new Vector2(0f, LoreTop);
+
+            return LoreTop - text.preferredHeight;
         }
 
-        void BuildPrompt(Transform parent, Color color, Color caretColor)
+        void BuildPrompt(Transform parent, float y, Color color, Color caretColor)
         {
-            Text text = Centered(parent, Prompt, PromptSize, PromptY, color, UIFactory.MediumFont);
+            Text text = Centered(parent, Prompt, PromptSize, y, color, UIFactory.MediumFont);
 
             var go = new GameObject("Caret", typeof(Image));
             go.transform.SetParent(parent, false);
@@ -126,7 +141,7 @@ namespace MetalRaptors
             var rt = _caret.rectTransform;
             rt.sizeDelta = new Vector2(CaretWidth, CaretHeight);
             rt.anchoredPosition = new Vector2(
-                text.preferredWidth * 0.5f + CaretGap + CaretWidth * 0.5f, PromptY - CaretDrop);
+                text.preferredWidth * 0.5f + CaretGap + CaretWidth * 0.5f, y - CaretDrop);
         }
 
         void Update()
@@ -156,6 +171,7 @@ namespace MetalRaptors
             {
                 Release();
                 if (_hud != null) _hud.SetActive(true);
+                _onDismissed?.Invoke();
                 Destroy(gameObject);
             });
         }
