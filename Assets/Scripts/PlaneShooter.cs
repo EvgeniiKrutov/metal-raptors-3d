@@ -40,9 +40,11 @@ namespace MetalRaptors
 
         public void Stop() => enabled = false;
 
+        public void Resume() => enabled = true;
+
         void Update()
         {
-            if (GameMenu.IsOpen) return;
+            if (GameMenu.IsOpen || LevelBriefing.IsOpen) return;
 
             _cooldown -= Time.deltaTime;
 

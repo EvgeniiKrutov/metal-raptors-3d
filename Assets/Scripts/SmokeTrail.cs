@@ -6,6 +6,8 @@ namespace MetalRaptors
     public class SmokeTrail : MonoBehaviour
     {
         const float EmitInterval = 0.05f;
+        const float BurnEmitInterval = 0.028f;
+        const float BurnSizeFactor = 0.45f;
 
         const float LifeMin = 0.9f;
         const float LifeMax = 1.5f;
@@ -21,6 +23,7 @@ namespace MetalRaptors
         static readonly Color SmokeColor = new Color(0.10f, 0.10f, 0.11f, Opacity);
 
         bool _armed;
+        bool _burning;
         bool _cleared;
         float _size;
         float _emitTimer;
@@ -42,6 +45,12 @@ namespace MetalRaptors
             _size = Mathf.Max(1f, planeSize);
         }
 
+        public void Ignite(float planeSize)
+        {
+            Arm(planeSize);
+            _burning = true;
+        }
+
         public void Clear()
         {
             _armed = false;
@@ -59,7 +68,7 @@ namespace MetalRaptors
             _emitTimer -= Time.deltaTime;
             if (_emitTimer <= 0f)
             {
-                _emitTimer = EmitInterval;
+                _emitTimer = _burning ? BurnEmitInterval : EmitInterval;
                 EmitPuff();
             }
         }
@@ -77,7 +86,8 @@ namespace MetalRaptors
             Vector3 back = -transform.right;
             Vector3 spawn = transform.position;
 
-            float scale = _size * StartSizeFactor * Random.Range(1f - StartSizeJitter, 1f + StartSizeJitter);
+            float sizeFactor = _burning ? BurnSizeFactor : StartSizeFactor;
+            float scale = _size * sizeFactor * Random.Range(1f - StartSizeJitter, 1f + StartSizeJitter);
             var go = UIFactory.CreatePrimitive3D(PrimitiveType.Cube,
                 spawn, Vector3.one * scale, SmokeColor, emissive: false, keepCollider: false);
             go.name = "Smoke";

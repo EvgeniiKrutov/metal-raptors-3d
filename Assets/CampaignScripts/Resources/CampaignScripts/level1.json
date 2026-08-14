@@ -1,0 +1,32 @@
+{
+  "steps": [
+    { "op": "say", "speaker": "hq", "line": "l1_line1" },
+    { "op": "say", "speaker": "you", "line": "l1_line2" },
+    { "op": "say", "speaker": "hq", "line": "l1_line3" },
+    { "op": "say", "speaker": "you", "line": "l1_line4" },
+
+    { "op": "task", "line": "l1_task1" },
+    { "op": "wait", "seconds": 2.5 },
+    { "op": "taskdone" },
+
+    { "op": "task", "line": "l1_task2" },
+    { "op": "wave", "enemies": [ { "plane": "fokker", "count": 1 } ] },
+    { "op": "taskdone" },
+
+    { "op": "wait", "seconds": 2 },
+
+    { "op": "say", "speaker": "hq", "line": "l1_line5" },
+    { "op": "say", "speaker": "you", "line": "l1_line6", "seconds": 3.5 },
+
+    { "op": "wait", "seconds": 1 },
+
+    { "op": "task", "line": "l1_task3" },
+    { "op": "wave", "enemies": [ { "plane": "fokker", "count": 2 } ] },
+    { "op": "taskdone" },
+
+    { "op": "say", "speaker": "hq", "line": "l1_line7" },
+    { "op": "say", "speaker": "you", "line": "l1_line8", "seconds": 4 },
+
+    { "op": "finish" }
+  ]
+}

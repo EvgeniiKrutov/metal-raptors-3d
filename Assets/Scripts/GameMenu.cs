@@ -9,27 +9,45 @@ namespace MetalRaptors
     public class GameMenu : MonoBehaviour
     {
         public static GameMenu Current { get; private set; }
-        public static bool IsOpen => Current != null;
+        public static bool IsOpen => Current != null || _pending;
 
         static readonly Color Scrim = new Color(0f, 0f, 0f, 0.6f);
+
+        static bool _pending;
 
         MenuPanel _panel;
         GameObject _hud;
         bool _closable;
         int _openedFrame;
 
-        public static GameMenu Open(GameMenuKind kind, string subtitle, GameObject hud,
+        public static void Open(GameMenuKind kind, string subtitle, GameObject hud,
             string nextScene = null, Action beforeNext = null)
         {
-            if (Current != null) return Current;
+            if (IsOpen) return;
 
+            if (kind == GameMenuKind.Pause)
+            {
+                Create(kind, subtitle, hud, nextScene, beforeNext);
+                return;
+            }
+
+            _pending = true;
+            ScreenFade.Swap(() =>
+            {
+                _pending = false;
+                Create(kind, subtitle, hud, nextScene, beforeNext);
+            });
+        }
+
+        static void Create(GameMenuKind kind, string subtitle, GameObject hud, string nextScene,
+            Action beforeNext)
+        {
             Canvas canvas = UIFactory.CreateCanvas("Game Menu");
             canvas.sortingOrder = 200;
 
             var menu = canvas.gameObject.AddComponent<GameMenu>();
             Current = menu;
             menu.Build(canvas, kind, subtitle, hud, nextScene, beforeNext);
-            return menu;
         }
 
         void Build(Canvas canvas, GameMenuKind kind, string subtitle, GameObject hud, string nextScene,
@@ -85,7 +103,7 @@ namespace MetalRaptors
 
         void Update()
         {
-            if (_panel == null) return;
+            if (_panel == null || ScreenFade.IsBusy) return;
 
             int step = MenuInput.ReadStep();
             if (step != 0) _panel.MoveFocus(step);
@@ -107,15 +125,12 @@ namespace MetalRaptors
 
         void Restart() => Load(SceneManager.GetActiveScene().name);
 
-        void Load(string scene)
-        {
-            Release();
-            SceneManager.LoadScene(scene);
-        }
+        void Load(string scene) => ScreenFade.Load(scene, Release);
 
         void Release()
         {
             if (Current == this) Current = null;
+            _pending = false;
             Time.timeScale = 1f;
         }
 

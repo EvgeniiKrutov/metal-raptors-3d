@@ -1,11 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using UnityEngine;
 
 namespace MetalRaptors
 {
-    public enum CampaignOp { Wait, Say, Wave, Spawn, WaitClear, Finish }
+    public enum CampaignOp { Wait, Say, Task, TaskDone, Wave, Spawn, WaitClear, Finish }
 
     public class CampaignStep
     {
@@ -46,15 +45,19 @@ namespace MetalRaptors
 
         public static CampaignScript Parse(string source, string origin)
         {
-            var steps = new List<CampaignStep>();
-            string[] lines = source.Replace("\r\n", "\n").Split('\n');
+            var root = Json.Parse(source) as Dictionary<string, object>;
+            var list = root != null ? Value(root, "steps") as List<object> : null;
 
-            for (int i = 0; i < lines.Length; i++)
+            if (list == null)
             {
-                string line = lines[i].Trim();
-                if (line.Length == 0 || line[0] == '#') continue;
+                Debug.LogError($"CampaignScript '{origin}': no 'steps' array.");
+                return null;
+            }
 
-                CampaignStep step = ParseLine(line, origin, i + 1);
+            var steps = new List<CampaignStep>();
+            for (int i = 0; i < list.Count; i++)
+            {
+                CampaignStep step = ParseStep(list[i] as Dictionary<string, object>, origin, i);
                 if (step != null) steps.Add(step);
             }
 
@@ -64,108 +67,112 @@ namespace MetalRaptors
             return new CampaignScript(steps.ToArray());
         }
 
-        static CampaignStep ParseLine(string line, string origin, int number)
+        static CampaignStep ParseStep(Dictionary<string, object> step, string origin, int index)
         {
-            int cut = line.IndexOfAny(Space);
-            string keyword = (cut < 0 ? line : line.Substring(0, cut)).ToLowerInvariant();
-            string rest = cut < 0 ? string.Empty : line.Substring(cut + 1).Trim();
+            if (step == null)
+            {
+                Debug.LogError($"CampaignScript {origin}[{index}]: step is not an object.");
+                return null;
+            }
 
-            switch (keyword)
+            string op = Text(step, "op");
+
+            switch (op.ToLowerInvariant())
             {
                 case "wait":
-                    return new CampaignStep
-                    {
-                        op = CampaignOp.Wait,
-                        seconds = ParseSeconds(rest, origin, number),
-                    };
-                case "say": return ParseSay(rest, origin, number);
-                case "wave": return ParseWave(CampaignOp.Wave, rest, origin, number);
-                case "spawn": return ParseWave(CampaignOp.Spawn, rest, origin, number);
+                    return new CampaignStep { op = CampaignOp.Wait, seconds = Seconds(step) };
+                case "say": return ParseSay(step, origin, index);
+                case "task": return ParseTask(step, origin, index);
+                case "taskdone": return new CampaignStep { op = CampaignOp.TaskDone };
+                case "wave": return ParseWave(CampaignOp.Wave, step, origin, index);
+                case "spawn": return ParseWave(CampaignOp.Spawn, step, origin, index);
                 case "waitclear": return new CampaignStep { op = CampaignOp.WaitClear };
                 case "finish": return new CampaignStep { op = CampaignOp.Finish };
                 default:
-                    Debug.LogError($"CampaignScript {origin}:{number}: unknown op '{keyword}'.");
+                    Debug.LogError($"CampaignScript {origin}[{index}]: unknown op '{op}'.");
                     return null;
             }
         }
 
-        static CampaignStep ParseSay(string rest, string origin, int number)
+        static CampaignStep ParseSay(Dictionary<string, object> step, string origin, int index)
         {
-            int colon = rest.IndexOf(':');
-            if (colon < 0)
+            string speaker = Text(step, "speaker");
+            string key = Text(step, "line");
+
+            if (speaker.Length == 0 || key.Length == 0)
             {
-                Debug.LogError($"CampaignScript {origin}:{number}: 'say' needs '<speaker>: <text>'.");
+                Debug.LogError($"CampaignScript {origin}[{index}]: 'say' needs 'speaker' and 'line'.");
                 return null;
             }
 
-            string[] head = rest.Substring(0, colon).Split(Space, StringSplitOptions.RemoveEmptyEntries);
-            string text = rest.Substring(colon + 1).Trim();
-
-            if (head.Length == 0 || text.Length == 0)
-            {
-                Debug.LogError($"CampaignScript {origin}:{number}: 'say' needs a speaker and text.");
-                return null;
-            }
-
-            float seconds = 0f;
-            if (head.Length > 1) seconds = ParseSeconds(head[head.Length - 1], origin, number);
+            string line = DialogueLines.For(key);
+            float seconds = Seconds(step);
 
             return new CampaignStep
             {
                 op = CampaignOp.Say,
-                speaker = CampaignSpeakers.For(head[0]),
-                text = text,
-                seconds = seconds > 0f ? seconds : ReadingTime(text),
+                speaker = CampaignSpeakers.For(speaker),
+                text = line,
+                seconds = seconds > 0f ? seconds : ReadingTime(line),
             };
         }
 
-        static CampaignStep ParseWave(CampaignOp op, string rest, string origin, int number)
+        static CampaignStep ParseTask(Dictionary<string, object> step, string origin, int index)
+        {
+            string key = Text(step, "line");
+            if (key.Length == 0)
+            {
+                Debug.LogError($"CampaignScript {origin}[{index}]: 'task' needs a 'line' key.");
+                return null;
+            }
+
+            return new CampaignStep { op = CampaignOp.Task, text = DialogueLines.For(key) };
+        }
+
+        static CampaignStep ParseWave(CampaignOp op, Dictionary<string, object> step, string origin,
+            int index)
         {
             var groups = new List<EnemyGroup>();
 
-            foreach (string chunk in rest.Split(','))
+            if (Value(step, "enemies") is List<object> list)
             {
-                string[] tokens = chunk.Split(Space, StringSplitOptions.RemoveEmptyEntries);
-                if (tokens.Length == 0) continue;
-
-                PlaneModelConfig plane = PlaneModels.ById(tokens[0]);
-                if (plane == null)
+                foreach (object entry in list)
                 {
-                    Debug.LogError($"CampaignScript {origin}:{number}: unknown plane '{tokens[0]}'.");
-                    continue;
-                }
+                    if (!(entry is Dictionary<string, object> group)) continue;
 
-                int count = 1;
-                if (tokens.Length > 1)
-                {
-                    string raw = tokens[1].TrimStart('x', 'X');
-                    if (!int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out count))
+                    string id = Text(group, "plane");
+                    PlaneModelConfig plane = PlaneModels.ById(id);
+                    if (plane == null)
                     {
-                        Debug.LogError($"CampaignScript {origin}:{number}: bad count '{tokens[1]}'.");
-                        count = 1;
+                        Debug.LogError($"CampaignScript {origin}[{index}]: unknown plane '{id}'.");
+                        continue;
                     }
-                }
 
-                groups.Add(new EnemyGroup(plane, Mathf.Max(1, count)));
+                    int count = Mathf.RoundToInt(Number(group, "count", 1f));
+                    groups.Add(new EnemyGroup(plane, Mathf.Max(1, count)));
+                }
             }
 
             if (groups.Count == 0)
             {
-                Debug.LogError($"CampaignScript {origin}:{number}: '{op}' names no planes.");
+                Debug.LogError($"CampaignScript {origin}[{index}]: '{op}' names no planes.");
                 return null;
             }
 
             return new CampaignStep { op = op, groups = groups.ToArray() };
         }
 
-        static float ParseSeconds(string raw, string origin, int number)
-        {
-            if (float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out float value))
-                return Mathf.Max(0f, value);
+        static float Seconds(Dictionary<string, object> step) =>
+            Mathf.Max(0f, Number(step, "seconds", 0f));
 
-            Debug.LogError($"CampaignScript {origin}:{number}: '{raw}' is not a number of seconds.");
-            return 0f;
-        }
+        static object Value(Dictionary<string, object> obj, string key) =>
+            obj.TryGetValue(key, out object value) ? value : null;
+
+        static string Text(Dictionary<string, object> obj, string key) =>
+            Value(obj, key) is string text ? text.Trim() : string.Empty;
+
+        static float Number(Dictionary<string, object> obj, string key, float fallback) =>
+            Value(obj, key) is double number ? (float)number : fallback;
 
         static float ReadingTime(string text)
         {

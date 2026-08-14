@@ -130,7 +130,7 @@ namespace MetalRaptors
                 return null;
             }
 
-            var config = Build(id, MusicJson.Parse(asset.text) as Dictionary<string, object>);
+            var config = Build(id, Json.Parse(asset.text) as Dictionary<string, object>);
             Cache[id] = config;
             return config;
         }

@@ -18,6 +18,10 @@ namespace MetalRaptors
         const float CamShakeMagnitude = 7f;
         const float CamShakeDuration = 0.3f;
 
+        const float TaskLeft = -860f;
+        const float TaskTop = 447f;
+        const float TaskTopUnderLight = 406f;
+
         const float DitchSplashSize = 75f;
         const float SinkSpeed = 26f;
         const float SinkDriftKeep = 0.15f;
@@ -44,7 +48,10 @@ namespace MetalRaptors
         CampaignEnemies _enemies;
         CampaignScriptRunner _runner;
         DialogueBar _dialogue;
+        LevelTask _task;
+        LevelIntro _intro;
 
+        Vector2 _taskCorner;
         float _halfViewHeight;
         float _halfViewWidth;
         Vector3 _camBasePos;
@@ -90,7 +97,22 @@ namespace MetalRaptors
             PlaneScrapes.DisablePlanePlaneCollisions();
             BuildHud();
             _sound = SoundSystem.Begin(_cube, null);
-            BeginScript();
+            BeginIntro();
+            ShowBriefing();
+        }
+
+        bool IntroActive => _intro != null && _intro.Active;
+
+        void BeginIntro()
+        {
+            _intro = LevelIntro.Begin(gameObject, _cube, _shooter, StartX, _halfViewWidth, BeginScript);
+        }
+
+        void ShowBriefing()
+        {
+            if (CustomBattle.Requested) return;
+
+            LevelBriefing.Open($"LEVEL {_levelNumber}", _level.title, _level.dateline, _level.lore, _hud);
         }
 
         void BeginScript()
@@ -180,7 +202,7 @@ namespace MetalRaptors
 
         void Update()
         {
-            if (_gameOver || GameMenu.IsOpen) return;
+            if (_gameOver || GameMenu.IsOpen || LevelBriefing.IsOpen || ScreenFade.IsBusy) return;
             if (MenuInput.ReadCancel()) GameMenu.Open(GameMenuKind.Pause, Subtitle, _hud);
         }
 
@@ -212,7 +234,8 @@ namespace MetalRaptors
                 _camShake = Mathf.Max(0f, _camShake - Time.deltaTime / CamShakeDuration);
             if (_cam != null) PositionCamera(instant: false);
 
-            if (_cube != null) _cube.SetLeftWall(_camBasePos.x - _halfViewWidth + CubeHalf);
+            if (_cube != null && !IntroActive)
+                _cube.SetLeftWall(_camBasePos.x - _halfViewWidth + CubeHalf);
 
             if (_terrain != null) _terrain.UpdateStreaming(_camBasePos.x);
             if (_ceilingBar != null)
@@ -258,6 +281,20 @@ namespace MetalRaptors
         {
             if (_gameOver || _enemies == null) return;
             _enemies.Spawn(groups, _camBasePos.x, _halfViewWidth);
+        }
+
+        public void ShowTask(string text)
+        {
+            if (_gameOver || _hud == null) return;
+
+            if (_task != null) Destroy(_task.gameObject);
+            _task = LevelTask.Create(_hud.transform, _taskCorner, text);
+        }
+
+        public float CompleteTask()
+        {
+            if (_task == null || _task.IsCompleting) return 0f;
+            return _task.Complete();
         }
 
         public void CompleteLevel()
@@ -348,6 +385,9 @@ namespace MetalRaptors
                 _lightIndicator = new SearchlightIndicator(canvas.transform, new Vector2(-785f, 435f));
             _distanceText = UIFactory.CreateText(canvas.transform, "0 m", 40,
                 new Vector2(660f, 480f), new Vector2(500, 60), TextAnchor.MiddleRight, FontStyle.Bold);
+
+            _taskCorner = new Vector2(TaskLeft,
+                _lightIndicator != null ? TaskTopUnderLight : TaskTop);
             UpdateHud();
         }
 

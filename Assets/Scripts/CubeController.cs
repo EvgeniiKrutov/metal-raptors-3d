@@ -26,9 +26,6 @@ namespace MetalRaptors
 
         public float MaxTurnRate => _config != null ? _config.rotationSpeed * Mathf.Deg2Rad : 0f;
 
-        const float FallGravity = 150f;
-        const float FallInitialDrop = 25f;
-        const float FallHorizontalDrag = 1.5f;
         const float ExplosionSize = 60f;
 
         const float CollisionDamage = 10f;
@@ -40,11 +37,13 @@ namespace MetalRaptors
         Rigidbody _rb;
         ShakeEffect _shake;
         SmokeTrail _smoke;
+        PlaneFire _fire;
 
         float _heading;
         float _angularVelocity;
         float _speed;
         bool _active;
+        bool _controlled = true;
         bool _falling;
         float _lastCollisionTime = -999f;
 
@@ -85,6 +84,8 @@ namespace MetalRaptors
             _active = true;
         }
 
+        public void SetControlled(bool value) => _controlled = value;
+
         public void Stop()
         {
             _active = false;
@@ -101,6 +102,7 @@ namespace MetalRaptors
             _active = false;
             _falling = false;
             if (_smoke != null) _smoke.Clear();
+            if (_fire != null) _fire.Extinguish();
             if (_rb == null) return;
 
             _rb.useGravity = false;
@@ -117,13 +119,11 @@ namespace MetalRaptors
 
             if (_falling)
             {
-                Vector3 v = _rb.linearVelocity;
-                v.x = Mathf.MoveTowards(v.x, 0f, Mathf.Abs(v.x) * FallHorizontalDrag * dt);
-                _rb.linearVelocity = v;
+                PlaneFall.Step(_rb, dt);
                 return;
             }
 
-            var kb = Keyboard.current;
+            var kb = _controlled ? Keyboard.current : null;
             bool left  = kb != null && (kb.aKey.isPressed || kb.leftArrowKey.isPressed);
             bool right = kb != null && (kb.dKey.isPressed || kb.rightArrowKey.isPressed);
 
@@ -196,13 +196,10 @@ namespace MetalRaptors
             _falling = true;
             OnShotDown?.Invoke();
 
-            Physics.gravity = new Vector3(0f, -FallGravity, 0f);
-            _rb.useGravity = true;
-            Vector3 v = _rb.linearVelocity;
-            v.y -= FallInitialDrop;
-            _rb.linearVelocity = v;
-            _rb.angularVelocity = new Vector3(0f, 0f,
-                (UnityEngine.Random.value < 0.5f ? -1f : 1f) * 2.5f);
+            if (_smoke != null) _smoke.Ignite(ExplosionSize);
+            _fire = PlaneFire.Ignite(gameObject, ExplosionSize);
+
+            PlaneFall.Begin(_rb);
         }
 
         void OnTriggerEnter(Collider other)
@@ -233,6 +230,7 @@ namespace MetalRaptors
         void HideModel()
         {
             if (_smoke != null) _smoke.Clear();
+            if (_fire != null) _fire.Extinguish();
 
             foreach (Transform child in transform)
                 child.gameObject.SetActive(false);

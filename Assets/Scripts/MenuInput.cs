@@ -41,6 +41,20 @@ namespace MetalRaptors
                    || (pad != null && pad.buttonSouth.wasPressedThisFrame);
         }
 
+        public static bool ReadAnyKey()
+        {
+            Keyboard kb = Keyboard.current;
+            if (kb != null && kb.anyKey.wasPressedThisFrame) return true;
+
+            Gamepad pad = Gamepad.current;
+            if (pad != null && (pad.buttonSouth.wasPressedThisFrame || pad.buttonEast.wasPressedThisFrame
+                                || pad.buttonWest.wasPressedThisFrame || pad.buttonNorth.wasPressedThisFrame
+                                || pad.startButton.wasPressedThisFrame)) return true;
+
+            Mouse mouse = Mouse.current;
+            return mouse != null && mouse.leftButton.wasPressedThisFrame;
+        }
+
         public static bool ReadCancel()
         {
             Keyboard kb = Keyboard.current;

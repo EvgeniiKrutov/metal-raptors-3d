@@ -87,9 +87,11 @@ carrier GameObject so it outlives the visual (3D rolloff would mute it at the ca
 
 ### Crash flow
 
-Every player plane that reaches the ground explodes — whether it was shot down and fell
-(`_falling`) or flew straight into the dirt under control. `CubeController.OnCollisionEnter`
-spawns the explosion, hides the plane model, then raises `OnCrashed`.
+**Nothing explodes in the air.** Zero health on either side starts a fall (see "Death fall"
+below); the explosion only ever happens where the plane meets the ground. Every plane that
+reaches the ground explodes — whether it was shot down and fell (`_falling`) or flew straight
+into the dirt under control. `CubeController.OnCollisionEnter` spawns the explosion, hides the
+plane model, then raises `OnCrashed`; `EnemyController.OnCollisionEnter` calls `Explode`.
 
 The blast is spawned a beat before the plane is removed (`Explosion.RemovalDelay`, ~0.15 s),
 so the plane is briefly visible inside the growing fireball and then vanishes into it rather
@@ -100,6 +102,60 @@ than blinking out the instant the effect appears. This applies to both sides:
 - **Enemy** (`EnemyController.Explode`) freezes the wreck's velocity and drops its health bar
   and collider immediately — so it can't drift, be hit again, or leave a floating bar — then
   removes the whole object with `Destroy(gameObject, RemovalDelay)`.
+
+Because the last enemy now dies on the ground rather than in the air, `LevelController` holds
+the win screen back until the wreck is gone (`WinAfterWreck` waits on the destroyed
+`EnemyController` reference), so the completed menu's `Time.timeScale = 0` can't freeze a plane
+mid-fall. If the player was shot down in the meantime the win is dropped and the fail screen
+takes over as usual.
+
+## Death fall and burning wreck (`PlaneFall.cs`, `PlaneFire.cs`)
+
+At zero health a plane is *not* destroyed — it becomes a burning wreck that falls. Both sides
+run the same sequence (`CubeController.BeginFall`, `EnemyController.BeginFall`):
+
+1. `SmokeTrail.Ignite` — the damage trail switches to its heavy burning mode (below).
+2. `PlaneFire.Ignite` — flames on the model.
+3. `PlaneFall.Begin` — nose kicked down, a random tumble spin about Z.
+
+`PlaneFall` (see docs/flight-model.md) holds the shared fall constants and the per-step
+integration both controllers call from their `FixedUpdate`. The wreck keeps its collider so the
+ground contact still registers; it is out of the fight the moment it starts falling — it can't
+be damaged again, can't scrape, can't fire, and `EnemyController.IsAlive` goes false so the
+level's kill count, the campaign wave logic and its engine voice all drop it immediately rather
+than waiting for the impact.
+
+An enemy wreck that never reaches ground (its terrain chunk streamed away behind the camera, a
+fall out over the sea) is removed silently after `PlaneFall.Timeout` instead of hanging in the
+scene forever — no explosion, since it is well off camera by then.
+
+### Flames (`PlaneFire.cs`)
+
+`PlaneFire.Ignite(plane, size)` parents a `Fire` root to the plane's **physics body**, so the
+flames ride the wreck through its tumble, and hangs five `BlobMesh` blobs off it (the same
+faceted shape the explosion and clouds use) clustered at the **nose**, over the engine, each
+jittered a little sideways and back along the fuselage so the fire isn't a single ball.
+
+The nose anchor is measured at ignition, not assumed: models are not centred on the body pivot,
+so `NoseLocal` walks the eight corners of the **hitbox mesh's** local bounds into body space and
+takes the front-most point along the body's local `+X` (the nose axis every plane is built
+along), at that mesh's lateral centre line. It is measured in body space rather than from world
+`Renderer.bounds` because the plane is already banking — and often tumbling — when it catches
+fire, and a world AABB inflates and shifts under rotation. The plane's hitbox is the fuselage
+(the biggest mesh, see `PlaneFactory.AddPlaneCollider`), which is also why the search starts
+there rather than at every child renderer: the searchlight's beam shaft is a child renderer too,
+and it reaches hundreds of units ahead of the nose. A plane with no readable hitbox renderer
+falls back to a fixed forward offset.
+
+Each flame flickers on its own clock: a randomised rate (5–10 Hz) and phase drive a two-sine
+scale pulse — so no two flames beat together and the fire never looks like a pulsing sphere —
+while the colour slides between deep orange `(1, 0.32, 0.05)` and hot yellow `(1, 0.86, 0.38)`
+with emission at 2.6× colour. Flames cast no shadows and carry no collider or rigidbody.
+
+`Extinguish()` destroys the fire root and, through `OnDestroy`, its per-flame meshes and
+materials (each flame needs its own material to flicker independently). It is called when the
+wreck explodes on impact, when the player's model is hidden, and when a ditching player sinks;
+a wreck removed outright takes its fire down with the `GameObject`.
 
 For all fail cases the fail screen (`GameMenuKind.Failed`, see `docs/game-menu.md`) is delayed
 until the blast finishes: `LevelController` / `CampaignLevelController` freeze the plane and
@@ -189,6 +245,12 @@ to smoke, it smokes until it's gone. `Arm` is idempotent, so it's safe to call a
 subsequent hit. The emitter lives on the plane's physics body (so it always knows the current
 nose axis and emits from the tail, the opposite end) and steadily spawns dark, half-transparent
 cube puffs that tumble, drift backward and slightly upward, shrink, and fade out.
+
+`Ignite` is the burning-wreck escalation of the same emitter, called when a plane's health
+reaches zero: it arms the trail (if damage hadn't already) and switches it to a shorter emit
+interval and a much larger puff size, so the falling wreck lays down a thick column of smoke
+instead of the thin damage wisp. Everything else — world-space puffs, the live list, `Clear` —
+is unchanged, so a burning trail dies exactly like a damage trail.
 
 The puffs themselves are spawned in **world space, not parented to the plane** — once born
 they hang in the air and fall behind as the plane flies on, rather than riding along with it.

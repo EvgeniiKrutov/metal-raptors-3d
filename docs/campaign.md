@@ -43,7 +43,11 @@ and what extra meshes ride along with it).
   ceiling at the top, it blocks movement (slide along it, no damage, no crash) and never
   auto-turns the plane — the pilot keeps full control of the heading. Implemented as
   `CubeController.Initialize(..., hardLeftWall: true)` + `SetLeftWall`, which replaces the
-  fixed levels' soft `FlightSteering.EdgeSteer` boundaries.
+  fixed levels' soft `FlightSteering.EdgeSteer` boundaries. The wall is armed only after the
+  intro, since the plane flies in from behind it (docs/level-intro.md).
+- A level **opens on an intro**: the frame holds still, the plane flies in from off the left
+  edge with the controls dead, and the script's first radio call plays between two black film
+  bars. Control comes back during the fly-in (docs/level-intro.md).
 - The daytime is authored on the definition: level 1 flies at dawn (`Daytime.Morning`). Sky,
   fog and ambient reuse the same sky classes as the fixed terrain levels.
 - A **custom battle** is the one exception. When `CustomBattle.Requested` is set (the menu's
@@ -107,6 +111,12 @@ the bottom of the screen, timed pauses, enemy waves, and the win condition. Leve
 docs/campaign-scripts.md for the file format, the dialogue bar, and how the enemy AI was
 adapted to a forward-scrolling world, and docs/campaign-ww1-scenario.md for the WW1 era's
 plot, cast, loading-screen text and every radio line (story only — none of it is wired up).
+docs/campaign-ww1-portraits.md holds the avatar generation prompts for those speakers.
+
+## Pre-level briefing
+
+`CampaignDefinition` also carries the briefing text — `title`, `dateline` and `lore` — shown on
+a full-screen page before the level starts. Custom battles skip it. See docs/level-briefing.md.
 
 ## Shared pieces extracted in this change
 

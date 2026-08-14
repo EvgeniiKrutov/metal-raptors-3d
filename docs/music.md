@@ -30,7 +30,7 @@ intro→loop handoff is sample-accurate on the DSP clock.
 | File | Role |
 | --- | --- |
 | `Assets/Music/Resources/Music/*.json` | The soundtracks (note data). |
-| `MusicJson.cs` | Minimal JSON reader (objects, arrays, strings, numbers) — the note tuples mix strings and numbers, which `JsonUtility` cannot read. |
+| `Json.cs` | Minimal JSON reader (objects, arrays, strings, numbers) — the note tuples mix strings and numbers, which `JsonUtility` cannot read. Shared with the campaign scripts (docs/campaign-scripts.md). |
 | `MusicConfig.cs` | Data model and `MusicLibrary`, which loads + parses + caches configs from `Resources/Music/<id>`. Pitch names resolve to frequencies here (A4 = 440 Hz, `#`/`b` supported). |
 | `MusicSynth.cs` | Bake entry point + the legacy chiptune renderer. `Bake(config, rate)` is pure sample math; `ToClips` wraps the result in `AudioClip`s. |
 | `MusicSynthRetro.cs` | The stereo retrowave renderer. |

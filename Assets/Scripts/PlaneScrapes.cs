@@ -45,12 +45,27 @@ namespace MetalRaptors
                     var a = Scratch[i];
                     var b = Scratch[j];
                     if (a == null || b == null) continue;
-                    if (((Vector2)a.transform.position - (Vector2)b.transform.position).sqrMagnitude > reachSq)
-                        continue;
+                    if (!ModelsOverlap(a, b, reachSq)) continue;
 
                     a.Scrape();
                     b.Scrape();
                 }
+        }
+
+        static bool ModelsOverlap(EnemyController a, EnemyController b, float coreReachSq)
+        {
+            float broad = (a.ModelSize + b.ModelSize) * 0.5f;
+            float gapSq = ((Vector2)a.transform.position - (Vector2)b.transform.position).sqrMagnitude;
+            if (gapSq > broad * broad) return false;
+
+            Collider ca = a.Hitbox;
+            Collider cb = b.Hitbox;
+            if (ca == null || cb == null || !ca.enabled || !cb.enabled) return gapSq <= coreReachSq;
+
+            Transform ta = ca.transform;
+            Transform tb = cb.transform;
+            return Physics.ComputePenetration(ca, ta.position, ta.rotation,
+                cb, tb.position, tb.rotation, out _, out _);
         }
     }
 }

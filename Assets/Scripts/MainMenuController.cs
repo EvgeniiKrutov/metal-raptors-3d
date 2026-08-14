@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace MetalRaptors
@@ -55,7 +54,7 @@ namespace MetalRaptors
 
         void Update()
         {
-            if (_group == null) return;
+            if (_group == null || ScreenFade.IsBusy) return;
 
             int step = MenuInput.ReadStep();
             if (step != 0) _group.MoveFocus(step);
@@ -70,10 +69,10 @@ namespace MetalRaptors
         MenuPanel BuildMainPanel(Transform column)
         {
             var panel = new MenuPanel(column, "Main Panel", MenuTheme.ListTop);
-            panel.AddNav("career", ShowEras);
+            panel.AddNav("career", () => ScreenFade.Swap(ShowEras));
             panel.AddNav("challenges", null, interactable: false);
-            panel.AddNav("custom battle", ShowCustom);
-            panel.AddNav("garage", () => SceneManager.LoadScene(SceneNames.Garage));
+            panel.AddNav("custom battle", () => ScreenFade.Swap(ShowCustom));
+            panel.AddNav("garage", () => ScreenFade.Load(SceneNames.Garage));
             panel.AddNav("online battles", null, interactable: false);
             panel.AddNav("options", null, interactable: false);
             return panel;
@@ -83,15 +82,15 @@ namespace MetalRaptors
         {
             var panel = new MenuPanel(column, "Challenges Panel", MenuTheme.ListTop);
             panel.AddCaption("challenges");
-            panel.AddNav("level 1", () => SceneManager.LoadScene(SceneNames.Level1));
+            panel.AddNav("level 1", () => ScreenFade.Load(SceneNames.Level1));
 
             bool unlocked = GameManager.Instance == null || GameManager.Instance.IsLevelUnlocked(2);
             MenuItemView level2 = panel.AddNav("level 2",
-                () => SceneManager.LoadScene(SceneNames.Level2), unlocked);
+                () => ScreenFade.Load(SceneNames.Level2), unlocked);
             if (!unlocked) panel.AddTag(level2, "locked");
 
             panel.AddGap(MenuTheme.SectionGap);
-            panel.AddNav("back", () => ShowHome(_main));
+            panel.AddNav("back", GoHome);
             return panel;
         }
 
@@ -111,7 +110,8 @@ namespace MetalRaptors
             for (int i = 0; i < eras.Length; i++)
             {
                 int index = i;
-                _eras.AddCard(eras[i].Title, eras[i].Years, eras[i].Unlocked, () => ShowEra(index));
+                _eras.AddCard(eras[i].Title, eras[i].Years, eras[i].Unlocked,
+                    () => ScreenFade.Swap(() => ShowEra(index)));
             }
 
             _eras.Layout();
@@ -126,10 +126,10 @@ namespace MetalRaptors
 
             _eraPanel = new MenuPanel(page, "Era Panel", MenuTheme.ListTop);
             _eraPanel.AddNav("start", StartCampaign);
-            _eraPanel.AddNav("level select", ShowLevels);
+            _eraPanel.AddNav("level select", () => ScreenFade.Swap(ShowLevels));
 
             _eraPanel.AddGap(MenuTheme.SectionGap);
-            _eraPanel.AddNav("back", () => ShowHome(_main));
+            _eraPanel.AddNav("back", GoHome);
 
             _levelsPanel = BuildLevelsPanel(page);
             return page.gameObject;
@@ -148,7 +148,7 @@ namespace MetalRaptors
             }
 
             panel.AddGap(MenuTheme.SectionGap);
-            panel.AddNav("back", ShowEraPanel);
+            panel.AddNav("back", () => ScreenFade.Swap(ShowEraPanel));
             return panel;
         }
 
@@ -166,7 +166,7 @@ namespace MetalRaptors
             _customPanel.AddNav("start level", StartCustomBattle);
 
             _customPanel.AddGap(MenuTheme.SectionGap);
-            _customPanel.AddNav("back to menu", () => ShowHome(_main));
+            _customPanel.AddNav("back to menu", GoHome);
 
             Transform band = MenuLayout.CreateRegion(screen, "Custom Preview", MenuTheme.ColumnFraction, 1f, 0f);
             _mapPreview = new MenuPreviewCard(band, PreviewTitle(), Vector2.zero);
@@ -191,7 +191,7 @@ namespace MetalRaptors
         void StartCustomBattle()
         {
             CustomBattle.Request(BattleMaps.All[_mapIndex], _daytime);
-            SceneManager.LoadScene(SceneNames.CampaignLevel1);
+            ScreenFade.Load(SceneNames.CampaignLevel1);
         }
 
         static void StartCampaign() => StartCampaignLevel(CampaignRun.FirstLevel);
@@ -200,7 +200,7 @@ namespace MetalRaptors
         {
             CustomBattle.Clear();
             CampaignRun.Request(number);
-            SceneManager.LoadScene(SceneNames.CampaignLevel1);
+            ScreenFade.Load(SceneNames.CampaignLevel1);
         }
 
         void ShowEraHeader(int index)
@@ -209,6 +209,8 @@ namespace MetalRaptors
             _erasTitle.text = era.Title;
             _erasDescription.text = era.Description;
         }
+
+        void GoHome() => ScreenFade.Swap(() => ShowHome(_main));
 
         void ShowHome(MenuPanel panel)
         {
@@ -268,10 +270,10 @@ namespace MetalRaptors
         {
             if (_screen == MenuScreen.Era && _group == _levelsPanel)
             {
-                ShowEraPanel();
+                ScreenFade.Swap(ShowEraPanel);
                 return;
             }
-            if (_screen != MenuScreen.Home || _homePanel != _main) ShowHome(_main);
+            if (_screen != MenuScreen.Home || _homePanel != _main) GoHome();
         }
     }
 }

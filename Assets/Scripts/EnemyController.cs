@@ -22,7 +22,11 @@ namespace MetalRaptors
 
         public float CurrentHealth { get; private set; }
 
-        public bool IsAlive => !_dead;
+        public bool IsAlive => !_dead && !_falling;
+
+        public Collider Hitbox => _collider;
+
+        public float ModelSize => _bodyRadius > 0f ? _bodyRadius * 2f : 30f;
 
         enum AiState { Attack, Fly, Evade, Recover, Return }
         enum EvadePhase { Roll, Jitter, Unroll }
@@ -37,6 +41,9 @@ namespace MetalRaptors
         float _heading;
         float _angularVelocity;
         bool _dead;
+        bool _falling;
+        bool _reported;
+        float _fallTimer;
         bool _standDown;
 
         float _minX, _maxX, _groundY, _ceilingY, _edgeMargin;
@@ -55,6 +62,7 @@ namespace MetalRaptors
         float _lastCollisionTime = -999f;
         ShakeEffect _shake;
         SmokeTrail _smoke;
+        PlaneFire _fire;
 
         GameObject _bulletTemplate;
         AudioSource _audio;
@@ -120,6 +128,13 @@ namespace MetalRaptors
             if (_dead || _config == null) return;
 
             float dt = Time.fixedDeltaTime;
+
+            if (_falling)
+            {
+                TickFall(dt);
+                return;
+            }
+
             _stateTimer = Mathf.Max(0f, _stateTimer - dt);
             _jitterTimer = Mathf.Max(0f, _jitterTimer - dt);
             _fireCooldown -= dt;
@@ -152,6 +167,14 @@ namespace MetalRaptors
 
             if (!_standDown && _state != AiState.Fly && _state != AiState.Return)
                 UpdateFiring();
+        }
+
+        void TickFall(float dt)
+        {
+            PlaneFall.Step(_rb, dt);
+
+            _fallTimer += dt;
+            if (_fallTimer >= PlaneFall.Timeout) RemoveWreck();
         }
 
         bool CheckGroundAvoidance()
@@ -362,18 +385,48 @@ namespace MetalRaptors
 
         public void TakeDamage(float amount)
         {
-            if (_dead) return;
+            if (_dead || _falling) return;
             ApplyDamage(amount);
 
-            if (!_dead && (_state == AiState.Attack || _state == AiState.Fly)) EnterEvade();
+            if (!_falling && (_state == AiState.Attack || _state == AiState.Fly)) EnterEvade();
         }
 
         void ApplyDamage(float amount)
         {
             CurrentHealth = Mathf.Max(0f, CurrentHealth - amount);
             UpdateHealthBar();
-            if (CurrentHealth < SmokeHealthThreshold && _smoke != null) _smoke.Arm(_bodyRadius * 2f);
-            if (CurrentHealth <= 0f) Explode();
+            if (CurrentHealth < SmokeHealthThreshold && _smoke != null) _smoke.Arm(ModelSize);
+            if (CurrentHealth <= 0f) BeginFall();
+        }
+
+        void BeginFall()
+        {
+            if (_dead || _falling) return;
+            _falling = true;
+
+            if (_smoke != null) _smoke.Ignite(ModelSize);
+            _fire = PlaneFire.Ignite(gameObject, ModelSize);
+
+            PlaneFall.Begin(_rb);
+            if (_bar != null) Destroy(_bar.gameObject);
+
+            ReportDestroyed();
+        }
+
+        void RemoveWreck()
+        {
+            _dead = true;
+            if (_smoke != null) _smoke.Clear();
+
+            ReportDestroyed();
+            Destroy(gameObject);
+        }
+
+        void ReportDestroyed()
+        {
+            if (_reported) return;
+            _reported = true;
+            OnDestroyed?.Invoke(this);
         }
 
         public void Explode()
@@ -381,14 +434,15 @@ namespace MetalRaptors
             if (_dead) return;
             _dead = true;
 
-            Explosion.Spawn(transform.position, _bodyRadius > 0f ? _bodyRadius * 2f : 30f);
+            Explosion.Spawn(transform.position, ModelSize);
             if (_smoke != null) _smoke.Clear();
+            if (_fire != null) _fire.Extinguish();
 
             if (_rb != null) { _rb.linearVelocity = Vector3.zero; _rb.angularVelocity = Vector3.zero; }
             if (_collider != null) _collider.enabled = false;
             if (_bar != null) Destroy(_bar.gameObject);
 
-            OnDestroyed?.Invoke(this);
+            ReportDestroyed();
             Destroy(gameObject, Explosion.RemovalDelay);
         }
 
@@ -408,15 +462,15 @@ namespace MetalRaptors
 
         public bool Scrape()
         {
-            if (_dead) return false;
+            if (_dead || _falling) return false;
             if (Time.time - _lastCollisionTime < CollisionCooldown) return false;
             _lastCollisionTime = Time.time;
 
             ApplyDamage(CollisionDamage);
-            if (!_dead)
+            if (!_falling)
             {
                 if (_shake != null) _shake.Play();
-                Sparks.Spawn(transform.position, _bodyRadius > 0f ? _bodyRadius * 2f : 30f);
+                Sparks.Spawn(transform.position, ModelSize);
             }
             return true;
         }

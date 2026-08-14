@@ -58,20 +58,33 @@ Outside the bands the caller's own input rate passes through unchanged.
 Campaign mode replaces this with a hard left wall instead (see
 docs/campaign.md).
 
-## Shot-down fall
+## Shot-down fall (`PlaneFall`)
 
-`CubeController.BeginFall` hands the plane to Unity's own rigidbody gravity
-rather than a hand-stepped velocity edit, so the fall is genuine accelerating
-projectile motion. `FallGravity` (~15× Unity's default 9.81) is scaled up
-because the world is compressed relative to real scale — a plane spans ~60
-units in a 700 m arena, so real gravity would read as a slow, weightless
-drift. `BeginFall` also kicks the nose down and sets `Physics.gravity`
-directly (switching `useGravity` on); only the shot-down player ever uses
-gravity — every plane spawns with it off, and enemies explode outright
-instead of falling — so overriding the global setting here affects nothing
-else in the scene. `FixedUpdate` only bleeds the leftover forward momentum
-once falling, so the plane pitches into a dive instead of gliding sideways
-down.
+Zero health never destroys a plane outright on either side: the player and
+every enemy fighter fall out of the sky, burning, and only explode where they
+hit the ground (see docs/effects.md). Both `CubeController.BeginFall` and
+`EnemyController.BeginFall` go through the shared static `PlaneFall`, so the
+two sides fall identically:
+
+- `Begin` kicks the nose down (`InitialDrop`) and sets a random tumble spin
+  about Z — the only rotation axis a plane's constraints leave free.
+- `Step`, called from the falling branch of each controller's `FixedUpdate`,
+  integrates `Gravity` into the rigidbody's velocity itself and bleeds the
+  leftover forward momentum (`HorizontalDrag`), so the plane pitches into a
+  dive instead of gliding sideways down.
+
+`Gravity` (~15× Unity's default 9.81) is scaled up because the world is
+compressed relative to real scale — a plane spans ~60 units in a 700 m arena,
+so real gravity would read as a slow, weightless drift. It is integrated by
+hand rather than by switching `useGravity` on: every plane spawns with gravity
+off and the earlier player-only version had to override the *global*
+`Physics.gravity` to get the scaled-up pull, which is scene-wide state for
+what is a per-plane effect — and now that enemies fall too, more than one
+plane can be falling at once.
+
+`PlaneFall.Timeout` is the enemy-side safety net: a wreck that has been
+falling that long without an impact (its terrain chunk streamed away behind
+the camera) is removed rather than left falling forever.
 
 ## Collision & damage (plane-to-plane scrapes)
 
@@ -96,15 +109,34 @@ contacts. Note the layer opt-out is global Unity state that survives scene
 loads, so playing a skirmish first used to mask the campaign bug.
 
 `PlaneScrapes.Check` runs every physics step from each controller's
-`FixedUpdate`: any two planes whose small fuselage hitboxes overlap (radius far
-smaller than the ~60 m model span, so only a real fuselage overlap counts — a
-wingtip clipping a tail slips past) take a scrape via `CubeController.Scrape` /
+`FixedUpdate` and sweeps two kinds of pair, with **two different hit tests**.
+
+**Player against an enemy** is a fuselage-core test: `HitboxRadius` is 15 m
+against a ~60 m model span, so the two origins have to come within 30 m and
+only a real fuselage overlap counts — a wingtip clipping a tail slips past.
+That tolerance is deliberate: the player aims, and a core that reads as
+"I flew *into* him" is what a rammed hit should feel like.
+
+**Enemy against enemy** is an exact test — a cheap origin-distance broad phase
+at the pair's mean model span, then `Physics.ComputePenetration` on the two
+planes' real convex hulls (`EnemyController.Hitbox`, convex by construction in
+`PlaneFactory.AddPlaneCollider`), so a scrape lands exactly when the two models
+actually intersect. The fuselage core is the *wrong* test here and was why
+enemies flew through each other unharmed while the player's rams worked: no AI
+plane ever aims at another, so two fighters converging on the player cross at
+an angle and their origins rarely close the last 30 m, even as their silhouettes
+plainly collide. Hulls have no such blind spot. If either collider is missing or
+already disabled the pair falls back to the fuselage core.
+
+Either way the pair takes a scrape via `CubeController.Scrape` /
 `EnemyController.Scrape`, which shaves off a fixed amount of health on both
 planes, shivers the model and throws sparks, gated by a per-plane cooldown so
-one encounter (which can span several frames of overlap) is a single hit. A
-scrape the player is part of also kicks the camera with a short, decaying
-jitter applied on top of the normal follow smoothing (kept separate so the
-jitter can't feed back into the follow itself). Ground contact is a separate
+one encounter (which can span several frames of overlap) is a single hit — an
+enemy pair that stays interlocked therefore grinds itself down 10 points every
+0.5 s until one of them falls. A scrape the player is part of also kicks the
+camera with a short, decaying jitter applied on top of the normal follow
+smoothing (kept separate so the jitter can't feed back into the follow itself).
+Ground contact is a separate
 path (`OnCollisionEnter`): bullets never reach it (they already apply damage
 via `TakeDamage`), and plane-plane contact normally can't reach it either since
 collisions are disabled — but the handler swallows a stray contact
@@ -151,5 +183,11 @@ A world-space health bar (dark backplate + emissive fill, left-anchored pivot
 scaled by the health fraction) floats above the fighter, deliberately outside
 its hierarchy so the fighter's banking never tilts it. Below a shared health
 threshold both sides start trailing damage smoke (see "Collision & damage"
-above); at zero health the fighter explodes via the same `Explosion` /
-removal-delay sequence as the player's crash (docs/effects.md).
+above); at zero health the fighter stops flying the AI entirely and falls as a
+burning wreck (`PlaneFall`, above), exploding on impact via the same
+`Explosion` / removal-delay sequence as the player's crash (docs/effects.md).
+The kill is reported to the level the moment the fall starts, not when the
+wreck lands, so `IsAlive`, the level's enemy list and the campaign's wave
+pacing all treat a falling fighter as already dead — its engine voice cuts
+out, it can't be damaged or scraped again, and the next wave doesn't wait on
+the wreck.

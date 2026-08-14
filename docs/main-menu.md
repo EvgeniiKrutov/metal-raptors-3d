@@ -37,7 +37,18 @@ UI — the `MainMenu` scene only holds a camera, a light and the controller obje
 | `CareerEras.cs` | The four eras: title, years, description, unlocked. |
 | `MenuLayout.cs` | The column/page/band rects and the title + accent rule, shared with the in-level menu. |
 | `MenuInput.cs` | The navigation keys (`ReadStep` / `ReadAdjust` / `ReadSubmit` / `ReadCancel`), shared with the in-level menu. |
+| `ScreenFade.cs` | The fade to black between every two screens, in this scene or across a `LoadScene`. |
 | `MainMenuController.cs` | Composes the column, the career pages, and reads navigation input. |
+
+## Moving between screens
+
+No screen here is swapped in directly. Going forward (`career`, an era card,
+`level select`, `custom battle`) and going back (a `back` entry, `Escape`) both hand the
+swap to `ScreenFade.Swap`, which fades the current screen to black, applies it, and fades
+the next one up; leaving the scene (`garage`, a challenge, `start`, a campaign level, a
+custom battle) hands the scene name to `ScreenFade.Load`. `Update` bails while
+`ScreenFade.IsBusy`, so a key pressed mid-fade is dropped instead of stacking a second
+transition on the first. `screen-fade.md` has the rest.
 | `UIFactory.cs` | `CreateLabel` / `CreateInlineLabel` / `CreateBottomLabel` / `CreateParagraph` / `CreateRule` primitives and the project-wide font lookup. |
 
 ## Structure

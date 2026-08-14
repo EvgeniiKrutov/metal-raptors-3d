@@ -4,7 +4,7 @@ using System.Text;
 
 namespace MetalRaptors
 {
-    public static class MusicJson
+    public static class Json
     {
         public static object Parse(string text)
         {

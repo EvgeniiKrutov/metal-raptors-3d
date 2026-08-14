@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace MetalRaptors
@@ -95,6 +94,8 @@ namespace MetalRaptors
 
         void Update()
         {
+            if (ScreenFade.IsBusy) return;
+
             int adjust = MenuInput.ReadAdjust();
             if (adjust != 0) Step(adjust);
 
@@ -102,7 +103,7 @@ namespace MetalRaptors
             if (step != 0) _panel.MoveFocus(step);
 
             if (MenuInput.ReadSubmit()) _panel.ActivateFocused();
-            if (MenuInput.ReadCancel()) SceneManager.LoadScene(SceneNames.MainMenu);
+            if (MenuInput.ReadCancel()) ScreenFade.Load(SceneNames.MainMenu);
         }
 
         void Step(int delta)

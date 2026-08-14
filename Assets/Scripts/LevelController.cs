@@ -192,7 +192,15 @@ namespace MetalRaptors
             _enemies.Remove(enemy);
 
             if (!_gameOver && _enemies.Count == 0 && _cube != null && _cube.CurrentHealth > 0f)
-                WinLevel();
+                StartCoroutine(WinAfterWreck(enemy));
+        }
+
+        IEnumerator WinAfterWreck(EnemyController wreck)
+        {
+            while (wreck != null) yield return null;
+
+            if (_cube != null && _cube.CurrentHealth <= 0f) yield break;
+            WinLevel();
         }
 
         void SetupCamera()
@@ -226,7 +234,7 @@ namespace MetalRaptors
 
         void Update()
         {
-            if (_gameOver || GameMenu.IsOpen) return;
+            if (_gameOver || GameMenu.IsOpen || ScreenFade.IsBusy) return;
             if (MenuInput.ReadCancel()) GameMenu.Open(GameMenuKind.Pause, Subtitle, _hud);
         }
 

@@ -30,6 +30,12 @@ the level. The right band is black at 60%, so the frozen scene reads through it.
 | `Failed` | `LEVEL FAILED` | restart · options · quit to menu | the crash coroutine, after `Explosion.Duration` |
 | `Completed` | `LEVEL COMPLETED` | restart · next level · options · quit to menu | the last enemy dying |
 
+**Pause opens and closes instantly; fail and win fade in.** `Pause` is a toggle over a
+screen that is still there, so `GameMenu.Open` builds it on the spot and `resume` tears it
+down on the spot. `Failed` and `Completed` are a move to another screen, so they go through
+`ScreenFade.Swap` — the level fades to black and the result screen fades up out of it. Every
+entry that leaves the scene goes through `ScreenFade.Load`. See `screen-fade.md`.
+
 * **resume** (pause only) closes the menu and unfreezes, the same thing `Escape` does.
 * **restart** reloads the active scene. A custom battle restarts as the same battle —
   `CustomBattle` is static and survives the reload.
@@ -77,6 +83,7 @@ does not immediately close it again.
 | `GameMenu.cs` | The overlay: bands, title, subtitle, entries, freeze, and its own input loop. |
 | `MenuLayout.cs` | `CreatePage` / `CreateRegion` / `CreateScreen` / `CreateBand` / `BuildTitle`, shared with the main menu. |
 | `MenuInput.cs` | `ReadStep` / `ReadAdjust` / `ReadSubmit` / `ReadCancel`, shared with the main menu. |
+| `ScreenFade.cs` | The fade to black either side of the fail/win screens and of every scene this menu loads. |
 
 `MenuLayout` and `MenuInput` were lifted out of `MainMenuController` when this screen landed
 — it needs the same 15%-down, 120px-inset column and the same navigation keys, and neither

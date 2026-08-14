@@ -149,7 +149,7 @@ namespace MetalRaptors
 
         void Update()
         {
-            if (GameMenu.IsOpen) return;
+            if (GameMenu.IsOpen || LevelBriefing.IsOpen) return;
 
             var kb = Keyboard.current;
             if (kb != null && kb.tKey.wasPressedThisFrame) SetOn(!_on);

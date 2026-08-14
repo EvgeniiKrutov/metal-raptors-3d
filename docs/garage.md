@@ -314,7 +314,10 @@ visibly changes it.
   turn* above); releasing eases it back. The band overlaps the right triangle, so a click
   there both switches the plane and opens a drag — harmless, since a click travels far too
   little to turn anything visibly.
-* `Enter` / `Space` selects; `Escape` returns to the main menu. There is no `back` entry.
+* `Enter` / `Space` selects; `Escape` returns to the main menu through `ScreenFade.Load`, so
+  the garage fades to black and the menu fades up out of it (`screen-fade.md`). There is no
+  `back` entry. Stepping planes is not a screen change and never fades — `Update` only bails
+  while `ScreenFade.IsBusy`, which is the departing transition itself.
 
 ## Selecting
 

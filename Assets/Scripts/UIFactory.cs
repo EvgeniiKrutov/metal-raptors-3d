@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
@@ -270,6 +271,52 @@ namespace MetalRaptors
 
             if (pointsLeft) _triangleLeft = sprite;
             else _triangleRight = sprite;
+            return sprite;
+        }
+
+        static readonly Dictionary<int, Sprite> Rings = new Dictionary<int, Sprite>();
+
+        public static Sprite RingSprite(float thickness)
+        {
+            int key = Mathf.RoundToInt(Mathf.Clamp(thickness, 0.02f, 0.5f) * 1000f);
+            if (Rings.TryGetValue(key, out Sprite cached) && cached != null) return cached;
+
+            const int size = 128;
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            {
+                name = $"Ring {key}",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+                hideFlags = HideFlags.HideAndDontSave,
+            };
+
+            const float outer = 0.5f;
+            const float feather = 1f / size;
+            float inner = outer - key / 1000f;
+
+            var pixels = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                float v = (y + 0.5f) / size - 0.5f;
+                for (int x = 0; x < size; x++)
+                {
+                    float u = (x + 0.5f) / size - 0.5f;
+                    float r = Mathf.Sqrt(u * u + v * v);
+
+                    float alpha = Mathf.Clamp01((outer - feather * 0.5f - r) / feather);
+                    if (inner > 0f) alpha *= Mathf.Clamp01((r - inner) / feather);
+
+                    pixels[y * size + x] = new Color32(255, 255, 255, (byte)(alpha * 255f));
+                }
+            }
+
+            tex.SetPixels32(pixels);
+            tex.Apply();
+
+            Sprite sprite = Sprite.Create(tex, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f));
+            sprite.hideFlags = HideFlags.HideAndDontSave;
+
+            Rings[key] = sprite;
             return sprite;
         }
 
