@@ -15,6 +15,9 @@ here.
 | 1 | `TerrainKind.Verdun` | Morning | this one |
 | 2 | `TerrainKind.Flanders` | Morning | docs/flanders-coast.md |
 
+`TerrainKind.Dolomites` (docs/dolomites.md) exists as a fourth kind but no career level uses
+it — it is reachable only through a custom battle.
+
 **One scene serves every level.** `CampaignLevel1` is the only endless scene; the menu writes
 the wanted level into the static `CampaignRun` before loading it, the same trick
 `CustomBattle` already uses, and `CampaignLevelController` reads `CampaignRun.Level` in
@@ -23,11 +26,11 @@ scene still carries an orphan serialized `levelNumber` from before this change; 
 it.)
 
 `CampaignTerrain` is now an abstract streamer with a concrete land per kind —
-`VerdunTerrain` and `FlandersTerrain`. `CampaignTerrain.Begin(kind, …)` picks one. The base
-owns everything about *chunks* (the keep-window, time-slicing, terrain object assembly,
-neighbour links, disposal); a subclass owns everything about *ground* (its height scale and
-world Y offset, how a chunk's heights are filled, how it is painted, what it decorates with,
-and what extra meshes ride along with it).
+`VerdunTerrain`, `FlandersTerrain` and `DolomitesTerrain`. `CampaignTerrain.Begin(kind, …)`
+switches over the kind. The base owns everything about *chunks* (the keep-window,
+time-slicing, terrain object assembly, neighbour links, disposal); a subclass owns everything
+about *ground* (its height scale and world Y offset, how a chunk's heights are filled, how it
+is painted, what it decorates with, and what extra meshes ride along with it).
 
 ## Rules of the level
 

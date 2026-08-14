@@ -12,6 +12,13 @@ built entirely at runtime (no material/profile assets): `MorningSky`, `MiddaySky
 > horizon at eye level rather than on a map edge (`SkyHorizon.AtEyeLevel`). Its table also
 > owns that map's sea colour.
 > See docs/flanders-coast.md.
+>
+> Dolomites has a third set, as `DolomitesSky`, built the same way — warmer, more saturated
+> and more contrasty than the inland skies (sunny northern Italy at altitude), with the
+> longest fog reach in the game (2000) because the background mountains *are* that map's
+> distance, and its sun pinned to a fixed viewport point high enough to clear the peaks
+> rather than riding the horizon. Its table also owns the mountains' rock colours.
+> See docs/dolomites.md.
 
 1. A gradient skybox (`Custom/GradientSkybox` in `Assets/Resources/Shaders`) with a
    two-part sun (HDR core + atmospheric halo), anchored to a fixed viewport spot — the
@@ -120,6 +127,41 @@ Mechanics:
 
 Every sky attaches one in `BuildSkybox`, next to `GodRays`, which is what makes it apply to
 both maps and all four daytimes without a per-level switch.
+
+## Ground haze (`GroundHaze`)
+
+Distance fog cannot fog *part* of a thing. Every fragment of one distant object sits at almost
+the same eye depth, so any ramp strong enough to bury the foot of a mountain greys its summit by
+the same amount. That is fine for hiding a map's far edge, and useless for hiding a horizontal
+seam — a place where two surfaces meet at one **world height** and the join draws a straight line
+across the frame.
+
+`GroundHaze` is the height-aware counterpart, and it is a fullscreen pass for the same reason
+`AerialHaze` is: a seam is only invisible if both sides of it get *identical* haze, which
+geometry standing in front of the join cannot guarantee and a depth-buffer pass gets for free.
+
+```
+worldY = eye.y + viewRay.y * linearEyeDepth
+alpha  = strength · (1 − smoothstep(bandTop, bandClear, worldY)) · smoothstep(fromZ, fullZ, depth)
+```
+
+- **The height term** is full at and below `bandTop` and gone by `bandClear`, so the mist fills
+  the low ground and thins upward. It is the *world* height that matters, not a height above the
+  surface — that is what pins the densest haze to a specific altitude and lets the crests above it
+  stay legible.
+- **The distance term** is what keeps the near ground clear. Without it a world-height band would
+  fog the valley under the player as hard as the valley a kilometre back, since both are the same
+  height. The two thresholds are given as world Z planes and turned into eye depth each frame
+  against the camera's own Z; every camera in the game looks down `+Z` with an identity rotation,
+  so the two differ only by the eye.
+
+`Blend SrcAlpha OneMinusSrcAlpha` toward `RenderSettings.fogColor`, read live so the mist is always
+the same value as the distance fog and the sky's horizon band. It runs one event **after**
+`AerialHaze` (`BeforeRenderingTransparents + 1`): `AerialHaze` brightens fogged pixels back up to
+the sky, and mist laid down first would be partly undone by it.
+
+Only `DolomitesSky` attaches one — it is the only map whose mountains cut through the ground
+inside the view (docs/dolomites.md). Sky pixels are skipped, as in `AerialHaze`.
 
 ## MorningSky design
 

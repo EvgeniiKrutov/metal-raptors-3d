@@ -20,6 +20,7 @@ namespace MetalRaptors
         {
             new BattleMap(TerrainNames.Verdun, 1917, TerrainKind.Verdun),
             new BattleMap(TerrainNames.Flanders, 1918, TerrainKind.Flanders),
+            new BattleMap(TerrainNames.Dolomites, 1915, TerrainKind.Dolomites),
         };
 
         public static string[] Names()

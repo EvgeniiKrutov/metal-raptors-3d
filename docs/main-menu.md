@@ -243,13 +243,15 @@ column plus one card in the right band — the first screen to use both halves.
 * The labels (`map`, `weather`) are `Fg`, the same weight and colour as `start` and `back`
   — they name rows the player acts on, so they read as entries, not as captions.
 * The list does **not** wrap. The triangle at either end greys out.
-* `map` picks a `BattleMap` from `BattleMaps.All` — **verdun** and **flanders**, each a name,
-  a terrain seed and a `TerrainKind`; `weather` picks a `Daytime`, in the enum's own order.
-  Neither is persisted: a custom battle's picks are not settings, so the screen opens on
-  verdun/morning every time the menu is built.
+* `map` picks a `BattleMap` from `BattleMaps.All` — **verdun**, **flanders** and
+  **dolomites**, each a name, a terrain seed and a `TerrainKind`; `weather` picks a `Daytime`,
+  in the enum's own order. Neither is persisted: a custom battle's picks are not settings, so
+  the screen opens on verdun/morning every time the menu is built.
 * Flanders Coast is listed as `flanders` rather than its full name so it fits the 190px
   `SelectorValueWidth` that `verdun` was sized against; the full name is what career's level
-  list tags its row with.
+  list tags its row with. `dolomites` (docs/dolomites.md) is the longest value the row
+  carries and still fits at `ItemSize` 30.
+* Dolomites is a custom-battle map only — no career level flies it.
 * `start` fills in `CustomBattle` and loads the endless `CampaignLevel1` scene, where
   `CampaignLevelController` builds `CampaignLevels.Custom(map, daytime)` instead of the
   authored level. Career's own `start` calls `CustomBattle.Clear()` first, so an era keeps

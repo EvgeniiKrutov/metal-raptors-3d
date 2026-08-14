@@ -352,6 +352,19 @@ namespace MetalRaptors
             data.wavingGrassSpeed = 0.3f;
         }
 
+        public static void SetupGrassDetail(TerrainData data, int detailRes, Color healthy, Color dry)
+        {
+            SetupGrassDetail(data, detailRes);
+
+            var prototypes = data.detailPrototypes;
+            for (int i = 0; i < prototypes.Length; i++)
+            {
+                prototypes[i].healthyColor = healthy;
+                prototypes[i].dryColor = dry;
+            }
+            data.detailPrototypes = prototypes;
+        }
+
         static void PlantGrass(System.Random rng, TerrainData data, float width, List<Vector3> craters)
         {
             SetupGrassDetail(data, GrassDetailRes);

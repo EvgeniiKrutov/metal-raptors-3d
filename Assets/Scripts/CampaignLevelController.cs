@@ -70,6 +70,8 @@ namespace MetalRaptors
 
         bool Coast => _level.terrain == TerrainKind.Flanders;
 
+        bool Alpine => _level.terrain == TerrainKind.Dolomites;
+
         void Start()
         {
             _levelNumber = CampaignRun.Level;
@@ -91,6 +93,12 @@ namespace MetalRaptors
                 _sea = SeaSurface.Begin(_cam, _level.daytime);
                 Battlefield.BeginCoast(_cam, _halfViewWidth, _level.seed,
                     SeaSurface.Level, SeaSurface.NearEdge);
+            }
+            else if (Alpine)
+            {
+                MountainRange.Begin(_cam, _level.seed, _level.daytime);
+                Battlefield.BeginValley(_cam, _halfViewWidth, _level.seed, _terrain.InCrater,
+                    DolomitesTerrain.ValleyZMax);
             }
             else
             {
@@ -197,6 +205,10 @@ namespace MetalRaptors
             {
                 CoastSky.Apply(_cam, _level.daytime, _level.weather);
             }
+            else if (Alpine)
+            {
+                DolomitesSky.Apply(_cam, _level.daytime, _level.weather);
+            }
             else
             {
                 switch (_level.daytime)
@@ -219,6 +231,9 @@ namespace MetalRaptors
             if (Coast)
                 CloudSystem.Begin(_cam, CoastSky.CloudColor(_level.daytime),
                     CoastSky.CloudGlow(_level.daytime), _level.clouds, PlayPlaneZ);
+            else if (Alpine)
+                CloudSystem.Begin(_cam, DolomitesSky.CloudColor(_level.daytime),
+                    DolomitesSky.CloudGlow(_level.daytime), _level.clouds, PlayPlaneZ);
             else
                 CloudSystem.Begin(_cam, _level.daytime, _level.weather, _level.clouds, PlayPlaneZ);
         }

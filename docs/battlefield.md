@@ -14,7 +14,8 @@ controllers start it once the camera exists:
 - `LevelController` — only when `VerdunLand`, seeded from `_level.terrain.seed`,
   and passing the level's `MinX`/`MaxX`. The flat-slab terrain gets nothing.
 - `CampaignLevelController` — always, seeded from `_level.seed`, with no bounds.
-  On Flanders Coast it calls `BeginCoast` instead (see *Coast mode* below).
+  On Flanders Coast it calls `BeginCoast` instead (see *Coast mode* below), and on
+  Dolomites `BeginValley` (see *Valley mode*).
 
 `Begin` needs the camera's half view width because everything streams around the
 camera, and needs the map bounds because bounded and endless maps populate
@@ -29,9 +30,9 @@ it). Passing no bounds means `±infinity`, which is what `Bounded` tests.
 entry point (docs/flanders-coast.md). It builds the same coordinator with three switches
 thrown:
 
-- **`_populate = false`** — neither `BattlefieldProps` nor `BattlefieldPeople` is started, so
-  the map carries blasts and smoke columns and nothing else. There is no crater test either:
-  the only thing that consumed it was the scenery.
+- **`_placeProps = _placePeople = false`** — neither `BattlefieldProps` nor
+  `BattlefieldPeople` is started, so the map carries blasts and smoke columns and nothing else.
+  There is no crater test either: the only thing that consumed it was the scenery.
 - **`_seaLevel`** — a world Y (elsewhere `−infinity`, which is what makes every test below a
   no-op on Verdun) that the blast and column code compare sampled ground against.
 - **`_waterFromZ`** — the Z the sea mesh actually begins at (elsewhere `+infinity`). Water is
@@ -54,6 +55,20 @@ A smoke column needs ground at least `DryClearance` (2 units) above the water, a
 the same per-cell `System.Random`, so a site is still in the same place every pass; a candidate
 whose ground is not streamed in yet still leaves the cell undecided rather than falling through
 to the next one, so the choice never depends on streaming timing.
+
+## Valley mode
+
+`Battlefield.BeginValley(cam, halfViewWidth, seed, inCrater, peopleZMax)` is the Dolomites
+entry point (docs/dolomites.md). It is the ordinary inland battlefield with two switches:
+
+- **`_placeProps = false`** — no trees and no houses; that map places nothing solid. People,
+  blasts and smoke columns all run normally. Splitting the old single `_populate` flag into
+  `_placeProps` and `_placePeople` is what makes props-off-people-on expressible;
+  `BattlefieldPeople` already null-checked `Props` before asking it to steer around anything.
+- **`_peopleZMax`** — the squads' Z ceiling, 520 there instead of the usual 700, so infantry
+  stays on the valley floor and out of the foothills. Exposed as `Battlefield.PeopleZMax` and
+  read by `BattlefieldPeople` in place of its old `ZMax` constant; every other map passes
+  nothing and keeps 700. Blasts are *not* capped — shells still land on the lower slopes.
 
 ## Crater lookup
 
@@ -105,7 +120,7 @@ deliberately occupy different slices of it:
 | --- | --- | --- |
 | Ground blasts | 15 – 700 | The whole map, foreground included — shells land under and in front of the plane as well as behind it. |
 | Smoke columns | 140 – 380 | Just behind the play plane, close enough to read as part of the scene rather than horizon decoration. |
-| People | 40 – 700 | The whole map, so squads are seen both in front of and behind the aircraft. |
+| People | 40 – 700 | The whole map, so squads are seen both in front of and behind the aircraft. The back edge is per-map (`Battlefield.PeopleZMax`); Dolomites pulls it in to 520. |
 | Scenery props | 20 – 700 | The whole map. Reaching in front of the play plane is deliberate: near trees sweep past the camera for parallax, and the handful that land in the flight lane are the ones a plane can hit. |
 
 ## Ground blasts (`GroundBlast.cs`)
@@ -415,9 +430,26 @@ their length), so squads never pop into existence in front of the player.
 instead, and new squads always enter **from the right**. The campaign camera can
 only ever move right (`PositionCamera` clamps it with `Mathf.Max`), so a squad
 spawned to the left would be behind the player forever and culled without ever
-being seen. Squads are culled once they fall a full `halfViewWidth + 460` behind
-the camera; the cull bound ahead of the camera is twice that, purely as a
-backstop for a squad that wanders forward while the camera is stationary.
+being seen.
+
+A new squad is placed **500–1100 units past the right view edge** — out where the
+terrain streamer is building chunks, not just over the lip of the frame. The
+margin used to be 60–260, which is under a second of flight: squads visibly
+popped into existence at the screen edge, and on a map with no fog to hide them
+(docs/dolomites.md) that is exactly what it looked like. The window and the squad
+count follow from the same two numbers (`ScrollerBehind` = `halfViewWidth + 460`,
+`ScrollerAhead` = `halfViewWidth + 1100`), so the wider band carries
+proportionally more squads and the on-screen density is unchanged; the ahead cull
+bound is `ScrollerAhead + 460`, far enough that a squad can never be culled on
+the frame it was spawned. The spawn lead stays inside the terrain's own keep-ahead
+distance, so there is ground under it.
+
+Figures are **placed on the ground in `SpawnGroup`**, not on their first tick. A
+figure's transform is created at its parent's origin, and the spawn loop runs at
+the end of `Tick` — so a fresh squad used to render one frame at world origin
+before `TickFigure` moved it onto the terrain, which reads as figures appearing
+out of thin air. Each figure now samples its own ground at birth and falls back to
+the squad centre's height where that sample misses.
 
 ### Casualties
 

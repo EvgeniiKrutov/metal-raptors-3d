@@ -49,11 +49,19 @@ namespace MetalRaptors
         public static CampaignTerrain Begin(TerrainKind kind, int seed, Daytime daytime,
             Weather weather, float cameraDistance, float playPlaneZ, float startCamX)
         {
-            bool coast = kind == TerrainKind.Flanders;
-            var go = new GameObject(coast ? "Flanders Coast" : "Campaign Land");
-            CampaignTerrain land = coast
-                ? (CampaignTerrain)go.AddComponent<FlandersTerrain>()
-                : go.AddComponent<VerdunTerrain>();
+            CampaignTerrain land;
+            switch (kind)
+            {
+                case TerrainKind.Flanders:
+                    land = new GameObject("Flanders Coast").AddComponent<FlandersTerrain>();
+                    break;
+                case TerrainKind.Dolomites:
+                    land = new GameObject("Dolomites").AddComponent<DolomitesTerrain>();
+                    break;
+                default:
+                    land = new GameObject("Campaign Land").AddComponent<VerdunTerrain>();
+                    break;
+            }
 
             land._seed = seed;
             land._terrainMat = new Material(Shader.Find("Universal Render Pipeline/Terrain/Lit"));

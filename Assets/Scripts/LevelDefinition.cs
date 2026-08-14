@@ -28,6 +28,7 @@ namespace MetalRaptors
         FlatSlab,
         Verdun,
         Flanders,
+        Dolomites,
     }
 
     public class TerrainPart
@@ -42,6 +43,7 @@ namespace MetalRaptors
         public const string Verdun = "verdun";
         public const string Flanders = "flanders";
         public const string FlandersFull = "flanders coast";
+        public const string Dolomites = "dolomites";
         public const string FlatSlab = "flat slab";
 
         public static string For(TerrainKind kind)
@@ -50,6 +52,7 @@ namespace MetalRaptors
             {
                 case TerrainKind.Verdun: return Verdun;
                 case TerrainKind.Flanders: return Flanders;
+                case TerrainKind.Dolomites: return Dolomites;
                 default: return FlatSlab;
             }
         }

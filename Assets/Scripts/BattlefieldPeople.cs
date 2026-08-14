@@ -10,12 +10,11 @@ namespace MetalRaptors
         const int MaxGroups = 18;
         const int GroupSizeMin = 4, GroupSizeMax = 8;
 
-        const float ZMin = 40f, ZMax = 700f;
+        const float ZMin = 40f;
         const float ZEdgeMargin = 40f;
-        const float SpawnMarginMin = 60f, SpawnMarginMax = 260f;
+        const float ScrollerLeadMin = 500f, ScrollerLeadMax = 1100f;
         const float CullMargin = 460f;
         const float OffCameraMargin = 80f;
-        const float ScrollerAheadCull = 2f;
 
         const float Height = 13f;
         const float Width = 4.6f;
@@ -106,19 +105,23 @@ namespace MetalRaptors
 
         float BandMinX => _field.MinX - _field.HalfViewWidth;
         float BandMaxX => _field.MaxX + _field.HalfViewWidth;
+        float ZMax => _field.PeopleZMax;
+
+        float ScrollerBehind => _field.HalfViewWidth + CullMargin;
+        float ScrollerAhead => _field.HalfViewWidth + ScrollerLeadMax;
 
         int TargetGroupCount()
         {
             float width = _field.Bounded
                 ? BandMaxX - BandMinX
-                : 2f * (_field.HalfViewWidth + CullMargin);
+                : ScrollerBehind + ScrollerAhead;
             return Mathf.Clamp(Mathf.RoundToInt(width / GroupSpacing), 2, MaxGroups);
         }
 
         float InitialX(int index)
         {
             if (!_field.Bounded)
-                return _field.CameraX + Random.Range(-1f, 1f) * (_field.HalfViewWidth + CullMargin);
+                return _field.CameraX + Random.Range(-ScrollerBehind, ScrollerAhead);
 
             return Mathf.Lerp(BandMinX, BandMaxX, (index + 0.5f) / _targetGroups)
                    + Random.Range(-GroupSpacing, GroupSpacing) * 0.35f;
@@ -164,14 +167,13 @@ namespace MetalRaptors
             if (group.figures.Count == 0) return true;
             if (_field.Bounded) return false;
 
-            float cullBound = _field.HalfViewWidth + CullMargin;
-            return group.x < camX - cullBound || group.x > camX + cullBound * ScrollerAheadCull;
+            return group.x < camX - ScrollerBehind || group.x > camX + ScrollerAhead + CullMargin;
         }
 
         float RespawnX(float camX)
         {
             if (!_field.Bounded)
-                return camX + _field.HalfViewWidth + Random.Range(SpawnMarginMin, SpawnMarginMax);
+                return camX + _field.HalfViewWidth + Random.Range(ScrollerLeadMin, ScrollerLeadMax);
 
             float left = camX - _field.HalfViewWidth - OffCameraMargin;
             float right = camX + _field.HalfViewWidth + OffCameraMargin;
@@ -187,7 +189,7 @@ namespace MetalRaptors
         Group SpawnGroup(float x)
         {
             float z = Random.Range(ZMin + ZEdgeMargin, ZMax - ZEdgeMargin);
-            if (!_field.SampleGround(x, z, out _)) return null;
+            if (!_field.SampleGround(x, z, out float groundY)) return null;
             if (_field.Props != null
                 && _field.Props.Blocks(x, z, GroupPropClearance, out _)) return null;
 
@@ -210,11 +212,17 @@ namespace MetalRaptors
             for (int i = 0; i < count; i++)
             {
                 var tr = BuildFigure(root.transform, group.faction, Random.Range(0, SkinColors.Length));
+                float fx = x + Random.Range(-SpawnSpreadX, SpawnSpreadX);
+                float fz = Mathf.Clamp(z + Random.Range(-SpawnSpreadZ, SpawnSpreadZ), ZMin, ZMax);
+
+                if (!_field.SampleGround(fx, fz, out float fy)) fy = groundY;
+                tr.position = new Vector3(fx, fy, fz);
+
                 group.figures.Add(new Figure
                 {
                     tr = tr,
-                    x = x + Random.Range(-SpawnSpreadX, SpawnSpreadX),
-                    z = Mathf.Clamp(z + Random.Range(-SpawnSpreadZ, SpawnSpreadZ), ZMin, ZMax),
+                    x = fx,
+                    z = fz,
                     headingDeg = Random.Range(0f, 360f),
                     moving = true,
                     stateTimer = Random.Range(MoveTimeMin, MoveTimeMax),

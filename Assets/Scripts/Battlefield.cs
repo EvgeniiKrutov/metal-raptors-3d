@@ -24,6 +24,8 @@ namespace MetalRaptors
         const float DryClearance = 2f;
         const int SmokeSiteTries = 3;
 
+        const float PeopleZMaxDefault = 700f;
+
         Camera _cam;
         float _halfViewWidth;
         float _minX, _maxX;
@@ -33,7 +35,9 @@ namespace MetalRaptors
         float _seaLevel = float.NegativeInfinity;
         float _waterFromZ = float.PositiveInfinity;
         float _smokeZMin = SmokeZMin, _smokeZMax = SmokeZMax;
-        bool _populate = true;
+        float _peopleZMax = PeopleZMaxDefault;
+        bool _placeProps = true;
+        bool _placePeople = true;
 
         readonly List<Terrain> _terrains = new List<Terrain>();
         readonly Dictionary<int, SmokeColumn> _columns = new Dictionary<int, SmokeColumn>();
@@ -50,10 +54,24 @@ namespace MetalRaptors
         public float MaxX => _maxX;
         public bool Bounded => !float.IsInfinity(_minX) && !float.IsInfinity(_maxX);
         public BattlefieldProps Props => _props;
+        public float PeopleZMax => _peopleZMax;
 
         public static Battlefield Begin(Camera cam, float halfViewWidth, int seed,
             System.Func<float, float, bool> inCrater)
             => Begin(cam, halfViewWidth, seed, float.NegativeInfinity, float.PositiveInfinity, inCrater);
+
+        public static Battlefield BeginValley(Camera cam, float halfViewWidth, int seed,
+            System.Func<float, float, bool> inCrater, float peopleZMax)
+        {
+            var field = Create(cam, halfViewWidth, seed,
+                float.NegativeInfinity, float.PositiveInfinity, inCrater);
+            if (field == null) return null;
+
+            field._placeProps = false;
+            field._peopleZMax = peopleZMax;
+            field.Populate();
+            return field;
+        }
 
         public static Battlefield BeginCoast(Camera cam, float halfViewWidth, int seed,
             float seaLevel, float waterFromZ)
@@ -67,7 +85,8 @@ namespace MetalRaptors
             field._smokeZMin = CoastSmokeZMin;
             field._smokeZMax = CoastSmokeZMax;
             field._seaTimer = Random.Range(0f, SeaBlastIntervalMax);
-            field._populate = false;
+            field._placeProps = false;
+            field._placePeople = false;
             field.Populate();
             return field;
         }
@@ -104,10 +123,9 @@ namespace MetalRaptors
         {
             RefreshTerrains();
             UpdateColumns(CameraX);
-            if (!_populate) return;
 
-            _props = BattlefieldProps.Begin(this, _seed);
-            _people = BattlefieldPeople.Begin(this);
+            if (_placeProps) _props = BattlefieldProps.Begin(this, _seed);
+            if (_placePeople) _people = BattlefieldPeople.Begin(this);
         }
 
         public bool InCrater(float x, float z) => _inCrater != null && _inCrater(x, z);
