@@ -64,7 +64,7 @@ namespace MetalRaptors
 
             _body = new GameObject("Menu Plane");
             _body.transform.position = PlanePreviewRig.Origin;
-            PlaneFactory.BuildPlaneModel(_body.transform, plane);
+            PlaneFactory.BuildPlaneModel(_body.transform, plane, skin: GameManager.CurrentSkin);
         }
 
         void Update()

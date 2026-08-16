@@ -33,12 +33,14 @@ uGUI buttons and the volume steppers are gone, along with `GameManager`'s
 │     HEALTH              │                           │
 │     ██████████░░░░░░    │                           │
 │                         │                           │
+│     colour   ◀ green ▶  │                           │  ← Sopwith only; the value
+│                         │                           │    is centred between them
 │     select plane        │                           │
 │                         │                           │
 ◀                         │                           ▶  ← switch the plane
 │                                                     │
-│         lorem ipsum dolor sit amet, consectetur     │  ← centred on the page,
-│         adipiscing elit, sed do eiusmod tempor…     │    not on the column
+│      Britain's most successful scout of the war,    │  ← centred on the page,
+│      credited with more enemy aircraft downed…      │    not on the column
 └─────────────────────────────────────────────────────┘
       ↑ 200px, not the 120px every other screen uses
 ```
@@ -55,10 +57,18 @@ it is the only screen with something outside the column on the same side: at 120
 would start just 46px clear of the left triangle and read as crowding it. That leaves 512px
 of inner width, which the 460px stat bars still sit inside.
 
-The description is anchored `GarageDescriptionBottom` (168px) off the bottom and drawn
+The description is anchored `GarageDescriptionBottom` (124px) off the bottom and drawn
 `LowerCenter`, so it grows upward from that line rather than down from a top edge — it sits
-just under the plane's band (which stops at 24% of the height) and about 45px under the last
-entry in the column, tying the two halves together instead of floating at the page's foot.
+under the plane's band (which stops at 24% of the height) and about 40px under the last
+**wide** entry in the column, tying the two halves together instead of floating at the page's
+foot.
+
+That constant is set against the column, not chosen for looks, and it moved from 168px when
+the `colour` row was added: the row pushes everything below it 54px down
+(`ItemRowHeight` + `ItemGap`) and, at 460px, it is exactly as wide as the stat bars — so it
+reaches into the description's x-range where `select plane` (~150px of text) never did. The
+description had to drop by the same 54px to keep the clearance it had. The widest low row in
+the column is what this number is solved against; adding another one means moving it again.
 
 ## The plane
 
@@ -247,9 +257,9 @@ straight back would flatten into a band along the contact line.
 `degreesPerSecond` to 0 on build, so the parked plane's propeller is still. Activating
 `select plane` runs it through a one-shot ramp — smoothstep up to `SpinPeakDegreesPerSecond`
 over `SpinUpSeconds`, held for `SpinHoldSeconds`, then smoothstepped back to a standstill
-over `SpinDownSeconds`. Switching planes cancels it, and `GaragePlaneView.SetPlane` no-ops
-when handed the plane it already holds, so the refresh that follows a selection does not
-rebuild the body out from under the animation.
+over `SpinDownSeconds`. Switching planes cancels it, and `GaragePlaneView.SetPlane` only
+repaints when handed the plane it already holds, so the refresh that follows a selection does
+not rebuild the body out from under the animation.
 
 ## Stats
 
@@ -257,18 +267,25 @@ rebuild the body out from under the animation.
 definition. `PlaneStatBars.All` is the display list — one entry per bar, carrying its
 label, the field to read and the **ceiling** the bar is drawn against:
 
-| bar | ceiling | today's value |
-| --- | --- | --- |
-| max speed | 280 | 192 |
-| rotation speed | 260 | 180 |
-| mass | 4 | 2.5 |
-| fire rate | 8 | 5 |
-| damage | 15 | 10 |
-| health | 150 | 100 |
+| bar | ceiling | Sopwith Camel | Fokker Dr.I |
+| --- | --- | --- | --- |
+| max speed | 360 | 288 | 264 |
+| rotation speed | 200 | 120 | 140 |
+| mass | 4 | 2.5 | 2.1 |
+| fire rate | 8 | 5 | 5.5 |
+| damage | 15 | 10 | 10 |
+| health | 200 | 150 | 128 |
 
-The ceilings are display-only headroom, not caps — they exist so today's values sit around
-two thirds full instead of pegged at 100%, leaving somewhere for a faster or tougher plane
-to go. A bar is `fill / ceiling`, clamped.
+The ceilings are display headroom, not caps — they exist so today's values sit around two
+thirds full instead of pegged at 100%, leaving somewhere for a faster or tougher plane to go.
+A bar is `fill / ceiling`, clamped. Three of them moved when the planes were given real
+numbers: **max speed** from 280 (the Camel's 288 would have pegged the bar), **rotation
+speed** from 260 (at 120 the bar read under half full and looked broken rather than modest)
+and **health** from 150, when the Camel was raised to 150 flat and would have pegged it.
+
+The health numbers were 100 / 85 before that raise; the Dr.I keeps the same 85% of the
+Camel it always had, so the two planes still read the same way against each other — the
+whole scale just moved up.
 
 Above the bars sit two rows that are not bars, and neither carries a caption:
 
@@ -292,24 +309,67 @@ against that height to keep the badge, the country, the six bars and `select pla
 the column — the whole block runs ~536px from `ListTop`, ending ~288px above the bottom of a
 1080 screen, with the description another ~39px below that.
 
-**Both planes currently carry identical stats**, written out per plane rather than shared,
-so giving one of them its own numbers is a one-line edit. The values mirror
-`PlayerConfig.asset` (max speed being `flySpeed × maxSpeedMultiplier`, fire rate being
-`1 / fireRate` in shots per second), but they are **display-only**: flight behaviour still
-comes from the single `PlayerConfig` asset whichever plane is selected.
+### The bars are real
 
-The description under each plane is placeholder lorem ipsum, one per plane so switching
-visibly changes it.
+The stats are **not** a spec sheet — they are what the player flies. `PlaneLoadout.Build`
+turns the selected plane's `PlaneStats` into the `PlayerConfig` the player's plane is
+initialised with, so picking the Dr.I really does buy a harder turn for a lower top speed.
+See `docs/flight-model.md` for the conversion and what it leaves alone.
+
+The Camel's block is set to exactly what `PlayerConfig.asset` already held (`flySpeed` 180 ×
+`maxSpeedMultiplier` 1.6 = 288, `fireRate` 0.2 s = 5 shots/s), so the plane the game shipped
+with flies unchanged and the asset stays the baseline everything else is measured from. The
+old numbers here — 192 and 180 — were stale copies that had drifted from it, which is the
+failure mode a display-only table invites.
+
+The Dr.I is drawn from the aircraft: lighter and quicker on the controls, slower in level
+flight, more fragile, and a shade faster on the guns (its twin Spandaus outpaced the Camel's
+Vickers). Damage is the one bar the two share — both carried a pair of synchronised
+rifle-calibre machine guns.
+
+**Enemies are unaffected.** An enemy flying a Fokker is initialised from
+`EnemyConfig.asset`, which has its own numbers and its own AI fields; the garage block only
+ever reaches a plane the player selected. Same for the companion wingman, which keeps the
+shared `PlayerConfig` (`docs/companion.md`) — the stats follow the player, not the model.
+
+The description under each plane is a short history of the real aircraft, held in
+`PlaneModels` next to the rest of its definition.
+
+## Colour
+
+Under the bars sits a `colour` selector row — the plane's skin, described in full in
+`docs/plane-skins.md`. It is an ordinary `MenuPanel.AddSelector`, the same widget custom
+battle uses for `map` and `weather`, so it comes with its own pair of triangles that grey out
+at the ends of the list.
+
+Three things are particular to it:
+
+* **It is per plane, and only the Sopwith has skins.** `PlaneSkins.Selectable` is false for
+  the Fokker, so the row is switched off and `select plane` moves up by
+  `ColourRowHeight` (54px) to close the gap it left. `MenuPanel` skips focusables whose
+  GameObject is inactive — that rule lives in `MoveFocus` / `FocusFirst` rather than in the
+  garage, so any panel can hide a row now — and if the hidden row happened to hold the
+  focus, `RefreshColour` hands it to `select plane`.
+* **Changing it is not a selection.** There is no confirm step: `PickColour` writes straight
+  through `GameManager.SetSkin` (persisted to `PlayerPrefs` immediately, like the plane) and
+  repaints the preview. `select plane` is unaffected — the colour of a plane you are only
+  browsing is still saved, since it is stored under that plane's own key.
+* **The repaint does not rebuild the plane.** `GaragePlaneView.SetSkin` pushes the texture
+  onto the model standing there, so the resting pitch stays solved, the ground stays put and
+  a drag in progress is not interrupted.
 
 ## Navigation
 
-* `←` / `→` switch the plane from anywhere on the screen — they are not routed into the
-  panel, so the list never spends them. The two triangles do the same on click, and light
-  `Accent` while hovered (`MenuArrowView` gained an `Exited` event for this; the selector
-  rows do not subscribe, so their arrows keep the menu's no-clear-on-exit rule).
+* `←` / `→` switch the plane from anywhere on the screen — with one exception: while the
+  `colour` row holds the focus they go to the row instead, because a selector that ignored
+  the arrow keys would be the only one in the game that did. Everywhere else in the column
+  they still step planes, so the list never spends them. The two page triangles do the same
+  on click, and light `Accent` while hovered (`MenuArrowView` gained an `Exited` event for
+  this; the selector rows do not subscribe, so their arrows keep the menu's no-clear-on-exit
+  rule).
 * The list **wraps**: with two planes both triangles are always live, so neither ever greys
   out the way a selector row's do at the end of its values.
-* `↑` / `↓` move the focus inside the column — only `select plane` is focusable.
+* `↑` / `↓` move the focus inside the column — `colour` (when shown) and `select plane`.
 * **Holding the left button over the plane** and moving left/right turns it (see *Drag to
   turn* above); releasing eases it back. The band overlaps the right triangle, so a click
   there both switches the plane and opens a drag — harmless, since a click travels far too
@@ -331,11 +391,14 @@ on rather than vanishing.
 `GameManager.CurrentPlane` is the read side, null-safe against `Instance`, and it is what
 `MainMenuController`, `LevelController` and `CampaignLevelController` build the player's
 plane from — so the pick shows up in the menu's flying plane, in the levels, and in the
-HUD's `Piloting:` line.
+HUD's `Piloting:` line. `GameManager.CurrentSkin` rides along at the same three sites, so
+the colour travels with the plane.
 
 Enemies are **not** affected: `LevelDefinition` keeps its authored `PlaneModels.Fokker`
 groups, so picking the Fokker means both sides fly it. They stay distinguishable by the
-mirrored, opposite-pitched build `PlaneFactory` gives an enemy.
+mirrored, opposite-pitched build `PlaneFactory` gives an enemy, and by the player's skin —
+and they do not borrow the plane's stats either, since an enemy is built from
+`EnemyConfig.asset`.
 
 ## Files
 
@@ -348,5 +411,7 @@ mirrored, opposite-pitched build `PlaneFactory` gives an enemy.
 | `MenuBadge.cs` | The type badge: a filled rectangle sized to its own label. |
 | `GroundShadowCatcher.shader` | The invisible ground that shows only the plane's cast shadow. |
 | `GarageLighting.cs` | Ambient, sun and shadow distance for the scene, mirroring a level's atmosphere. |
+| `PlaneSkin.cs` | The skins a plane can wear and how one is painted onto a model (`docs/plane-skins.md`). |
 | `PlaneStats.cs` | The stat block a plane carries, and the bar list with its ceilings. |
+| `PlaneLoadout.cs` | Turns the selected plane's stat block into the `PlayerConfig` it is flown with. |
 | `PlaneModelConfig.cs` | Each plane's model, display name, country, description and stats; `PlaneModels.All` is the switch order. |

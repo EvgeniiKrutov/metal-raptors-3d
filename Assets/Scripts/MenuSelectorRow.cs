@@ -33,8 +33,9 @@ namespace MetalRaptors
             rt.anchoredPosition = new Vector2(0f, top);
 
             var view = go.GetComponent<MenuSelectorRow>();
-            view._values = values;
-            view._index = Mathf.Clamp(index, 0, values.Length - 1);
+            view._values = values ?? new string[0];
+            view._index = view._values.Length > 0
+                ? Mathf.Clamp(index, 0, view._values.Length - 1) : 0;
             view._onChanged = onChanged;
 
             CreateHitBox(rt);
@@ -56,8 +57,9 @@ namespace MetalRaptors
             view._left.Hovered += view.RaiseHovered;
             view._right.Hovered += view.RaiseHovered;
 
-            view._value = UIFactory.CreateInlineLabel(rt, values[view._index], MenuTheme.ItemSize,
+            view._value = UIFactory.CreateInlineLabel(rt, view.CurrentValue, MenuTheme.ItemSize,
                 new Vector2(valueX, 0f), MenuTheme.ItemRowHeight, MenuTheme.Colors.Fg, UIFactory.MediumFont);
+            view._value.alignment = TextAnchor.MiddleCenter;
             view._value.rectTransform.sizeDelta =
                 new Vector2(MenuTheme.SelectorValueWidth, MenuTheme.ItemRowHeight);
 
@@ -80,8 +82,19 @@ namespace MetalRaptors
             rt.offsetMax = Vector2.zero;
         }
 
+        string CurrentValue => _values.Length > 0 ? _values[_index] : string.Empty;
+
+        public void SetValues(string[] values, int index)
+        {
+            _values = values ?? new string[0];
+            _index = _values.Length > 0 ? Mathf.Clamp(index, 0, _values.Length - 1) : 0;
+            Apply();
+        }
+
         void Step(int delta)
         {
+            if (_values.Length == 0) return;
+
             int next = Mathf.Clamp(_index + delta, 0, _values.Length - 1);
             RaiseHovered();
             if (next == _index) return;
@@ -97,7 +110,7 @@ namespace MetalRaptors
         {
             MenuPalette palette = MenuTheme.Colors;
 
-            _value.text = _values[_index];
+            _value.text = CurrentValue;
             _value.color = _focused ? palette.Accent : palette.Fg;
             _value.font = _focused ? UIFactory.BoldFont : UIFactory.MediumFont;
 

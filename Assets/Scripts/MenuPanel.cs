@@ -14,6 +14,9 @@ namespace MetalRaptors
 
         public GameObject Root => _root.gameObject;
 
+        public IMenuFocusable Focused =>
+            _focus >= 0 && _focus < _focusables.Count ? _focusables[_focus] : null;
+
         public MenuPanel(Transform parent, string name, float top)
         {
             var go = new GameObject(name, typeof(RectTransform));
@@ -136,14 +139,30 @@ namespace MetalRaptors
             if (index >= 0) FocusIndex(index);
         }
 
-        public void FocusFirst() => FocusIndex(0);
+        public void FocusFirst()
+        {
+            for (int i = 0; i < _focusables.Count; i++)
+                if (Reachable(_focusables[i])) { FocusIndex(i); return; }
+
+            FocusIndex(0);
+        }
 
         public void MoveFocus(int delta)
         {
             if (_focusables.Count == 0) return;
-            int next = _focus < 0 ? 0 : (_focus + delta + _focusables.Count) % _focusables.Count;
+
+            int next = _focus < 0 ? 0 : Wrap(_focus + delta);
+            for (int i = 0; i < _focusables.Count && !Reachable(_focusables[next]); i++)
+                next = Wrap(next + delta);
+
             FocusIndex(next);
         }
+
+        int Wrap(int index) =>
+            (index % _focusables.Count + _focusables.Count) % _focusables.Count;
+
+        static bool Reachable(IMenuFocusable item) =>
+            !(item is MonoBehaviour behaviour) || behaviour.gameObject.activeInHierarchy;
 
         public void Adjust(int delta)
         {

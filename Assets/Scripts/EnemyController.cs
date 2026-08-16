@@ -16,6 +16,10 @@ namespace MetalRaptors
         const float CollisionDamage = 10f;
         const float CollisionCooldown = 0.5f;
 
+        const float SnapFireConeDeg = 26f;
+        const float SnapWindowFactor = 2f;
+        const float DefaultTargetRadius = 15f;
+
         const float SmokeHealthThreshold = 30f;
 
         const float BarWidth = 36f;
@@ -40,6 +44,7 @@ namespace MetalRaptors
         Collider _collider;
         Camera _cam;
         float _bodyRadius;
+        float _targetRadius = DefaultTargetRadius;
 
         float _heading;
         float _angularVelocity;
@@ -64,6 +69,7 @@ namespace MetalRaptors
         ShakeEffect _shake;
         SmokeTrail _smoke;
         PlaneFire _fire;
+        readonly PlaneRoll _roll = new PlaneRoll(true);
 
         GameObject _bulletTemplate;
         AudioSource _audio;
@@ -101,7 +107,10 @@ namespace MetalRaptors
 
             _collider = GetComponentInChildren<Collider>();
             _shake = GetComponentInChildren<ShakeEffect>();
-            _bodyRadius = MeasureBodyRadius();
+            _bodyRadius = MeasureRadius(gameObject);
+            _targetRadius = target != null
+                ? Mathf.Clamp(MeasureRadius(target.gameObject), 8f, 40f)
+                : DefaultTargetRadius;
             _smoke = gameObject.AddComponent<SmokeTrail>();
             _bulletTemplate = Bullet.BuildTemplate(Bullet.RoundColor);
 
@@ -168,8 +177,7 @@ namespace MetalRaptors
             _rb.linearVelocity = vel;
             if (pos.y > _ceilingY) { pos.y = _ceilingY; _rb.position = pos; }
 
-            if (!_standDown && _state != AiState.Fly && _state != AiState.Return)
-                UpdateFiring();
+            if (!_standDown && _state != AiState.Return) UpdateFiring();
         }
 
         void TickFall(float dt)
@@ -358,12 +366,15 @@ namespace MetalRaptors
             float approach = 1f - Mathf.Exp(-(_config.turnResponsiveness / _rb.mass) * dt);
             _angularVelocity += (desiredRate - _angularVelocity) * approach;
             _heading += _angularVelocity * dt;
+            _roll.Tick(dt, _heading, PlaneRoll.Steady(_angularVelocity, maxRate),
+                _config.rotationSpeed);
             ApplyRotation();
         }
 
         void ApplyRotation()
         {
-            transform.rotation = Quaternion.Euler(0f, 0f, _heading * Mathf.Rad2Deg);
+            transform.rotation = Quaternion.Euler(0f, 0f, _heading * Mathf.Rad2Deg)
+                               * Quaternion.Euler(_roll.Angle, 0f, 0f);
         }
 
         float HeadingTo(Vector2 point)
@@ -371,10 +382,10 @@ namespace MetalRaptors
             return Mathf.Atan2(point.y - transform.position.y, point.x - transform.position.x);
         }
 
-        float MeasureBodyRadius()
+        static float MeasureRadius(GameObject go)
         {
-            var rends = GetComponentsInChildren<Renderer>();
-            if (rends.Length == 0) return 15f;
+            var rends = go.GetComponentsInChildren<Renderer>();
+            if (rends.Length == 0) return DefaultTargetRadius;
             var b = rends[0].bounds;
             for (int i = 1; i < rends.Length; i++) b.Encapsulate(rends[i].bounds);
             return Mathf.Max(b.size.x, b.size.y, b.size.z) * 0.5f;
@@ -386,10 +397,8 @@ namespace MetalRaptors
 
             if (TargetDistance() > _config.maxFireRange) return;
 
-            Vector2 aim = PredictIntercept();
-            float aimErrorDeg = Mathf.Abs(Mathf.DeltaAngle(_heading * Mathf.Rad2Deg,
-                HeadingTo(aim) * Mathf.Rad2Deg));
-            if (aimErrorDeg > _config.fireAngleThreshold) return;
+            if (!HasFiringSolution(PredictIntercept())
+                && !HasFiringSolution(_target.position)) return;
 
             if (_fireCooldown > 0f) return;
             _fireCooldown = Mathf.Max(0.01f, _config.fireRate);
@@ -404,6 +413,20 @@ namespace MetalRaptors
 
             MuzzleFlash.Spawn(muzzle, dir, _bodyRadius);
             if (_shotClip != null) _audio.PlayOneShot(_shotClip, ShotVolume);
+        }
+
+        bool HasFiringSolution(Vector2 point)
+        {
+            float range = Vector2.Distance(transform.position, point);
+            if (range < 1f) return false;
+
+            float errorDeg = Mathf.Abs(Mathf.DeltaAngle(_heading * Mathf.Rad2Deg,
+                HeadingTo(point) * Mathf.Rad2Deg));
+            if (errorDeg <= _config.fireAngleThreshold) return true;
+            if (errorDeg > SnapFireConeDeg) return false;
+
+            return range * Mathf.Sin(errorDeg * Mathf.Deg2Rad)
+                <= _targetRadius * SnapWindowFactor;
         }
 
         Vector2 PredictIntercept()

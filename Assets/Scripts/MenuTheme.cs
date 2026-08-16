@@ -96,7 +96,7 @@ namespace MetalRaptors
         public static readonly Vector2 GarageArrowSize = new Vector2(30f, 38f);
         public const float GarageArrowInset = 44f;
         public const float GarageDescriptionWidth = 1080f;
-        public const float GarageDescriptionBottom = 168f;
+        public const float GarageDescriptionBottom = 124f;
         public const float GarageDescriptionRowHeight = 96f;
 
         public const int DescriptionSize = 20;

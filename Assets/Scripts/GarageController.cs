@@ -5,8 +5,11 @@ namespace MetalRaptors
 {
     public class GarageController : MonoBehaviour
     {
+        const float ColourRowHeight = MenuTheme.ItemRowHeight + MenuTheme.ItemGap;
+
         MenuPanel _panel;
         MenuItemView _selectItem;
+        MenuSelectorRow _colour;
         MenuBadge _typeBadge;
         MenuStatRow _country;
         MenuStatRow[] _bars;
@@ -19,8 +22,13 @@ namespace MetalRaptors
         Text _description;
 
         int _index;
+        float _selectTop;
 
         PlaneModelConfig Plane => PlaneModels.All[_index];
+
+        static PlaneSkin SkinOf(PlaneModelConfig plane) =>
+            GameManager.Instance != null ? GameManager.Instance.SkinFor(plane)
+                                         : PlaneSkins.Default(plane);
 
         void Start()
         {
@@ -28,7 +36,7 @@ namespace MetalRaptors
 
             var canvas = UIFactory.CreateCanvas("Garage Canvas");
             UIFactory.CreateBackground(canvas.transform, MenuTheme.Colors.Bg);
-            _planeView = GaragePlaneView.Build(canvas.transform, Plane);
+            _planeView = GaragePlaneView.Build(canvas.transform, Plane, SkinOf(Plane));
 
             Transform screen = MenuLayout.CreateScreen(canvas.transform, "Garage Screen");
             Transform column = MenuLayout.CreateRegion(screen, "Garage Column", 0f,
@@ -43,8 +51,8 @@ namespace MetalRaptors
                 MenuTheme.GarageDescriptionWidth, MenuTheme.GarageDescriptionRowHeight,
                 MenuTheme.DescriptionLineSpacing, MenuTheme.Colors.Muted, UIFactory.MediumFont);
 
-            _panel.FocusFirst();
             Refresh();
+            _panel.FocusFirst();
         }
 
         void BuildPanel(Transform column)
@@ -59,7 +67,9 @@ namespace MetalRaptors
                 _bars[i] = _panel.AddStatBar(PlaneStatBars.All[i].label);
 
             _panel.AddGap(MenuTheme.SectionGap);
+            _colour = _panel.AddSelector("colour", PlaneSkins.Labels(Plane), 0, PickColour);
             _selectItem = _panel.AddNav("select plane", SelectPlane);
+            _selectTop = _selectItem.RectTransform.anchoredPosition.y;
         }
 
         void BuildArrows(Transform screen)
@@ -97,7 +107,11 @@ namespace MetalRaptors
             if (ScreenFade.IsBusy) return;
 
             int adjust = MenuInput.ReadAdjust();
-            if (adjust != 0) Step(adjust);
+            if (adjust != 0)
+            {
+                if (_panel.Focused == (IMenuFocusable)_colour) _panel.Adjust(adjust);
+                else Step(adjust);
+            }
 
             int step = MenuInput.ReadStep();
             if (step != 0) _panel.MoveFocus(step);
@@ -111,6 +125,15 @@ namespace MetalRaptors
             int count = PlaneModels.All.Length;
             _index = ((_index + delta) % count + count) % count;
             Refresh();
+        }
+
+        void PickColour(int index)
+        {
+            PlaneSkin[] skins = PlaneSkins.Of(Plane);
+            if (index < 0 || index >= skins.Length) return;
+
+            if (GameManager.Instance != null) GameManager.Instance.SetSkin(Plane, skins[index]);
+            _planeView.SetSkin(skins[index]);
         }
 
         void SelectPlane()
@@ -135,12 +158,29 @@ namespace MetalRaptors
                 _bars[i].SetFill(bar.read(plane.stats) / bar.ceiling);
             }
 
-            _planeView.SetPlane(plane);
+            RefreshColour(plane);
+
+            _planeView.SetPlane(plane, SkinOf(plane));
 
             bool selected = GameManager.Instance != null
                             && GameManager.Instance.SelectedPlaneIndex == _index;
             _selectItem.SetLabel(selected ? "selected" : "select plane");
             _selectItem.SetInteractable(!selected);
+        }
+
+        void RefreshColour(PlaneModelConfig plane)
+        {
+            bool selectable = PlaneSkins.Selectable(plane);
+
+            if (selectable)
+                _colour.SetValues(PlaneSkins.Labels(plane),
+                    PlaneSkins.IndexOf(plane, SkinOf(plane)));
+
+            _colour.gameObject.SetActive(selectable);
+            _selectItem.SetY(selectable ? _selectTop : _selectTop + ColourRowHeight);
+
+            if (!selectable && _panel.Focused == (IMenuFocusable)_colour)
+                _panel.Focus(_selectItem);
         }
     }
 }

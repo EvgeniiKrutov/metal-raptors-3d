@@ -48,6 +48,7 @@ namespace MetalRaptors
         ShakeEffect _shake;
         SmokeTrail _smoke;
         PlaneFire _fire;
+        readonly PlaneRoll _roll = new PlaneRoll(false);
 
         float _heading;
         float _angularVelocity;
@@ -155,6 +156,7 @@ namespace MetalRaptors
             float approach = 1f - Mathf.Exp(-(_config.turnResponsiveness / _rb.mass) * dt);
             _angularVelocity += (desiredRate - _angularVelocity) * approach;
             _heading += _angularVelocity * dt;
+            _roll.Tick(dt, _heading, !left && !right, _config.rotationSpeed);
             ApplyRotation();
 
             UpdateSpeed(dt);
@@ -222,7 +224,8 @@ namespace MetalRaptors
 
         void ApplyRotation()
         {
-            transform.rotation = Quaternion.Euler(0f, 0f, _heading * Mathf.Rad2Deg);
+            transform.rotation = Quaternion.Euler(0f, 0f, _heading * Mathf.Rad2Deg)
+                               * Quaternion.Euler(_roll.Angle, 0f, 0f);
         }
 
         public void TakeDamage(float amount)
@@ -232,6 +235,14 @@ namespace MetalRaptors
             OnDamaged?.Invoke();
             if (CurrentHealth < SmokeHealthThreshold && _smoke != null) _smoke.Arm(ExplosionSize);
             if (CurrentHealth <= 0f) BeginFall();
+        }
+
+        public void Bump()
+        {
+            if (!_active || _falling) return;
+
+            if (_shake != null) _shake.Play();
+            OnScraped?.Invoke();
         }
 
         public bool Scrape()

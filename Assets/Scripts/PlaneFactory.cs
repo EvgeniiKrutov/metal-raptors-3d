@@ -11,7 +11,8 @@ namespace MetalRaptors
 
         const float FallbackCubeScale = 30f;
 
-        public static Transform BuildPlaneModel(Transform parent, PlaneModelConfig plane, bool mirrored = false)
+        public static Transform BuildPlaneModel(Transform parent, PlaneModelConfig plane,
+            bool mirrored = false, PlaneSkin skin = null)
         {
             var prefab = Resources.Load<GameObject>(plane.resourceName);
             if (prefab == null)
@@ -38,6 +39,8 @@ namespace MetalRaptors
 
             foreach (var r in model.GetComponentsInChildren<Renderer>())
                 r.shadowCastingMode = ShadowCastingMode.On;
+
+            PlaneSkins.Apply(model.transform, skin);
 
             AddPlaneCollider(model.transform);
             StartPropeller(model.transform, plane);

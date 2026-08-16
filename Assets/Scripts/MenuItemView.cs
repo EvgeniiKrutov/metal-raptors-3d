@@ -78,6 +78,12 @@ namespace MetalRaptors
             rt.anchoredPosition = new Vector2(x, rt.anchoredPosition.y);
         }
 
+        public void SetY(float y)
+        {
+            RectTransform rt = _text.rectTransform;
+            rt.anchoredPosition = new Vector2(rt.anchoredPosition.x, y);
+        }
+
         public void SetFocused(bool focused)
         {
             _focused = focused;

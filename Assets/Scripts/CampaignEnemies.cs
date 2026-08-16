@@ -24,14 +24,17 @@ namespace MetalRaptors
 
         public IReadOnlyList<EnemyController> Live => _live;
 
-        public CampaignEnemies(Rigidbody player, float groundY, float worldTop)
+        public CampaignEnemies(Rigidbody player, float groundY, float worldTop, float health)
         {
             _player = player;
             _groundY = groundY;
             _worldTop = worldTop;
 
-            _config = Resources.Load<EnemyConfig>("EnemyConfig");
-            if (_config == null) _config = ScriptableObject.CreateInstance<EnemyConfig>();
+            var asset = Resources.Load<EnemyConfig>("EnemyConfig");
+            _config = asset != null
+                ? Object.Instantiate(asset)
+                : ScriptableObject.CreateInstance<EnemyConfig>();
+            if (health > 0f) _config.health = health;
         }
 
         public void SetWindow(float camX, float halfViewWidth)

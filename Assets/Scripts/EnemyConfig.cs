@@ -9,8 +9,8 @@ namespace MetalRaptors
         [Tooltip("Hit points (sibling: 100). Player fire subtracts PlayerConfig.damage per hit.")]
         public float health = 100f;
 
-        [Tooltip("Damage one enemy bullet deals to the player (sibling: 10).")]
-        public float damage = 10f;
+        [Tooltip("Damage one enemy bullet deals to the player (sibling: 10, scaled to 0.6).")]
+        public float damage = 6f;
 
         [Tooltip("Seconds between two enemy bullets while firing (sibling fires 5/s = 0.2 s).")]
         public float fireRate = 0.2f;

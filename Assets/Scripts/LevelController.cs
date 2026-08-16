@@ -123,7 +123,10 @@ namespace MetalRaptors
             go.transform.position = new Vector3(MinX + EdgeMargin, 150f, PlayPlaneZ);
 
             var planeModel = GameManager.CurrentPlane;
-            var plane = PlaneFactory.BuildPlaneModel(go.transform, planeModel);
+            var plane = PlaneFactory.BuildPlaneModel(go.transform, planeModel,
+                skin: GameManager.CurrentSkin);
+
+            PlayerConfig flight = PlaneLoadout.Build(config, planeModel);
 
             _cube = go.AddComponent<CubeController>();
             _cubeTr = go.transform;
@@ -132,28 +135,28 @@ namespace MetalRaptors
             _cube.OnDamaged += OnPlayerDamaged;
             _cube.OnScraped += OnPlayerScraped;
 
-            _cube.Initialize(config, 0f, MinX, MaxX, WorldTop - CubeHalf, EdgeMargin);
+            _cube.Initialize(flight, 0f, MinX, MaxX, WorldTop - CubeHalf, EdgeMargin);
 
-            SetupGuns(config, go, plane, planeModel);
+            SetupGuns(flight, go, plane, planeModel);
 
             _searchlight = PlaneSearchlight.Mount(go,
                 PlaneFactory.NoseLocal(go, plane, planeModel), _level.daytime);
         }
 
-        void SetupGuns(PlayerConfig config, GameObject body, Transform model, PlaneModelConfig plane)
+        void SetupGuns(PlayerConfig flight, GameObject body, Transform model, PlaneModelConfig plane)
         {
             var muzzle = PlaneFactory.MountMuzzle(body, model, plane, out var flashPoint);
             var hitbox = body.GetComponentInChildren<Collider>();
 
             _shooter = body.AddComponent<PlaneShooter>();
-            _shooter.Initialize(config, muzzle, flashPoint, hitbox);
+            _shooter.Initialize(flight, muzzle, flashPoint, hitbox);
 
             _bomber = body.AddComponent<PlaneBomber>();
-            _bomber.Initialize(config, hitbox);
+            _bomber.Initialize(flight, hitbox);
             _bomber.OnDetonated += OnBombDetonated;
 
             _boost = body.AddComponent<PlaneBoost>();
-            _boost.Initialize(config, _cube, model);
+            _boost.Initialize(flight, _cube, model);
         }
 
         void SpawnEnemies()

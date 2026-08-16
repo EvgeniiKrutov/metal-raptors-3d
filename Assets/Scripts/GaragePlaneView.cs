@@ -35,7 +35,9 @@ namespace MetalRaptors
 
         PlanePreviewRig _rig;
         PlaneModelConfig _plane;
+        PlaneSkin _skin;
         GameObject _body;
+        Transform _model;
         Transform _ground;
         PropellerSpin _propeller;
 
@@ -49,30 +51,38 @@ namespace MetalRaptors
         float _dragTarget;
         float _dragYaw, _dragVelocity;
 
-        public static GaragePlaneView Build(Transform canvas, PlaneModelConfig plane)
+        public static GaragePlaneView Build(Transform canvas, PlaneModelConfig plane, PlaneSkin skin)
         {
             var go = new GameObject("Garage Plane View");
             var view = go.AddComponent<GaragePlaneView>();
-            view.Compose(canvas, plane);
+            view.Compose(canvas, plane, skin);
             return view;
         }
 
-        public void SetPlane(PlaneModelConfig plane)
+        public void SetPlane(PlaneModelConfig plane, PlaneSkin skin)
         {
-            if (plane == _plane) return;
+            if (plane == _plane) { SetSkin(skin); return; }
 
             _plane = plane;
+            _skin = skin;
             _spinTime = -1f;
             if (_body != null) Destroy(_body);
             _rig.SetPlaneSize(plane.onScreenSize);
             BuildBody();
         }
 
+        public void SetSkin(PlaneSkin skin)
+        {
+            _skin = skin;
+            PlaneSkins.Apply(_model, skin);
+        }
+
         public void PlaySpinUp() => _spinTime = 0f;
 
-        void Compose(Transform canvas, PlaneModelConfig plane)
+        void Compose(Transform canvas, PlaneModelConfig plane, PlaneSkin skin)
         {
             _plane = plane;
+            _skin = skin;
             GarageLighting.Apply();
             _rig = new PlanePreviewRig(canvas, transform, new PlanePreviewFraming
             {
@@ -95,7 +105,8 @@ namespace MetalRaptors
             _body.transform.position = PlanePreviewRig.Origin;
             _body.transform.rotation = Quaternion.identity;
 
-            Transform model = PlaneFactory.BuildPlaneModel(_body.transform, _plane);
+            Transform model = PlaneFactory.BuildPlaneModel(_body.transform, _plane, skin: _skin);
+            _model = model;
 
             _propeller = model.GetComponentInChildren<PropellerSpin>();
             if (_propeller != null) _propeller.degreesPerSecond = 0f;

@@ -14,6 +14,10 @@ namespace MetalRaptors
         public static PlaneModelConfig CurrentPlane =>
             Instance != null ? Instance.SelectedPlane : PlaneModels.All[0];
 
+        public static PlaneSkin CurrentSkin =>
+            Instance != null ? Instance.SkinFor(Instance.SelectedPlane)
+                             : PlaneSkins.Default(PlaneModels.All[0]);
+
         public float MasterVolume { get; private set; } = 1f;
 
         public int HighestUnlockedLevel { get; private set; } = 1;
@@ -25,6 +29,7 @@ namespace MetalRaptors
         const string PrefVolume = "mr_master_volume";
         const string PrefUnlocked = "mr_highest_unlocked_level";
         const string PrefPlane = "mr_selected_plane";
+        const string PrefSkinPrefix = "mr_plane_skin_";
         const string PrefLevel1Daytime = "mr_level1_daytime";
         const string PrefCampaignDaytime = "mr_campaign_daytime";
 
@@ -54,6 +59,22 @@ namespace MetalRaptors
         {
             SelectedPlaneIndex = Mathf.Clamp(index, 0, PlaneModels.All.Length - 1);
             PlayerPrefs.SetInt(PrefPlane, SelectedPlaneIndex);
+            PlayerPrefs.Save();
+        }
+
+        public PlaneSkin SkinFor(PlaneModelConfig plane)
+        {
+            if (plane == null) return null;
+
+            string id = PlayerPrefs.GetString(PrefSkinPrefix + plane.resourceName, string.Empty);
+            return PlaneSkins.ById(plane, id) ?? PlaneSkins.Default(plane);
+        }
+
+        public void SetSkin(PlaneModelConfig plane, PlaneSkin skin)
+        {
+            if (plane == null || skin == null) return;
+
+            PlayerPrefs.SetString(PrefSkinPrefix + plane.resourceName, skin.id);
             PlayerPrefs.Save();
         }
 

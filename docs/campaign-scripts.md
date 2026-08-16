@@ -101,9 +101,10 @@ player so the level still runs.
 ## The dialogue bar (`DialogueBar`)
 
 Radio lines are spoken **inside the film bars**. A block of `say` steps raises the two black
-cinematic bars (docs/level-intro.md), holds them empty for a 0.55 s lead-in, and only then starts
-typing; the next op that is not a `say` lowers them again. The bars are the bar — there is no
-separate stripe any more.
+cinematic bars (docs/level-intro.md), waits for the wingman to finish flying back into formation
+(`CompanionReady`, docs/companion.md — instant on a level with no companion), holds them empty for
+a 0.55 s lead-in, and only then starts typing; the next op that is not a `say` lowers them again.
+The bars are the bar — there is no separate stripe any more.
 
 The line itself sits in the bottom bar, 150 px tall at the 1920×1080 reference resolution: the
 speaker's display name on its own 28 px row — tinted blue for the player and amber for anyone else,
@@ -136,6 +137,24 @@ A line's on-screen time is unchanged by the reveal: typing is spent *out of* the
 not added to it, and whatever is left after the last character is the hold. A line whose duration is
 shorter than its typing still holds for a minimum of **0.8 s** afterwards, so the last word is never
 snatched away the instant it appears.
+
+### Skipping a line (space)
+
+**One tap of space ends the current line** — mid-typing or mid-hold, either way — and the next one
+starts immediately. It is one line per tap, not "skip the conversation": holding space does
+nothing, because the read is edge-triggered (`MenuInput.ReadSkip`, space or the pad's south
+button).
+
+Only the two loops that hold a line on screen are skippable. The bars sliding in and the 0.55 s
+lead-in are not, so a tap during the opening of a block cannot skip a line that has not been shown
+yet. `CampaignScriptRunner.Skipped()` also refuses while the pause menu, the briefing or a screen
+fade is up: coroutines still tick at `Time.timeScale = 0`, so without that guard a space press
+aimed at the pause menu's buttons would eat a line behind it.
+
+The same guard is why the press is recorded by frame (`_skipFrame`) and why a skipped line yields
+one frame before returning. The runner walks its steps inside a single coroutine, so a skip that
+returned immediately would let the *next* `say` read the same still-true `wasPressedThisFrame` and
+cascade through the whole block on one tap.
 
 ## The current task (`LevelTask`)
 
@@ -177,7 +196,8 @@ and `CompleteTask` returns the seconds the runner should wait.
 ## Running a script (`CampaignScriptRunner`)
 
 A component added to the level controller that walks the steps in a coroutine. The controller
-implements `ICampaignScriptHost` (`IsOver`, `EnemiesAlive`, `SpawnWave`, `CompleteLevel`), which is
+implements `ICampaignScriptHost` (`IsOver`, `EnemiesAlive`, `CompanionReady`, `SpawnWave`,
+`CompleteLevel`), which is
 the whole surface between the script and the level — the runner never touches the plane, the
 camera or the terrain.
 
@@ -209,6 +229,14 @@ streamed ground under an enemy is not sampled.
 
 `AliveCount` is what makes `wave` blocking; the list also drops planes destroyed by any other
 means, so nothing can wedge the script permanently.
+
+Every wave in a level flies the shared `EnemyConfig` asset, except for its health:
+`CampaignDefinition.enemyHealth` overrides it per level (0 keeps the asset's own figure), so a
+level can be made softer or tougher without a second config asset. `CampaignEnemies` never
+touches the loaded asset — it clones it once per level and edits the clone, since a Resources
+asset mutated at runtime stays mutated for the rest of the editor session. Campaign level 1
+flies at 50 against the asset's 100, so the opening fight is short — the player brings 150
+health of their own into it, and the level is the tutorial for the guns, not a test of them.
 
 ## Level 1
 

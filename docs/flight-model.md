@@ -52,11 +52,41 @@ excess halves roughly every 0.8 s. Keep `bulletSpeed` (400) well above the
 cap so rounds still pull away from the plane in a dive — under boost the cap
 rises to 374, which is still clear of it.
 
+## The asset is a baseline, not the whole config
+
+`PlayerConfig.asset` is loaded once per level and then **copied per plane**.
+`PlaneLoadout.Build` instantiates it and overwrites the six fields the garage
+shows as stat bars from the selected plane's `PlaneStats` (docs/garage.md):
+
+| stat bar | `PlayerConfig` field | conversion |
+|---|---|---|
+| max speed | `flySpeed` | `maxSpeed / maxSpeedMultiplier` |
+| rotation speed | `rotationSpeed` | direct |
+| mass | `mass` | direct |
+| fire rate | `fireRate` | `1 / fireRate` (bar is shots/s, field is seconds between) |
+| damage | `damage` | direct |
+| health | `health` | direct |
+
+Everything else on the asset — `diveAcceleration`, `speedDrag`,
+`maxSpeedMultiplier`, `turnResponsiveness`, `bulletSpeed`, every bomb and boost
+field — is shared by every plane and is edited only in the asset. So the numbers
+in the table above still describe the Camel exactly (its stat block is set to the
+asset's own values); the Dr.I cruises at 165 instead of 180, and its dive and
+drag behave identically.
+
+It is a **copy** rather than an edit in place because `Resources.Load` hands back
+the asset itself: writing the selected plane's numbers onto it would dirty
+`PlayerConfig.asset` on disk in the editor and leak the last-flown plane's
+handling into the next session.
+
 ## Scope
 
-Player only. Enemies (`EnemyController`) keep their constant `flySpeed`. The
-shot-down fall is a separate mode (real rigidbody gravity, see
-`CubeController.BeginFall`) and is untouched by this model.
+Player only. Enemies (`EnemyController`) keep their constant `flySpeed` and are
+built from `EnemyConfig.asset`, which the per-plane loadout never touches — an
+enemy Fokker and a player-selected Fokker have nothing in common but the model.
+The companion wingman is handed the shared `PlayerConfig` rather than a loadout
+(docs/companion.md). The shot-down fall is a separate mode (real rigidbody
+gravity, see `CubeController.BeginFall`) and is untouched by this model.
 
 ## Soft side boundaries (`FlightSteering`)
 
@@ -111,6 +141,92 @@ During a campaign cutscene a second clamp of the same shape appears, but at the
 are disabled and the ground is found by a downward raycast instead, so the plane
 skims the dirt under full control with no physics response to fight. See
 docs/level-intro.md.
+
+## Auto-righting half roll (`PlaneRoll`)
+
+A plane that flies "backwards" along the play plane is upside down, because the
+only rotation the flight model applies is Z = heading: at heading π the body is
+turned 180°, which points the nose the right way but puts the wheels up. Left
+alone the plane cruises inverted for the rest of the run, which reads as a bug.
+
+`PlaneRoll` fixes it with the manoeuvre a pilot would use — half a roll about
+the nose axis, so the plane keeps its heading and comes out wheels-down. Every
+plane owns one instance: the player (`CubeController`), each enemy fighter
+(`EnemyController`) and both background duellists (`DuelPlane`, so the
+companion and its foe, see docs/companion.md). Each controller multiplies the
+roll into its `ApplyRotation` as `Euler(0,0,heading) * Euler(roll,0,0)` — the
+local X axis is the nose axis once the heading rotation is applied.
+
+The roll is deliberately unhurried, and its rate comes from the airframe rather
+than from a fixed duration: `RollRateFraction` (0.6) of that plane's own
+`rotationSpeed`, so a 180 °/s fighter rolls at 108 °/s and takes ~1.7 s to come
+round. A plane that turns faster also rolls faster, which is what keeps the
+manoeuvre reading as the same aircraft — a fixed half-second flip looked like a
+snap the airframe could not have made.
+
+### Which way is up
+
+The model itself is baked either wheels-down-facing-right or, for `mirrored`
+planes (every enemy, and the companion's foe), wheels-down-facing-left — see
+`PlaneFactory.BuildPlaneModel`. So uprightness is
+`cos(heading) * cos(roll)`, negated for a mirrored plane, and the plane is
+inverted when that product is negative. Because the test reads the *current*
+roll it is self-correcting: after a flip to 180° the same rule fires again the
+next time the plane turns back the other way.
+
+### When it fires
+
+All three conditions must hold continuously for `InvertedDelay` (1 s):
+
+- **Inverted**, per the test above.
+- **Near-horizontal**: `|cos(heading)| >= LevelCos` (0.5), i.e. within 60° of
+  level. Pointing straight up or straight down is neither wheels-up nor
+  wheels-down, and rolling there reads as a random twitch; the plane waits
+  until it levels out. This is also what stops a loop from triggering a flip
+  halfway round — the inverted stretch of a loop is short and mostly steep.
+- **Flying steady**: for the player, neither turn key held; for every AI plane,
+  `PlaneRoll.Steady` — turn rate at or below `SteadyTurnFraction` (15 %) of the
+  plane's own maximum. A fighter mid-turn keeps the orientation its manoeuvre
+  gave it.
+
+The delay is what makes a deliberate inverted pass still possible: keep turning,
+or keep the nose steep, and the plane holds its attitude.
+
+`PlaneRoll.Flip` is the way past the delay: it starts the same half roll on the
+spot if — and only if — the plane is inverted by the same test and is not
+already rolling. The wingman's return to formation uses it (docs/companion.md)
+so that step of the sequence begins the frame the one before it ends instead of
+waiting out a second of level flight first.
+
+### The roll itself
+
+Smoothstepped rotation from the current angle to ±180° over
+`180 / (rotationSpeed * RollRateFraction)` seconds — the rate is captured when
+the flip starts, so a boost part-way through does not speed it up mid-roll, and
+a floor of 20 °/s keeps a badly configured plane from rolling forever. The
+direction is chosen at random per flip so a formation of enemies doesn't roll in
+lockstep. It is a pure aileron roll: heading, speed and position are untouched,
+so it can never steer the plane or spoil a shot, and input keeps working
+normally throughout — a turn pressed mid-roll steers as usual and the roll still
+finishes. Once started the flip always completes; the timer only gates the
+*start*. The angle is wrapped back into (-180°, 180°] on completion so repeated
+flips don't accumulate.
+
+The roll is applied to the plane's **body**, not just its model, so everything
+mounted on the body rolls with it. That is what makes the fix more than
+cosmetic: `PlaneBomber` releases from `-transform.up`, which on an inverted
+plane pointed *upward* and threw bombs over the wing.
+
+`DuelPlane` already had a roll of its own — the bank it leans into turns and
+depth changes. The two share the axis, so they add, with the bank scaled by
+`cos(flip)`: at 180° the bank is negated, which keeps it leaning into the turn
+as seen by the camera rather than away from it, and scaling (rather than
+flipping the sign at 90°) keeps that transition continuous through the roll.
+
+Skipped while falling and while sinking — `PlaneFall` and `DuelPlane`'s fall
+spin own the rotation there. Otherwise it runs everywhere the plane flies,
+campaign cutscenes and the level intro included; during a cutscene the player
+counts as flying steady, since a plane with no pilot input never blocks a flip.
 
 ## Shot-down fall (`PlaneFall`)
 
@@ -216,8 +332,8 @@ by a state machine originally ported from the sibling repo's `FighterPlane`:
 
 | State | Behaviour |
 |---|---|
-| `Attack` | Chase the player with lead-prediction aim (`PredictIntercept`); guns fire once the nose is within the aim threshold of the intercept point. On timing out it breaks away into `Fly` only if the player is inside `maxFireRange` — a merge just happened and there is something to break away *from*. Otherwise it re-arms another attack run rather than disengaging from a fight it is not yet in. |
-| `Fly` | Break away and reposition, weaving side to side over roughly where the player was, climbing to `flyPerchHeight` above the player (clamped inside the soft floor/ceiling band). Guns silent. Times out back into `Attack`. |
+| `Attack` | Chase the player with lead-prediction aim (`PredictIntercept`) and shoot whenever the fire gate below opens. On timing out it breaks away into `Fly` only if the player is inside `maxFireRange` — a merge just happened and there is something to break away *from*. Otherwise it re-arms another attack run rather than disengaging from a fight it is not yet in. |
+| `Fly` | Break away and reposition, weaving side to side over roughly where the player was, climbing to `flyPerchHeight` above the player (clamped inside the soft floor/ceiling band). Guns stay live for snap shots as the nose swings across the player. Times out back into `Attack`. |
 | `Evade` | A single hard break: one heading, held for `evadeDuration`, `evadeBreakAngle` off the line directly away from the player — so the fighter crosses the attacker's gunsight instead of running down it — with `jitterAmplitude` of random wobble re-rolled `jitterHz` times a second so tracking fire keeps missing. The side of the break is picked for airspace, whichever of the two candidates has more room before the floor or ceiling, choosing randomly when they are comparable. Then straight back into `Attack`. |
 | `Recover` | Entered whenever altitude drops below `minAltitudeMargin`, overriding every other state: climb hard at a fixed 70° until back above `safeAltitudeMargin`, then return to `Attack`. |
 | `Return` | Entered when the fighter drifts off camera: fly straight back toward the player at `ReturnSpeedFactor` × cruise until it's on screen again, then resume `Attack`. The catch-up speed exists because cruise alone is below the player's, so a fighter that fell behind used to trail off screen for the rest of the level; it only applies while the fighter is off camera, where the speed-up cannot be seen. |
@@ -251,6 +367,32 @@ finished, so the phase lasted a single frame.
 round would take to reach the player's current straight-line-extrapolated
 position, then re-estimates from where that gives, converging quickly enough
 in two passes for the plane's turn rates.
+
+### The fire gate (`UpdateFiring` / `HasFiringSolution`)
+
+Firing is decided by geometry, not by which state the fighter happens to be
+in. Every state except `Return` (which only runs off camera, where a shot
+would be invisible anyway) and the scripted `StandDown` may shoot, provided
+the player is on camera and inside `maxFireRange`.
+
+The gate itself is checked twice per fixed step, once against the lead point
+from `PredictIntercept` and once against the player's *present* position;
+either one opening is enough to pull the trigger. A candidate point passes if
+the nose is within `fireAngleThreshold` of it — the ordinary deflection shot —
+or, failing that, if the burst would still pass within `SnapWindowFactor`
+target radii of it, capped at `SnapFireConeDeg` off the nose so the fighter
+never sprays sideways. Because that second clause is a miss *distance*, it
+opens the cone only where a plane-width miss is a real angle: at knife range
+it allows a wide snap shot, at 400 m it is tighter than the base threshold and
+changes nothing.
+
+Both halves fix the same complaint — a fighter turning onto the player and
+holding fire. Gating on the intercept point alone meant that in a close
+crossing pass, where the lead angle exceeds `fireAngleThreshold` outright and
+the limited turn rate leaves the nose trailing on the player rather than ahead
+of them, the guns stayed cold with the player square in the gunsight. Silencing
+the guns for the whole of `Fly` did the same thing for roughly a third of every
+attack cycle.
 
 A world-space health bar (dark backplate + emissive fill, left-anchored pivot
 scaled by the health fraction) floats above the fighter, deliberately outside

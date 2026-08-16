@@ -25,20 +25,23 @@ namespace MetalRaptors
 
         public string propBladesNode;
 
+        public PlaneSkin[] skins;
+
         public PlaneStats stats;
     }
 
     public static class PlaneModels
     {
-        const string Lorem =
-            "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor " +
-            "incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud " +
-            "exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.";
+        const string SopwithStory =
+            "Britain's most successful scout of the war, credited with more enemy aircraft downed " +
+            "than any other Allied fighter. The hump over its twin Vickers guns gave it the name, " +
+            "and the torque of its rotary engine gave it a vicious right-hand turn — lethal to " +
+            "novices and to the enemy alike.";
 
-        const string LoremAlt =
-            "Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque " +
-            "laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi " +
-            "architecto beatae vitae dicta sunt explicabo, nemo enim ipsam voluptatem.";
+        const string FokkerStory =
+            "Germany's answer to the Sopwith Triplane: three stubby wings, a light frame and a rate " +
+            "of climb nothing could follow. Slow in level flight and grounded early by wing " +
+            "failures, barely 320 were built — but Manfred von Richthofen flew his last in one.";
 
         public static readonly PlaneModelConfig Sopwith = new PlaneModelConfig
         {
@@ -46,20 +49,21 @@ namespace MetalRaptors
             displayName    = "Sopwith Camel",
             country        = "Great Britain",
             type           = PlaneTypes.Fighter,
-            description    = Lorem,
+            description    = SopwithStory,
             standUpEuler   = new Vector3(90f, -90f, 0f),
             rollWheelsDown = true,
             onScreenSize   = 60f,
             propPivotNode  = "propPivot",
             propBladesNode = "propBlades",
+            skins          = PlaneSkins.SopwithCamel,
             stats = new PlaneStats
             {
-                maxSpeed      = 192f,
-                rotationSpeed = 180f,
+                maxSpeed      = 288f,
+                rotationSpeed = 120f,
                 mass          = 2.5f,
                 fireRate      = 5f,
                 damage        = 10f,
-                health        = 100f,
+                health        = 150f,
             },
         };
 
@@ -69,7 +73,7 @@ namespace MetalRaptors
             displayName    = "Fokker Dr.I",
             country        = "Germany",
             type           = PlaneTypes.Fighter,
-            description    = LoremAlt,
+            description    = FokkerStory,
             standUpEuler   = new Vector3(90f, -90f, 0f),
             rollWheelsDown = true,
             onScreenSize   = 60f,
@@ -77,12 +81,12 @@ namespace MetalRaptors
             propBladesNode = "propBlades",
             stats = new PlaneStats
             {
-                maxSpeed      = 192f,
-                rotationSpeed = 180f,
-                mass          = 2.5f,
-                fireRate      = 5f,
+                maxSpeed      = 264f,
+                rotationSpeed = 140f,
+                mass          = 2.1f,
+                fireRate      = 5.5f,
                 damage        = 10f,
-                health        = 100f,
+                health        = 128f,
             },
         };
 

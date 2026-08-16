@@ -13,6 +13,10 @@ namespace MetalRaptors
         public string title;
         public string dateline;
         public string lore;
+        public bool companion;
+        public float enemyHealth;
+        public PlaneModelConfig companionPlane = PlaneModels.Sopwith;
+        public PlaneModelConfig companionFoe = PlaneModels.Fokker;
     }
 
     public static class CampaignLevels
@@ -40,6 +44,8 @@ namespace MetalRaptors
             weather = Weather.Calm,
             clouds = new CloudsPart(),
             script = "level1",
+            companion = true,
+            enemyHealth = 50f,
             title = "FIRST LIGHT",
             dateline = "14 April 1916 — Verdun sector — dawn",
             lore = Lore1,

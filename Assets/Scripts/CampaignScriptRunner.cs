@@ -7,6 +7,7 @@ namespace MetalRaptors
     {
         bool IsOver { get; }
         int EnemiesAlive { get; }
+        bool CompanionReady { get; }
         void SpawnWave(EnemyGroup[] groups);
         void ShowTask(string text);
         float CompleteTask();
@@ -21,6 +22,7 @@ namespace MetalRaptors
         ICampaignScriptHost _host;
         DialogueBar _bar;
         bool _stopped;
+        int _skipFrame = -1;
 
         public static CampaignScriptRunner Begin(GameObject owner, CampaignScript script,
             ICampaignScriptHost host, DialogueBar bar)
@@ -112,6 +114,7 @@ namespace MetalRaptors
             {
                 _bar.Open();
                 while (Running && !_bar.IsReady) yield return null;
+                while (Running && !_host.CompanionReady) yield return null;
                 yield return Wait(DialogueBar.LeadInSec);
                 if (!Running) yield break;
             }
@@ -119,15 +122,37 @@ namespace MetalRaptors
             _bar.Show(step.speaker, step.text);
 
             float typing = 0f;
+            bool skipped = false;
             while (Running && _bar.IsRevealing)
             {
+                if (Skipped()) { skipped = true; break; }
+
                 _bar.Reveal(Time.deltaTime);
                 typing += Time.deltaTime;
                 yield return null;
             }
 
-            yield return Wait(Mathf.Max(step.seconds - typing, HoldMin));
+            float hold = skipped ? 0f : Mathf.Max(step.seconds - typing, HoldMin);
+            while (hold > 0f && Running)
+            {
+                if (Skipped()) { skipped = true; break; }
+
+                hold -= Time.deltaTime;
+                yield return null;
+            }
+
             _bar.ClearLine();
+            if (skipped) yield return null;
+        }
+
+        bool Skipped()
+        {
+            if (Time.frameCount == _skipFrame) return false;
+            if (GameMenu.IsOpen || LevelBriefing.IsOpen || ScreenFade.IsBusy) return false;
+            if (!MenuInput.ReadSkip()) return false;
+
+            _skipFrame = Time.frameCount;
+            return true;
         }
 
         IEnumerator Wait(float seconds)

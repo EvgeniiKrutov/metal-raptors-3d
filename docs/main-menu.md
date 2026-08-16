@@ -99,7 +99,8 @@ returns true.
 ## Plane preview
 
 The main list's right band holds the player's plane — **whichever plane is selected in the
-garage** (`GameManager.CurrentPlane`) — flying nose-right and hanging in one place. It is
+garage**, in the colour picked there (`GameManager.CurrentPlane` and `CurrentSkin`, see
+`docs/plane-skins.md`) — flying nose-right and hanging in one place. It is
 built by `MenuPlaneView` and shown on the **home screen only** (the main list and
 challenges) — every other screen hides it, the custom battle band belonging to the map
 preview card and the era cards page taking the whole canvas.
@@ -237,9 +238,12 @@ column plus one card in the right band — the first screen to use both halves.
    └─────────────────────────┴───────────────────────────┘
 ```
 
-* A selector row is two columns, each reading from its own left edge: the label, then the
-  control. The value column is a fixed `SelectorValueWidth`, so the right triangle holds
-  still while the value changes under it.
+* A selector row is two columns: the label reads from its own left edge, then the control.
+  The value column is a fixed `SelectorValueWidth`, so the right triangle holds still while
+  the value changes under it, and the value is drawn `MiddleCenter` inside that column — the
+  one place in the menu that is not left-aligned. Left-aligned, a short value (`green`) would
+  hug the left triangle and leave a hole in front of the right one; centred, the pair of
+  triangles reads as a control wrapped around its value whatever the value's length.
 * The labels (`map`, `weather`) are `Fg`, the same weight and colour as `start` and `back`
   — they name rows the player acts on, so they read as entries, not as captions.
 * The list does **not** wrap. The triangle at either end greys out.

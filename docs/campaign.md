@@ -116,6 +116,13 @@ adapted to a forward-scrolling world, and docs/campaign-ww1-scenario.md for the 
 plot, cast, loading-screen text and every radio line (story only — none of it is wired up).
 docs/campaign-ww1-portraits.md holds the avatar generation prompts for those speakers.
 
+## The companion
+
+A level can fly with a wingman: `CampaignDefinition.companion` turns it on and names the two
+plane models involved. It holds formation while the film bars are up and peels 250 m back into
+a background dogfight while the level is being played, swapping every time the cutscene state
+does. See docs/companion.md.
+
 ## Pre-level briefing
 
 `CampaignDefinition` also carries the briefing text — `title`, `dateline` and `lore` — shown on

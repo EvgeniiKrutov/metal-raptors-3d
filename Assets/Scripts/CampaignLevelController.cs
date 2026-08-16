@@ -49,6 +49,7 @@ namespace MetalRaptors
         HudCurtain _curtain;
 
         CampaignEnemies _enemies;
+        CompanionFlight _wing;
         CampaignScriptRunner _runner;
         DialogueBar _dialogue;
         LevelTask _task;
@@ -67,6 +68,8 @@ namespace MetalRaptors
         public bool IsOver => _gameOver;
 
         public int EnemiesAlive => _enemies != null ? _enemies.AliveCount : 0;
+
+        public bool CompanionReady => _wing == null || _wing.Formed;
 
         bool Coast => _level.terrain == TerrainKind.Flanders;
 
@@ -110,6 +113,7 @@ namespace MetalRaptors
             BuildHud();
             _sound = SoundSystem.Begin(_cube, null, silent: HasBriefing);
             BeginIntro();
+            BeginCompanion(config);
             ShowBriefing();
         }
 
@@ -121,6 +125,13 @@ namespace MetalRaptors
         {
             _intro = LevelIntro.Begin(gameObject, _cube, _shooter, _bomber, _boost, StartX,
                 _halfViewWidth, BeginScript);
+        }
+
+        void BeginCompanion(PlayerConfig config)
+        {
+            if (CustomBattle.Requested) return;
+
+            _wing = CompanionFlight.Begin(_level, config, _cubeTr, PlayPlaneZ, AiGroundY, WorldTop);
         }
 
         void ShowBriefing()
@@ -143,7 +154,8 @@ namespace MetalRaptors
             CampaignScript script = CampaignScript.Load(_level.script);
             if (script == null) return;
 
-            _enemies = new CampaignEnemies(_cube.GetComponent<Rigidbody>(), AiGroundY, WorldTop);
+            _enemies = new CampaignEnemies(_cube.GetComponent<Rigidbody>(), AiGroundY, WorldTop,
+                _level.enemyHealth);
             _dialogue = new DialogueBar(_hud.transform);
             _runner = CampaignScriptRunner.Begin(gameObject, script, this, _dialogue);
         }
@@ -164,7 +176,10 @@ namespace MetalRaptors
             go.transform.position = new Vector3(StartX, SpawnY, PlayPlaneZ);
 
             var planeModel = GameManager.CurrentPlane;
-            var model = PlaneFactory.BuildPlaneModel(go.transform, planeModel);
+            var model = PlaneFactory.BuildPlaneModel(go.transform, planeModel,
+                skin: GameManager.CurrentSkin);
+
+            PlayerConfig flight = PlaneLoadout.Build(config, planeModel);
 
             _cube = go.AddComponent<CubeController>();
             _cubeTr = go.transform;
@@ -173,21 +188,21 @@ namespace MetalRaptors
             _cube.OnDamaged += OnPlayerDamaged;
             _cube.OnScraped += OnPlayerScraped;
 
-            _cube.Initialize(config, 0f, float.MinValue, float.MaxValue,
+            _cube.Initialize(flight, 0f, float.MinValue, float.MaxValue,
                 WorldTop - CubeHalf, 0f, hardLeftWall: true);
 
             var muzzle = PlaneFactory.MountMuzzle(go, model, planeModel, out var flashPoint);
             var hitbox = go.GetComponentInChildren<Collider>();
 
             _shooter = go.AddComponent<PlaneShooter>();
-            _shooter.Initialize(config, muzzle, flashPoint, hitbox);
+            _shooter.Initialize(flight, muzzle, flashPoint, hitbox);
 
             _bomber = go.AddComponent<PlaneBomber>();
-            _bomber.Initialize(config, hitbox);
+            _bomber.Initialize(flight, hitbox);
             _bomber.OnDetonated += OnBombDetonated;
 
             _boost = go.AddComponent<PlaneBoost>();
-            _boost.Initialize(config, _cube, model);
+            _boost.Initialize(flight, _cube, model);
 
             _searchlight = PlaneSearchlight.Mount(go,
                 PlaneFactory.NoseLocal(go, model, planeModel), _level.daytime);
@@ -248,6 +263,13 @@ namespace MetalRaptors
         {
             if (_gameOver) return;
             PlaneScrapes.Check(_cube, _cubeTr, _enemies != null ? _enemies.Live : null);
+            if (_wing != null && _wing.CheckBump(_cubeTr)) OnCompanionBump();
+        }
+
+        void OnCompanionBump()
+        {
+            _camShake = 1f;
+            if (_cube != null) _cube.Bump();
         }
 
         string MapName => TerrainNames.For(_level.terrain);
@@ -287,6 +309,11 @@ namespace MetalRaptors
 
             UpdateHud();
             if (_enemies != null) _enemies.SetWindow(_camBasePos.x, _halfViewWidth);
+
+            if (_wing == null) return;
+            _wing.SetWindow(_camBasePos.x, _halfViewWidth);
+            _wing.SetCinematic(Cinematic);
+            _wing.Tick(Time.deltaTime);
         }
 
         void PositionCamera(bool instant)
@@ -347,6 +374,7 @@ namespace MetalRaptors
             _cube.Stop();
             StopWeapons();
             if (_enemies != null) _enemies.StandDown();
+            if (_wing != null) _wing.StandDown();
             if (_dialogue != null) _dialogue.Hide();
             if (_sound != null) _sound.EnterGameOver();
 
@@ -360,6 +388,7 @@ namespace MetalRaptors
         {
             if (_runner != null) _runner.Stop();
             if (_enemies != null) _enemies.StandDown();
+            if (_wing != null) _wing.StandDown();
         }
 
         void Ditch()
