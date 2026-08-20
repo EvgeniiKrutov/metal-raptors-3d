@@ -12,8 +12,9 @@ namespace MetalRaptors
         [Tooltip("Damage one enemy bullet deals to the player (sibling: 10, scaled to 0.6).")]
         public float damage = 6f;
 
-        [Tooltip("Seconds between two enemy bullets while firing (sibling fires 5/s = 0.2 s).")]
-        public float fireRate = 0.2f;
+        [Tooltip("Seconds between two enemy bullets while firing (sibling fires 5/s = 0.2 s; "
+                 + "eased off to 4/s here).")]
+        public float fireRate = 0.25f;
 
         [Tooltip("Enemy bullet speed in metres/second (matches the player's rounds).")]
         public float bulletSpeed = 400f;

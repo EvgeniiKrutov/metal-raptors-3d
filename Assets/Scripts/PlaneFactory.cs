@@ -14,10 +14,10 @@ namespace MetalRaptors
         public static Transform BuildPlaneModel(Transform parent, PlaneModelConfig plane,
             bool mirrored = false, PlaneSkin skin = null)
         {
-            var prefab = Resources.Load<GameObject>(plane.resourceName);
+            var prefab = Resources.Load<GameObject>(plane.ResourcePath);
             if (prefab == null)
             {
-                Debug.LogError($"PlaneFactory: {plane.resourceName} model not found in Resources.");
+                Debug.LogError($"PlaneFactory: {plane.ResourcePath} model not found in Resources.");
                 var fallback = UIFactory.CreatePrimitive3D(PrimitiveType.Cube,
                     Vector3.zero, Vector3.one * FallbackCubeScale, Color.white);
                 fallback.transform.SetParent(parent, false);

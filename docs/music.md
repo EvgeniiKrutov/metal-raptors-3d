@@ -37,8 +37,9 @@ intro→loop handoff is sample-accurate on the DSP clock.
 | `MusicPlayer.cs` | Persistent player (bootstraps itself `BeforeSceneLoad`, `DontDestroyOnLoad`). Owns the two `AudioSource`s and the fades, and reacts to scene loads. |
 
 The JSON lives in `Assets/Music/Resources/Music/` rather than `Assets/Resources/` because
-`.gitignore` excludes `/Assets/Resources` as private content — any folder named `Resources`
-is a resources root, so `Resources.Load<TextAsset>("Music/raptor-march-neon")` finds them.
+`.gitignore` used to exclude all of `/Assets/Resources` as private content — any folder named
+`Resources` is a resources root, so `Resources.Load<TextAsset>("Music/raptor-march-neon")`
+finds them (docs/conventions.md).
 
 `.gitignore` no longer excludes `/Assets/Music`, so the soundtracks are tracked and ship with
 the repo.

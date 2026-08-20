@@ -8,9 +8,9 @@ namespace MetalRaptors
     {
         const string ShotClip = "Sounds/bullet_shot_1";
 
-        const float CruiseSpeed = 175f;
-        const float CatchUpFactor = 1.45f;
-        const float CatchUpBand = 0.5f;
+        public const float CruiseSpeed = 175f;
+
+        const float PaceRate = 60f;
         const float PilotGain = 5f;
 
         const float BankPerDepthSpeed = 0.40f;
@@ -70,12 +70,11 @@ namespace MetalRaptors
         const float CeilingMargin = 100f;
         const float ClampSpeed = 120f;
 
-        const float FallSeconds = 3f;
         const float FallDiveDeg = -38f;
         const float FallSpinDeg = 230f;
         const float FallDiveResponse = 1.1f;
         const float FallSpeedGain = 20f;
-        const float FallFloorDrop = 100f;
+        const float FallExitMargin = 60f;
 
         enum PassState { Approach, Overshoot, Reposition }
 
@@ -106,6 +105,8 @@ namespace MetalRaptors
         float _size = 60f;
         float _heading;
         float _speed = CruiseSpeed;
+        float _pace = CruiseSpeed;
+        float _paceTarget = CruiseSpeed;
         float _angularVelocity;
         float _bank;
         PlaneRoll _roll;
@@ -119,11 +120,15 @@ namespace MetalRaptors
         float _escortFloorY, _escortCeilingY;
         bool _bounded;
 
+        float _viewMinX, _viewMaxX, _viewMinY, _viewMaxY;
+        bool _hasView;
+        float _groundY;
+        bool _hasGround;
+
         float _shotTimer, _restTimer;
         int _burstLeft;
 
         bool _falling;
-        float _fallTime;
         float _fallSpeed;
         float _fallHeadingDeg;
 
@@ -256,6 +261,26 @@ namespace MetalRaptors
             _escortCeilingY = ceilingY;
         }
 
+        public void SetView(float minX, float maxX, float minY, float maxY)
+        {
+            _viewMinX = minX;
+            _viewMaxX = maxX;
+            _viewMinY = minY;
+            _viewMaxY = maxY;
+            _hasView = true;
+        }
+
+        public void SetGround(float y)
+        {
+            _groundY = y;
+            _hasGround = true;
+        }
+
+        public void SetPace(float cruise)
+        {
+            _paceTarget = Mathf.Max(1f, cruise);
+        }
+
         public void StandDown()
         {
             if (_falling) return;
@@ -274,8 +299,9 @@ namespace MetalRaptors
             _falling = true;
             _role = DuelRole.Idle;
             _opponent = null;
+            _escort = null;
             _burstLeft = 0;
-            _fallSpeed = CruiseSpeed;
+            _fallSpeed = Mathf.Max(_speed, CruiseSpeed);
             _fallHeadingDeg = Mathf.Cos(_heading) >= 0f ? FallDiveDeg : 180f - FallDiveDeg;
 
             Explosion.Spawn(transform.position, _size);
@@ -287,13 +313,6 @@ namespace MetalRaptors
         {
             float dt = Time.deltaTime;
             if (dt <= 0f) return;
-
-            if (_falling && (_fallTime >= FallSeconds
-                || transform.position.y <= _floorY - FallFloorDrop))
-            {
-                Remove();
-                return;
-            }
 
             _roleTime += dt;
 
@@ -312,7 +331,45 @@ namespace MetalRaptors
             UpdateBank(dt, (_z - previousZ) / dt);
             ApplyRotation();
 
-            if (!_falling && _role == DuelRole.Hunt) UpdateGun(dt);
+            if (_falling) { TickWreck(pos); return; }
+            if (_role == DuelRole.Hunt) UpdateGun(dt);
+        }
+
+        void TickWreck(Vector3 pos)
+        {
+            if (Surface(pos, out float surface, out bool water) && pos.y <= surface)
+            {
+                Crash(new Vector3(pos.x, surface, pos.z), water);
+                return;
+            }
+
+            if (OutOfView(pos)) Remove();
+        }
+
+        bool Surface(Vector3 pos, out float y, out bool water)
+        {
+            Battlefield field = Battlefield.Current;
+            if (field != null && field.Surface(pos.x, pos.z, out y, out water)) return true;
+
+            water = false;
+            y = _groundY;
+            return _hasGround;
+        }
+
+        bool OutOfView(Vector3 pos)
+        {
+            if (!_hasView) return false;
+
+            float margin = _size * 0.5f + FallExitMargin;
+            return pos.x < _viewMinX - margin || pos.x > _viewMaxX + margin
+                || pos.y < _viewMinY - margin || pos.y > _viewMaxY + margin;
+        }
+
+        void Crash(Vector3 point, bool water)
+        {
+            if (!water) Explosion.Spawn(point, _size);
+            if (Battlefield.Current != null) Battlefield.Current.Impact(point, _size, water);
+            Remove();
         }
 
         bool Escorting => _role == DuelRole.Escort || _role == DuelRole.Form;
@@ -380,10 +437,9 @@ namespace MetalRaptors
 
             SteerToHeading(target, dt);
 
-            float cruise = CruiseSpeed;
-            if (_bounded && _role != DuelRole.Idle && pos.x < _minX + SideMargin * CatchUpBand)
-                cruise *= CatchUpFactor;
+            _pace = Mathf.MoveTowards(_pace, _paceTarget, PaceRate * dt);
 
+            float cruise = _pace;
             float floor = cruise;
             if (_role == DuelRole.Form)
             {
@@ -471,8 +527,6 @@ namespace MetalRaptors
 
         Vector3 Fall(Vector3 pos, float dt)
         {
-            _fallTime += dt;
-
             _heading = Mathf.LerpAngle(_heading * Mathf.Rad2Deg, _fallHeadingDeg,
                 1f - Mathf.Exp(-FallDiveResponse * dt)) * Mathf.Deg2Rad;
             _fallSpeed += FallSpeedGain * dt;

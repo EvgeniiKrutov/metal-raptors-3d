@@ -1,8 +1,9 @@
 # Pre-level briefing (`LevelBriefing`)
 
-A full-screen page shown before a campaign level begins: the level's name, its dateline, a block of
-lore, and `Press any key to continue...` with a blinking cursor. It is the screen the WW1 scenario
-calls the loading screen (docs/campaign-ww1-scenario.md).
+A full-screen page shown before a campaign level begins: the level's name, its dateline and a block
+of lore, all typed out like a radio transmission coming in, then `Press any key to continue...`
+with a blinking cursor. It is the screen the WW1 scenario calls the loading screen
+(docs/campaign-ww1-scenario.md).
 
 ## Where the text comes from
 
@@ -40,8 +41,30 @@ and the prompt is placed at `min(−400, bottom − 56)`, floored at −470 so i
 screen. With today's two-paragraph bodies the −400 default wins; a longer one pushes the prompt
 down instead of colliding with the text. The blinking cursor follows the prompt's row.
 
-The lore appears whole. Only the in-flight radio lines type themselves out
-(docs/campaign-scripts.md).
+## The print
+
+Nothing on the page is there when it opens. The four text blocks type themselves out in order —
+caption, title, dateline, lore — the way the in-flight radio lines do (docs/campaign-scripts.md),
+at the same 55 characters a second, except the lore which runs at 2.2× that: at one rate a
+two-paragraph briefing takes nine seconds to land on its own, and the body is the part the player
+is reading rather than watching. A 0.35 s beat separates the blocks, 0.5 s after the dateline,
+where the accent rule flicks on — it is the one element that appears whole, being four pixels tall.
+
+The reveal is the `<color=#00000000>` trick: the full string is in the `Text` from the start and
+the untyped tail is painted transparent, so the layout is final on the first frame. Typing by
+appending would re-centre every line on every character, and would have invalidated the lore
+measurement the prompt row is placed from.
+
+Printing runs on `Time.unscaledDeltaTime` — the page has already frozen the game — and does not
+start until `ScreenFade.IsBusy` clears, so the first characters are not typed behind the black
+frame of the fade that brought the level in.
+
+Once the last character lands the page waits **two seconds** before the prompt and its cursor fade
+in over 0.35 s. Until they do, the page cannot be dismissed at all: `Update` returns before it
+ever reads a key. The one exception is **space** (or a pad's south button, `MenuInput.ReadSkip`),
+which completes the print and skips the two-second wait, putting the prompt up at once — a testing
+shortcut, not a designed affordance, and the reason the prompt still has to be dismissed with a
+second press.
 
 ## The cursor
 
@@ -66,8 +89,9 @@ every source until `Open`'s `onDismissed` callback arms it at the black frame of
 (docs/sounds.md). Freezing time would not have done it — the sound system runs on unscaled time —
 and an engine droning under a static briefing page reads as a bug.
 
-Any keyboard key, any face button or start on a pad, or a left click continues (`MenuInput.ReadAnyKey`).
-Input is ignored while the screen fade is running, so the keypress that started the level from the
+Once the prompt is up, any keyboard key, any face button or start on a pad, or a left click
+continues (`MenuInput.ReadAnyKey`); before that only space skips the print, as above. Input is
+ignored while the screen fade is running, so the keypress that started the level from the
 menu cannot fall through into it. Continuing fades to black (`ScreenFade.Swap`), restores the time
 scale and the HUD object at the black frame, fires `onDismissed`, and destroys the canvas. Note
 that restoring the HUD *object* is not the same as showing the HUD: the campaign controller's

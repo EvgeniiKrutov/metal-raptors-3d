@@ -27,6 +27,8 @@ namespace MetalRaptors
 
         const float ProbeY = -5000f;
 
+        const string ModelFolder = "objects/";
+
         static readonly Quaternion StandUp = Quaternion.Euler(-90f, 0f, 0f);
 
         static readonly string[] TreeModels =
@@ -198,10 +200,10 @@ namespace MetalRaptors
         {
             if (_prototypes.TryGetValue(model, out var cached)) return cached;
 
-            var prefab = Resources.Load<GameObject>(model);
+            var prefab = Resources.Load<GameObject>(ModelFolder + model);
             if (prefab == null)
             {
-                Debug.LogError($"BattlefieldProps: {model} not found in Resources.");
+                Debug.LogError($"BattlefieldProps: {ModelFolder}{model} not found in Resources.");
                 _prototypes[model] = null;
                 return null;
             }

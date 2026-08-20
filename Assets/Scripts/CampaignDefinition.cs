@@ -15,6 +15,10 @@ namespace MetalRaptors
         public string lore;
         public bool companion;
         public float enemyHealth;
+        public float enemyRotationSpeed;
+        public int supplyDrops;
+        public float supplyHealthFraction = 0.3f;
+        public float supplyHeal = 50f;
         public PlaneModelConfig companionPlane = PlaneModels.Sopwith;
         public PlaneModelConfig companionFoe = PlaneModels.Fokker;
     }
@@ -46,6 +50,8 @@ namespace MetalRaptors
             script = "level1",
             companion = true,
             enemyHealth = 50f,
+            enemyRotationSpeed = 84f,
+            supplyDrops = 1,
             title = "FIRST LIGHT",
             dateline = "14 April 1916 — Verdun sector — dawn",
             lore = Lore1,

@@ -32,7 +32,8 @@ crashlytics-build.properties
 Thumbs.db
 
 #Private Resources
-/Assets/Resources
+/Assets/Resources/objects
+/Assets/Resources/Sounds
 /Assets/Textures
 /Assets/Music
 .claude/settings.local.json

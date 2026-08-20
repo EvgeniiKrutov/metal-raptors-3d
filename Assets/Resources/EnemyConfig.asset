@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: acbf914809754ae594859220c6c00b11, type: 3}
+  m_Name: EnemyConfig
+  m_EditorClassIdentifier:
+  health: 100
+  damage: 6
+  fireRate: 0.25
+  bulletSpeed: 400
+  flySpeed: 150
+  rotationSpeed: 105
+  mass: 1.5
+  turnResponsiveness: 5
+  fireAngleThreshold: 14
+  leadFactor: 1
+  maxFireRange: 500
+  minAltitudeMargin: 160
+  safeAltitudeMargin: 260
+  attackDuration: 3.5
+  flyDuration: 1.6
+  flyPerchHeight: 90
+  weaveAmplitude: 45
+  weaveHz: 0.4
+  evadeDuration: 1.3
+  evadeCooldown: 3
+  evadeBreakAngle: 65
+  jitterAmplitude: 45
+  jitterHz: 9
+  threatRange: 420
+  threatCone: 18
+  threatTailAngle: 95
+  cubeScale: 30
+  color: {r: 0.62, g: 0.14, b: 0.12, a: 1}

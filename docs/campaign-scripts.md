@@ -18,10 +18,12 @@ place.
 | `Assets/CampaignScripts/Resources/CampaignScripts/<name>.json` | One level's steps, loaded with `Resources.Load<TextAsset>("CampaignScripts/" + name)`. |
 | `Assets/Dialogue/Resources/Dialogue/lines.json` | Every line of text in the campaign, keyed. |
 
-The nested `Resources` roots are deliberate: `/Assets/Resources` is gitignored (private art and
-sounds live there), so a file dropped in it would never be committed. Unity treats *any* folder
-named `Resources` under `Assets` as a resource root, the same trick
-`Assets/Music/Resources/Music/*.json` and `Assets/Fonts/Resources` already use.
+The nested `Resources` roots date from when all of `/Assets/Resources` was gitignored, so a file
+dropped in it would never be committed. Unity treats *any* folder named `Resources` under
+`Assets` as a resource root, the same trick `Assets/Music/Resources/Music/*.json` and
+`Assets/Fonts/Resources` already use. Today only the private art and audio subfolders are
+excluded (docs/conventions.md), but these files stay where they are — the paths are baked into
+`CampaignScript.ResourceFolder` and every level definition.
 
 A level names its script on its definition: `CampaignLevels.Level1.script = "level1"`. A level
 with no `script` (level 2, and every custom battle) behaves as before — endless flight with no
@@ -50,6 +52,41 @@ step rather than the whole level.
 `count` defaults to 1. Plane ids are matched against `PlaneModelConfig.resourceName` either in full
 (`fokker_dr1`) or by its first segment (`fokker`), so `PlaneModels` stays the one place a plane is
 defined.
+
+### The incoming warning (`EnemyWarning`)
+
+`wave` and `spawn` do not put planes in the air the moment the runner reaches them. Both go
+through `CampaignScriptRunner.Warn` first, so a wave always has a lead-in and the script author
+never has to write one. The plane count is the sum over the wave's groups, so a mixed wave
+counts once for all of it.
+
+**A level shows the banner exactly twice**, and the runner — not the script — decides when:
+
+| Trigger | Fires on |
+| --- | --- |
+| first encounter | the first `wave`/`spawn` of the level, whatever its count |
+| first pair | the first wave whose total count is ≥ 2 |
+
+Each trigger fires at most once, and a level that opens on a 2-plane wave spends both at once and
+so shows a single banner. Every other wave gets a silent 1 s beat (`SilentWaveLeadSec`) instead of
+the 2.6 s banner, which is why the middle of a level tightens up as it goes: the player has been
+told what a wave looks like and what two of them looks like, and after that the planes just come.
+The two flags live on the runner instance, so they reset with the level on a retry.
+
+The overlay is a centred red-bordered plate reading `ENEMY PLANE IS INCOMING` for one plane and
+`TWO ENEMY PLANES INCOMING` (`THREE`, `FOUR`, … up to eight, then the digits) for more. It
+rises and scales into place over 0.3 s, holds 1.8 s and fades out over 0.5 s, and its text and
+border pulse at 2.2 Hz throughout — the border between 65% and full alpha, the text between 40%
+and full, so the lettering does the visible breathing and the frame only glows with it. The
+whole 2.6 s is what `WarnIncoming` returns and the runner waits, so the planes appear just as
+the plate leaves the screen.
+
+It is built on the HUD canvas and handed to the `HudCurtain` like the task row, so a cutscene
+starting on top of it hides it with the rest of the HUD rather than leaving it burning over the
+cinematic bars.
+
+It is the only banner in the game: the supply drop (docs/supply-drops.md) deliberately has no
+HUD announcement of its own — the crate coming down the screen is its own cue.
 
 Both files are read with `Json.cs`, the same small reader the music engine uses (docs/music.md) —
 `JsonUtility` cannot deserialize a bare key/text map. JSON has no comments, so group steps with
@@ -230,27 +267,44 @@ streamed ground under an enemy is not sampled.
 `AliveCount` is what makes `wave` blocking; the list also drops planes destroyed by any other
 means, so nothing can wedge the script permanently.
 
-Every wave in a level flies the shared `EnemyConfig` asset, except for its health:
-`CampaignDefinition.enemyHealth` overrides it per level (0 keeps the asset's own figure), so a
-level can be made softer or tougher without a second config asset. `CampaignEnemies` never
-touches the loaded asset — it clones it once per level and edits the clone, since a Resources
-asset mutated at runtime stays mutated for the rest of the editor session. Campaign level 1
-flies at 50 against the asset's 100, so the opening fight is short — the player brings 150
-health of their own into it, and the level is the tutorial for the guns, not a test of them.
+Every wave in a level flies the shared `EnemyConfig` asset, with per-level overrides taken from
+the `CampaignDefinition` — `0` on any of them keeps the asset's own figure, so a level can be
+made softer or tougher without a second config asset:
+
+| Field | Asset default | Level 1 |
+| --- | --- | --- |
+| `enemyHealth` | 100 | 50 |
+| `enemyRotationSpeed` | 105 °/s | 84 °/s (−20%) |
+
+`CampaignEnemies` takes the whole definition and never touches the loaded asset — it clones it
+once per level and edits the clone, since a Resources asset mutated at runtime stays mutated for
+the rest of the editor session.
+
+Both level 1 overrides pull in the same direction: it is the tutorial for the guns, not a test of
+them. Half health means the opening fight is short against the 150 health the player brings into
+it, and the slower turn rate stops a fighter from simply rotating onto the player's tail faster
+than a new player can answer — at 84°/s the Fokker no longer out-turns the Sopwith's own 120.
 
 ## Level 1
 
 ```
 say  l1_line1 … l1_line4     (hq / you / hq / you, over the intro fly-in)
 task l1_task1 → wait 2.5 → taskdone
-task l1_task2 → wave fokker ×1 (blocks until it is down) → taskdone
-wait 2
+task l1_task2 → wave fokker ×1 → wait 4 → wave fokker ×1 → taskdone
+wait 1.5
 say  l1_line5, l1_line6
-wait 1
-task l1_task3 → wave fokker ×2 (blocks until both are down) → taskdone
+task l1_task3 → wave fokker ×1 → wait 4 → wave fokker ×1 → wave fokker ×2 → taskdone
+wait 1.5
 say  l1_line7, l1_line8
 finish
 ```
+
+Six fighters in five waves, one at a time until the last: **cutscene → 1 → breather → 2 →
+cutscene → 3 → breather → 4 → 5 and 6 together → cutscene**. Every `wave` blocks, so each
+`wait` between two of them is a breather that starts when the previous fighter goes down, not a
+timer running under the fight. The two `wait 1.5`s are different — they are the beat between the
+last kill of a phase and the radio opening up, so the cinematic bars don't slide in over a
+falling wreck.
 
 `finish` stops the plane, stands the enemies down, and opens LEVEL COMPLETED. Because one scene
 serves every campaign level (docs/campaign.md), **next level** bumps the static `CampaignRun` and

@@ -80,8 +80,9 @@ and puts a flick in exactly the moment the eye is on. It splits the job:
   player and lets him catch up. At the slot the two speeds match by construction.
 
   The speed model eases onto that (drag, ~1.1 s), it is never assigned: `UpdateSpeed` takes the
-  floor of its clamp separately from its target so a raised cruise can no longer snap the speed to
-  it the way the duel's edge catch-up does.
+  floor of its clamp separately from its target, so a raised cruise cannot snap the speed to it.
+  `Form` is the one role that ignores the duel's pace trim ("Holding station is throttle", below) —
+  it is already holding station on the player directly.
 
 While it is forming up the wingman is held in the **escort** Y band (ground + 60 … top − 40)
 rather than the duel band, both for the containment steer and the hard clamp — otherwise the duel
@@ -110,20 +111,51 @@ of the player's size with no scaling anywhere — pure perspective. It also puts
 cloud layer (Z 40–160, docs/clouds.md), so a cloud drifts in front of the duel now and then,
 which is most of the depth cue.
 
-They are kept in a band around the camera so the fight cannot wander off and be lost:
+### Staying on screen
+
+The band the pair fight in is not a world rectangle — it is **the camera's own frustum, measured at
+the duel depth**. `CampaignLevelController` hands `CompanionFlight.SetWindow` the camera *position*
+and both half-view extents, and the flight scales them by `(CameraDistance + Depth) / CameraDistance`
+= **1.595**: whatever the player's screen is, the visible half-width at Z 350 is that much wider than
+at the play plane. Everything below is a fraction of that visible half-extent, so it holds at any
+aspect ratio and any resolution.
 
 | Bound | Value | Why |
 | --- | --- | --- |
-| X | camera ± 1.25 × half view width | At their depth the frame is 1.6× wider than the play plane's, so this band is the middle ~78 % of the screen: the duel stays visible without crowding the player's own fight at the edges. |
-| Y | ground + 140 … `WorldTop` − 110 | Room to fight without ever nearing the terrain. |
+| X | camera − **0.72** … + **0.88** visible half-widths | Inside the frame with ~50 m to spare on the far side even for a 60 m model, and deliberately **asymmetric**: the fight sits forward of centre, in the half of the screen the player is flying into. |
+| Y | camera ± **0.86** visible half-heights, intersected with ground + 140 … `WorldTop` − 110 | The world limits keep it off the terrain; the camera-relative half keeps it on the screen when the player is at the top or the bottom of the world. The old absolute band could sit 378 m above a low-flying player, which is the edge of the 386 m frustum — the wingman clipped off the top. |
 
-Both bounds are *soft*: `FlightSteering.Contain` (the same containment the scripted enemies use,
-docs/campaign-scripts.md) pushes the heading back over a 200 m side / 80 m vertical band, and a
-plane that falls behind the left edge has its *cruise target* raised 1.45× until it is back — the
-speed model eases onto that rather than jumping to it, so a player who boosts away does not leave
-the duel behind and nothing visibly teleports to catch up. The hard clamp behind that moves a plane back into
-the band at 120 m/s rather than teleporting it, which is what makes the escort→duel bound swap
-(the wingman may escort as low as ground + 60) invisible.
+The X band is not centred on the camera and neither is the fight: `StationX` is **0.12 half-widths
+ahead** of it (≈ 80 m). That is the "slightly ahead" the pair are trimmed toward, so the duel leads
+the player's eye rather than trailing off the back of the frame.
+
+#### Holding station is throttle, not a fence
+
+The old version had a constant 175 m/s cruise and a **catch-up hack**: cross into the last 100 m of
+the left margin and the cruise jumped 1.45×. That only ever fired once the pair were already at the
+edge, and a dogfighting plane's *forward* progress is well under its airspeed (a 55° break turn
+makes 100 m/s of ground down a 175 m/s airframe), so against a player cruising at 180 — let alone
+boosting at 234 — the fight sat pinned to the left margin and slid off it.
+
+It is now a continuous trim, computed once per frame in `CompanionFlight.ApplyPace` and given to
+**both** planes identically:
+
+```
+pace   = clamp(camera speed, 175, 280)          // measured, filtered at 3 /s
+cruise = pace + clamp((StationX − centreX) × 0.35, −55, +90)
+```
+
+- `pace` is the **camera's** real X speed, so a boost or a dive is matched rather than reacted to.
+- The trim is on the **pair's centre**, not on each plane. Both get the same number, so the duel's
+  own geometry — the 190–380 m pass cycle, the break turns — is untouched; only the whole fight is
+  translated back onto its station.
+- `DuelPlane` eases onto the commanded cruise at **60 m/s²** (`SetPace` sets a target, `Fly` moves
+  toward it), so the pace can never snap the speed the way the old catch-up's raised floor could.
+
+The containment steering (`FlightSteering.Contain`, the same the scripted enemies use —
+docs/campaign-scripts.md) and the 120 m/s hard Y clamp are still there behind it, but with the
+pace doing the work they are a backstop rather than the mechanism. The hard clamp is also what
+makes the escort→duel bound swap (the wingman may escort as low as ground + 60) invisible.
 
 ## The duel itself (`DuelPlane`)
 
@@ -138,8 +170,10 @@ physics. Movement is plain transform integration, but the *model* is the player'
 (**120 °/s**), its turn easing (`turnResponsiveness / mass` = 5 / 2.5 = **2.0**), its dive
 acceleration, its drag and its speed cap from it. Nothing about the way a background plane rotates
 in the Z plane is tuned separately any more — change the asset and the wingman changes with it.
-The one number it keeps for itself is **cruise speed, 175 m/s**: it has to hold station on a
-boosting player and still have energy to manoeuvre.
+The one number it keeps for itself is `DuelPlane.CruiseSpeed`, **175 m/s** — and even that is only
+the *floor* of the pace the duel is flown at ("Holding station is throttle", above): the commanded
+cruise follows the camera so the fight keeps up with a boosting player and still has energy to
+manoeuvre.
 
 It is handed the **asset**, not the per-plane loadout the player flies (docs/flight-model.md).
 The wingman is another pilot in another aeroplane; the garage stats belong to the plane the
@@ -271,9 +305,32 @@ the foe is `CompanionFlight.BeginAlign` — the cutscene trigger, the first step
 and the wingman is never killed at all.
 
 `DuelPlane.Kill` is the death: an `Explosion` at the spot, smoke and fire lit, and then a burning
-38° spiral away (spinning at 230°/s, gaining speed) for at most 3 s, cut short if it drops within
-100 m of the duel floor. So the wreck always leaves the frame or fades out well above the
-terrain; it never reaches the ground.
+38° dive away, spinning at 230 °/s and gaining 20 m/s².
+
+### The wreck is never deleted on screen
+
+The wreck used to be `Destroy`d on a **3 s timer**, or as soon as it sank 100 m below the duel
+floor — both of which happen with the thing still in frame, so a burning aeroplane simply blinked
+out of existence mid-dive. There is no timer any more and no floor test. `TickWreck` runs after
+the position has been integrated and has exactly two exits:
+
+| Exit | When | What happens |
+| --- | --- | --- |
+| **It lands** | The wreck is at or below the surface under it | `Explosion` + `GroundBlast` at the impact point, then removal. Over water (coast levels — the duel's Z 350 is past `SeaSurface.NearEdge`) it is a `WaterSplash` and no fireball, matching what a bomb does. |
+| **It leaves** | Fully outside the camera frustum at the duel depth, by its own half-length + 60 m | Silent removal — there is nothing left to watch. |
+
+Whichever comes first. In practice a wreck killed high leaves the frame; one killed low flies the
+crash all the way in, which is the whole point: the fall reads as a fall.
+
+The surface under it is the real terrain, not a constant. `Battlefield.Surface(x, z)` samples the
+streamed terrain at the wreck's own position and resolves sea level for the coast, so the crash
+lands on the hillside it is actually over. If no chunk is loaded there it falls back to the
+`AiGroundY` the flight was constructed with.
+
+The frustum the second test uses is the *uninset* one from "Staying on screen" —
+`CompanionFlight.ApplyView` pushes it to both planes and to the wreck every frame, and it keeps
+doing so after `StandDown`, so a wreck falling as the level ends still disappears at the right
+moment rather than the moment the bounds are released.
 
 ## Bumping into it
 

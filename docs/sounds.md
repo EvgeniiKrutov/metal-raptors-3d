@@ -31,8 +31,12 @@ Arming is one-way and idempotent; nothing ever puts the system back to silent.
 
 Copied from `metal-raptors/public/sounds` into `Assets/Resources/Sounds`:
 `engine_idle`, `engine_throttle_1`, `engine_stutter`,
-`ambient_wind`. Note that `/Assets/Resources` is gitignored, so these files —
-like the existing bullet and explosion clips — are not tracked by the repo.
+`ambient_wind`. Note that `/Assets/Resources/Sounds` is gitignored, so these files —
+like the existing bullet and explosion clips — are not tracked by the repo
+(docs/conventions.md).
+
+One effect has no clip at all: the supply-crate pickup chime is synthesised at runtime with
+`AudioClip.Create` and cached, rather than adding another wav (docs/supply-drops.md).
 
 Base volumes: throttle 0.2, stutter 0.3, wind 0.35, enemy throttle 0.15 — all as
 in the 2D library. Idle was raised from the 2D 0.7 to 0.95 so the idle bed sits

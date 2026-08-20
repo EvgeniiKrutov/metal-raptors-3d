@@ -216,10 +216,12 @@ two on its own.
 ## Scenery props (`BattlefieldProps.cs`)
 
 Dead trees and burned-out houses, the only solid things on the battlefield. The
-models are the 12 FBX files in `Resources/trees` and the 6 in
-`Resources/burned_houses`, each with a single flat Phong material — like the
-plane models they live under `Assets/Resources`, which the repository does not
-track.
+models are the 12 FBX files in `Resources/objects/trees` and the 6 in
+`Resources/objects/burned_houses`, each with a single flat Phong material — like
+the plane models they live under `Assets/Resources/objects`, which the repository
+does not track (docs/conventions.md). The `objects/` prefix is not in the model
+table: `BattlefieldProps.Load` adds it, because the bare names are also the
+prototype cache's keys.
 
 ### Placement
 

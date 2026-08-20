@@ -9,6 +9,7 @@ namespace MetalRaptors
         int EnemiesAlive { get; }
         bool CompanionReady { get; }
         void SpawnWave(EnemyGroup[] groups);
+        float WarnIncoming(int planes);
         void ShowTask(string text);
         float CompleteTask();
         void CompleteLevel();
@@ -17,12 +18,16 @@ namespace MetalRaptors
     public class CampaignScriptRunner : MonoBehaviour
     {
         const float HoldMin = 0.8f;
+        const float SilentWaveLeadSec = 1f;
+        const int PairSize = 2;
 
         CampaignScript _script;
         ICampaignScriptHost _host;
         DialogueBar _bar;
         bool _stopped;
         int _skipFrame = -1;
+        bool _warnedFirst;
+        bool _warnedPair;
 
         public static CampaignScriptRunner Begin(GameObject owner, CampaignScript script,
             ICampaignScriptHost host, DialogueBar bar)
@@ -73,10 +78,12 @@ namespace MetalRaptors
                         break;
 
                     case CampaignOp.Spawn:
+                        yield return Warn(step.groups);
                         _host.SpawnWave(step.groups);
                         break;
 
                     case CampaignOp.Wave:
+                        yield return Warn(step.groups);
                         _host.SpawnWave(step.groups);
                         yield return WaitForClear();
                         break;
@@ -153,6 +160,22 @@ namespace MetalRaptors
 
             _skipFrame = Time.frameCount;
             return true;
+        }
+
+        IEnumerator Warn(EnemyGroup[] groups)
+        {
+            int planes = 0;
+            if (groups != null)
+                foreach (EnemyGroup group in groups) planes += group.count;
+
+            if (planes <= 0) yield break;
+
+            bool announce = !_warnedFirst || (!_warnedPair && planes >= PairSize);
+
+            _warnedFirst = true;
+            if (planes >= PairSize) _warnedPair = true;
+
+            yield return Wait(announce ? _host.WarnIncoming(planes) : SilentWaveLeadSec);
         }
 
         IEnumerator Wait(float seconds)

@@ -16,9 +16,18 @@ namespace MetalRaptors
         const float RollLimit = 1.5f;
         const float FormLimit = 8f;
 
-        const float BandFactor = 1.25f;
-        const float FoeEntryFactor = 1.75f;
-        const float FoeEntryMargin = 100f;
+        const float BandBehind = 0.72f;
+        const float BandAhead = 0.88f;
+        const float BandVertical = 0.86f;
+        const float StationLead = 0.12f;
+
+        const float PaceFilter = 3f;
+        const float PaceGain = 0.35f;
+        const float PaceTrim = 55f;
+        const float PacePush = 90f;
+        const float PaceCeiling = 1.6f;
+
+        const float FoeEntryMargin = 160f;
         const float FoeEntryRise = 70f;
 
         const float DuelFloorMargin = 140f;
@@ -42,9 +51,11 @@ namespace MetalRaptors
         readonly float _playZ;
         readonly float _groundY;
         readonly float _worldTop;
+        readonly float _depthScale;
 
         DuelPlane _companion;
         DuelPlane _foe;
+        DuelPlane _wreck;
 
         Phase _phase = Phase.Escort;
         bool _cinematic = true;
@@ -56,10 +67,16 @@ namespace MetalRaptors
         float _bumpTime = -999f;
 
         float _camX;
+        float _camY;
+        float _camSpeed = DuelPlane.CruiseSpeed;
+        bool _hasCam;
         float _halfView;
+        float _halfHeight;
+        float _floorY;
+        float _ceilingY;
 
         CompanionFlight(CampaignDefinition level, PlayerConfig playerFlight, Transform player,
-            float playZ, float groundY, float worldTop)
+            float playZ, float groundY, float worldTop, float cameraDistance)
         {
             _level = level;
             _flight = playerFlight;
@@ -67,14 +84,18 @@ namespace MetalRaptors
             _playZ = playZ;
             _groundY = groundY;
             _worldTop = worldTop;
+            _depthScale = cameraDistance > 1f ? (cameraDistance + Depth) / cameraDistance : 1f;
+            _floorY = groundY + DuelFloorMargin;
+            _ceilingY = worldTop - DuelCeilingMargin;
         }
 
         public static CompanionFlight Begin(CampaignDefinition level, PlayerConfig playerFlight,
-            Transform player, float playZ, float groundY, float worldTop)
+            Transform player, float playZ, float groundY, float worldTop, float cameraDistance)
         {
             if (level == null || !level.companion || player == null) return null;
 
-            var flight = new CompanionFlight(level, playerFlight, player, playZ, groundY, worldTop);
+            var flight = new CompanionFlight(level, playerFlight, player, playZ, groundY, worldTop,
+                cameraDistance);
 
             Vector3 station = player.position + Station;
             station.z = playZ;
@@ -85,31 +106,85 @@ namespace MetalRaptors
 
             flight._companion.SetEscort(player, Station);
             flight._companion.SetEscortBounds(flight.EscortFloorY, flight.EscortCeilingY);
+            flight._companion.SetGround(groundY);
             flight._companion.SetRole(DuelRole.Escort, null);
             return flight;
         }
 
         static Vector3 Station => new Vector3(StationAhead, StationAbove, 0f);
 
-        float FloorY => _groundY + DuelFloorMargin;
-
-        float CeilingY => _worldTop - DuelCeilingMargin;
-
         float EscortFloorY => _groundY + EscortFloorMargin;
 
         float EscortCeilingY => _worldTop - EscortCeilingMargin;
 
-        public void SetWindow(float camX, float halfViewWidth)
+        float StationX => _camX + _halfView * StationLead;
+
+        float CentreX
         {
-            _camX = camX;
-            _halfView = halfViewWidth;
+            get
+            {
+                if (_companion == null) return StationX;
+                if (_foe == null) return _companion.transform.position.x;
+                return (_companion.transform.position.x + _foe.transform.position.x) * 0.5f;
+            }
+        }
+
+        public void SetWindow(Vector3 camPos, float halfViewWidth, float halfViewHeight)
+        {
+            float dt = Time.deltaTime;
+            if (_hasCam && dt > 0f)
+            {
+                float rate = (camPos.x - _camX) / dt;
+                _camSpeed += (rate - _camSpeed) * (1f - Mathf.Exp(-PaceFilter * dt));
+            }
+            _hasCam = true;
+
+            _camX = camPos.x;
+            _camY = camPos.y;
+            _halfView = halfViewWidth * _depthScale;
+            _halfHeight = halfViewHeight * _depthScale;
+
+            ApplyView();
             if (_standDown) return;
 
-            float minX = camX - halfViewWidth * BandFactor;
-            float maxX = camX + halfViewWidth * BandFactor;
+            ApplyBand();
+            ApplyPace();
+        }
 
-            if (_companion != null) _companion.SetBounds(minX, maxX, FloorY, CeilingY);
-            if (_foe != null) _foe.SetBounds(minX, maxX, FloorY, CeilingY);
+        void ApplyView()
+        {
+            float minX = _camX - _halfView;
+            float maxX = _camX + _halfView;
+            float minY = _camY - _halfHeight;
+            float maxY = _camY + _halfHeight;
+
+            if (_companion != null) _companion.SetView(minX, maxX, minY, maxY);
+            if (_foe != null) _foe.SetView(minX, maxX, minY, maxY);
+            if (_wreck != null) _wreck.SetView(minX, maxX, minY, maxY);
+        }
+
+        void ApplyBand()
+        {
+            float minX = _camX - _halfView * BandBehind;
+            float maxX = _camX + _halfView * BandAhead;
+
+            _floorY = Mathf.Max(_groundY + DuelFloorMargin, _camY - _halfHeight * BandVertical);
+            _ceilingY = Mathf.Min(_worldTop - DuelCeilingMargin,
+                _camY + _halfHeight * BandVertical);
+            if (_floorY > _ceilingY) _floorY = _ceilingY = (_floorY + _ceilingY) * 0.5f;
+
+            if (_companion != null) _companion.SetBounds(minX, maxX, _floorY, _ceilingY);
+            if (_foe != null) _foe.SetBounds(minX, maxX, _floorY, _ceilingY);
+        }
+
+        void ApplyPace()
+        {
+            float pace = Mathf.Clamp(_camSpeed, DuelPlane.CruiseSpeed,
+                DuelPlane.CruiseSpeed * PaceCeiling);
+            float cruise = pace + Mathf.Clamp((StationX - CentreX) * PaceGain, -PaceTrim, PacePush);
+
+            if (_companion != null) _companion.SetPace(cruise);
+            if (_foe != null) _foe.SetPace(cruise);
         }
 
         public bool Formed => _standDown || _companion == null
@@ -208,6 +283,7 @@ namespace MetalRaptors
             if (_foe != null)
             {
                 _foe.Kill();
+                _wreck = _foe;
                 _foe = null;
             }
 
@@ -253,16 +329,16 @@ namespace MetalRaptors
             if (_foe != null) return;
 
             float y = Mathf.Clamp(_player.position.y + Random.Range(-FoeEntryRise, FoeEntryRise),
-                FloorY, CeilingY);
-            var entry = new Vector3(_camX + _halfView * FoeEntryFactor + FoeEntryMargin, y,
-                _playZ + Depth);
+                _floorY, _ceilingY);
+            var entry = new Vector3(_camX + _halfView + FoeEntryMargin, y, _playZ + Depth);
 
             _foe = DuelPlane.Spawn("Background Foe", _level.companionFoe, _flight, entry,
                 Mathf.PI, mirrored: true);
             if (_foe == null) return;
 
-            _foe.SetBounds(_camX - _halfView * BandFactor, _camX + _halfView * BandFactor,
-                FloorY, CeilingY);
+            _foe.SetBounds(_camX - _halfView * BandBehind, _camX + _halfView * BandAhead,
+                _floorY, _ceilingY);
+            _foe.SetGround(_groundY);
             _foe.SetRole(DuelRole.Hunt, _companion);
         }
 

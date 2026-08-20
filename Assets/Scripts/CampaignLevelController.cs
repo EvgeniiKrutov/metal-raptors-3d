@@ -50,6 +50,8 @@ namespace MetalRaptors
 
         CampaignEnemies _enemies;
         CompanionFlight _wing;
+        SupplyDrop _supply;
+        Transform _playerModel;
         CampaignScriptRunner _runner;
         DialogueBar _dialogue;
         LevelTask _task;
@@ -111,6 +113,7 @@ namespace MetalRaptors
             PlaneScrapes.DisablePlanePlaneCollisions();
             PlaneScrapes.SetGroundCollisions(true);
             BuildHud();
+            BeginSupply();
             _sound = SoundSystem.Begin(_cube, null, silent: HasBriefing);
             BeginIntro();
             BeginCompanion(config);
@@ -127,11 +130,18 @@ namespace MetalRaptors
                 _halfViewWidth, BeginScript);
         }
 
+        void BeginSupply()
+        {
+            _supply = SupplyDrop.Begin(gameObject, _level, _cube, _playerModel,
+                PlayPlaneZ, AiGroundY);
+        }
+
         void BeginCompanion(PlayerConfig config)
         {
             if (CustomBattle.Requested) return;
 
-            _wing = CompanionFlight.Begin(_level, config, _cubeTr, PlayPlaneZ, AiGroundY, WorldTop);
+            _wing = CompanionFlight.Begin(_level, config, _cubeTr, PlayPlaneZ, AiGroundY, WorldTop,
+                CameraDistance);
         }
 
         void ShowBriefing()
@@ -155,7 +165,7 @@ namespace MetalRaptors
             if (script == null) return;
 
             _enemies = new CampaignEnemies(_cube.GetComponent<Rigidbody>(), AiGroundY, WorldTop,
-                _level.enemyHealth);
+                _level);
             _dialogue = new DialogueBar(_hud.transform);
             _runner = CampaignScriptRunner.Begin(gameObject, script, this, _dialogue);
         }
@@ -178,6 +188,7 @@ namespace MetalRaptors
             var planeModel = GameManager.CurrentPlane;
             var model = PlaneFactory.BuildPlaneModel(go.transform, planeModel,
                 skin: GameManager.CurrentSkin);
+            _playerModel = model;
 
             PlayerConfig flight = PlaneLoadout.Build(config, planeModel);
 
@@ -308,10 +319,12 @@ namespace MetalRaptors
                 && _cubeTr.position.y <= SeaSurface.Level) Ditch();
 
             UpdateHud();
+            if (!_gameOver && _supply != null)
+                _supply.Tick(_camBasePos, _halfViewWidth, _halfViewHeight, Cinematic);
             if (_enemies != null) _enemies.SetWindow(_camBasePos.x, _halfViewWidth);
 
             if (_wing == null) return;
-            _wing.SetWindow(_camBasePos.x, _halfViewWidth);
+            _wing.SetWindow(_camBasePos, _halfViewWidth, _halfViewHeight);
             _wing.SetCinematic(Cinematic);
             _wing.Tick(Time.deltaTime);
         }
@@ -351,6 +364,15 @@ namespace MetalRaptors
             _enemies.Spawn(groups, _camBasePos.x, _halfViewWidth);
         }
 
+        public float WarnIncoming(int planes)
+        {
+            if (_gameOver || _hud == null || planes <= 0) return 0f;
+
+            EnemyWarning warning = EnemyWarning.Show(_hud.transform, planes);
+            if (_curtain != null) _curtain.Adopt(warning.gameObject);
+            return EnemyWarning.Seconds;
+        }
+
         public void ShowTask(string text)
         {
             if (_gameOver || _hud == null) return;
@@ -375,6 +397,7 @@ namespace MetalRaptors
             StopWeapons();
             if (_enemies != null) _enemies.StandDown();
             if (_wing != null) _wing.StandDown();
+            if (_supply != null) _supply.StandDown();
             if (_dialogue != null) _dialogue.Hide();
             if (_sound != null) _sound.EnterGameOver();
 
@@ -389,6 +412,7 @@ namespace MetalRaptors
             if (_runner != null) _runner.Stop();
             if (_enemies != null) _enemies.StandDown();
             if (_wing != null) _wing.StandDown();
+            if (_supply != null) _supply.StandDown();
         }
 
         void Ditch()

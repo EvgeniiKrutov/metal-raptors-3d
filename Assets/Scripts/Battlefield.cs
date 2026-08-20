@@ -155,6 +155,26 @@ namespace MetalRaptors
             return false;
         }
 
+        public bool Surface(float x, float z, out float y, out bool water)
+        {
+            water = false;
+            bool land = SampleGround(x, z, out y);
+            if (z < _waterFromZ || float.IsNegativeInfinity(_seaLevel)) return land;
+            if (land && y >= _seaLevel) return true;
+
+            y = _seaLevel;
+            water = true;
+            return true;
+        }
+
+        public void Impact(Vector3 point, float size, bool water)
+        {
+            if (_cam == null) return;
+
+            if (water) WaterSplash.Spawn(point, size, _cam.transform.position);
+            else GroundBlast.Spawn(point, size, _cam.transform.position);
+        }
+
         void LateUpdate()
         {
             if (_cam == null) return;

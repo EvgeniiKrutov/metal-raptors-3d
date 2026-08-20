@@ -448,9 +448,10 @@ the **whole game**, not just this menu — `UIFactory` loads Regular / Medium / 
 every screen built through it now renders in Poppins.
 
 The three weights sit in `Assets/Fonts/Resources/` rather than the usual
-`Assets/Resources/`, because `.gitignore` excludes that folder as private content and
-these files must ship with the repo. Any folder named `Resources` anywhere under `Assets`
-is a resources root, so `Resources.Load<Font>("Poppins-Bold")` finds them either way.
+`Assets/Resources/`, from when `.gitignore` excluded that whole folder as private content
+and these files had to ship with the repo. Any folder named `Resources` anywhere under
+`Assets` is a resources root, so `Resources.Load<Font>("Poppins-Bold")` finds them either
+way (docs/conventions.md).
 
 The three weights are separate assets rather than `FontStyle.Bold` on one file: legacy
 `Text` fakes bold by smearing the regular outline, so `UIFactory.CreateText` and

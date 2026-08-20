@@ -5,6 +5,8 @@ The ambient Verdun ground life — random shell blasts, burning smoke columns an
 infantry squads — has its own page: docs/battlefield.md.
 The player's bombs — release, ballistic fall and area blast — have their own page:
 docs/bombs.md.
+The parachuted health crate, its splinter burst and the green heal pulse on the plane have
+their own page: docs/supply-drops.md.
 
 ## Muzzle flash (`Assets/Scripts/MuzzleFlash.cs`)
 

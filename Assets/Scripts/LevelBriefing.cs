@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -33,18 +34,48 @@ namespace MetalRaptors
         const float CaretDrop = 2f;
         const float CaretBlinkSec = 0.5f;
 
+        const float CharsPerSecond = 55f;
+        const float LoreSpeedFactor = 2.2f;
+        const float LineGapSec = 0.35f;
+        const float RuleGapSec = 0.5f;
+        const float PromptDelaySec = 2f;
+        const float PromptFadeSec = 0.35f;
+
+        const string HiddenOpen = "<color=#00000000>";
+        const string HiddenClose = "</color>";
+
         static readonly Vector2 RuleSize = new Vector2(96f, 4f);
 
         public static bool IsOpen => Current != null;
 
         static LevelBriefing Current;
 
+        struct Printed
+        {
+            public Text text;
+            public string full;
+            public float speed;
+            public float gapAfter;
+        }
+
+        readonly List<Printed> _lines = new List<Printed>();
+
         GameObject _hud;
         Action _onDismissed;
+        Image _rule;
+        CanvasGroup _prompt;
         Image _caret;
         float _blink;
         int _openedFrame;
         bool _closing;
+
+        int _line;
+        int _ruleAfter;
+        float _shown;
+        float _gap;
+        float _hold = PromptDelaySec;
+        float _promptFade;
+        bool _printed;
 
         public static void Open(string caption, string title, string dateline, string lore,
             GameObject hud, Action onDismissed = null)
@@ -77,12 +108,43 @@ namespace MetalRaptors
 
             UIFactory.CreateBackground(page, colors.Bg);
 
-            Centered(page, caption, CaptionSize, CaptionY, colors.Muted, UIFactory.MediumFont);
-            Centered(page, title, TitleSize, TitleY, colors.Fg, UIFactory.BoldFont);
-            Centered(page, dateline, DatelineSize, DatelineY, colors.Muted, UIFactory.RegularFont);
-            BuildRule(page, colors.Accent);
-            float loreBottom = BuildLore(page, lore, colors.Fg);
+            Print(Centered(page, caption, CaptionSize, CaptionY, colors.Muted, UIFactory.MediumFont),
+                caption, 1f, LineGapSec);
+            Print(Centered(page, title, TitleSize, TitleY, colors.Fg, UIFactory.BoldFont),
+                title, 1f, LineGapSec);
+            Print(Centered(page, dateline, DatelineSize, DatelineY, colors.Muted, UIFactory.RegularFont),
+                dateline, 1f, RuleGapSec);
+
+            _ruleAfter = _lines.Count;
+            _rule = BuildRule(page, colors.Accent);
+            _rule.enabled = false;
+
+            Text body = BuildLore(page, lore, colors.Fg, out float loreBottom);
+            Print(body, lore, LoreSpeedFactor, 0f);
+
             BuildPrompt(page, PromptRow(loreBottom), colors.Muted, colors.Accent);
+        }
+
+        void Print(Text text, string content, float speed, float gapAfter)
+        {
+            _lines.Add(new Printed
+            {
+                text = text,
+                full = content ?? string.Empty,
+                speed = speed,
+                gapAfter = gapAfter,
+            });
+            Paint(text, content, 0);
+        }
+
+        static void Paint(Text text, string full, int count)
+        {
+            if (text == null) return;
+
+            full = full ?? string.Empty;
+            text.text = count >= full.Length
+                ? full
+                : full.Substring(0, count) + HiddenOpen + full.Substring(count) + HiddenClose;
         }
 
         static float PromptRow(float loreBottom) => Mathf.Max(PromptFloor,
@@ -97,7 +159,7 @@ namespace MetalRaptors
             return text;
         }
 
-        static void BuildRule(Transform parent, Color color)
+        static Image BuildRule(Transform parent, Color color)
         {
             var go = new GameObject("Rule", typeof(Image));
             go.transform.SetParent(parent, false);
@@ -109,9 +171,10 @@ namespace MetalRaptors
             var rt = image.rectTransform;
             rt.sizeDelta = RuleSize;
             rt.anchoredPosition = new Vector2(0f, RuleY);
+            return image;
         }
 
-        static float BuildLore(Transform parent, string lore, Color color)
+        static Text BuildLore(Transform parent, string lore, Color color, out float bottom)
         {
             Text text = UIFactory.CreateText(parent, lore, LoreSize, Vector2.zero,
                 new Vector2(LoreWidth, LoreHeight), TextAnchor.UpperCenter);
@@ -124,15 +187,31 @@ namespace MetalRaptors
             rt.pivot = new Vector2(0.5f, 1f);
             rt.anchoredPosition = new Vector2(0f, LoreTop);
 
-            return LoreTop - text.preferredHeight;
+            bottom = LoreTop - text.preferredHeight;
+            return text;
         }
 
         void BuildPrompt(Transform parent, float y, Color color, Color caretColor)
         {
-            Text text = Centered(parent, Prompt, PromptSize, y, color, UIFactory.MediumFont);
+            var row = new GameObject("Prompt", typeof(RectTransform), typeof(CanvasGroup));
+            row.transform.SetParent(parent, false);
+
+            var rowRt = (RectTransform)row.transform;
+            rowRt.anchorMin = new Vector2(0.5f, 0.5f);
+            rowRt.anchorMax = new Vector2(0.5f, 0.5f);
+            rowRt.pivot = new Vector2(0.5f, 0.5f);
+            rowRt.sizeDelta = Vector2.zero;
+            rowRt.anchoredPosition = Vector2.zero;
+
+            _prompt = row.GetComponent<CanvasGroup>();
+            _prompt.alpha = 0f;
+            _prompt.blocksRaycasts = false;
+            _prompt.interactable = false;
+
+            Text text = Centered(row.transform, Prompt, PromptSize, y, color, UIFactory.MediumFont);
 
             var go = new GameObject("Caret", typeof(Image));
-            go.transform.SetParent(parent, false);
+            go.transform.SetParent(row.transform, false);
 
             _caret = go.GetComponent<Image>();
             _caret.color = caretColor;
@@ -146,10 +225,71 @@ namespace MetalRaptors
 
         void Update()
         {
-            Blink(Time.unscaledDeltaTime);
+            float deltaTime = Time.unscaledDeltaTime;
+
+            if (!_printed)
+            {
+                if (ScreenFade.IsBusy) return;
+                if (MenuInput.ReadSkip()) FinishPrinting();
+                else Advance(deltaTime);
+                return;
+            }
+
+            FadeInPrompt(deltaTime);
+            Blink(deltaTime);
 
             if (_closing || ScreenFade.IsBusy || Time.frameCount == _openedFrame) return;
             if (MenuInput.ReadAnyKey()) Close();
+        }
+
+        void Advance(float deltaTime)
+        {
+            if (_gap > 0f)
+            {
+                _gap -= deltaTime;
+                return;
+            }
+
+            if (_line < _lines.Count)
+            {
+                Printed line = _lines[_line];
+                int was = Mathf.FloorToInt(_shown);
+                _shown = Mathf.Min(_shown + deltaTime * CharsPerSecond * line.speed, line.full.Length);
+
+                int now = Mathf.FloorToInt(_shown);
+                if (now != was) Paint(line.text, line.full, now);
+
+                if (_shown < line.full.Length) return;
+
+                Paint(line.text, line.full, line.full.Length);
+                _gap = line.gapAfter;
+                _shown = 0f;
+                _line++;
+                if (_line == _ruleAfter && _rule != null) _rule.enabled = true;
+                return;
+            }
+
+            _hold -= deltaTime;
+            if (_hold <= 0f) _printed = true;
+        }
+
+        void FinishPrinting()
+        {
+            for (int i = _line; i < _lines.Count; i++)
+                Paint(_lines[i].text, _lines[i].full, _lines[i].full.Length);
+
+            _line = _lines.Count;
+            if (_rule != null) _rule.enabled = true;
+            _hold = 0f;
+            _printed = true;
+        }
+
+        void FadeInPrompt(float deltaTime)
+        {
+            if (_prompt == null || _promptFade >= PromptFadeSec) return;
+
+            _promptFade = Mathf.Min(_promptFade + deltaTime, PromptFadeSec);
+            _prompt.alpha = _promptFade / PromptFadeSec;
         }
 
         void Blink(float deltaTime)

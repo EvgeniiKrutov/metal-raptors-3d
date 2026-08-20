@@ -5,7 +5,15 @@ namespace MetalRaptors
 {
     public class PlaneModelConfig
     {
+        public const string WorldWar1 = "objects/planes/world_war_1";
+
         public string resourceName;
+
+        public string folder = WorldWar1;
+
+        public string ResourcePath => string.IsNullOrEmpty(folder)
+            ? resourceName
+            : $"{folder}/{resourceName}";
 
         public string displayName;
 
@@ -46,6 +54,7 @@ namespace MetalRaptors
         public static readonly PlaneModelConfig Sopwith = new PlaneModelConfig
         {
             resourceName   = "sopwith_camel",
+            folder         = PlaneModelConfig.WorldWar1,
             displayName    = "Sopwith Camel",
             country        = "Great Britain",
             type           = PlaneTypes.Fighter,
@@ -70,6 +79,7 @@ namespace MetalRaptors
         public static readonly PlaneModelConfig Fokker = new PlaneModelConfig
         {
             resourceName   = "fokker_dr1",
+            folder         = PlaneModelConfig.WorldWar1,
             displayName    = "Fokker Dr.I",
             country        = "Germany",
             type           = PlaneTypes.Fighter,

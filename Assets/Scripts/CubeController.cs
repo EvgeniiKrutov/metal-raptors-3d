@@ -237,6 +237,14 @@ namespace MetalRaptors
             if (CurrentHealth <= 0f) BeginFall();
         }
 
+        public void Heal(float amount)
+        {
+            if (!_active || _falling || amount <= 0f) return;
+
+            CurrentHealth = Mathf.Min(MaxHealth, CurrentHealth + amount);
+            if (CurrentHealth >= SmokeHealthThreshold && _smoke != null) _smoke.Disarm();
+        }
+
         public void Bump()
         {
             if (!_active || _falling) return;

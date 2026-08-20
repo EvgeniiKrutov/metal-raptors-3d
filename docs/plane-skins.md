@@ -43,11 +43,11 @@ The `Resources` folder in the middle is the whole point — a texture cannot be 
 at runtime from anywhere else, and `Assets/Textures` on its own is not a resources root.
 Unity treats **any** folder named `Resources` under `Assets` as one, which is the same trick
 `Assets/Fonts/Resources` uses (see `docs/standalone-builds.md`). The `skins/` level keeps the
-path from colliding with `Assets/Resources/sopwith_camel.fbx`, which already owns the bare
-name `sopwith_camel`.
+path from colliding with the plane models, which own the bare name `sopwith_camel` under
+`Assets/Resources/objects/planes/world_war_1`.
 
-Both this folder and `Assets/Resources` are gitignored, so the PNGs are not in the repo —
-same as the FBX models they paint.
+Both `Assets/Textures` and `Assets/Resources/objects` are gitignored, so the PNGs are not in
+the repo — same as the FBX models they paint (docs/conventions.md).
 
 ## How a skin is applied
 

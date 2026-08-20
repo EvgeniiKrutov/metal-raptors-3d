@@ -109,12 +109,21 @@ builds missing ones up to `camX + (fogEnd + 1.5·chunk)`. Removal destroys the c
 ## Level scripts, dialogue and enemy waves
 
 `CampaignDefinition.script` names a text script that drives the level's pacing — dialogue at
-the bottom of the screen, timed pauses, enemy waves, and the win condition. Level 1 runs
-`level1`; level 2 and custom battles have none and stay endless. See
+the bottom of the screen, timed pauses, enemy waves with their incoming warning, and the win
+condition. `CampaignDefinition.enemyHealth` and `enemyRotationSpeed` set what those waves fly
+with. Level 1 runs
+`level1` — six fighters in five waves, three cutscenes; level 2 and custom battles have none
+and stay endless. See
 docs/campaign-scripts.md for the file format, the dialogue bar, and how the enemy AI was
 adapted to a forward-scrolling world, and docs/campaign-ww1-scenario.md for the WW1 era's
 plot, cast, loading-screen text and every radio line (story only — none of it is wired up).
 docs/campaign-ww1-portraits.md holds the avatar generation prompts for those speakers.
+
+## Supply drops
+
+`CampaignDefinition.supplyDrops` lets a level parachute a health crate past the player when the
+plane drops to `supplyHealthFraction` of its health. Level 1 sends one, worth 50 health; every
+other level and the custom battle send none. See docs/supply-drops.md.
 
 ## The companion
 

@@ -24,7 +24,8 @@ namespace MetalRaptors
 
         public IReadOnlyList<EnemyController> Live => _live;
 
-        public CampaignEnemies(Rigidbody player, float groundY, float worldTop, float health)
+        public CampaignEnemies(Rigidbody player, float groundY, float worldTop,
+            CampaignDefinition level)
         {
             _player = player;
             _groundY = groundY;
@@ -34,7 +35,10 @@ namespace MetalRaptors
             _config = asset != null
                 ? Object.Instantiate(asset)
                 : ScriptableObject.CreateInstance<EnemyConfig>();
-            if (health > 0f) _config.health = health;
+
+            if (level == null) return;
+            if (level.enemyHealth > 0f) _config.health = level.enemyHealth;
+            if (level.enemyRotationSpeed > 0f) _config.rotationSpeed = level.enemyRotationSpeed;
         }
 
         public void SetWindow(float camX, float halfViewWidth)

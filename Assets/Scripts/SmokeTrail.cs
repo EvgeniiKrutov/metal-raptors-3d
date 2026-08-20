@@ -53,8 +53,13 @@ namespace MetalRaptors
 
         public void Clear()
         {
-            _armed = false;
             _cleared = true;
+            Disarm();
+        }
+
+        public void Disarm()
+        {
+            _armed = false;
             for (int i = _puffs.Count - 1; i >= 0; i--)
                 if (_puffs[i] != null) Destroy(_puffs[i].gameObject);
             _puffs.Clear();
