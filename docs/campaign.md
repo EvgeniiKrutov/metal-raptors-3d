@@ -119,6 +119,12 @@ adapted to a forward-scrolling world, and docs/campaign-ww1-scenario.md for the 
 plot, cast, loading-screen text and every radio line (story only — none of it is wired up).
 docs/campaign-ww1-portraits.md holds the avatar generation prompts for those speakers.
 
+## Sky flak
+
+`CampaignDefinition.flak` scales how heavily the level is shelled from the ground — `1` by
+default on every level, `0` to fly a clean sky. The same field exists on the arena's
+`LevelDefinition`. See docs/sky-flak.md.
+
 ## Supply drops
 
 `CampaignDefinition.supplyDrops` lets a level parachute a health crate past the player when the
@@ -162,9 +168,33 @@ and has no collider, since the camera looks straight down `+Z` and would never a
 occluded by it.
 
 `PlaneFactory.BuildPlaneModel` reads its per-model rest orientation, scale and propeller node
-names from a `PlaneModelConfig` (`PlaneModels.Fokker` / `.Sopwith`) rather than baking them in
+names from a `PlaneModelConfig` (`PlaneModels.Albatros` / `.Sopwith`) rather than baking them in
 as constants — different FBX exports can sit at different rest orientations and node names, so
 a differently-exported or brand-new model is a new registry entry, not a code change. The same
 config drives both the upright player and the mirrored enemy; the mirror-specific handling
 (skipping the wheels-down roll, since the enemy's own ~180° heading spin already flips it
 belly-down) stays in `BuildPlaneModel` rather than in the per-plane data.
+
+### The nose trim
+
+`BuildPlaneModel` pitches every model `ModelPitchDeg` (−10°) nose-down inside its body, so a
+plane in level flight reads as flying rather than hanging. That constant assumes the model was
+built in a **parked** attitude — nose up on the tail skid, which is how a WW1 biplane sits on
+the ground — and it is the −10° that cancels it back to level. Measured off the fuselage,
+tail-centroid to nose-centroid:
+
+| plane | built in at | + `ModelPitchDeg` | in flight |
+| --- | --- | --- | --- |
+| Sopwith Camel | +7.3° nose-up | −10° | −2.7° |
+| Fokker Dr.I | +5.9° nose-up | −10° | −4.1° |
+| Albatros D.III | −2.1° nose-**down** | −10° | −12.1° |
+
+The Albatros was exported in a level flying attitude instead, so there was nothing for the
+−10° to cancel and it flew visibly nose-down. `PlaneModelConfig.pitchTrimDeg` absorbs the
+difference — it is added to `ModelPitchDeg` before the mirror flip, so it corrects the enemy
+build too — and the Albatros carries `+9.4°`, which lands it on the Camel's −2.7°.
+
+The **garage is unaffected** by any of this: `GaragePlaneView.SolveRestingPitch` measures the
+built model's contact points and pitches the *body* to stand them on the ground, so a change
+to the model's own pitch is cancelled out by the solve. The trim is a flight-attitude
+correction only.

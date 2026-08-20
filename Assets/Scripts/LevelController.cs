@@ -30,6 +30,8 @@ namespace MetalRaptors
         const float CubeScale = 30f;
         const float CubeHalf = CubeScale / 2f;
 
+        const float CamResponse = 8f;
+        const float FallCamResponse = 3.3f;
         const float CamShakeMagnitude = 7f;
         const float CamShakeDuration = 0.3f;
         const float CameraDistance = 420f;
@@ -58,6 +60,7 @@ namespace MetalRaptors
         float _halfViewHeight;
         float _halfViewWidth;
         bool _gameOver;
+        bool _playerFalling;
         float _camShake;
         Vector3 _camBasePos;
         System.Func<float, float, bool> _inCrater;
@@ -76,6 +79,7 @@ namespace MetalRaptors
             SpawnEnemies();
             if (VerdunLand)
                 Battlefield.Begin(_cam, _halfViewWidth, _level.terrain.seed, MinX, MaxX, _inCrater);
+            SkyFlak.Begin(_cam, _cubeTr, _halfViewWidth, _halfViewHeight, PlayPlaneZ, _level.flak);
             PlaneScrapes.DisablePlanePlaneCollisions();
             PlaneScrapes.SetGroundCollisions(true);
             BuildHud();
@@ -172,7 +176,8 @@ namespace MetalRaptors
                 {
                     var go = new GameObject("Enemy");
                     go.transform.position = RandomEnemySpawn(aiGroundY);
-                    PlaneFactory.BuildPlaneModel(go.transform, group.plane, mirrored: true);
+                    PlaneFactory.BuildPlaneModel(go.transform, group.plane, mirrored: true,
+                        skin: PlaneSkins.Default(group.plane));
 
                     var enemy = go.AddComponent<EnemyController>();
                     enemy.Initialize(_enemyConfig, playerBody,
@@ -275,7 +280,7 @@ namespace MetalRaptors
         {
             Vector3 cubePos = _cubeTr.position;
 
-            float minCamY = (VerdunLand ? ProceduralTerrain.CutRevealY : GroundY) + _halfViewHeight;
+            float minCamY = CamFloorY;
             float maxCamY = WorldTop - _halfViewHeight;
             if (minCamY > maxCamY) minCamY = maxCamY = (GroundY + WorldTop) * 0.5f;
             float targetY = Mathf.Clamp(cubePos.y, minCamY, maxCamY);
@@ -288,7 +293,8 @@ namespace MetalRaptors
             }
             else
             {
-                float t = 1f - Mathf.Exp(-8f * Time.deltaTime);
+                float response = _playerFalling ? FallCamResponse : CamResponse;
+                float t = 1f - Mathf.Exp(-response * Time.deltaTime);
                 _camBasePos = new Vector3(
                     Mathf.Lerp(_camBasePos.x, target.x, t),
                     Mathf.Lerp(_camBasePos.y, target.y, t),
@@ -304,8 +310,21 @@ namespace MetalRaptors
             _cam.transform.position = pos;
         }
 
+        float CamFloorY
+        {
+            get
+            {
+                if (!VerdunLand) return GroundY + _halfViewHeight;
+
+                float reveal = _playerFalling
+                    ? ProceduralTerrain.WallBottomY : ProceduralTerrain.CutRevealY;
+                return reveal + _halfViewHeight;
+            }
+        }
+
         void OnShotDown()
         {
+            _playerFalling = true;
             StopWeapons();
             if (_sound != null) _sound.EnterGameOver();
         }

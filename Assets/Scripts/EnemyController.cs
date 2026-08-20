@@ -6,7 +6,7 @@ namespace MetalRaptors
     [RequireComponent(typeof(Rigidbody))]
     public class EnemyController : MonoBehaviour, IDamageable
     {
-        const float ShotVolume = 0.15f;
+        const float ShotVolume = 0.18f;
         const float RecoverClimbAngleDeg = 70f;
         const float CeilingMargin = 130f;
         const float ReturnSpeedFactor = 1.35f;
@@ -50,6 +50,7 @@ namespace MetalRaptors
         float _angularVelocity;
         bool _dead;
         bool _falling;
+        PlaneFall _fall;
         bool _reported;
         float _fallTimer;
         bool _standDown;
@@ -182,7 +183,9 @@ namespace MetalRaptors
 
         void TickFall(float dt)
         {
-            PlaneFall.Step(_rb, dt);
+            _fall.Step(_rb, dt);
+            _heading = _fall.Heading;
+            ApplyRotation();
 
             _fallTimer += dt;
             if (_fallTimer >= PlaneFall.Timeout) RemoveWreck();
@@ -373,8 +376,9 @@ namespace MetalRaptors
 
         void ApplyRotation()
         {
+            float roll = _roll.Angle + (_fall != null ? _fall.Roll : 0f);
             transform.rotation = Quaternion.Euler(0f, 0f, _heading * Mathf.Rad2Deg)
-                               * Quaternion.Euler(_roll.Angle, 0f, 0f);
+                               * Quaternion.Euler(roll, 0f, 0f);
         }
 
         float HeadingTo(Vector2 point)
@@ -476,7 +480,7 @@ namespace MetalRaptors
             if (_smoke != null) _smoke.Ignite(ModelSize);
             _fire = PlaneFire.Ignite(gameObject, ModelSize);
 
-            PlaneFall.Begin(_rb);
+            _fall = PlaneFall.Begin(_rb, _heading, _config.flySpeed);
             if (_bar != null) Destroy(_bar.gameObject);
 
             ReportDestroyed();

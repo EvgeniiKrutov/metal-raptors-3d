@@ -69,7 +69,8 @@ namespace MetalRaptors
                 {
                     var go = new GameObject("Enemy");
                     go.transform.position = SpawnPoint(camX, halfViewWidth, index);
-                    PlaneFactory.BuildPlaneModel(go.transform, group.plane, mirrored: true);
+                    PlaneFactory.BuildPlaneModel(go.transform, group.plane, mirrored: true,
+                        skin: PlaneSkins.Default(group.plane));
 
                     var enemy = go.AddComponent<EnemyController>();
                     enemy.Initialize(_config, _player, _minX, _maxX, _groundY,

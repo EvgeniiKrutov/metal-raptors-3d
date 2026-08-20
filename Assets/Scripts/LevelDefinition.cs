@@ -77,6 +77,7 @@ namespace MetalRaptors
         public Weather weather;
         public CloudsPart clouds;
         public EnemyGroup[] enemies;
+        public float flak = 1f;
     }
 
     public static class Levels
@@ -88,7 +89,7 @@ namespace MetalRaptors
                 ? GameManager.Instance.Level1Daytime : Daytime.Midday,
             weather = Weather.Calm,
             clouds = new CloudsPart(),
-            enemies = new[] { new EnemyGroup(PlaneModels.Fokker, 1) },
+            enemies = new[] { new EnemyGroup(PlaneModels.Albatros, 1) },
         };
 
         public static readonly LevelDefinition Level2 = new LevelDefinition
@@ -96,7 +97,7 @@ namespace MetalRaptors
             terrain = new TerrainPart { kind = TerrainKind.Verdun, seed = 1916, width = 2000f },
             daytime = Daytime.Morning,
             weather = Weather.Calm,
-            enemies = new[] { new EnemyGroup(PlaneModels.Fokker, 1) },
+            enemies = new[] { new EnemyGroup(PlaneModels.Albatros, 1) },
         };
 
         public static LevelDefinition ForNumber(int number)

@@ -101,7 +101,7 @@ namespace MetalRaptors
         public float threatTailAngle = 95f;
 
         [Header("Body (legacy)")]
-        [Tooltip("Unused: the enemy is now the Fokker Dr.1 model, sized to the player's plane. " +
+        [Tooltip("Unused: the enemy is now the Albatros D.III model, sized to the player's plane. " +
                  "Kept only so the existing asset still deserializes cleanly.")]
         public float cubeScale = 30f;
 

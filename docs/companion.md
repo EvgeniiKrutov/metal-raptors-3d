@@ -13,7 +13,7 @@ Per level, on `CampaignDefinition` (`CampaignDefinition.cs`):
 | --- | --- | --- |
 | `companion` | `false` | Whether this level flies with a wingman at all. Level 1 sets it `true`; level 2 does not. |
 | `companionPlane` | `PlaneModels.Sopwith` | The wingman's model. Any `PlaneModelConfig` — the same registry the player and the enemy waves pick from. |
-| `companionFoe` | `PlaneModels.Fokker` | The model of the plane it duels in the background. |
+| `companionFoe` | `PlaneModels.Albatros` | The model of the plane it duels in the background. |
 
 Custom battles never get one: `CampaignLevels.Custom` leaves the flag off, and
 `CampaignLevelController.BeginCompanion` refuses on `CustomBattle.Requested` as well.

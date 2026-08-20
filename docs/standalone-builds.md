@@ -17,8 +17,8 @@ CollisionMeshData couldn't be created because the mesh has been marked as non-ac
 ```
 
 The plane then had no collider at all — no scrapes, no bullet hits, no crashes.
-`sopwith_camel.fbx` and `fokker_dr1.fbx` (under `Resources/objects/planes/world_war_1`)
-therefore set `isReadable: 1`. The prop models (`objects/trees/`, `objects/burned_houses/`)
+`sopwith_camel.fbx`, `fokker_dr1.fbx` and `albatros_d3.fbx` (under
+`Resources/objects/planes/world_war_1`) therefore set `isReadable: 1`. The prop models (`objects/trees/`, `objects/burned_houses/`)
 stay non-readable on purpose: `BattlefieldProps` gives them capsule and box colliders sized
 from renderer bounds, which needs no mesh data.
 

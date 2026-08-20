@@ -15,6 +15,8 @@ namespace MetalRaptors
         const float CamZ = PlayPlaneZ - CameraDistance;
         const float StartX = 0f;
         const float SpawnY = 150f;
+        const float CamResponse = 8f;
+        const float FallCamResponse = 3.3f;
         const float CamShakeMagnitude = 7f;
         const float CamShakeDuration = 0.3f;
 
@@ -63,6 +65,7 @@ namespace MetalRaptors
         Vector3 _camBasePos;
         float _camShake;
         bool _gameOver;
+        bool _playerFalling;
         float _furthestX = StartX;
 
         float Distance => Mathf.Max(0f, _furthestX - StartX);
@@ -109,6 +112,8 @@ namespace MetalRaptors
             {
                 Battlefield.Begin(_cam, _halfViewWidth, _level.seed, _terrain.InCrater);
             }
+
+            SkyFlak.Begin(_cam, _cubeTr, _halfViewWidth, _halfViewHeight, PlayPlaneZ, _level.flak);
 
             PlaneScrapes.DisablePlanePlaneCollisions();
             PlaneScrapes.SetGroundCollisions(true);
@@ -300,7 +305,7 @@ namespace MetalRaptors
         {
             if (_cubeTr == null) return;
 
-            _furthestX = Mathf.Max(_furthestX, _cubeTr.position.x);
+            if (!_playerFalling) _furthestX = Mathf.Max(_furthestX, _cubeTr.position.x);
             if (_camShake > 0f)
                 _camShake = Mathf.Max(0f, _camShake - Time.deltaTime / CamShakeDuration);
             if (_cam != null) PositionCamera(instant: false);
@@ -333,7 +338,7 @@ namespace MetalRaptors
         {
             Vector3 cubePos = _cubeTr.position;
 
-            float minCamY = ProceduralTerrain.CutRevealY + _halfViewHeight;
+            float minCamY = CamFloorY;
             float maxCamY = WorldTop - _halfViewHeight;
             if (minCamY > maxCamY) minCamY = maxCamY = WorldTop * 0.5f;
             float targetY = Mathf.Clamp(cubePos.y, minCamY, maxCamY);
@@ -344,7 +349,8 @@ namespace MetalRaptors
             }
             else
             {
-                float t = 1f - Mathf.Exp(-8f * Time.deltaTime);
+                float response = _playerFalling ? FallCamResponse : CamResponse;
+                float t = 1f - Mathf.Exp(-response * Time.deltaTime);
                 float x = Mathf.Max(_camBasePos.x, Mathf.Lerp(_camBasePos.x, cubePos.x, t));
                 _camBasePos = new Vector3(x, Mathf.Lerp(_camBasePos.y, targetY, t), CamZ);
             }
@@ -431,8 +437,19 @@ namespace MetalRaptors
             StartCoroutine(ShowFailScreenAfter(SinkDuration));
         }
 
+        float CamFloorY
+        {
+            get
+            {
+                float reveal = _playerFalling
+                    ? ProceduralTerrain.WallBottomY : ProceduralTerrain.CutRevealY;
+                return reveal + _halfViewHeight;
+            }
+        }
+
         void OnShotDown()
         {
+            _playerFalling = true;
             StopScript();
             StopWeapons();
             if (_sound != null) _sound.EnterGameOver();

@@ -70,10 +70,10 @@ namespace MetalRaptors
         const float CeilingMargin = 100f;
         const float ClampSpeed = 120f;
 
-        const float FallDiveDeg = -38f;
-        const float FallSpinDeg = 230f;
-        const float FallDiveResponse = 1.1f;
-        const float FallSpeedGain = 20f;
+        const float FallDiveDeg = PlaneFall.DiveDeg;
+        const float FallSpinDeg = PlaneFall.RollRateDeg;
+        const float FallDiveResponse = PlaneFall.DiveResponse;
+        const float FallSpeedGain = PlaneFall.SpeedGain;
         const float FallExitMargin = 60f;
 
         enum PassState { Approach, Overshoot, Reposition }
@@ -172,7 +172,8 @@ namespace MetalRaptors
 
             var go = new GameObject(name);
             go.transform.position = position;
-            PlaneFactory.BuildPlaneModel(go.transform, plane, mirrored);
+            PlaneFactory.BuildPlaneModel(go.transform, plane, mirrored,
+                mirrored ? PlaneSkins.Default(plane) : null);
 
             foreach (Collider col in go.GetComponentsInChildren<Collider>()) Destroy(col);
 

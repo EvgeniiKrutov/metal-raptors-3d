@@ -18,7 +18,7 @@ namespace MetalRaptors
 
         const float BodyYawDeg = 8f;
         const float FallbackNoseUpDeg = 12f;
-        const float DropFraction = 0.035f;
+        const float GroundLineFraction = 0.213f;
 
         const float GroundSizeFactor = 8f;
         const float ShadowAlpha = 0.4f;
@@ -67,9 +67,12 @@ namespace MetalRaptors
             _skin = skin;
             _spinTime = -1f;
             if (_body != null) Destroy(_body);
-            _rig.SetPlaneSize(plane.onScreenSize);
+            _rig.SetPlaneSize(GarageSize(plane));
             BuildBody();
         }
+
+        static float GarageSize(PlaneModelConfig plane) =>
+            plane.onScreenSize / Mathf.Max(0.01f, plane.garageZoom);
 
         public void SetSkin(PlaneSkin skin)
         {
@@ -94,7 +97,7 @@ namespace MetalRaptors
                 verticalMarginFraction = VerticalMarginFraction,
                 regionLeftFraction = RegionLeftFraction,
                 regionBottomFraction = RegionBottomFraction,
-            }, plane.onScreenSize);
+            }, GarageSize(plane));
 
             BuildBody();
         }
@@ -115,11 +118,13 @@ namespace MetalRaptors
             ApplyBodyRotation();
 
             Bounds bounds = MeasureBounds(model);
-            model.position += PlanePreviewRig.Origin - bounds.center
-                              - Vector3.up * (_plane.onScreenSize * DropFraction);
-            bounds = MeasureBounds(model);
+            float groundY = PlanePreviewRig.Origin.y - GarageSize(_plane) * GroundLineFraction;
+            model.position += new Vector3(
+                PlanePreviewRig.Origin.x - bounds.center.x,
+                groundY - ContactHeight(model),
+                PlanePreviewRig.Origin.z - bounds.center.z);
 
-            PlaceGround(bounds, ContactHeight(model));
+            PlaceGround(MeasureBounds(model), groundY);
         }
 
         static Bounds MeasureBounds(Transform model)

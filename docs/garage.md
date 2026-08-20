@@ -107,9 +107,10 @@ camera adds its own 13° of look-down and −32° of yaw.
 
 **The pitch is solved from the mesh, not authored.** A hardcoded angle cannot put a plane on
 the ground: too little and it sinks through, too much and it balances on its tail with the
-wheels in the air, and the right value differs per model. Neither FBX has wheel nodes to
-measure against either — the only named nodes are `propPivot`, `propBlades`, `tailplane` and
-the wings — so there is nothing to hang a per-plane constant off.
+wheels in the air, and the right value differs per model. No FBX gives anything to hang a
+per-plane constant off either: the Camel and the Dr.I carry only `propPivot`, `propBlades`,
+`tailplane` and the wings, and the Albatros only its propeller nodes and a row of empty
+grouping nodes left over from its export. None of them is a wheel.
 
 `SolveRestingPitch` finds the angle the airframe actually rests at, the same way a real one
 would settle:
@@ -122,9 +123,9 @@ would settle:
    would balance on rather than tip off.
 4. `EdgePitch` returns the rotation that levels that edge, `-atan2(Δy, Δx)`.
 
-So both contact points land on the ground at once, whatever the model's proportions, and a
-third plane needs no tuning. `FallbackNoseUpDeg` (12°) only applies if the model has no
-measurable mesh at all.
+So both contact points land on the ground at once, whatever the model's proportions. The
+Albatros was added without a single pose constant, which is what this was built for.
+`FallbackNoseUpDeg` (12°) only applies if the model has no measurable mesh at all.
 
 The propeller is **excluded** from the profile (`ContactMeshes` skips anything under
 `propPivotNode` / `propBladesNode`). A blade pointing down would otherwise be the lowest
@@ -140,11 +141,39 @@ propeller turned toward the viewer with the flank and wings still open. Yawing t
 further positive turns it more head-on (it would be nose-straight-at-camera around +58°);
 negative swings it back to the broadside view.
 
-After the model is built its renderer bounds are measured and the model is shifted so those
-bounds are centred on the rig origin, then dropped `DropFraction` (3.5% of the plane's own
-size, ~37px) below it — the camera stays aimed at the origin, so the plane sits a little
-under the band's middle rather than dead centre. The ground is placed after that shift, from
-the contact height, so it follows the drop and the plane stays on it.
+### Where it stands
+
+The model is shifted **horizontally** so its renderer bounds are centred on the rig origin —
+the camera is aimed there, so that is what puts the plane in the middle of its band.
+
+**Vertically it is anchored on the wheels, not on the airframe.** The ground line is placed
+`GroundLineFraction` (0.213) of the plane's framed size below the origin, and the model is
+dropped so `ContactHeight` — the lowest vertex of everything but the propeller — lands
+exactly on it. The ground quad then goes to the same `groundY`, so the plane is standing on
+it by construction rather than by a second measurement.
+
+It used to centre the **bounds** vertically too and let the wheels fall wherever the airframe's
+lower extent happened to be, which meant the ground line moved every time the plane changed:
+
+| plane | ground line below the origin, as a fraction of size |
+| --- | --- |
+| Sopwith Camel | −0.422 |
+| Fokker Dr.I | −0.213 |
+| Albatros D.III | −0.444 |
+
+Over a fifth of a plane's length of travel between two entries in the same list — the ground
+visibly jumped, and only the Dr.I sat at a natural height. 0.213 is the Dr.I's number, so it
+is the one plane the change leaves where it was.
+
+The fraction is of `GarageSize` — `onScreenSize / garageZoom`, the same figure the camera
+distance is solved from — not of `onScreenSize`. Scaling it by the raw size would put the
+ground at a fixed *world* offset, which a zoomed-in plane would then render further down the
+screen; against the framed size it lands on the same **screen** row for every plane.
+
+The trade is that the airframe is no longer vertically centred: a taller plane now reaches
+higher in the band instead of hanging lower. You can align the wheels or centre the airframe,
+not both, and the wheels are the edge the eye tracks when the plane changes — a plane's own
+height is read against the ground it stands on, not against the middle of an invisible band.
 
 ### Drag to turn
 
@@ -172,9 +201,21 @@ height — never moves. The body sits at the rig origin and the model's bounds a
 it, so the plane turns on its own axis rather than orbiting.
 
 The framing solves the camera distance from `onScreenSize`, and `PlaneFactory.NormalizeSize`
-already scales every model to that same longest-dimension size — so two planes of very
-different real dimensions both arrive framed identically, and the garage needs no per-plane
-scale of its own.
+already scales every model to that same longest-dimension size — so planes of very
+different real dimensions all arrive framed identically. All three share `onScreenSize` 60.
+
+That normalisation is on the **longest** dimension, which for every plane here is the
+wingspan, and it is the only thing the framing knows about. A flatter airframe therefore
+arrives at the same width but fills less of the band's height and reads as further away:
+the Camel stands 0.365 of its span tall, the Albatros only 0.287. `PlaneModelConfig.garageZoom`
+is the correction — the garage frames the camera from `onScreenSize / garageZoom`, so 1.1
+puts the camera 10% closer and the plane 10% larger. It is **garage-only**: `onScreenSize`
+itself is the plane's real size in a level and its hitbox, so it must not be touched for
+framing. The Albatros is 1.1; the other two are 1.
+
+There is not much room above that. At 1920×1080 the Camel spans x 719–1775 with ~59px clear
+to the stat bars and ~71px to the right triangle — about 12% of headroom in total, shared by
+every plane, since they all normalise to the same width.
 
 The garage frames **wider than the main menu**: `FillHeight` is deliberately set past 1
 (1.5), which makes the height constraint slack so `FillWidth` (0.93) is always what binds.
@@ -253,8 +294,9 @@ straight back would flatten into a band along the contact line.
 
 ### Select animation
 
-`PlaneFactory` attaches `PropellerSpin` to every plane it builds; the garage sets its
-`degreesPerSecond` to 0 on build, so the parked plane's propeller is still. Activating
+`PlaneFactory` attaches `PropellerSpin` to every plane it builds and hands it the body to
+read its spin axis from (`docs/effects.md`); the garage sets its `degreesPerSecond` to 0 on
+build, so the parked plane's propeller is still. Activating
 `select plane` runs it through a one-shot ramp — smoothstep up to `SpinPeakDegreesPerSecond`
 over `SpinUpSeconds`, held for `SpinHoldSeconds`, then smoothstepped back to a standstill
 over `SpinDownSeconds`. Switching planes cancels it, and `GaragePlaneView.SetPlane` only
@@ -267,14 +309,14 @@ not rebuild the body out from under the animation.
 definition. `PlaneStatBars.All` is the display list — one entry per bar, carrying its
 label, the field to read and the **ceiling** the bar is drawn against:
 
-| bar | ceiling | Sopwith Camel | Fokker Dr.I |
-| --- | --- | --- | --- |
-| max speed | 360 | 288 | 264 |
-| rotation speed | 200 | 120 | 140 |
-| mass | 4 | 2.5 | 2.1 |
-| fire rate | 8 | 5 | 5.5 |
-| damage | 15 | 10 | 10 |
-| health | 200 | 150 | 128 |
+| bar | ceiling | Sopwith Camel | Fokker Dr.I | Albatros D.III |
+| --- | --- | --- | --- | --- |
+| max speed | 360 | 288 | 264 | 300 |
+| rotation speed | 200 | 120 | 140 | 104 |
+| mass | 4 | 2.5 | 2.1 | 3 |
+| fire rate | 8 | 5 | 5.5 | 5.5 |
+| damage | 15 | 10 | 10 | 10 |
+| health | 200 | 150 | 128 | 165 |
 
 The ceilings are display headroom, not caps — they exist so today's values sit around two
 thirds full instead of pegged at 100%, leaving somewhere for a faster or tougher plane to go.
@@ -285,7 +327,8 @@ and **health** from 150, when the Camel was raised to 150 flat and would have pe
 
 The health numbers were 100 / 85 before that raise; the Dr.I keeps the same 85% of the
 Camel it always had, so the two planes still read the same way against each other — the
-whole scale just moved up.
+whole scale just moved up. The Albatros arrived after that raise and was written against the
+new scale directly.
 
 Above the bars sit two rows that are not bars, and neither carries a caption:
 
@@ -294,7 +337,7 @@ Above the bars sit two rows that are not bars, and neither carries a caption:
   `PlaneTypes` holds the table (`Fighter` `#9E4A3C`, plus `Bomber` and `Recon` ready for when
   a plane needs them); a plane points at one through `PlaneModelConfig.type`. The badge sizes
   itself to its text plus `BadgePadX` either side, so a longer type name just makes a wider
-  badge. Both planes are `Fighter` today.
+  badge. All three planes are `Fighter` today.
 * the **country** — a bare `Fg` value, no caption over it. It reads fine unlabelled under the
   plane's name, and the caption would only be in the way of the flag that is going there.
 
@@ -324,10 +367,16 @@ failure mode a display-only table invites.
 
 The Dr.I is drawn from the aircraft: lighter and quicker on the controls, slower in level
 flight, more fragile, and a shade faster on the guns (its twin Spandaus outpaced the Camel's
-Vickers). Damage is the one bar the two share — both carried a pair of synchronised
-rifle-calibre machine guns.
+Vickers). Damage is the one bar all three share — every one of them carried a pair of
+synchronised rifle-calibre machine guns.
 
-**Enemies are unaffected.** An enemy flying a Fokker is initialised from
+The Albatros D.III is the other extreme: a 160 hp inline Mercedes instead of a rotary, so it
+is the **fastest** and the **toughest** of the three and by far the **worst turner** (104°/s,
+against the Camel's 120 and the Dr.I's 140). It is the heaviest as well, at 3 of a 4 ceiling.
+It shares the Dr.I's 5.5 fire rate — the same twin Spandaus — which leaves turn rate as the
+price the player pays for its speed and its health.
+
+**Enemies are unaffected.** An enemy flying an Albatros is initialised from
 `EnemyConfig.asset`, which has its own numbers and its own AI fields; the garage block only
 ever reaches a plane the player selected. Same for the companion wingman, which keeps the
 shared `PlayerConfig` (`docs/companion.md`) — the stats follow the player, not the model.
@@ -344,8 +393,9 @@ at the ends of the list.
 
 Three things are particular to it:
 
-* **It is per plane, and only the Sopwith has skins.** `PlaneSkins.Selectable` is false for
-  the Fokker, so the row is switched off and `select plane` moves up by
+* **It is per plane, and only the Sopwith has more than one skin.** `PlaneSkins.Selectable`
+  is false for the Fokker (no skins) and for the Albatros (one, `plywood`, which it always
+  wears), so the row is switched off and `select plane` moves up by
   `ColourRowHeight` (54px) to close the gap it left. `MenuPanel` skips focusables whose
   GameObject is inactive — that rule lives in `MoveFocus` / `FocusFirst` rather than in the
   garage, so any panel can hide a row now — and if the hidden row happened to hold the
@@ -367,7 +417,7 @@ Three things are particular to it:
   on click, and light `Accent` while hovered (`MenuArrowView` gained an `Exited` event for
   this; the selector rows do not subscribe, so their arrows keep the menu's no-clear-on-exit
   rule).
-* The list **wraps**: with two planes both triangles are always live, so neither ever greys
+* The list **wraps**: with three planes both triangles are always live, so neither ever greys
   out the way a selector row's do at the end of its values.
 * `↑` / `↓` move the focus inside the column — `colour` (when shown) and `select plane`.
 * **Holding the left button over the plane** and moving left/right turns it (see *Drag to
@@ -394,11 +444,63 @@ plane from — so the pick shows up in the menu's flying plane, in the levels, a
 HUD's `Piloting:` line. `GameManager.CurrentSkin` rides along at the same three sites, so
 the colour travels with the plane.
 
-Enemies are **not** affected: `LevelDefinition` keeps its authored `PlaneModels.Fokker`
-groups, so picking the Fokker means both sides fly it. They stay distinguishable by the
-mirrored, opposite-pitched build `PlaneFactory` gives an enemy, and by the player's skin —
-and they do not borrow the plane's stats either, since an enemy is built from
+Enemies are **not** affected: `LevelDefinition` keeps its authored `PlaneModels.Albatros`
+groups, so picking the Albatros means both sides fly it. They stay distinguishable by the
+mirrored, opposite-pitched build `PlaneFactory` gives an enemy — not by paint, since enemies
+now wear the plane's *default* skin (`docs/plane-skins.md`) and the Albatros has only one.
+They do not borrow the plane's stats either, since an enemy is built from
 `EnemyConfig.asset`.
+
+## Propeller nodes are per model
+
+The names are not a convention — each FBX brings its own, and the config carries them so a
+differently-exported model is a registry entry rather than a code change:
+
+| plane | `propPivotNode` | `propBladesNode` | under them |
+| --- | --- | --- | --- |
+| Sopwith Camel | `propPivot` | `propBlades` | the blade mesh |
+| Fokker Dr.I | `propPivot` | `propBlades` | the blade mesh |
+| Albatros D.III | `propAssembly` | `prop` | `cyl.013` spinner, and `blade` + `cyl.014` under `prop` |
+
+The Albatros carries a spinner as well as blades, which is why its pivot is a level above its
+blade node: `PropellerSpin` goes on `propPivotNode`, so the spinner turns with the blades
+instead of being left behind at the nose.
+
+**A node that exists is not enough — it has to have geometry under it.** The Albatros first
+arrived with its meshes joined into one object and `propAssembly` / `prop` left behind empty.
+Nothing about the config looked wrong, but three things broke quietly:
+
+* `StartPropeller` attached `PropellerSpin` to an empty transform, so nothing turned.
+* `NoseLocal` found no renderer under the node and fell back to
+  `Bounds(body.transform.position, one)` — the muzzle landed in the middle of the fuselage and
+  the plane fired from its own cockpit.
+* `ContactMeshes` had nothing to exclude, so the propeller — welded into the airframe mesh —
+  joined the resting-pitch solve.
+
+Pointing both fields at **null** is strictly better than pointing them at an empty node:
+`NoseLocal` then falls back to the whole model and still puts the muzzle at the nose.
+`PlaneFactory` logs the plane by name when it finds no propeller node at all.
+
+## Adding a plane
+
+The Albatros D.III went in without touching a line of `GarageController` or `GaragePlaneView`,
+which is the bar a fourth plane should also clear:
+
+1. Drop the FBX in `Assets/Resources/objects/planes/world_war_1/`. Its `.meta` must carry
+   `isReadable: 1` or the plane gets a box hitbox instead of a mesh collider
+   (`docs/standalone-builds.md`) — copy an existing plane's `.meta` and give it a fresh guid.
+2. Add a `PlaneModelConfig` to `PlaneModels` and append it to `PlaneModels.All`, which is the
+   `←` / `→` order. `resourceName` is the file's bare name and doubles as the id campaign
+   scripts spawn it by, matched in full or on its first segment.
+3. Name its propeller nodes in `propPivotNode` / `propBladesNode`, and **check they hold
+   geometry** — see *Propeller nodes are per model* above for what an empty one costs.
+4. Give it a `PlaneStats` block. It is what the player flies, not a spec sheet — see
+   *The bars are real* above.
+5. Skins, if any: `docs/plane-skins.md`. One skin means no `colour` row and the plane simply
+   always wears it.
+
+Everything else is derived: the pose is solved from the mesh, the framing from `onScreenSize`,
+the badge from `type`, and the list length from `PlaneModels.All`.
 
 ## Files
 
@@ -414,4 +516,4 @@ and they do not borrow the plane's stats either, since an enemy is built from
 | `PlaneSkin.cs` | The skins a plane can wear and how one is painted onto a model (`docs/plane-skins.md`). |
 | `PlaneStats.cs` | The stat block a plane carries, and the bar list with its ceilings. |
 | `PlaneLoadout.cs` | Turns the selected plane's stat block into the `PlayerConfig` it is flown with. |
-| `PlaneModelConfig.cs` | Each plane's model, display name, country, description and stats; `PlaneModels.All` is the switch order. |
+| `PlaneModelConfig.cs` | Each plane's model, display name, country, description, stats and `garageZoom`; `PlaneModels.All` is the switch order. |

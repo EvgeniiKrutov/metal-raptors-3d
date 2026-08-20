@@ -5,7 +5,7 @@ namespace MetalRaptors
 {
     public class PlaneShooter : MonoBehaviour
     {
-        const float ShotVolume = 0.3f;
+        const float ShotVolume = 0.36f;
 
         PlayerConfig _config;
         Transform _muzzle;

@@ -7,6 +7,8 @@ The player's bombs — release, ballistic fall and area blast — have their own
 docs/bombs.md.
 The parachuted health crate, its splinter burst and the green heal pulse on the plane have
 their own page: docs/supply-drops.md.
+The anti-aircraft shells bursting in the sky around the camera have their own page:
+docs/sky-flak.md.
 
 ## Muzzle flash (`Assets/Scripts/MuzzleFlash.cs`)
 
@@ -120,10 +122,13 @@ run the same sequence (`CubeController.BeginFall`, `EnemyController.BeginFall`):
 
 1. `SmokeTrail.Ignite` — the damage trail switches to its heavy burning mode (below).
 2. `PlaneFire.Ignite` — flames on the model.
-3. `PlaneFall.Begin` — nose kicked down, a random tumble spin about Z.
+3. `PlaneFall.Begin` — the nose eases into a −38° dive while the plane rolls about its own
+   nose axis at 230°/s and picks up speed: a diving barrel roll, the same fall the background
+   duel's losing plane has always had (`DuelPlane`, docs/companion.md).
 
 `PlaneFall` (see docs/flight-model.md) holds the shared fall constants and the per-step
-integration both controllers call from their `FixedUpdate`. The wreck keeps its collider so the
+integration both controllers call from their `FixedUpdate`; each falling plane owns one
+instance of it. The wreck keeps its collider so the
 ground contact still registers; it is out of the fight the moment it starts falling — it can't
 be damaged again, can't scrape, can't fire, and `EnemyController.IsAlive` goes false so the
 level's kill count, the campaign wave logic and its engine voice all drop it immediately rather
@@ -209,17 +214,48 @@ level ends (crash or win).
 
 ## Propeller (`PropellerSpin.cs`)
 
-Spins the propeller pivot about the plane body's nose axis (`+X`, the same axis
+Spins the propeller pivot about the plane **body's** nose axis (`+X`, the same axis
 `CubeController` yaws to the flight heading) at a constant ~2 rev/s — fast enough to look
-alive, slow enough that individual blades still read. The spin axis is read from the body's
-local `+X` every frame (not cached), so it follows the plane through every bank, and the
-rotation is centred on the blade disc's own mesh-bounds hub rather than the pivot's origin, so
-the prop spins in place instead of orbiting an off-centre point. Using the nose direction as
-the spin axis is deliberate and rig-derived, not a guess: every plane is oriented at spawn so
-its nose points along the heading, so the axis holds for any model regardless of how its
-propeller mesh is shaped. An earlier version derived the axis from the blade mesh's shortest
-bounds extent, which assumed a symmetric disc and picked the wrong axis for a flat two-blade
-prop like the Sopwith Camel's, sweeping a visibly slanted cone.
+alive, slow enough that individual blades still read. `PlaneFactory` wires the body in as
+`axisSpace` at build time and the axis is recomputed from `axisSpace.rotation` every frame,
+so it follows the plane through every bank, the garage's rest pitch and a drag-to-turn.
+
+The rotation is centred on the hub — the combined mesh bounds of everything under the pivot,
+not the pivot's origin — so the prop spins in place instead of orbiting an off-centre point.
+Combining all the meshes matters for a multi-part assembly like the Albatros' (spinner, blade,
+hub pin): taking the first `MeshFilter` found instead made the hub depend on Unity's
+name-sort order.
+
+### Why the body's axis and not the model's
+
+The model is not exactly aligned with the body. `BuildPlaneModel` pitches it `ModelPitchDeg`
+(−10°) nose-down inside the body, and the FBX's own built-in attitude adds to that — see
+*The nose trim* in `docs/campaign.md`. What is left over is the angle between the body's `+X`
+and where the model's nose really points:
+
+| plane | built in at | + `ModelPitchDeg` | + `pitchTrimDeg` | off the body's `+X` |
+| --- | --- | --- | --- | --- |
+| Sopwith Camel | +7.3° | −10° | — | −2.7° |
+| Fokker Dr.I | +5.9° | −10° | — | −4.1° |
+| Albatros D.III | −2.1° | −10° | +9.4° | −2.7° |
+
+Three or four degrees of cone is not visible on a spinning blade, so the body's axis is the
+right one to use: it needs no per-plane data, it cannot drift out of step with a re-export,
+and it is already the axis everything else about the plane is measured against.
+
+**Chasing the axis is the wrong fix when a propeller looks wrong.** It has been blamed twice:
+
+* Once correctly — an early version derived the axis from the blade mesh's shortest bounds
+  extent, which assumed a symmetric disc and picked the wrong axis outright for a flat
+  two-blade prop.
+* Once wrongly. The Albatros' prop swept a badly slanted cone, and the axis was moved to the
+  model's `Rz(ModelPitchDeg) * right` to chase it. That was **−10° off instead of −2.7°**, so
+  it made the Camel and the Dr.I worse while barely helping. The real fault was the last
+  column above: the Albatros was exported in a level attitude rather than a parked one, so it
+  sat at −12.1° and the propeller honestly reported it. Fixing the attitude with
+  `pitchTrimDeg` fixed the propeller, and the axis went back to the body's `+X`.
+
+If a prop cones, check the plane's attitude and its propeller nodes before the axis.
 
 ## Scrape shake (`ShakeEffect.cs`)
 

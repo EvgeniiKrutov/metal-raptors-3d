@@ -43,14 +43,14 @@ step rather than the whole level.
 | `{ "op": "say", "speaker": "you", "line": "l1_line6", "seconds": 3.5 }` | Same, but hold it for exactly 3.5 s. |
 | `{ "op": "task", "line": "l1_task1" }` | Show the current objective under the health bar. |
 | `{ "op": "taskdone" }` | Tick the objective, cross it out and fade it away; blocks for the animation. |
-| `{ "op": "wave", "enemies": [ { "plane": "fokker", "count": 2 } ] }` | Spawn the wave **and block** until every plane in it is destroyed. |
-| `{ "op": "wave", "enemies": [ { "plane": "fokker", "count": 2 }, { "plane": "sopwith", "count": 1 } ] }` | A wave of mixed types. |
+| `{ "op": "wave", "enemies": [ { "plane": "albatros", "count": 2 } ] }` | Spawn the wave **and block** until every plane in it is destroyed. |
+| `{ "op": "wave", "enemies": [ { "plane": "albatros", "count": 2 }, { "plane": "sopwith", "count": 1 } ] }` | A wave of mixed types. |
 | `{ "op": "spawn", "enemies": [ … ] }` | Same spawn, but the script continues immediately. |
 | `{ "op": "waitclear" }` | Block until no scripted enemy is alive (pairs with `spawn`). |
 | `{ "op": "finish" }` | End the level: LEVEL COMPLETED overlay, and stop reading the script. |
 
 `count` defaults to 1. Plane ids are matched against `PlaneModelConfig.resourceName` either in full
-(`fokker_dr1`) or by its first segment (`fokker`), so `PlaneModels` stays the one place a plane is
+(`albatros_d3`) or by its first segment (`albatros`), so `PlaneModels` stays the one place a plane is
 defined.
 
 ### The incoming warning (`EnemyWarning`)
@@ -283,17 +283,17 @@ the rest of the editor session.
 Both level 1 overrides pull in the same direction: it is the tutorial for the guns, not a test of
 them. Half health means the opening fight is short against the 150 health the player brings into
 it, and the slower turn rate stops a fighter from simply rotating onto the player's tail faster
-than a new player can answer — at 84°/s the Fokker no longer out-turns the Sopwith's own 120.
+than a new player can answer — at 84°/s the Albatros no longer out-turns the Sopwith's own 120.
 
 ## Level 1
 
 ```
 say  l1_line1 … l1_line4     (hq / you / hq / you, over the intro fly-in)
 task l1_task1 → wait 2.5 → taskdone
-task l1_task2 → wave fokker ×1 → wait 4 → wave fokker ×1 → taskdone
+task l1_task2 → wave albatros ×1 → wait 4 → wave albatros ×1 → taskdone
 wait 1.5
 say  l1_line5, l1_line6
-task l1_task3 → wave fokker ×1 → wait 4 → wave fokker ×1 → wave fokker ×2 → taskdone
+task l1_task3 → wave albatros ×1 → wait 4 → wave albatros ×1 → wave albatros ×2 → taskdone
 wait 1.5
 say  l1_line7, l1_line8
 finish

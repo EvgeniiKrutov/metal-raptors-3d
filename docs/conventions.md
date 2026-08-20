@@ -31,7 +31,7 @@ runtime assets can simply go in the main root.
 Two paths are built from this layout in code rather than written out per file:
 `PlaneModelConfig.folder` (defaulted to `PlaneModelConfig.WorldWar1`) joined with
 `resourceName` gives `ResourcePath`, which is what `PlaneFactory` loads — `resourceName`
-stays the plane's bare **id**, since campaign scripts (`"fokker"`), the skin PlayerPrefs
+stays the plane's bare **id**, since campaign scripts (`"albatros"`), the skin PlayerPrefs
 keys and the model's GameObject name all key off it. `BattlefieldProps` prefixes its
 model table with `objects/` at load time for the same reason: the table entries double as
 dictionary keys.

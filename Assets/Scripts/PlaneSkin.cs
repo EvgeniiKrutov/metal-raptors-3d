@@ -24,6 +24,11 @@ namespace MetalRaptors
             new PlaneSkin { id = "blue",  label = "blue",  texture = "skins/sopwith_camel/blue" },
         };
 
+        public static readonly PlaneSkin[] AlbatrosD3 =
+        {
+            new PlaneSkin { id = "plywood", label = "plywood", texture = "skins/albatros_d3/plywood" },
+        };
+
         public static PlaneSkin[] Of(PlaneModelConfig plane) =>
             plane != null && plane.skins != null ? plane.skins : Empty;
 

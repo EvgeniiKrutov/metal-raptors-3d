@@ -56,6 +56,7 @@ namespace MetalRaptors
         bool _active;
         bool _controlled = true;
         bool _falling;
+        PlaneFall _fall;
         float _lastCollisionTime = -999f;
 
         float _minX, _maxX, _worldWidth, _ceilingY, _edgeMargin;
@@ -116,6 +117,7 @@ namespace MetalRaptors
         {
             _active = false;
             _falling = false;
+            _fall = null;
             if (_smoke != null) _smoke.Clear();
             if (_fire != null) _fire.Extinguish();
             if (_rb == null) return;
@@ -134,7 +136,9 @@ namespace MetalRaptors
 
             if (_falling)
             {
-                PlaneFall.Step(_rb, dt);
+                _fall.Step(_rb, dt);
+                _heading = _fall.Heading;
+                ApplyRotation();
                 return;
             }
 
@@ -224,8 +228,9 @@ namespace MetalRaptors
 
         void ApplyRotation()
         {
+            float roll = _roll.Angle + (_fall != null ? _fall.Roll : 0f);
             transform.rotation = Quaternion.Euler(0f, 0f, _heading * Mathf.Rad2Deg)
-                               * Quaternion.Euler(_roll.Angle, 0f, 0f);
+                               * Quaternion.Euler(roll, 0f, 0f);
         }
 
         public void TakeDamage(float amount)
@@ -277,7 +282,7 @@ namespace MetalRaptors
             if (_smoke != null) _smoke.Ignite(ExplosionSize);
             _fire = PlaneFire.Ignite(gameObject, ExplosionSize);
 
-            PlaneFall.Begin(_rb);
+            _fall = PlaneFall.Begin(_rb, _heading, Mathf.Max(_speed, CruiseSpeed));
         }
 
         void OnTriggerEnter(Collider other)

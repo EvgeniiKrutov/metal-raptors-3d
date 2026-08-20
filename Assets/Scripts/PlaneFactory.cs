@@ -30,10 +30,10 @@ namespace MetalRaptors
 
             Quaternion wheelsDown = (plane.rollWheelsDown && !mirrored)
                 ? Quaternion.Euler(180f, 0f, 0f) : Quaternion.identity;
-            float pitch = mirrored ? -ModelPitchDeg : ModelPitchDeg;
-            model.transform.localRotation = Quaternion.Euler(0f, 0f, pitch)
-                                          * wheelsDown
-                                          * Quaternion.Euler(plane.standUpEuler);
+            Quaternion standUp = wheelsDown * Quaternion.Euler(plane.standUpEuler);
+            float nosePitch = ModelPitchDeg + plane.pitchTrimDeg;
+            float pitch = mirrored ? -nosePitch : nosePitch;
+            model.transform.localRotation = Quaternion.Euler(0f, 0f, pitch) * standUp;
 
             NormalizeSize(model.transform, plane.onScreenSize);
 
@@ -43,7 +43,7 @@ namespace MetalRaptors
             PlaneSkins.Apply(model.transform, skin);
 
             AddPlaneCollider(model.transform);
-            StartPropeller(model.transform, plane);
+            StartPropeller(model.transform, plane, parent);
             model.AddComponent<ShakeEffect>();
             return model.transform;
         }
@@ -143,11 +143,19 @@ namespace MetalRaptors
             col.convex = true;
         }
 
-        static void StartPropeller(Transform model, PlaneModelConfig plane)
+        static void StartPropeller(Transform model, PlaneModelConfig plane, Transform body)
         {
             Transform spinner = FindDeep(model, plane.propPivotNode) ?? FindDeep(model, plane.propBladesNode);
-            if (spinner != null) spinner.gameObject.AddComponent<PropellerSpin>();
-            else Debug.LogWarning("PlaneFactory: propeller node not found on the plane model.");
+            if (spinner == null)
+            {
+                Debug.LogWarning($"PlaneFactory: {plane.resourceName} has no propeller node " +
+                                 "(propPivotNode / propBladesNode); its propeller cannot spin.");
+                return;
+            }
+
+            var spin = spinner.gameObject.AddComponent<PropellerSpin>();
+            spin.axisSpace = body;
+            spin.axisInSpace = Vector3.right;
         }
 
         public static Transform FindDeep(Transform root, string name)

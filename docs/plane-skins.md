@@ -1,14 +1,26 @@
 # Plane skins
 
 A **skin** is an alternate base texture for a plane model. The Sopwith Camel has two —
-`green` and `blue` — and the player picks one in the garage (`docs/garage.md`). The pick is
-per plane, persists across launches, and is worn by the **player's** plane everywhere: the
-garage preview, the main menu's flying plane, challenge levels and campaign levels.
+`green` and `blue` — and the player picks one in the garage (`docs/garage.md`); the Albatros
+D.III has one, `plywood`, which it simply always wears. The pick is per plane, persists
+across launches, and is worn by the **player's** plane everywhere: the garage preview, the
+main menu's flying plane, challenge levels and campaign levels.
 
-Enemies and the companion wingman are deliberately left out. They are built through the same
-`PlaneFactory.BuildPlaneModel` but without a skin argument, so they keep the texture that
-ships inside the FBX — which is what keeps the two sides of a dogfight apart when both fly
-the same model.
+**Enemies wear the plane's default skin** — `PlaneSkins.Default(group.plane)`, i.e. `skins[0]`,
+passed at the three mirrored build sites (`LevelController`, `CampaignEnemies`, and
+`DuelPlane` when it is spawning the background foe rather than the wingman). A plane with no
+skins resolves to `null`, so the Fokker is untouched and keeps the texture inside its FBX;
+the Albatros gets `plywood`, which it otherwise flew unpainted.
+
+It is the **default**, never the player's pick: enemies read `PlaneSkins`, not `GameManager`,
+so repainting your own plane cannot repaint the other side.
+
+The **companion wingman is still left out** and keeps the texture that ships inside its FBX
+(`DuelPlane` passes a skin only when `mirrored`).
+
+The cost is that the player's Albatros and an enemy Albatros now wear the same paint. They
+stay apart by the mirrored, opposite-pitched build `PlaneFactory` gives an enemy, and by
+which way each is flying — the skin is no longer doing that work.
 
 ## The registry
 
@@ -26,18 +38,21 @@ stats and its model:
 | --- | --- |
 | Sopwith Camel | `green`, `blue` |
 | Fokker Dr.I | none (`skins` left null) |
+| Albatros D.III | `plywood` |
 
 **The first entry is the default.** `PlaneSkins.Default` returns `skins[0]`, so the Sopwith
 is green until the player says otherwise, and a plane with no skins resolves to `null` —
 which `Apply` treats as "leave the model alone".
 
 `Selectable` is `skins.Length > 1`, not `> 0`: one skin is not a choice, so the garage hides
-the row rather than showing a selector that cannot move.
+the row rather than showing a selector that cannot move. The Albatros is exactly that case —
+it is painted `plywood` because that is its only entry, and no `colour` row appears.
 
 ## Where the textures live
 
 `Assets/Textures/Resources/skins/<plane>/<skin>.png`, loaded as
-`Resources.Load<Texture2D>("skins/sopwith_camel/green")`.
+`Resources.Load<Texture2D>("skins/sopwith_camel/green")` or
+`Resources.Load<Texture2D>("skins/albatros_d3/plywood")`.
 
 The `Resources` folder in the middle is the whole point — a texture cannot be loaded by name
 at runtime from anywhere else, and `Assets/Textures` on its own is not a resources root.

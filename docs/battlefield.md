@@ -262,6 +262,28 @@ same correction; `PlaneFactory` folds it into each `PlaneModelConfig.standUpEule
 The random yaw goes on the **parent** root, so `rootYaw × StandUp` spins a
 standing model about the world Y axis.
 
+### Model colours
+
+Nothing in the code touches a prop's material — each FBX carries a single flat Phong
+material and is rendered with whatever the importer builds from it (`materialImportMode: 2`,
+embedded, identical on all 18 models). The authored diffuse values are the only thing that
+gives a prop its colour:
+
+| Models | Material | Diffuse |
+| --- | --- | --- |
+| `bent_tree_*`, `gnarled_tree_*` | `TreeDeadWood.*` | 0.34, 0.21, 0.10 |
+| `dead_tree_*` | `TreeDeadWood.*` | 0.28, 0.16, 0.07 |
+| `house_0`–`house_5` | `BurnedWood.001`–`.006` | 0.052, 0.034, 0.022 |
+
+**A white prop means a bad export, not a shader problem.** `house_0` shipped with its
+diffuse *and* specular at pure white — the exporter's default — which rendered it as a
+bright untextured blob. Because a house cell picks uniformly from the six models, that
+showed up as roughly one house in six being white, which reads as an intermittent
+rendering fault rather than one broken asset. The values above were written back into
+`house_0.fbx` directly (six doubles, file length unchanged). Since
+`Assets/Resources/objects` is not tracked (docs/conventions.md), a re-export from the
+source scene will bring the white back unless the material is fixed there too.
+
 ### Scale, seating and colliders
 
 The models are authored in metres (a tree is about 5 m, a house 7.5 m wide) and

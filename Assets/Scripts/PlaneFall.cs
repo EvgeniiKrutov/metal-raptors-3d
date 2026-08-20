@@ -2,34 +2,50 @@ using UnityEngine;
 
 namespace MetalRaptors
 {
-    public static class PlaneFall
+    public class PlaneFall
     {
-        public const float Gravity = 150f;
-        public const float InitialDrop = 25f;
-        public const float HorizontalDrag = 1.5f;
-        public const float SpinRate = 2.5f;
+        public const float DiveDeg = -38f;
+        public const float DiveResponse = 1.1f;
+        public const float SpeedGain = 20f;
+        public const float RollRateDeg = 230f;
         public const float Timeout = 8f;
 
-        public static void Begin(Rigidbody rb)
-        {
-            if (rb == null) return;
+        float _heading;
+        float _diveDeg;
+        float _speed;
+        float _roll;
 
-            rb.useGravity = false;
-            Vector3 v = rb.linearVelocity;
-            v.y -= InitialDrop;
-            rb.linearVelocity = v;
-            rb.angularVelocity = new Vector3(0f, 0f,
-                (Random.value < 0.5f ? -1f : 1f) * SpinRate);
+        public float Heading => _heading;
+        public float Roll => _roll;
+
+        public static PlaneFall Begin(Rigidbody rb, float heading, float speed)
+        {
+            var fall = new PlaneFall
+            {
+                _heading = heading,
+                _speed = Mathf.Max(0f, speed),
+                _diveDeg = Mathf.Cos(heading) >= 0f ? DiveDeg : 180f - DiveDeg,
+            };
+
+            if (rb != null)
+            {
+                rb.useGravity = false;
+                rb.angularVelocity = Vector3.zero;
+            }
+
+            return fall;
         }
 
-        public static void Step(Rigidbody rb, float dt)
+        public void Step(Rigidbody rb, float dt)
         {
+            _heading = Mathf.LerpAngle(_heading * Mathf.Rad2Deg, _diveDeg,
+                1f - Mathf.Exp(-DiveResponse * dt)) * Mathf.Deg2Rad;
+            _speed += SpeedGain * dt;
+            _roll += RollRateDeg * dt;
+
             if (rb == null) return;
 
-            Vector3 v = rb.linearVelocity;
-            v.y -= Gravity * dt;
-            v.x = Mathf.MoveTowards(v.x, 0f, Mathf.Abs(v.x) * HorizontalDrag * dt);
-            rb.linearVelocity = v;
+            rb.linearVelocity = new Vector3(Mathf.Cos(_heading), Mathf.Sin(_heading), 0f) * _speed;
         }
     }
 }

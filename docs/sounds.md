@@ -108,6 +108,23 @@ to `ReportPlayerDamaged`, which plays `engine_stutter` once when the player is
 alive and at or below 30% health. It will not retrigger while an earlier stutter
 is still playing.
 
+## Guns
+
+The machine guns are not part of `SoundSystem` — each shooter plays
+`Sounds/bullet_shot_1` itself through its own `AudioSource` as it fires, at a fixed
+`ShotVolume`:
+
+| Source | Volume |
+| --- | --- |
+| Player (`PlaneShooter`) | 0.36 |
+| Enemy (`EnemyController`) | 0.18 |
+| Menu duel (`DuelPlane`) | 0.045 |
+
+The enemy sits at half the player's level so a swarm never drowns out the plane the
+player is flying, and the menu duel is quieter again — it is background decoration
+behind a menu, not a fight the player is in, so it is deliberately left out of any
+retune of the two gameplay values.
+
 ## Pause and game over
 
 While `GameMenu.IsOpen` (pause menu, `Time.timeScale = 0`), every source on the

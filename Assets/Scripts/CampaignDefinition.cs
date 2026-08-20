@@ -14,13 +14,14 @@ namespace MetalRaptors
         public string dateline;
         public string lore;
         public bool companion;
+        public float flak = 1f;
         public float enemyHealth;
         public float enemyRotationSpeed;
         public int supplyDrops;
         public float supplyHealthFraction = 0.3f;
         public float supplyHeal = 50f;
         public PlaneModelConfig companionPlane = PlaneModels.Sopwith;
-        public PlaneModelConfig companionFoe = PlaneModels.Fokker;
+        public PlaneModelConfig companionFoe = PlaneModels.Albatros;
     }
 
     public static class CampaignLevels

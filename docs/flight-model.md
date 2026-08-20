@@ -83,7 +83,7 @@ handling into the next session.
 
 Player only. Enemies (`EnemyController`) keep their constant `flySpeed` and are
 built from `EnemyConfig.asset`, which the per-plane loadout never touches — an
-enemy Fokker and a player-selected Fokker have nothing in common but the model.
+enemy Albatros and a player-selected Albatros have nothing in common but the model.
 The companion wingman is handed the shared `PlayerConfig` rather than a loadout
 (docs/companion.md). The shot-down fall is a separate mode (real rigidbody
 gravity, see `CubeController.BeginFall`) and is untouched by this model.
@@ -224,7 +224,8 @@ as seen by the camera rather than away from it, and scaling (rather than
 flipping the sign at 90°) keeps that transition continuous through the roll.
 
 Skipped while falling and while sinking — `PlaneFall` and `DuelPlane`'s fall
-spin own the rotation there. Otherwise it runs everywhere the plane flies,
+roll own the rotation there (the flip angle it left behind is still added in,
+so it is carried through the fall rather than snapped away). Otherwise it runs everywhere the plane flies,
 campaign cutscenes and the level intro included; during a cutscene the player
 counts as flying steady, since a plane with no pilot input never blocks a flip.
 
@@ -233,28 +234,76 @@ counts as flying steady, since a plane with no pilot input never blocks a flip.
 Zero health never destroys a plane outright on either side: the player and
 every enemy fighter fall out of the sky, burning, and only explode where they
 hit the ground (see docs/effects.md). Both `CubeController.BeginFall` and
-`EnemyController.BeginFall` go through the shared static `PlaneFall`, so the
-two sides fall identically:
+`EnemyController.BeginFall` go through the shared `PlaneFall`, so the two sides
+fall identically — and identically to the background duel's losing plane, which
+is where the animation came from (`DuelPlane`, docs/companion.md).
 
-- `Begin` kicks the nose down (`InitialDrop`) and sets a random tumble spin
-  about Z — the only rotation axis a plane's constraints leave free.
+It is a **diving barrel roll**, not a tumble: a pilot-less aircraft still has
+wings, and what it does is fall away in a long rolling dive. Each falling plane
+owns one `PlaneFall` instance holding its own heading, speed and roll angle:
+
+- `Begin(rb, heading, speed)` takes the plane's live heading and speed and picks
+  the dive target: `DiveDeg` (−38°) when the plane is flying right,
+  `180 − DiveDeg` when it is flying left, so the nose always drops toward the
+  ground rather than swinging through the vertical. It also zeroes the
+  rigidbody's angular velocity — the roll is animated, not solved.
 - `Step`, called from the falling branch of each controller's `FixedUpdate`,
-  integrates `Gravity` into the rigidbody's velocity itself and bleeds the
-  leftover forward momentum (`HorizontalDrag`), so the plane pitches into a
-  dive instead of gliding sideways down.
+  eases the heading toward that dive angle (`DiveResponse`, an exponential
+  approach, so the nose *drops* over about a second instead of snapping down),
+  adds `SpeedGain` (20 u/s²) to the speed, winds the roll on by
+  `RollRateDeg` (230°/s), and drives the rigidbody's velocity straight along
+  the heading.
 
-`Gravity` (~15× Unity's default 9.81) is scaled up because the world is
-compressed relative to real scale — a plane spans ~60 units in a 700 m arena,
-so real gravity would read as a slow, weightless drift. It is integrated by
-hand rather than by switching `useGravity` on: every plane spawns with gravity
-off and the earlier player-only version had to override the *global*
-`Physics.gravity` to get the scaled-up pull, which is scene-wide state for
-what is a per-plane effect — and now that enemies fall too, more than one
-plane can be falling at once.
+The controllers read `Heading` and `Roll` back out and feed them into their
+existing `ApplyRotation`, whose `Rz(heading) · Rx(roll)` form already puts the
+roll on the nose axis — so the wreck rolls about its own length while it dives.
+`PlaneRoll`'s flip angle (above) is added to the fall roll rather than replaced,
+so a plane shot down mid-flip carries that attitude into the fall.
+
+There is no gravity in it at all. The old fall integrated a scaled-up `Gravity`
+(~15× 9.81, because the world is compressed relative to real scale) and bled off
+the forward momentum with a `HorizontalDrag`, which produced a plane that stalled,
+stopped and dropped. Driving the velocity along a diving heading instead means the
+wreck keeps flying while it falls, and the speed *gain* rather than an acceleration
+term is what reads as it running away downhill. Gravity stays off on every plane's
+rigidbody, as it always has.
+
+`DuelPlane` keeps its own kinematic implementation — it has no rigidbody — but its
+four fall constants are now aliases of `PlaneFall`'s, so the background duel and
+the gameplay planes cannot drift apart under a retune.
 
 `PlaneFall.Timeout` is the enemy-side safety net: a wreck that has been
 falling that long without an impact (its terrain chunk streamed away behind
 the camera) is removed rather than left falling forever.
+
+### The death cam
+
+The player's wreck is followed all the way to the explosion. The camera was already
+tracking the plane's transform — the body object outlives the model precisely so it
+stays the follow target — but two things kept it from reading as a follow, and both
+level controllers now switch them at `OnShotDown` (a `_playerFalling` flag that is
+never cleared; the level is over either way):
+
+- **The follow loosens.** `CamResponse` (8) drops to `FallCamResponse` (3.3), roughly
+  a 0.3 s time constant instead of 0.125 s, so the camera visibly trails the diving
+  wreck and settles onto it rather than staying servo-locked. It is still catching up
+  as the plane hits the ground, which is what gives the impact its drift.
+- **The floor drops.** `PositionCamera` clamps the camera above
+  `CutRevealY + halfViewHeight` so the bottom of the frame never falls past the
+  terrain's cut edge. While the player is falling that limit moves down to
+  `WallBottomY` (−120 instead of −80) — the full depth of the cut wall
+  `ProceduralTerrain.BuildCutWallMesh` actually draws, on the arena and on all three
+  campaign terrains alike, which all place that wall at world y = 0. Those 40 units
+  are the entire budget: below the wall's bottom edge there is nothing to see but sky
+  under the ground, so the camera cannot follow a wreck further down than this no
+  matter how it is tuned, and the impact is framed low by design.
+
+Nothing resets the flag on the coast's ditch either, so a plane that sinks into the
+sea keeps the same held shot.
+
+One side effect worth knowing: the campaign's `Distance` readout stops counting once
+the player is falling. The wreck flies forward as it dives, and without the gate a
+shot-down player would be credited with the distance their own wreck coasted.
 
 ## Collision & damage (plane-to-plane scrapes)
 
@@ -326,7 +375,7 @@ scene is left untouched.
 
 ## Enemy AI (`EnemyController`)
 
-A mirrored Fokker Dr.1 (it attacks from the right and flies left) flying the
+A mirrored Albatros D.III (it attacks from the right and flies left) flying the
 same constant-speed physics as the player, tuned via `EnemyConfig` and driven
 by a state machine originally ported from the sibling repo's `FighterPlane`:
 
