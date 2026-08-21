@@ -5,18 +5,19 @@ namespace MetalRaptors
 {
     public class MainMenuController : MonoBehaviour
     {
-        enum MenuScreen { Home, Eras, Era, Custom }
+        enum MenuScreen { Home, Eras, Era, Levels, Custom }
 
         MenuPanel _main;
         MenuPanel _challenges;
         MenuPanel _eraPanel;
-        MenuPanel _levelsPanel;
         MenuPanel _customPanel;
         MenuCardRow _eras;
+        MenuLevelRow _levels;
 
         GameObject _column;
         GameObject _erasPage;
         GameObject _eraPage;
+        GameObject _levelsPage;
         GameObject _customPage;
 
         MenuPlaneView _planeView;
@@ -24,9 +25,15 @@ namespace MetalRaptors
         Text _erasTitle;
         Text _erasDescription;
         Text _eraTitle;
+        Text _levelTitle;
+        Text _levelDateline;
+        Text _levelBrief;
+        MenuArrowView _levelLeft;
+        MenuArrowView _levelRight;
         MenuPreviewCard _mapPreview;
 
         int _mapIndex;
+        int _eraIndex;
         Daytime _daytime = Daytime.Morning;
 
         IMenuFocusGroup _group;
@@ -47,6 +54,7 @@ namespace MetalRaptors
 
             _erasPage = BuildErasPage(canvas.transform);
             _eraPage = BuildEraPage(canvas.transform);
+            _levelsPage = BuildLevelsPage(canvas.transform);
             _customPage = BuildCustomPage(canvas.transform);
 
             ShowHome(_main);
@@ -110,7 +118,7 @@ namespace MetalRaptors
             for (int i = 0; i < eras.Length; i++)
             {
                 int index = i;
-                _eras.AddCard(eras[i].Title, eras[i].Years, eras[i].Unlocked,
+                _eras.AddCard(eras[i].Title, eras[i].Years, eras[i].Unlocked, eras[i].Emblem,
                     () => ScreenFade.Swap(() => ShowEra(index)));
             }
 
@@ -125,31 +133,85 @@ namespace MetalRaptors
             _eraTitle = MenuLayout.BuildTitle(page, string.Empty);
 
             _eraPanel = new MenuPanel(page, "Era Panel", MenuTheme.ListTop);
-            _eraPanel.AddNav("start", StartCampaign);
+            _eraPanel.AddNav(CampaignProgress.HighestCompleted > 0 ? "continue" : "start", StartCampaign);
             _eraPanel.AddNav("level select", () => ScreenFade.Swap(ShowLevels));
 
             _eraPanel.AddGap(MenuTheme.SectionGap);
             _eraPanel.AddNav("back", GoHome);
-
-            _levelsPanel = BuildLevelsPanel(page);
             return page.gameObject;
         }
 
-        MenuPanel BuildLevelsPanel(Transform page)
+        GameObject BuildLevelsPage(Transform parent)
         {
-            var panel = new MenuPanel(page, "Levels Panel", MenuTheme.ListTop);
-            panel.AddCaption("level select");
+            Transform screen = MenuLayout.CreateScreen(parent, "Level Select Page");
+            Transform page = MenuLayout.CreatePage(screen, "Level Select", 1f);
+
+            _levelTitle = MenuLayout.BuildTitle(page, string.Empty);
+
+            _levelDateline = UIFactory.CreateLabel(page, string.Empty, MenuTheme.LevelDatelineSize,
+                MenuTheme.ListTop, MenuTheme.LevelDatelineRowHeight, MenuTheme.Colors.Muted,
+                UIFactory.MediumFont);
+
+            float briefTop = MenuTheme.ListTop - MenuTheme.LevelDatelineRowHeight
+                             - MenuTheme.LevelDatelineToBrief;
+            _levelBrief = UIFactory.CreateParagraph(page, string.Empty, MenuTheme.DescriptionSize,
+                briefTop, MenuTheme.DescriptionWidth, MenuTheme.LevelBriefRowHeight,
+                MenuTheme.DescriptionLineSpacing, MenuTheme.Colors.Muted, UIFactory.MediumFont);
+
+            _levels = MenuLevelRow.Create(page, "Level Cards", MenuTheme.LevelCardsTop);
 
             foreach (CampaignLevelEntry level in CampaignLevelList.All)
             {
                 int number = level.Number;
-                MenuItemView item = panel.AddNav(level.Label, () => StartCampaignLevel(number));
-                panel.AddTag(item, level.MapName);
+                _levels.AddCard(level, CampaignProgress.IsUnlocked(number),
+                    CampaignProgress.IsCompleted(number), () => StartCampaignLevel(number));
             }
 
-            panel.AddGap(MenuTheme.SectionGap);
-            panel.AddNav("back", () => ScreenFade.Swap(ShowEraPanel));
-            return panel;
+            _levels.Layout();
+            _levels.FocusChanged += ShowLevelHeader;
+            _levels.ViewChanged += UpdateLevelArrows;
+
+            BuildLevelArrows(screen);
+            return screen.gameObject;
+        }
+
+        void BuildLevelArrows(Transform screen)
+        {
+            Transform band = MenuLayout.CreateRegion(screen, "Level Arrows", 0f, 1f, 0f, 0f);
+
+            _levelLeft = CreateEdgeArrow(band, true);
+            _levelRight = CreateEdgeArrow(band, false);
+
+            _levelLeft.Clicked += () => _levels.Slide(-1);
+            _levelRight.Clicked += () => _levels.Slide(1);
+
+            _levelLeft.Hovered += () => _levelLeft.SetState(_levels.CanSlide(-1), true);
+            _levelLeft.Exited += UpdateLevelArrows;
+            _levelRight.Hovered += () => _levelRight.SetState(_levels.CanSlide(1), true);
+            _levelRight.Exited += UpdateLevelArrows;
+        }
+
+        static MenuArrowView CreateEdgeArrow(Transform band, bool pointsLeft)
+        {
+            MenuArrowView view = MenuArrowView.Create(band, pointsLeft, Vector2.zero,
+                MenuTheme.GarageArrowSize);
+
+            float anchorX = pointsLeft ? 0f : 1f;
+            float x = pointsLeft ? MenuTheme.GarageArrowInset
+                                 : -(MenuTheme.GarageArrowInset + MenuTheme.GarageArrowSize.x);
+
+            RectTransform rt = view.RectTransform;
+            rt.anchorMin = new Vector2(anchorX, 1f);
+            rt.anchorMax = new Vector2(anchorX, 1f);
+            rt.pivot = new Vector2(0f, 0.5f);
+            rt.anchoredPosition = new Vector2(x, MenuTheme.LevelCardsTop - MenuTheme.CardSize * 0.5f);
+            return view;
+        }
+
+        void UpdateLevelArrows()
+        {
+            _levelLeft.SetState(_levels.CanSlide(-1), false);
+            _levelRight.SetState(_levels.CanSlide(1), false);
         }
 
         GameObject BuildCustomPage(Transform parent)
@@ -194,7 +256,7 @@ namespace MetalRaptors
             ScreenFade.Load(SceneNames.CampaignLevel1);
         }
 
-        static void StartCampaign() => StartCampaignLevel(CampaignRun.FirstLevel);
+        static void StartCampaign() => StartCampaignLevel(CampaignProgress.NextLevel);
 
         static void StartCampaignLevel(int number)
         {
@@ -208,6 +270,14 @@ namespace MetalRaptors
             CareerEra era = CareerEras.All[index];
             _erasTitle.text = era.Title;
             _erasDescription.text = era.Description;
+        }
+
+        void ShowLevelHeader(int index)
+        {
+            CampaignLevelEntry level = CampaignLevelList.All[index];
+            _levelTitle.text = level.Title;
+            _levelDateline.text = level.Dateline;
+            _levelBrief.text = level.Brief;
         }
 
         void GoHome() => ScreenFade.Swap(() => ShowHome(_main));
@@ -230,23 +300,20 @@ namespace MetalRaptors
 
         void ShowEra(int index)
         {
+            _eraIndex = index;
             SetScreen(MenuScreen.Era);
             _eraTitle.text = CareerEras.All[index].Title;
-            ShowEraPanel();
-        }
-
-        void ShowEraPanel()
-        {
-            _levelsPanel.SetActive(false);
-            _eraPanel.SetActive(true);
             _group = _eraPanel;
         }
 
+        void ShowEraPage() => ShowEra(_eraIndex);
+
         void ShowLevels()
         {
-            _eraPanel.SetActive(false);
-            _levelsPanel.SetActive(true);
-            _group = _levelsPanel;
+            SetScreen(MenuScreen.Levels);
+            _levels.FocusOn(CampaignProgress.NextLevel - CampaignRun.FirstLevel);
+            UpdateLevelArrows();
+            _group = _levels;
         }
 
         void ShowCustom()
@@ -262,15 +329,16 @@ namespace MetalRaptors
             _column.SetActive(screen == MenuScreen.Home);
             _erasPage.SetActive(screen == MenuScreen.Eras);
             _eraPage.SetActive(screen == MenuScreen.Era);
+            _levelsPage.SetActive(screen == MenuScreen.Levels);
             _customPage.SetActive(screen == MenuScreen.Custom);
             _planeView.SetActive(screen == MenuScreen.Home);
         }
 
         void Cancel()
         {
-            if (_screen == MenuScreen.Era && _group == _levelsPanel)
+            if (_screen == MenuScreen.Levels)
             {
-                ScreenFade.Swap(ShowEraPanel);
+                ScreenFade.Swap(ShowEraPage);
                 return;
             }
             if (_screen != MenuScreen.Home || _homePanel != _main) GoHome();

@@ -147,6 +147,49 @@ namespace MetalRaptors
             return text;
         }
 
+        public static Text CreateBottomWrapLabel(Transform parent, string content, int fontSize,
+            float bottom, float rowHeight, float padSide, Color color, Font font)
+        {
+            Text text = NewLabel(parent, content, fontSize, color, font, TextAnchor.LowerLeft);
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+
+            var rt = text.rectTransform;
+            rt.anchorMin = new Vector2(0f, 0f);
+            rt.anchorMax = new Vector2(1f, 0f);
+            rt.pivot = new Vector2(0.5f, 0f);
+            rt.sizeDelta = new Vector2(-2f * padSide, rowHeight);
+            rt.anchoredPosition = new Vector2(0f, bottom);
+            return text;
+        }
+
+        public static Text CreateTopLabel(Transform parent, string content, int fontSize, float top,
+            float rowHeight, float padSide, Color color, Font font)
+        {
+            Text text = NewLabel(parent, content, fontSize, color, font, TextAnchor.MiddleLeft);
+
+            var rt = text.rectTransform;
+            rt.anchorMin = new Vector2(0f, 1f);
+            rt.anchorMax = new Vector2(1f, 1f);
+            rt.pivot = new Vector2(0.5f, 1f);
+            rt.sizeDelta = new Vector2(-2f * padSide, rowHeight);
+            rt.anchoredPosition = new Vector2(0f, top);
+            return text;
+        }
+
+        public static Text CreateBottomInlineLabel(Transform parent, string content, int fontSize,
+            Vector2 anchoredPos, float rowHeight, Color color, Font font)
+        {
+            Text text = NewLabel(parent, content, fontSize, color, font, TextAnchor.MiddleLeft);
+
+            var rt = text.rectTransform;
+            rt.anchorMin = new Vector2(0f, 0f);
+            rt.anchorMax = new Vector2(0f, 0f);
+            rt.pivot = new Vector2(0f, 0f);
+            rt.sizeDelta = new Vector2(text.preferredWidth, rowHeight);
+            rt.anchoredPosition = anchoredPos;
+            return text;
+        }
+
         public static Text CreateParagraph(Transform parent, string content, int fontSize, float top,
             float width, float rowHeight, float lineSpacing, Color color, Font font)
         {

@@ -1,27 +1,62 @@
 # Campaign mode
 
 An endless side-scrolling flight over streamed terrain. Entry points: main menu → career →
-World War 1 → start (or → level select → a level), and main menu → custom battle → start
+World War 1 → continue (or → level select → a card), and main menu → custom battle → start
 (scene `CampaignLevel1`, controller `CampaignLevelController`, definition registry
 `CampaignLevels` in `CampaignDefinition.cs`). See docs/main-menu.md for the pages that lead
-here.
+here and docs/level-select.md for the card page the levels are picked from.
 
 ## Levels and maps
 
-`CampaignLevels` carries two levels, and a level names a **terrain kind** as well as a seed:
+`CampaignLevels` carries the **eight** levels of the World War 1 campaign. Their titles, dates,
+terrains and skies come from the campaign's story source, `Assets/Resources/docs/campaign-ww1-scenario.md`
+(untracked, work in progress — it is the authority when the two disagree):
 
-| Level | Terrain | Daytime | Page |
-| --- | --- | --- | --- |
-| 1 | `TerrainKind.Verdun` | Morning | this one |
-| 2 | `TerrainKind.Flanders` | Morning | docs/flanders-coast.md |
+| # | Title | Date | Terrain | Daytime |
+| --- | --- | --- | --- | --- |
+| 1 | FIRST LIGHT | 14 Apr 1916 | `Verdun` | Morning |
+| 2 | THE NUMBERS | 22 Jun 1916 | `Verdun` | Midday |
+| 3 | FIXED GROUND | 12 Feb 1917 | `Verdun` | Evening |
+| 4 | THE RAVEN | 6 Apr 1917 | `Flanders` | Morning |
+| 5 | NOTHING BURNS AT NIGHT | 19 Sep 1917 | `Flanders` | Night |
+| 6 | HOHRUPT | 3 Oct 1917 | `Dolomites` | Morning |
+| 7 | TWO FIRES | 24 Mar 1918 | `Dolomites` | Midday |
+| 8 | IRON BIRDS OF PREY | 15 May 1918 | `Dolomites` | Evening |
 
-`TerrainKind.Dolomites` (docs/dolomites.md) exists as a fourth kind but no career level uses
-it — it is reachable only through a custom battle.
+The scenario's `Mountain` sector is `TerrainKind.Dolomites`, the alpine streamer we already have
+(docs/dolomites.md) — so all three terrain kinds are now flown in career and none is
+custom-battle-only.
+
+**Everything below the title is placeholder.** Each level has a script (`level1` … `level8`) so
+that it can be *finished*, which is what career progression is built on — but every script is the
+same scroller shape (opening exchange → objective → waves → closing exchange → `finish`), its radio
+lines are lorem ipsum, and its briefing `lore` is lorem ipsum. The scenario designs levels 3, 5, 6
+and 7 as fixed-width, stealth, strike and time-attack levels and 4 and 8 as boss fights; none of
+those modes exist yet, so those levels currently fly as ordinary scrollers.
+
+Difficulty is a straight ramp across the eight: `enemyHealth` 50 → 100, `enemyRotationSpeed`
+84 → 124, and `flak` climbing to 1.5 at Hohrupt, where the scenario puts guns on both valley walls.
+
+## Progress
+
+`GameManager.CampaignLevelsCompleted` (PlayerPrefs `mr_campaign_progress`) is the highest
+career level cleared, and `CampaignProgress` in `CampaignRun.cs` is the null-safe facade the
+menu reads: `IsCompleted(n)`, `IsUnlocked(n)` (`n <= completed + 1`), `NextLevel`. It is
+written in `CampaignLevelController.CompleteLevel`, and **only outside a custom battle** — a
+skirmish on a career map cannot advance the campaign.
+
+It is deliberately a different key from `mr_highest_unlocked_level`, which belongs to the
+fixed challenge levels (`Level1`/`Level2`) and is untouched by career.
+
+Level 1 is always unlocked; every later card is locked until the one before it is cleared.
+`continue` on the era page flies `CampaignProgress.NextLevel`, which is the first uncleared
+level — and level 8 once the whole campaign is done, so `continue` replays the finale rather
+than dead-ending.
 
 **One scene serves every level.** `CampaignLevel1` is the only endless scene; the menu writes
 the wanted level into the static `CampaignRun` before loading it, the same trick
 `CustomBattle` already uses, and `CampaignLevelController` reads `CampaignRun.Level` in
-`Start`. A third level is a registry entry and a list row, not another scene file. (The
+`Start`. A ninth level is a registry entry and a card, not another scene file. (The
 scene still carries an orphan serialized `levelNumber` from before this change; nothing reads
 it.)
 
@@ -51,8 +86,10 @@ is painted, what it decorates with, and what extra meshes ride along with it).
 - A level **opens on an intro**: the frame holds still, the plane flies in from off the left
   edge with the controls dead, and the script's first radio call plays between two black film
   bars. Control comes back during the fly-in (docs/level-intro.md).
-- The daytime is authored on the definition: level 1 flies at dawn (`Daytime.Morning`). Sky,
-  fog and ambient reuse the same sky classes as the fixed terrain levels.
+- The daytime is authored on the definition: level 1 flies at dawn (`Daytime.Morning`), and
+  the eight spread over all four daytimes. Sky, fog and ambient reuse the same sky classes as
+  the fixed terrain levels — `CoastSky` and `DolomitesSky` carry a palette per daytime, which
+  is what lets levels 5 and 8 fly at night on the coast's and the alpine ground.
 - A **custom battle** is the one exception. When `CustomBattle.Requested` is set (the menu's
   custom battle screen did it), the controller builds
   `CampaignLevels.Custom(map, daytime)` — the picked map's seed under the picked sky — in

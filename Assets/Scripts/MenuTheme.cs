@@ -117,6 +117,33 @@ namespace MetalRaptors
         public const float CardYearsRowHeight = 20f;
         public const float CardTitleToYears = 2f;
 
+        public const float CardArtBottom = 96f;
+        public const float CardNumberToArt = 10f;
+
+        public const float LevelCardTitleRowHeight = 66f;
+        public const float LevelCardArtBottom =
+            CardPad + CardYearsRowHeight + CardTitleToYears + LevelCardTitleRowHeight;
+
+        public const int LevelNumberSize = 40;
+        public const float LevelNumberRowHeight = 46f;
+        public const float LevelCardArtTop =
+            CardPad + LevelNumberRowHeight + CardNumberToArt;
+
+        public const int LevelVisibleCards = 4;
+        public const float LevelRowSlide = 0.18f;
+
+        public const int LevelDatelineSize = 18;
+        public const float LevelDatelineRowHeight = 24f;
+        public const float LevelDatelineToBrief = 12f;
+        public const float LevelBriefRowHeight = 96f;
+
+        public static float LevelRowWidth =>
+            LevelVisibleCards * CardSize + (LevelVisibleCards - 1) * CardGap;
+
+        public static float LevelCardsTop =>
+            ListTop - LevelDatelineRowHeight - LevelDatelineToBrief
+            - LevelBriefRowHeight - DescriptionToCards;
+
         public static float ListTop =>
             -(TitleRowHeight + TitleToBar + BarHeight + BarToList);
     }

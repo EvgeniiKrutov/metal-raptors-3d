@@ -8,7 +8,12 @@ namespace MetalRaptors
         public static Transform CreatePage(Transform parent, string name, float widthFraction) =>
             CreateRegion(parent, name, 0f, widthFraction, MenuTheme.PadLeft);
 
-        public static Transform CreateRegion(Transform parent, string name, float xMin, float xMax, float padLeft)
+        public static Transform CreateRegion(Transform parent, string name, float xMin, float xMax,
+            float padLeft) =>
+            CreateRegion(parent, name, xMin, xMax, padLeft, MenuTheme.PadRight);
+
+        public static Transform CreateRegion(Transform parent, string name, float xMin, float xMax,
+            float padLeft, float padRight)
         {
             var go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(parent, false);
@@ -18,7 +23,7 @@ namespace MetalRaptors
             rt.anchorMax = new Vector2(xMax, 1f - MenuTheme.PadTopFraction);
             rt.pivot = new Vector2(0.5f, 1f);
             rt.offsetMin = new Vector2(padLeft, 0f);
-            rt.offsetMax = new Vector2(-MenuTheme.PadRight, 0f);
+            rt.offsetMax = new Vector2(-padRight, 0f);
             return go.transform;
         }
 

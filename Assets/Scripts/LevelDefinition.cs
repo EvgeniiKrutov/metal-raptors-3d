@@ -56,6 +56,9 @@ namespace MetalRaptors
                 default: return FlatSlab;
             }
         }
+
+        public static string Full(TerrainKind kind) =>
+            kind == TerrainKind.Flanders ? FlandersFull : For(kind);
     }
 
     public class EnemyGroup

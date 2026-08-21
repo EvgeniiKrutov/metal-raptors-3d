@@ -14,10 +14,9 @@ Files: `SupplyDrop.cs` (the director), `SupplyCrate.cs` (the falling crate),
 | `supplyHealthFraction` | `0.3` | Fraction of `MaxHealth` at or below which a crate is sent. |
 | `supplyHeal` | `50` | Health restored on catch, clamped to `MaxHealth`. |
 
-Only `CampaignLevels.Level1` opts in today (`supplyDrops = 1`). Every other level, and
-`CampaignLevels.Custom` — the Custom Battle skirmish — leaves it at `0`, so no crate ever falls
-there: the drop is a scripted campaign beat, not a general pickup. Adding it to a new level is
-one line in that level's definition.
+Every career level opts in — one crate on levels 1–6, two on 7 and 8. `CampaignLevels.Custom` — the Custom Battle skirmish — leaves it at `0`, so
+no crate ever falls there: the drop is a campaign beat, not a general pickup. Changing it for a
+level is one line in that level's definition.
 
 The default player has 100 health, so level 1 reads as: one crate, sent the first time the plane
 is at or under 30 health, worth 50 back.

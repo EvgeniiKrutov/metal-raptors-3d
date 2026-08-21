@@ -13,11 +13,13 @@ namespace MetalRaptors
         RectTransform _rt;
         Image _frame;
         Text _title;
+        PlaneEmblem _emblem;
         bool _focused;
 
         public bool Interactable { get; private set; }
 
-        public static MenuCardView Create(Transform parent, string title, string years, bool interactable)
+        public static MenuCardView Create(Transform parent, string title, string years,
+            bool interactable, EraEmblem emblem)
         {
             var go = new GameObject($"Card ({title})", typeof(RectTransform), typeof(MenuCardView));
             go.transform.SetParent(parent, false);
@@ -35,6 +37,14 @@ namespace MetalRaptors
             view._frame = CreateFrame(rt);
             CreateFace(rt);
 
+            view._emblem = PlaneEmblem.Create(rt, "Emblem");
+            RectTransform art = view._emblem.rectTransform;
+            art.anchorMin = new Vector2(0f, 0f);
+            art.anchorMax = new Vector2(1f, 1f);
+            art.offsetMin = new Vector2(MenuTheme.CardPad, MenuTheme.CardArtBottom);
+            art.offsetMax = new Vector2(-MenuTheme.CardPad, -MenuTheme.CardPad);
+            view._emblem.SetEmblem(emblem);
+
             view._title = UIFactory.CreateBottomLabel(rt, title, MenuTheme.CardTitleSize,
                 MenuTheme.CardPad + MenuTheme.CardYearsRowHeight + MenuTheme.CardTitleToYears,
                 MenuTheme.CardTitleRowHeight, MenuTheme.CardPad, MenuTheme.Colors.Fg, UIFactory.BoldFont);
@@ -46,7 +56,7 @@ namespace MetalRaptors
             return view;
         }
 
-        static Image CreateFrame(RectTransform parent)
+        public static Image CreateFrame(RectTransform parent)
         {
             var go = new GameObject("Frame", typeof(Image));
             go.transform.SetParent(parent, false);
@@ -62,7 +72,7 @@ namespace MetalRaptors
             return img;
         }
 
-        static void CreateFace(RectTransform parent)
+        public static void CreateFace(RectTransform parent)
         {
             var go = new GameObject("Face", typeof(Image));
             go.transform.SetParent(parent, false);
@@ -93,9 +103,12 @@ namespace MetalRaptors
         void Apply()
         {
             MenuPalette palette = MenuTheme.Colors;
+            Color mark = Interactable ? palette.Accent : palette.Muted;
+
             _title.color = Interactable ? (_focused ? palette.Accent : palette.Fg) : palette.Muted;
-            _frame.color = Interactable ? palette.Accent : palette.Muted;
+            _frame.color = mark;
             _frame.enabled = _focused;
+            _emblem.SetTint(mark, Color.Lerp(mark, MenuTheme.CardFace, 0.62f));
         }
 
         public void OnPointerEnter(PointerEventData eventData) => Hovered?.Invoke(this);

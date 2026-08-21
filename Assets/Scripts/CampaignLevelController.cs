@@ -407,6 +407,8 @@ namespace MetalRaptors
             if (_dialogue != null) _dialogue.Hide();
             if (_sound != null) _sound.EnterGameOver();
 
+            if (!CustomBattle.Requested) CampaignProgress.Complete(_levelNumber);
+
             bool hasNext = _levelNumber < CampaignRun.LastLevel;
             GameMenu.Open(GameMenuKind.Completed, Subtitle, _hud,
                 hasNext ? SceneNames.CampaignLevel1 : null,

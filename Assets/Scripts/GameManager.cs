@@ -22,12 +22,15 @@ namespace MetalRaptors
 
         public int HighestUnlockedLevel { get; private set; } = 1;
 
+        public int CampaignLevelsCompleted { get; private set; }
+
         public Daytime Level1Daytime { get; private set; } = Daytime.Midday;
 
         public Daytime CampaignDaytime { get; private set; } = Daytime.Midday;
 
         const string PrefVolume = "mr_master_volume";
         const string PrefUnlocked = "mr_highest_unlocked_level";
+        const string PrefCampaign = "mr_campaign_progress";
         const string PrefPlane = "mr_selected_plane";
         const string PrefSkinPrefix = "mr_plane_skin_";
         const string PrefLevel1Daytime = "mr_level1_daytime";
@@ -102,6 +105,14 @@ namespace MetalRaptors
 
         public bool IsLevelUnlocked(int level) => level <= HighestUnlockedLevel;
 
+        public void CompleteCampaignLevel(int level)
+        {
+            if (level <= CampaignLevelsCompleted) return;
+            CampaignLevelsCompleted = Mathf.Clamp(level, 0, CampaignRun.LastLevel);
+            PlayerPrefs.SetInt(PrefCampaign, CampaignLevelsCompleted);
+            PlayerPrefs.Save();
+        }
+
         public void UnlockLevel(int level)
         {
             if (level <= HighestUnlockedLevel) return;
@@ -116,6 +127,8 @@ namespace MetalRaptors
         {
             MasterVolume = PlayerPrefs.GetFloat(PrefVolume, 1f);
             HighestUnlockedLevel = PlayerPrefs.GetInt(PrefUnlocked, 1);
+            CampaignLevelsCompleted = Mathf.Clamp(PlayerPrefs.GetInt(PrefCampaign, 0),
+                0, CampaignRun.LastLevel);
             SelectedPlaneIndex = Mathf.Clamp(PlayerPrefs.GetInt(PrefPlane, 0),
                 0, PlaneModels.All.Length - 1);
             int daytime = PlayerPrefs.GetInt(PrefLevel1Daytime, (int)Daytime.Midday);

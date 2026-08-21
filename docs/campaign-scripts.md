@@ -25,9 +25,19 @@ dropped in it would never be committed. Unity treats *any* folder named `Resourc
 excluded (docs/conventions.md), but these files stay where they are — the paths are baked into
 `CampaignScript.ResourceFolder` and every level definition.
 
-A level names its script on its definition: `CampaignLevels.Level1.script = "level1"`. A level
-with no `script` (level 2, and every custom battle) behaves as before — endless flight with no
-dialogue, no waves and no win condition.
+A level names its script on its definition: `CampaignLevels.Level1.script = "level1"`. All
+eight career levels now carry one (`level1` … `level8`), so all eight can be *finished* — which
+is what career progression is built on (docs/campaign.md). A level with no `script` — every
+custom battle — behaves as before: endless flight with no dialogue, no waves and no win
+condition.
+
+These eight are **structure, not content**: the same scroller shape each time (opening exchange →
+objective → waves → closing exchange → `finish`), with wave counts and enemy mix climbing from four
+Albatros scouts in level 1 to eleven mixed machines in level 8. Level 4 is the one variation, using
+`spawn` + `waitclear` for a running fight instead of blocking waves. Every line they speak is
+placeholder Latin, and the real levels are designed in
+`Assets/Resources/docs/campaign-ww1-scenario.md` — including four modes and two boss fights this
+grammar cannot express yet.
 
 ## Grammar
 
@@ -101,13 +111,16 @@ script mid-line and resuming continues it.
 
 ```json
 {
-  "l1_line1": "Lorem ipsum dolor sit amet…",
+  "l1_line1": "Dawn patrol, you are cleared to depart. Stay on Blue Two's wing until you are over the lines.",
   "l1_task1": "Follow the flight leader"
 }
 ```
 
 Keys are `l<level>_line<n>` for radio calls and `l<level>_task<n>` for objectives — prefixing by
-level keeps one file usable for the whole campaign while staying greppable. Objectives share the
+level keeps one file usable for the whole campaign while staying greppable. It holds 79 keys, one
+block per level, each used by exactly one script step. The `_line` entries are lorem ipsum and the
+`_task` entries are plain objective text, so an objective reads correctly on the HUD while the
+dialogue is still visibly placeholder. Objectives share the
 table with dialogue on purpose: it is the *displayed text* file, not the *speech* file, and a
 translation pass wants both.
 

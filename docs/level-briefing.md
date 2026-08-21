@@ -2,8 +2,7 @@
 
 A full-screen page shown before a campaign level begins: the level's name, its dateline and a block
 of lore, all typed out like a radio transmission coming in, then `Press any key to continue...`
-with a blinking cursor. It is the screen the WW1 scenario calls the loading screen
-(docs/campaign-ww1-scenario.md).
+with a blinking cursor. It is the level's loading screen.
 
 ## Where the text comes from
 
@@ -16,8 +15,9 @@ Three fields on `CampaignDefinition`, authored next to the seed and the terrain:
 | `dateline` | `14 April 1916 — Verdun sector — dawn` | a muted line under the title |
 | `lore` | lorem ipsum, two paragraphs | the body, split on a blank line |
 
-The bodies are placeholder lorem ipsum for now; the real briefings are written in
-docs/campaign-ww1-scenario.md, one per level.
+All eight career levels carry a written `title` and `dateline` — the same two fields the level
+select cards and their header read (docs/level-select.md) — while the `lore` bodies are still
+placeholder lorem ipsum, two paragraphs each, waiting to be written.
 
 A definition with an empty `title` shows no briefing, and **custom battles never show one** — they
 drop straight into the flight as before.

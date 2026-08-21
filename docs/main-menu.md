@@ -11,8 +11,9 @@ inset by its padding. Nothing is centred, so the title, the entries and the acce
 share one vertical edge to read down.
 
 The era cards page is the same design widened: a full-canvas page hung from the same 15%,
-because a row of four cards needs the width. It is the only screen that leaves the column —
-every list of entries, career's included, stays in it.
+because a row of four cards needs the width. The level select page (docs/level-select.md) is
+the second one built that way, and the only screen whose content scrolls. Every *list of
+entries* stays in the column; only card pages leave it.
 
 Everything is built at runtime in C# (`MainMenuController`), like the rest of the game's
 UI — the `MainMenu` scene only holds a camera, a light and the controller object.
@@ -24,17 +25,22 @@ UI — the `MainMenu` scene only holds a camera, a light and the controller obje
 | `MenuTheme.cs` | The five colour palettes plus every layout metric (paddings, sizes, gaps). |
 | `MenuItemView.cs` | One text entry; owns the colour/weight rules for its state. |
 | `MenuPanel.cs` | A stack of entries with one shared highlight driven by mouse *and* keyboard. |
-| `MenuCardView.cs` | One square era card: white face, title and years in its foot, accent frame while highlighted. |
+| `MenuCardView.cs` | One square era card: white face, plane emblem, title and years in its foot, accent frame while highlighted. |
 | `MenuCardRow.cs` | A run of cards with one shared highlight; raises `FocusChanged` for the header above it. |
+| `MenuLevelCard.cs` | One level card: number, terrain silhouette, title over map name, `COMPLETED` / `LOCKED` tag (docs/level-select.md). |
+| `MenuLevelRow.cs` | The level cards' clipped, sliding row — four visible of eight, driven by the edge triangles and the arrow keys. |
+| `TerrainSilhouette.cs` | A level card's ridge art, generated from its terrain kind and seed. |
+| `PlaneEmblem.cs` | An era card's plane silhouette. |
 | `MenuSelectorRow.cs` | A value stepped in place: label column, then two triangles either side of the value. |
 | `MenuArrowView.cs` | One triangle of a selector — clicks a step, greys out at the end of the list. |
 | `MenuPreviewCard.cs` | A card that only shows: the picked map's square, its name in the foot, no focus and no click. |
 | `MenuPlaneView.cs` | The flying plane in the main list's right band: the shared preview rig plus mouse-driven flight. |
 | `PlanePreviewRig.cs` | The preview band itself — its camera, render texture and framing — shared with the garage. |
 | `MenuStatRow.cs` | One garage stat row: a caption over a bar, or a caption over a text value. |
-| `IMenuFocusGroup.cs` | What the navigation keys drive (`MenuPanel`, `MenuCardRow`) and, as `IMenuFocusable`, what a panel can highlight. |
+| `IMenuFocusGroup.cs` | What the navigation keys drive (`MenuPanel`, `MenuCardRow`, `MenuLevelRow`) and, as `IMenuFocusable`, what a panel can highlight. |
 | `CustomBattle.cs` | The maps a custom battle can pick, and the pick itself, read by the endless scene. |
-| `CareerEras.cs` | The four eras: title, years, description, unlocked. |
+| `CareerEras.cs` | The four eras: title, years, description, emblem, unlocked. |
+| `CampaignRun.cs` | The level the next campaign scene flies, career progress (`CampaignProgress`), and the card list. |
 | `MenuLayout.cs` | The column/page/band rects and the title + accent rule, shared with the in-level menu. |
 | `MenuInput.cs` | The navigation keys (`ReadStep` / `ReadAdjust` / `ReadSubmit` / `ReadCancel`), shared with the in-level menu. |
 | `ScreenFade.cs` | The fade to black between every two screens, in this scene or across a `LoadScene`. |
@@ -158,7 +164,8 @@ attached, unlike the in-level plane.
 ## Career
 
 `career` opens the era cards across the full canvas; picking an era drops back into the
-column, where the entries belong.
+column, where the entries belong; `level select` leaves it again for the level cards
+(docs/level-select.md).
 
 ```
    ┌───────────────────── era cards ──────────────────────┐
@@ -167,7 +174,7 @@ column, where the entries belong.
    │  lorem ipsum dolor sit amet, …                       │  ← its description
    │                                                      │
    │  ┌─────────┐┌─────────┐┌─────────┐┌─────────┐        │
-   │  │         ││         ││         ││         │        │
+   │  │  ✈ ══   ││   ✈     ││   ▶✈    ││   ◁✈    │        │  ← its plane emblem
    │  │         ││         ││         ││         │        │
    │  │ WORLD   ││ WORLD   ││ COLD    ││ MODERN  │        │
    │  │ WAR 1   ││ WAR 2   ││ WAR     ││ TIMES   │        │
@@ -178,47 +185,51 @@ column, where the entries belong.
    ┌───── 40% ─────┬──────────────────────────────────────┐
    │  WORLD WAR 1  │                                      │
    │  ───          │                                      │
-   │  start        │            (left empty)              │  → level 1, endless
-   │  level select │                                      │  → the level list below
+   │  continue     │            (left empty)              │  → the first uncleared level
+   │  level select │                                      │  → the level cards
    │               │                                      │
    │  back         │                                      │  → main list
    └───────────────┴──────────────────────────────────────┘
                           ↓  level select
-   ┌───── 40% ─────────────┬──────────────────────────────┐
-   │  WORLD WAR 1          │                              │
-   │  ───                  │                              │
-   │  LEVEL SELECT         │                              │
-   │                       │        (left empty)          │
-   │  level 1   VERDUN     │                              │  → level 1
-   │  level 2   FLANDERS…  │                              │  → level 2
-   │                       │                              │
-   │  back                 │                              │  → the era's page
-   └───────────────────────┴──────────────────────────────┘
+   ┌─────────────────── level cards ──────────────────────┐
+   │  FIRST LIGHT                                         │  ← the highlighted card's title
+   │  ───                                                 │
+   │  14 April 1916 — Verdun sector — dawn                │  ← its dateline
+   │  lorem ipsum dolor sit amet, …                       │  ← its brief
+   │                                                      │
+   │ ◀ ┌────────┐┌────────┐┌────────┐┌────────┐         ▶ │  ← 4 of 8, slides one at a time
+   │   │01 ╱╲__ ││02 ╱╲_╱ ││03 ╱╲_╱ ││04 ~~~~ │           │
+   │   │FIRST   ││THE     ││FIXED   ││THE     │           │
+   │   │verdun ✓││verdun  ││verdun  ││flanders│           │
+   │   └────────┘└────────┘└────────┘└────────┘           │
+   └──────────────────────────────────────────────────────┘
 ```
 
-* The header is one title + one paragraph, rewritten from whichever card holds the
-  highlight — so the page is titled after the card, exactly as `METAL RAPTORS` titles the
-  column. The descriptions are placeholder lorem ipsum for now.
-* Cards are white (`MenuTheme.CardFace`) whatever the palette; only their text and the
-  highlight frame come from the theme. Images will go in the empty upper two thirds. A
-  card's title and years read from its own left edge, inset by `CardPad` — the same rule as
-  the column, applied to the card's face.
+* The header of each card page is one title + the focused card's own lines, rewritten as the
+  highlight moves — so the page is titled after the card, exactly as `METAL RAPTORS` titles
+  the column. The era descriptions are still placeholder lorem ipsum, and so is the level
+  brief, which is the first paragraph of that level's briefing lore.
+* Cards are white (`MenuTheme.CardFace`) whatever the palette; only their text, art and
+  highlight frame come from the theme. A card's text reads from its own left edge, inset by
+  `CardPad` — the same rule as the column, applied to the card's face.
+* The blank upper area of both card kinds is now drawn art, generated at runtime rather than
+  shipped as images: a plane emblem per era, a seeded terrain silhouette per level
+  (docs/level-select.md).
 * World War 1 is the only unlocked era; the other three are muted and cannot be entered.
   Titles are set uppercase in `CareerEras`, matching `METAL RAPTORS`; a card title is the
   widest text the layout carries — `MODERN TIMES` runs 189px inside the 360px face.
-* The era cards page has **no back entry** — `Escape` is the way back to the main list.
+* Neither card page has a **back entry** — `Escape` is the way back, to the main list from the
+  era cards and to the era page from the level cards.
 * `back` on an era's page returns to the **main list**, not to the cards: picking an era is
   a step on the way into career, not a layer worth landing on again.
-* `start` becomes `continue` once campaign progress is tracked. `level select` swaps the
-  column's panel in place, exactly as `challenges` swaps the main list — the era title and
-  its accent rule stay put. Its rows carry the map name as a tag, the same `AddTag` the
-  `LOCKED` marker uses, so a row states both the level and the land it flies.
-* Nothing on this page is locked: both levels are reachable straight away, since the campaign
-  has no completion condition yet.
-* Both entries go through `CampaignRun.Request(n)` before loading `CampaignLevel1` — the one
-  endless scene serves every level (docs/campaign.md). `start` is `level 1` by another name.
-* `back` on the level list returns to the era's page, and `Escape` does the same, one layer
-  at a time.
+* The era page's first entry reads `start` on a fresh save and `continue` once anything has
+  been cleared, and it flies `CampaignProgress.NextLevel` — the first uncleared level, so it
+  is `level 1` by another name only until the first win.
+* Career levels **lock behind progress**: level 1 is always open, every later card needs the
+  one before it cleared, and a cleared card is tagged `COMPLETED` (docs/campaign.md).
+  The challenge list's `mr_highest_unlocked_level` is a separate key and a separate ladder.
+* Every entry into a level goes through `CampaignRun.Request(n)` before loading
+  `CampaignLevel1` — the one endless scene serves all eight (docs/campaign.md).
 
 ## Custom battle
 
@@ -255,7 +266,7 @@ column plus one card in the right band — the first screen to use both halves.
   `SelectorValueWidth` that `verdun` was sized against; the full name is what career's level
   list tags its row with. `dolomites` (docs/dolomites.md) is the longest value the row
   carries and still fits at `ItemSize` 30.
-* Dolomites is a custom-battle map only — no career level flies it.
+* Dolomites is no longer custom-battle-only: career levels 6 and 8 fly it (docs/campaign.md).
 * `start` fills in `CustomBattle` and loads the endless `CampaignLevel1` scene, where
   `CampaignLevelController` builds `CampaignLevels.Custom(map, daytime)` instead of the
   authored level. Career's own `start` calls `CustomBattle.Clear()` first, so an era keeps
@@ -292,10 +303,12 @@ are both built from it.
 ## Persistence
 
 `GameManager` bootstraps itself with `RuntimeInitializeOnLoadMethod(BeforeSceneLoad)`, so
-`Instance` exists no matter which scene is pressed Play in first. It carries three kinds of
+`Instance` exists no matter which scene is pressed Play in first. It carries four kinds of
 cross-scene state, each mirrored to `PlayerPrefs` on every setter and reloaded in `Load()`:
 the selected plane (`mr_selected_plane`, chosen in the Garage), audio settings (master
-volume), and progress (which levels are unlocked). The Level 1 / campaign daytime picks
+volume), challenge progress (`mr_highest_unlocked_level`), and career progress
+(`mr_campaign_progress` — the highest campaign level cleared, read through `CampaignProgress`
+and shown as the level cards' locks and ticks). The Level 1 / campaign daytime picks
 above are persisted the same way, but nothing in the current menu writes them.
 
 ## Themes
@@ -348,16 +361,17 @@ appears behind the face while it holds the highlight.
 
 ## Focus model
 
-A focus group (`IMenuFocusGroup`: the vertical `MenuPanel`, the horizontal `MenuCardRow`)
-owns a single focus index shared by every input device, so there is never more than one
-highlighted entry:
+A focus group (`IMenuFocusGroup`: the vertical `MenuPanel`, the horizontal `MenuCardRow` and
+`MenuLevelRow`) owns a single focus index shared by every input device, so there is never more
+than one highlighted entry:
 
 * hovering an entry moves the focus to it (the focus does **not** clear on pointer exit —
   the template always shows one focused entry);
 * `↓` and d-pad down step forward, `↑` and d-pad up step back, wrapping at both ends;
 * `→`/`←` go to the focused entry first (`IMenuFocusable.Adjust`): a selector row spends
   them on its own value and keeps the highlight, everything else lets them move the
-  highlight as `↓`/`↑` do. The card row reads across the screen, so they move it too;
+  highlight as `↓`/`↑` do. Both card rows read across the screen, so they move them too — and
+  on the level row they also drag the visible window when the highlight reaches its edge;
 * `Enter`, `Space` or gamepad south activates the focused entry;
 * `Escape` or gamepad east goes where the screen's own `back` goes — the main list, from
   challenges, from the era cards and from an era's page alike.
@@ -367,7 +381,8 @@ its triangles sit on top of that box and take their own clicks.
 
 In a panel, disabled entries are never registered, so the highlight skips them entirely. A
 card row is the exception: locked cards do take the highlight, because they are content —
-the header above the row is there to describe the era you are pointing at.
+the header above the row is there to describe the era or the level you are pointing at. They
+still refuse to activate.
 
 Hit boxes are measured from the rendered text (in the bold weight, so the box does not
 shrink when focus lands on the entry) — hovering the empty space either side of a word

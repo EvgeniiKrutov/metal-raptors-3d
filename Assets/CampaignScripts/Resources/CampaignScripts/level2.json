@@ -1,0 +1,27 @@
+{
+  "steps": [
+    { "op": "say", "speaker": "hq", "line": "l2_line1" },
+    { "op": "say", "speaker": "you", "line": "l2_line2" },
+    { "op": "say", "speaker": "hq", "line": "l2_line3" },
+
+    { "op": "task", "line": "l2_task1" },
+    { "op": "wave", "enemies": [ { "plane": "albatros", "count": 2 } ] },
+    { "op": "taskdone" },
+
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "say", "speaker": "hq", "line": "l2_line4" },
+    { "op": "say", "speaker": "you", "line": "l2_line5", "seconds": 3.5 },
+
+    { "op": "task", "line": "l2_task2" },
+    { "op": "wave", "enemies": [ { "plane": "albatros", "count": 2 } ] },
+    { "op": "wait", "seconds": 3 },
+    { "op": "wave", "enemies": [ { "plane": "albatros", "count": 3 } ] },
+    { "op": "taskdone" },
+
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "say", "speaker": "hq", "line": "l2_line6" },
+    { "op": "say", "speaker": "you", "line": "l2_line7", "seconds": 4 },
+
+    { "op": "finish" }
+  ]
+}
