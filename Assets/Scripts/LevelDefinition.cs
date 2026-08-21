@@ -42,7 +42,6 @@ namespace MetalRaptors
     {
         public const string Verdun = "verdun";
         public const string Flanders = "flanders";
-        public const string FlandersFull = "flanders coast";
         public const string Dolomites = "dolomites";
         public const string FlatSlab = "flat slab";
 
@@ -56,9 +55,6 @@ namespace MetalRaptors
                 default: return FlatSlab;
             }
         }
-
-        public static string Full(TerrainKind kind) =>
-            kind == TerrainKind.Flanders ? FlandersFull : For(kind);
     }
 
     public class EnemyGroup

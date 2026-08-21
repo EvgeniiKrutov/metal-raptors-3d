@@ -9,6 +9,10 @@ namespace MetalRaptors
 {
     public static class UIFactory
     {
+        const float ReferenceWidth = 1920f;
+        const float ReferenceHeight = 1080f;
+        const float ScaleMatch = 0.5f;
+
         static Font _regular;
         static Font _medium;
         static Font _bold;
@@ -64,10 +68,20 @@ namespace MetalRaptors
 
             var scaler = go.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920, 1080);
-            scaler.matchWidthOrHeight = 0.5f;
+            scaler.referenceResolution = new Vector2(ReferenceWidth, ReferenceHeight);
+            scaler.matchWidthOrHeight = ScaleMatch;
 
+            MenuTheme.Fit(CanvasWidth());
             return canvas;
+        }
+
+        static float CanvasWidth()
+        {
+            if (Screen.width <= 0 || Screen.height <= 0) return ReferenceWidth;
+
+            float scale = Mathf.Pow(Screen.width / ReferenceWidth, 1f - ScaleMatch)
+                          * Mathf.Pow(Screen.height / ReferenceHeight, ScaleMatch);
+            return scale > 0f ? Screen.width / scale : ReferenceWidth;
         }
 
         public static void EnsureEventSystem()
@@ -159,34 +173,6 @@ namespace MetalRaptors
             rt.pivot = new Vector2(0.5f, 0f);
             rt.sizeDelta = new Vector2(-2f * padSide, rowHeight);
             rt.anchoredPosition = new Vector2(0f, bottom);
-            return text;
-        }
-
-        public static Text CreateTopLabel(Transform parent, string content, int fontSize, float top,
-            float rowHeight, float padSide, Color color, Font font)
-        {
-            Text text = NewLabel(parent, content, fontSize, color, font, TextAnchor.MiddleLeft);
-
-            var rt = text.rectTransform;
-            rt.anchorMin = new Vector2(0f, 1f);
-            rt.anchorMax = new Vector2(1f, 1f);
-            rt.pivot = new Vector2(0.5f, 1f);
-            rt.sizeDelta = new Vector2(-2f * padSide, rowHeight);
-            rt.anchoredPosition = new Vector2(0f, top);
-            return text;
-        }
-
-        public static Text CreateBottomInlineLabel(Transform parent, string content, int fontSize,
-            Vector2 anchoredPos, float rowHeight, Color color, Font font)
-        {
-            Text text = NewLabel(parent, content, fontSize, color, font, TextAnchor.MiddleLeft);
-
-            var rt = text.rectTransform;
-            rt.anchorMin = new Vector2(0f, 0f);
-            rt.anchorMax = new Vector2(0f, 0f);
-            rt.pivot = new Vector2(0f, 0f);
-            rt.sizeDelta = new Vector2(text.preferredWidth, rowHeight);
-            rt.anchoredPosition = anchoredPos;
             return text;
         }
 

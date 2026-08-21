@@ -27,10 +27,10 @@ UI — the `MainMenu` scene only holds a camera, a light and the controller obje
 | `MenuPanel.cs` | A stack of entries with one shared highlight driven by mouse *and* keyboard. |
 | `MenuCardView.cs` | One square era card: white face, plane emblem, title and years in its foot, accent frame while highlighted. |
 | `MenuCardRow.cs` | A run of cards with one shared highlight; raises `FocusChanged` for the header above it. |
-| `MenuLevelCard.cs` | One level card: number, terrain silhouette, title over map name, `COMPLETED` / `LOCKED` tag (docs/level-select.md). |
+| `MenuLevelCard.cs` | One level card: terrain silhouette over the level's title, its state carried by the frame (docs/level-select.md). |
 | `MenuLevelRow.cs` | The level cards' clipped, sliding row — four visible of eight, driven by the edge triangles and the arrow keys. |
 | `TerrainSilhouette.cs` | A level card's ridge art, generated from its terrain kind and seed. |
-| `PlaneEmblem.cs` | An era card's plane silhouette. |
+| `PlaneEmblem.cs` | An era card's plane silhouette — the fallback when the era has no baked render. |
 | `MenuSelectorRow.cs` | A value stepped in place: label column, then two triangles either side of the value. |
 | `MenuArrowView.cs` | One triangle of a selector — clicks a step, greys out at the end of the list. |
 | `MenuPreviewCard.cs` | A card that only shows: the picked map's square, its name in the foot, no focus and no click. |
@@ -169,21 +169,21 @@ column, where the entries belong; `level select` leaves it again for the level c
 
 ```
    ┌───────────────────── era cards ──────────────────────┐
-   │  WORLD WAR 1                                         │  ← the highlighted card's title
+   │  CHAPTER 1                                           │  ← the highlighted card's title
    │  ───                                                 │
    │  lorem ipsum dolor sit amet, …                       │  ← its description
    │                                                      │
    │  ┌─────────┐┌─────────┐┌─────────┐┌─────────┐        │
-   │  │  ✈ ══   ││   ✈     ││   ▶✈    ││   ◁✈    │        │  ← its plane emblem
+   │  │  ✈ ══   ││   ✈     ││   ▶✈    ││   ◁✈    │        │  ← its plane art
    │  │         ││         ││         ││         │        │
-   │  │ WORLD   ││ WORLD   ││ COLD    ││ MODERN  │        │
-   │  │ WAR 1   ││ WAR 2   ││ WAR     ││ TIMES   │        │
-   │  │ 1914–…  ││ 1939–…  ││ 1947–…  ││ 1991–…  │        │
+   │  │         ││         ││         ││         │        │
+   │  │ CHAPTER ││ CHAPTER ││ CHAPTER ││ FINAL   │        │
+   │  │ 1       ││ 2       ││ 3       ││ CHAPTER │        │
    │  └─────────┘└─────────┘└─────────┘└─────────┘        │
    └──────────────────────────────────────────────────────┘
-                          ↓  WORLD WAR 1
+                          ↓  CHAPTER 1
    ┌───── 40% ─────┬──────────────────────────────────────┐
-   │  WORLD WAR 1  │                                      │
+   │  CHAPTER 1    │                                      │
    │  ───          │                                      │
    │  continue     │            (left empty)              │  → the first uncleared level
    │  level select │                                      │  → the level cards
@@ -194,15 +194,16 @@ column, where the entries belong; `level select` leaves it again for the level c
    ┌─────────────────── level cards ──────────────────────┐
    │  FIRST LIGHT                                         │  ← the highlighted card's title
    │  ───                                                 │
-   │  14 April 1916 — Verdun sector — dawn                │  ← its dateline
+   │  14 April 1916                                       │  ← its date
    │  lorem ipsum dolor sit amet, …                       │  ← its brief
    │                                                      │
-   │ ◀ ┌────────┐┌────────┐┌────────┐┌────────┐         ▶ │  ← 4 of 8, slides one at a time
-   │   │01 ╱╲__ ││02 ╱╲_╱ ││03 ╱╲_╱ ││04 ~~~~ │           │
-   │   │FIRST   ││THE     ││FIXED   ││THE     │           │
-   │   │verdun ✓││verdun  ││verdun  ││flanders│           │
-   │   └────────┘└────────┘└────────┘└────────┘           │
+   │ ◀ ╔════════╗┌────────┐┌────────┐┌────────┐         ▶ │  ← 4 of 8, slides one at a time
+   │   ║ ╱╲__╱╲ ║│ ╱╲_╱╲_ ││ ╱╲__╱╲ ││ ~~~~~~ │           │
+   │   ║FIRST   ║│THE     ││FIXED   ││THE     │           │
+   │   ║LIGHT   ║│NUMBERS ││GROUND  ││RAVEN   │           │
+   │   ╚════════╝└────────┘└────────┘└────────┘           │
    └──────────────────────────────────────────────────────┘
+     ╚═╝ cleared — a green frame, dropped for the accent one on hover
 ```
 
 * The header of each card page is one title + the focused card's own lines, rewritten as the
@@ -212,12 +213,18 @@ column, where the entries belong; `level select` leaves it again for the level c
 * Cards are white (`MenuTheme.CardFace`) whatever the palette; only their text, art and
   highlight frame come from the theme. A card's text reads from its own left edge, inset by
   `CardPad` — the same rule as the column, applied to the card's face.
-* The blank upper area of both card kinds is now drawn art, generated at runtime rather than
-  shipped as images: a plane emblem per era, a seeded terrain silhouette per level
-  (docs/level-select.md).
-* World War 1 is the only unlocked era; the other three are muted and cannot be entered.
-  Titles are set uppercase in `CareerEras`, matching `METAL RAPTORS`; a card title is the
-  widest text the layout carries — `MODERN TIMES` runs 189px inside the 360px face.
+* The blank upper area of both card kinds carries art: a seeded terrain silhouette drawn at
+  runtime per level (docs/level-select.md), and per era a baked top-view render of that era's
+  aircraft, falling back to the runtime `PlaneEmblem` silhouette where no render exists (below).
+* The four cards are titled `CHAPTER 1`–`CHAPTER 3` and `FINAL CHAPTER`, and carry no
+  dateline: the campaign is told as chapters, not as dated eras, so the years row is gone
+  from the card foot and the title sits on the foot alone (`CardPad` up from the bottom,
+  where `MenuPreviewCard` has always put its own label). `CareerEra` no longer holds a
+  `Years` field. Chapter 1 is the only unlocked one; the other three are muted and cannot
+  be entered.
+* Titles are set uppercase in `CareerEras`, matching `METAL RAPTORS`; a card title is the
+  widest text the layout carries — `FINAL CHAPTER` runs 196px, which is what sets
+  `CardSizeMin`: 196 plus two `CardPad`s, rounded to 280.
 * Neither card page has a **back entry** — `Escape` is the way back, to the main list from the
   era cards and to the era page from the level cards.
 * `back` on an era's page returns to the **main list**, not to the cards: picking an era is
@@ -226,10 +233,39 @@ column, where the entries belong; `level select` leaves it again for the level c
   been cleared, and it flies `CampaignProgress.NextLevel` — the first uncleared level, so it
   is `level 1` by another name only until the first win.
 * Career levels **lock behind progress**: level 1 is always open, every later card needs the
-  one before it cleared, and a cleared card is tagged `COMPLETED` (docs/campaign.md).
+  one before it cleared, and a cleared card keeps a green frame (docs/campaign.md).
   The challenge list's `mr_highest_unlocked_level` is a separate key and a separate ladder.
 * Every entry into a level goes through `CampaignRun.Request(n)` before loading
   `CampaignLevel1` — the one endless scene serves all eight (docs/campaign.md).
+
+### The era card art
+
+`MenuCardView.CreateArt` looks for `Resources.Load<Sprite>("ui/era_" + emblem)` — so
+`EraEmblem.Biplane` reads `ui/era_biplane` — and only falls back to `PlaneEmblem` when that
+sprite is missing. Chapter 1 ships a render (`Assets/Textures/Resources/ui/era_biplane.png`);
+the other three eras have no model yet and still draw their silhouette. A clone without the
+private art folders therefore gets four silhouettes rather than three holes.
+
+The render is a full-colour bake of `sopwith_camel.fbx` in its default green skin, so it
+cannot take the card's accent/muted tint the way a silhouette does. `Apply` gives it the one
+state that still matters: white while the era is playable, `Muted` while it is locked. Focus
+is carried by the frame and the title alone on a card with baked art.
+
+To re-bake it (Blender, headless — no Unity import step beyond dropping the file back):
+
+* import the FBX, lay `propBlades` flat by spinning it 90° about its own hub so the propeller
+  reads as a disc from above, and yaw the root 90° about Z — the model's nose is `-Y`, and the
+  menu wants it pointing right;
+* replace every material slot with one Principled BSDF whose base colour is
+  `Resources/skins/sopwith_camel/green.png`, which is what `PlaneSkins.Apply` does at runtime;
+* orthographic camera 20° off vertical, tilted along the fuselage. Straight down (0°) hides
+  the lower wing behind the upper one exactly and the Camel reads as a monoplane; 20° opens a
+  quarter-chord of daylight between the two and the struts appear;
+* key sun at 3.2 and a fill at 1.1, a 0.55-strength neutral world for ambient, view transform
+  `Standard` (AgX washes the roundels out), Cycles CPU, transparent film;
+* render 850×660, then crop to the alpha bounding box with a 6px margin — never resample, the
+  straight-alpha edges fringe. The card fits the result with `preserveAspect`, so the crop's
+  own aspect is what centres the plane in the art rect.
 
 ## Custom battle
 
@@ -424,14 +460,32 @@ from the template's computed values at a 1920-wide viewport, but every text metr
 scaled ~1.3× from it — the template's sizes were laid out for a browser and read too small
 across a room from a TV. Current values: a 44px bold title, 30px entries on a 54px pitch,
 22px option rows, 14px uppercase captions, and for the era cards page a 940px-wide 20px
-description over 360px cards on a 400px pitch, each card carrying a 25px title over 15px
-years inset by its 28px `CardPad`. `MenuTheme` holds all of them; nothing in the layout
-code hardcodes a number, so the next resize is one edit per metric there.
+description over cards of at most 360px on a 40px gap, each card carrying a 25px title
+inset by its 28px `CardPad`. `MenuTheme` holds all of them; nothing in the layout code
+hardcodes a number, so the next resize is one edit per metric there.
 
-The card row is what the era page is sized around: four 360px faces plus three 40px gaps
-run 1560px of the 1744px between the margins, from x 120 to x 1680, and the row hangs at
-y 440–800 of the 1080 reference height. The column has 592px of inner width for a 358px
-`METAL RAPTORS`.
+The card row is what the era page is sized around, and the face is the one metric that is
+**not** a flat constant. `MenuTheme.CardSize` is a property: it splits whatever width is
+left between two `PadLeft` margins among `RowCards` faces and their 40px gaps, clamped to
+`CardSizeMin`–`CardSizeMax` (280–360). `UIFactory.CreateCanvas` feeds it the canvas width
+through `MenuTheme.Fit`, computed from `Screen` and the scaler's own reference and match
+constants rather than read back off the canvas rect — the scaler has not run on the frame
+the menu is built, so that rect is not resolved yet.
+
+At 16:9 the upper clamp holds and nothing moves: four 360px faces plus three 40px gaps run
+1560px of the 1744px between the margins, from x 120 to x 1680, and the row hangs at
+y 440–800 of the 1080 reference height. Narrower viewports are where the fit earns its
+keep. The canvas is `sqrt(aspect × 1920 × 1080)` reference units wide, so a 3:2 window is
+only 1764 across: fixed 360px faces would end 85px from the right edge against 120px on the
+left — and, on the level page, *underneath* the right arrow, which sits 44–74px in. Fitting
+the face (345px at 3:2) restores `PadLeft` on both sides and clears the arrows at every
+aspect. Both rows take the same property, so the level cards shrink with the era cards.
+
+The fit is read once, when the canvas is built. The menu scene is rebuilt on every load, so
+that is enough for a resolution change between sessions; dragging a window narrower while
+the menu is open will not re-lay the row.
+
+The column has 592px of inner width for a 358px `METAL RAPTORS`.
 
 Horizontal placement is by anchor, never by a stored width, and every anchor is a left
 one — that is what makes the ragged-left rule hold at any width instead of needing a

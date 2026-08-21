@@ -10,16 +10,19 @@ namespace MetalRaptors
         public event Action Activated;
         public event Action<MenuCardView> Hovered;
 
+        const string EraArtFolder = "ui/era_";
+
         RectTransform _rt;
         Image _frame;
         Text _title;
         PlaneEmblem _emblem;
+        Image _art;
         bool _focused;
 
         public bool Interactable { get; private set; }
 
-        public static MenuCardView Create(Transform parent, string title, string years,
-            bool interactable, EraEmblem emblem)
+        public static MenuCardView Create(Transform parent, string title, bool interactable,
+            EraEmblem emblem)
         {
             var go = new GameObject($"Card ({title})", typeof(RectTransform), typeof(MenuCardView));
             go.transform.SetParent(parent, false);
@@ -37,20 +40,11 @@ namespace MetalRaptors
             view._frame = CreateFrame(rt);
             CreateFace(rt);
 
-            view._emblem = PlaneEmblem.Create(rt, "Emblem");
-            RectTransform art = view._emblem.rectTransform;
-            art.anchorMin = new Vector2(0f, 0f);
-            art.anchorMax = new Vector2(1f, 1f);
-            art.offsetMin = new Vector2(MenuTheme.CardPad, MenuTheme.CardArtBottom);
-            art.offsetMax = new Vector2(-MenuTheme.CardPad, -MenuTheme.CardPad);
-            view._emblem.SetEmblem(emblem);
+            view.CreateArt(rt, emblem);
 
             view._title = UIFactory.CreateBottomLabel(rt, title, MenuTheme.CardTitleSize,
-                MenuTheme.CardPad + MenuTheme.CardYearsRowHeight + MenuTheme.CardTitleToYears,
-                MenuTheme.CardTitleRowHeight, MenuTheme.CardPad, MenuTheme.Colors.Fg, UIFactory.BoldFont);
-
-            UIFactory.CreateBottomLabel(rt, years, MenuTheme.CardYearsSize, MenuTheme.CardPad,
-                MenuTheme.CardYearsRowHeight, MenuTheme.CardPad, MenuTheme.Colors.Muted, UIFactory.MediumFont);
+                MenuTheme.CardPad, MenuTheme.CardTitleRowHeight, MenuTheme.CardPad,
+                MenuTheme.Colors.Fg, UIFactory.BoldFont);
 
             view.Apply();
             return view;
@@ -70,6 +64,35 @@ namespace MetalRaptors
             rt.offsetMin = new Vector2(-MenuTheme.CardBorder, -MenuTheme.CardBorder);
             rt.offsetMax = new Vector2(MenuTheme.CardBorder, MenuTheme.CardBorder);
             return img;
+        }
+
+        void CreateArt(RectTransform parent, EraEmblem emblem)
+        {
+            var baked = Resources.Load<Sprite>(EraArtFolder + emblem.ToString().ToLowerInvariant());
+            RectTransform art;
+
+            if (baked != null)
+            {
+                var go = new GameObject("Art", typeof(RectTransform), typeof(Image));
+                go.transform.SetParent(parent, false);
+
+                _art = go.GetComponent<Image>();
+                _art.sprite = baked;
+                _art.preserveAspect = true;
+                _art.raycastTarget = false;
+                art = _art.rectTransform;
+            }
+            else
+            {
+                _emblem = PlaneEmblem.Create(parent, "Emblem");
+                _emblem.SetEmblem(emblem);
+                art = _emblem.rectTransform;
+            }
+
+            art.anchorMin = new Vector2(0f, 0f);
+            art.anchorMax = new Vector2(1f, 1f);
+            art.offsetMin = new Vector2(MenuTheme.CardPad, MenuTheme.CardArtBottom);
+            art.offsetMax = new Vector2(-MenuTheme.CardPad, -MenuTheme.CardPad);
         }
 
         public static void CreateFace(RectTransform parent)
@@ -108,7 +131,9 @@ namespace MetalRaptors
             _title.color = Interactable ? (_focused ? palette.Accent : palette.Fg) : palette.Muted;
             _frame.color = mark;
             _frame.enabled = _focused;
-            _emblem.SetTint(mark, Color.Lerp(mark, MenuTheme.CardFace, 0.62f));
+
+            if (_emblem != null) _emblem.SetTint(mark, Color.Lerp(mark, MenuTheme.CardFace, 0.62f));
+            if (_art != null) _art.color = Interactable ? Color.white : palette.Muted;
         }
 
         public void OnPointerEnter(PointerEventData eventData) => Hovered?.Invoke(this);

@@ -26,7 +26,7 @@ namespace MetalRaptors
         Text _erasDescription;
         Text _eraTitle;
         Text _levelTitle;
-        Text _levelDateline;
+        Text _levelDate;
         Text _levelBrief;
         MenuArrowView _levelLeft;
         MenuArrowView _levelRight;
@@ -118,7 +118,7 @@ namespace MetalRaptors
             for (int i = 0; i < eras.Length; i++)
             {
                 int index = i;
-                _eras.AddCard(eras[i].Title, eras[i].Years, eras[i].Unlocked, eras[i].Emblem,
+                _eras.AddCard(eras[i].Title, eras[i].Unlocked, eras[i].Emblem,
                     () => ScreenFade.Swap(() => ShowEra(index)));
             }
 
@@ -148,12 +148,12 @@ namespace MetalRaptors
 
             _levelTitle = MenuLayout.BuildTitle(page, string.Empty);
 
-            _levelDateline = UIFactory.CreateLabel(page, string.Empty, MenuTheme.LevelDatelineSize,
-                MenuTheme.ListTop, MenuTheme.LevelDatelineRowHeight, MenuTheme.Colors.Muted,
+            _levelDate = UIFactory.CreateLabel(page, string.Empty, MenuTheme.LevelDateSize,
+                MenuTheme.ListTop, MenuTheme.LevelDateRowHeight, MenuTheme.Colors.Muted,
                 UIFactory.MediumFont);
 
-            float briefTop = MenuTheme.ListTop - MenuTheme.LevelDatelineRowHeight
-                             - MenuTheme.LevelDatelineToBrief;
+            float briefTop = MenuTheme.ListTop - MenuTheme.LevelDateRowHeight
+                             - MenuTheme.LevelDateToBrief;
             _levelBrief = UIFactory.CreateParagraph(page, string.Empty, MenuTheme.DescriptionSize,
                 briefTop, MenuTheme.DescriptionWidth, MenuTheme.LevelBriefRowHeight,
                 MenuTheme.DescriptionLineSpacing, MenuTheme.Colors.Muted, UIFactory.MediumFont);
@@ -276,7 +276,7 @@ namespace MetalRaptors
         {
             CampaignLevelEntry level = CampaignLevelList.All[index];
             _levelTitle.text = level.Title;
-            _levelDateline.text = level.Dateline;
+            _levelDate.text = level.Date;
             _levelBrief.text = level.Brief;
         }
 

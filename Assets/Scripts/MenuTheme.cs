@@ -106,42 +106,46 @@ namespace MetalRaptors
         public const float DescriptionToCards = 48f;
 
         public static readonly Color CardFace = Color.white;
+        public static readonly Color CardDone = new Color32(0x5F, 0x91, 0x59, 0xFF);
 
-        public const float CardSize = 360f;
+        public const float CardSizeMax = 360f;
+        public const float CardSizeMin = 280f;
         public const float CardGap = 40f;
         public const float CardBorder = 4f;
         public const float CardPad = 28f;
         public const int CardTitleSize = 25;
         public const float CardTitleRowHeight = 32f;
-        public const int CardYearsSize = 15;
-        public const float CardYearsRowHeight = 20f;
-        public const float CardTitleToYears = 2f;
+        public const int RowCards = 4;
 
-        public const float CardArtBottom = 96f;
-        public const float CardNumberToArt = 10f;
+        static float _canvasWidth = 1920f;
 
-        public const float LevelCardTitleRowHeight = 66f;
+        public static void Fit(float canvasWidth) => _canvasWidth = canvasWidth;
+
+        public static float CardSize => Mathf.Clamp(
+            (_canvasWidth - 2f * PadLeft - (RowCards - 1) * CardGap) / RowCards,
+            CardSizeMin, CardSizeMax);
+
+        public const float CardTitleToArt = 14f;
+        public const float CardArtBottom = CardPad + CardTitleRowHeight + CardTitleToArt;
+
+        public const float CardTitleLineHeight = 38f;
+        public const float LevelCardTitleRowHeight = 2f * CardTitleLineHeight;
         public const float LevelCardArtBottom =
-            CardPad + CardYearsRowHeight + CardTitleToYears + LevelCardTitleRowHeight;
+            CardPad + LevelCardTitleRowHeight + CardTitleToArt;
 
-        public const int LevelNumberSize = 40;
-        public const float LevelNumberRowHeight = 46f;
-        public const float LevelCardArtTop =
-            CardPad + LevelNumberRowHeight + CardNumberToArt;
-
-        public const int LevelVisibleCards = 4;
+        public const int LevelVisibleCards = RowCards;
         public const float LevelRowSlide = 0.18f;
 
-        public const int LevelDatelineSize = 18;
-        public const float LevelDatelineRowHeight = 24f;
-        public const float LevelDatelineToBrief = 12f;
+        public const int LevelDateSize = 18;
+        public const float LevelDateRowHeight = 24f;
+        public const float LevelDateToBrief = 12f;
         public const float LevelBriefRowHeight = 96f;
 
         public static float LevelRowWidth =>
             LevelVisibleCards * CardSize + (LevelVisibleCards - 1) * CardGap;
 
         public static float LevelCardsTop =>
-            ListTop - LevelDatelineRowHeight - LevelDatelineToBrief
+            ListTop - LevelDateRowHeight - LevelDateToBrief
             - LevelBriefRowHeight - DescriptionToCards;
 
         public static float ListTop =>

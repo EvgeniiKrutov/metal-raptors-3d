@@ -25,10 +25,10 @@ namespace MetalRaptors
             _root.sizeDelta = Vector2.zero;
         }
 
-        public MenuCardView AddCard(string title, string years, bool interactable, EraEmblem emblem,
+        public MenuCardView AddCard(string title, bool interactable, EraEmblem emblem,
             Action onActivate)
         {
-            MenuCardView card = MenuCardView.Create(_root, title, years, interactable, emblem);
+            MenuCardView card = MenuCardView.Create(_root, title, interactable, emblem);
             if (interactable && onActivate != null) card.Activated += onActivate;
             card.Hovered += Focus;
 

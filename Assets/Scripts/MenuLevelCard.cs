@@ -12,10 +12,7 @@ namespace MetalRaptors
 
         RectTransform _rt;
         Image _frame;
-        Text _number;
         Text _title;
-        Text _map;
-        Text _status;
         TerrainSilhouette _art;
         bool _completed;
         bool _focused;
@@ -47,33 +44,14 @@ namespace MetalRaptors
             art.anchorMin = new Vector2(0f, 0f);
             art.anchorMax = new Vector2(1f, 1f);
             art.offsetMin = new Vector2(0f, MenuTheme.LevelCardArtBottom);
-            art.offsetMax = new Vector2(0f, -MenuTheme.LevelCardArtTop);
+            art.offsetMax = new Vector2(0f, -MenuTheme.CardPad);
             view._art.SetProfile(level.Terrain, level.Seed);
 
-            view._number = UIFactory.CreateTopLabel(rt, $"{level.Number:00}", MenuTheme.LevelNumberSize,
-                -MenuTheme.CardPad, MenuTheme.LevelNumberRowHeight, MenuTheme.CardPad,
-                MenuTheme.Colors.Border, UIFactory.BoldFont);
-
             view._title = UIFactory.CreateBottomWrapLabel(rt, level.Title, MenuTheme.CardTitleSize,
-                MenuTheme.CardPad + MenuTheme.CardYearsRowHeight + MenuTheme.CardTitleToYears,
-                MenuTheme.LevelCardTitleRowHeight, MenuTheme.CardPad, MenuTheme.Colors.Fg,
-                UIFactory.BoldFont);
+                MenuTheme.CardPad, MenuTheme.LevelCardTitleRowHeight, MenuTheme.CardPad,
+                MenuTheme.Colors.Fg, UIFactory.BoldFont);
 
-            view._map = UIFactory.CreateBottomLabel(rt, level.MapName, MenuTheme.CardYearsSize,
-                MenuTheme.CardPad, MenuTheme.CardYearsRowHeight, MenuTheme.CardPad,
-                MenuTheme.Colors.Muted, UIFactory.MediumFont);
-
-            string status = !unlocked ? "locked" : completed ? "completed" : null;
-            if (status != null)
-            {
-                var pos = new Vector2(MenuTheme.CardPad + view._map.preferredWidth + MenuTheme.TagGap,
-                    MenuTheme.CardPad);
-                view._status = UIFactory.CreateBottomInlineLabel(rt, status.ToUpperInvariant(),
-                    MenuTheme.CaptionSize, pos, MenuTheme.CardYearsRowHeight,
-                    MenuTheme.Colors.Muted, UIFactory.BoldFont);
-            }
-
-            view._completed = completed;
+            view._completed = unlocked && completed;
             view.Apply();
             return view;
         }
@@ -97,11 +75,8 @@ namespace MetalRaptors
             Color mark = Interactable ? palette.Accent : palette.Muted;
 
             _title.color = Interactable ? (_focused ? palette.Accent : palette.Fg) : palette.Muted;
-            _number.color = Interactable && _focused ? palette.Accent : palette.Border;
-            _frame.color = mark;
-            _frame.enabled = _focused;
-
-            if (_status != null) _status.color = _completed ? palette.Accent : palette.Muted;
+            _frame.color = _completed && !_focused ? MenuTheme.CardDone : mark;
+            _frame.enabled = _focused || _completed;
 
             _art.SetTint(mark, Color.Lerp(mark, MenuTheme.CardFace, 0.62f));
         }

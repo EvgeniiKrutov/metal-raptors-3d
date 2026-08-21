@@ -37,8 +37,7 @@ namespace MetalRaptors
         public readonly int Number;
         public readonly string Label;
         public readonly string Title;
-        public readonly string MapName;
-        public readonly string Dateline;
+        public readonly string Date;
         public readonly string Brief;
         public readonly TerrainKind Terrain;
         public readonly int Seed;
@@ -48,11 +47,18 @@ namespace MetalRaptors
             Number = number;
             Label = $"level {number}";
             Title = level.title;
-            MapName = TerrainNames.Full(level.terrain);
-            Dateline = level.dateline;
+            Date = DatePart(level.dateline);
             Brief = FirstParagraph(level.lore);
             Terrain = level.terrain;
             Seed = level.seed;
+        }
+
+        static string DatePart(string dateline)
+        {
+            if (string.IsNullOrEmpty(dateline)) return string.Empty;
+
+            int split = dateline.IndexOf('\u2014');
+            return (split > 0 ? dateline.Substring(0, split) : dateline).Trim();
         }
 
         static string FirstParagraph(string lore)

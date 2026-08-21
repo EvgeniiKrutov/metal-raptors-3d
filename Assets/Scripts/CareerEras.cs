@@ -3,15 +3,13 @@ namespace MetalRaptors
     public readonly struct CareerEra
     {
         public readonly string Title;
-        public readonly string Years;
         public readonly string Description;
         public readonly EraEmblem Emblem;
         public readonly bool Unlocked;
 
-        public CareerEra(string title, string years, string description, EraEmblem emblem, bool unlocked)
+        public CareerEra(string title, string description, EraEmblem emblem, bool unlocked)
         {
             Title = title;
-            Years = years;
             Description = description;
             Emblem = emblem;
             Unlocked = unlocked;
@@ -27,10 +25,10 @@ namespace MetalRaptors
 
         public static readonly CareerEra[] All =
         {
-            new CareerEra("WORLD WAR 1", "1914 – 1918", Placeholder, EraEmblem.Biplane, true),
-            new CareerEra("WORLD WAR 2", "1939 – 1945", Placeholder, EraEmblem.Fighter, false),
-            new CareerEra("COLD WAR", "1947 – 1991", Placeholder, EraEmblem.Jet, false),
-            new CareerEra("MODERN TIMES", "1991 – present", Placeholder, EraEmblem.Delta, false),
+            new CareerEra("CHAPTER 1", Placeholder, EraEmblem.Biplane, true),
+            new CareerEra("CHAPTER 2", Placeholder, EraEmblem.Fighter, false),
+            new CareerEra("CHAPTER 3", Placeholder, EraEmblem.Jet, false),
+            new CareerEra("FINAL CHAPTER", Placeholder, EraEmblem.Delta, false),
         };
     }
 }
