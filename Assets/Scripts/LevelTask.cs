@@ -81,8 +81,8 @@ namespace MetalRaptors
             plate.raycastTarget = false;
 
             _rt = plate.rectTransform;
-            _rt.anchorMin = new Vector2(0.5f, 0.5f);
-            _rt.anchorMax = new Vector2(0.5f, 0.5f);
+            _rt.anchorMin = new Vector2(0f, 1f);
+            _rt.anchorMax = new Vector2(0f, 1f);
             _rt.pivot = new Vector2(0f, 1f);
 
             float labelX = PadSide + BoxSize + LabelGap;

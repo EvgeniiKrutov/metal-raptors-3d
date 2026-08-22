@@ -36,19 +36,22 @@ namespace MetalRaptors
 
         public void Resume() => enabled = true;
 
+        public void Request()
+        {
+            if (!IsReady || _config == null || GameMenu.IsOpen || LevelBriefing.IsOpen) return;
+
+            _cooldown = Mathf.Max(0.01f, _config.bombCooldown);
+            Release();
+        }
+
         void Update()
         {
             if (_config == null || GameMenu.IsOpen || LevelBriefing.IsOpen) return;
 
             _cooldown = Mathf.Max(0f, _cooldown - Time.deltaTime);
 
-            if (CinematicBars.AnyShowing) return;
-
             var kb = Keyboard.current;
-            if (kb == null || !kb.hKey.wasPressedThisFrame || _cooldown > 0f) return;
-
-            _cooldown = Mathf.Max(0.01f, _config.bombCooldown);
-            Release();
+            if (kb != null && kb.hKey.wasPressedThisFrame) Request();
         }
 
         void Release()

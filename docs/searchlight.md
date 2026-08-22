@@ -94,11 +94,13 @@ ground.
 
 ## HUD
 
-`SearchlightIndicator` (`Assets/Scripts/SearchlightIndicator.cs`) — a 150×30 plate reading
-`LIGHT  T` under the health bar at `(-719, 425)`, to the right of the bomb square that now holds
-the left end of that row (docs/bombs.md), dim grey `(0.55, 0.55, 0.62)` when off and warm
-`(1, 0.85, 0.45)` when on. Refreshed from `PlaneSearchlight.IsOn` in each controller's HUD
-update. The bottom control-hint line is deliberately left alone.
+A `CooldownSquare` at the bottom of the HUD's action column, labelled `T` on desktop and `LIGHT`
+on touch, present only on night levels. It is a toggle rather than a cooldown, so it passes
+`charge: 0` and stays hollow; only the outline and caption switch, white while
+`PlaneSearchlight.IsOn` and grey when off, refreshed from each controller's HUD update. Pressing it
+calls `PlaneSearchlight.Toggle()`,
+which is the same guard-and-flip the `T` key runs. The dedicated `SearchlightIndicator` widget it
+replaced is gone. See docs/hud.md.
 
 ## Death
 

@@ -434,7 +434,10 @@ viewport is not 16:9:
 * `ColumnFraction = 0.4` — the column anchors from x 0 to x 0.4 of the canvas; the era
   cards page passes `1f` to the same `CreatePage` helper, and the one-era page passes
   `ColumnFraction` again;
-* `PadTopFraction = 0.15` — its top edge anchors 15% of the height down.
+* `PadTopFraction = 0.15` — its top edge anchors 15% of the height down. On a touch
+  platform it is **0.10** instead: a phone canvas is shorter than the desktop one and its
+  rows are 40% taller, and the garage column runs out of screen at 0.15
+  (docs/touch-input.md).
 
 The accent rule sits in equal air: `BarToList` is declared as `TitleToBar`, so the gap under
 the rule matches the gap over it (22px), and the list starts that much below the rule on
@@ -450,10 +453,18 @@ card row overflow at an extreme aspect ratio:
 * `PadRight = 56` — no content is right-aligned, so this only keeps stretched rows off the
   screen edge.
 
+Neither is used raw. `CreatePage` insets a page by `PageInsetLeft` / `PageInsetRight`, each
+of which is its constant widened to the arrow lane where the lane is bigger, plus the
+safe-area inset on that side (docs/touch-input.md). On a 16:9 desktop that is 120 and 120; on
+a landscape iPhone, 279 and 132.
+
 The custom battle screen is two bands inside one full-canvas holder, so both still measure
 their fractions against the whole width: the column (`0 → ColumnFraction`, inset by
 `PadLeft`) and the preview band (`ColumnFraction → 1`, no left inset — the split is already
 its left edge, and the card hangs at the band's top corner).
+
+On a touch platform the interactive metrics are scaled up and the top band is shortened —
+one table of swaps, in docs/touch-input.md.
 
 Everything inside is a reference pixel against the canvas' 1920×1080. The proportions come
 from the template's computed values at a 1920-wide viewport, but every text metric is
@@ -465,21 +476,50 @@ inset by its 28px `CardPad`. `MenuTheme` holds all of them; nothing in the layou
 hardcodes a number, so the next resize is one edit per metric there.
 
 The card row is what the era page is sized around, and the face is the one metric that is
-**not** a flat constant. `MenuTheme.CardSize` is a property: it splits whatever width is
-left between two `PadLeft` margins among `RowCards` faces and their 40px gaps, clamped to
-`CardSizeMin`–`CardSizeMax` (280–360). `UIFactory.CreateCanvas` feeds it the canvas width
-through `MenuTheme.Fit`, computed from `Screen` and the scaler's own reference and match
-constants rather than read back off the canvas rect — the scaler has not run on the frame
-the menu is built, so that rect is not resolved yet.
+**not** a flat constant: **four faces fill whatever the screen gives them**, on both card
+pages.
 
-At 16:9 the upper clamp holds and nothing moves: four 360px faces plus three 40px gaps run
-1560px of the 1744px between the margins, from x 120 to x 1680, and the row hangs at
-y 440–800 of the 1080 reference height. Narrower viewports are where the fit earns its
-keep. The canvas is `sqrt(aspect × 1920 × 1080)` reference units wide, so a 3:2 window is
-only 1764 across: fixed 360px faces would end 85px from the right edge against 120px on the
-left — and, on the level page, *underneath* the right arrow, which sits 44–74px in. Fitting
-the face (345px at 3:2) restores `PadLeft` on both sides and clears the arrows at every
-aspect. Both rows take the same property, so the level cards shrink with the era cards.
+```
+RowWidth = canvasWidth − PageInsetLeft − PageInsetRight
+Size     = min(RowWidth / (4 + 3 × CardGapRatio),  height left under the row's top)
+Gap      = Size × CardGapRatio            (CardGapRatio = CardGap / CardSizeMax = 0.111)
+```
+
+`MenuTheme.RowCardSize(visible, top)` is that, and both rows call it — `MenuCardRow` with its
+own card count, `MenuLevelRow` with `LevelVisibleCards` (4 of its 8). Holding the gap at a
+ratio of the face is what makes the row land *exactly* on `RowWidth` instead of leaving a
+remainder: four faces and three gaps solve to the full width at any size.
+
+There is **no upper clamp**. A 16:9 desktop gets 388px faces (up from the flat 360), a
+landscape iPhone ~394 — the row grows with the screen rather than sitting in the middle of it
+with a strip of dead space on the right, which is what a `CardSizeMax` cap left behind on a
+wide phone. What *does* cap it is height: `byHeight` is the space between the row's own top
+and `CardBottomMargin` (48px) off the bottom of the canvas, so an extremely wide, short
+viewport shortens the faces instead of running them off the screen. `CardSizeMin` (280) is the
+floor under both.
+
+`PageInsetLeft` / `PageInsetRight` are the same margins `MenuLayout.CreatePage` insets a page
+by, so the row starts and ends exactly on the page's own edges. Each is
+`max(PadLeft or PadRight, RowArrowLane)` plus that side's safe-area inset, where
+`RowArrowLane` is `GarageArrowInset + GarageArrowSize.x + ArrowToCards` — the width a level
+select triangle needs plus 46px of air. At 16:9 that resolves to 120 on the left (the lane is
+*exactly* `PadLeft`, which is where 120 came from) and lifts the right margin from 56 to 120,
+because a row that now reaches the right margin would otherwise run under the right-hand
+triangle. Both card pages take the same insets, so the era row and the level row are the same
+size on the same screen — the era page just has no triangles in its lanes.
+
+`UIFactory.CreateCanvas` feeds the canvas width, height and safe insets through
+`MenuTheme.Fit`, computed from `Screen` and the scaler's own reference and match constants
+rather than read back off the canvas rect — the scaler has not run on the frame the menu is
+built, so that rect is not resolved yet.
+
+Everything a card is built from scales with the face, through `CardMetrics`: pad, border,
+gap, title size, title row and art baseline are all the constant times `Size / CardSizeMax`.
+360 is the ratio's origin rather than a ceiling — at 388 the multiplier is 1.08, so the title
+goes to 27px and the pad to 30.
+
+`MenuTheme.CardSize` — the old four-across property, clamped to `CardSizeMin`–`CardSizeMax`
+(280–360) — survives for the custom battle preview card, which is one face rather than a row.
 
 The fit is read once, when the canvas is built. The menu scene is rebuilt on every load, so
 that is enough for a resolution change between sessions; dragging a window narrower while

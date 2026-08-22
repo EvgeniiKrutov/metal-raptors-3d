@@ -192,8 +192,8 @@ snatched away the instant it appears.
 
 **One tap of space ends the current line** — mid-typing or mid-hold, either way — and the next one
 starts immediately. It is one line per tap, not "skip the conversation": holding space does
-nothing, because the read is edge-triggered (`MenuInput.ReadSkip`, space or the pad's south
-button).
+nothing, because the read is edge-triggered (`MenuInput.ReadSkip`, space, the pad's south button,
+or a screen tap on a touch device — docs/touch-input.md).
 
 Only the two loops that hold a line on screen are skippable. The bars sliding in and the 0.55 s
 lead-in are not, so a tap during the opening of a block cannot skip a line that has not been shown
@@ -210,9 +210,10 @@ cascade through the whole block on one tap.
 
 One objective at a time, under the health bar in the top-left corner of the HUD: a stylised
 checkbox followed by the objective in 26 pt bold, both on the same translucent black plate the
-health bar and the light indicator use, sized to the text. It sits at x −860 (the HUD's left
-column) and at y 321, below the bomb and boost squares, which are always present (docs/bombs.md,
-docs/boost.md) — so the column above it never changes height and the task never moves.
+health bar uses, sized to the text. The row anchors to the canvas's top-left corner and sits at
+`LevelHud.TaskCorner`, which is the bottom of the action column — so it follows the squares
+wherever the safe area and the touch metrics put them (docs/hud.md). Only the night-only light
+square changes that column's height.
 
 The checkbox is a **round** 22 px ring with a 1.5 px stroke, drawn from a procedural sprite
 (`UIFactory.RingSprite`) rather than assembled from rectangles: a 128×128 antialiased annulus

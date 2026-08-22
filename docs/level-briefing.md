@@ -4,6 +4,11 @@ A full-screen page shown before a campaign level begins: the level's name, its d
 of lore, all typed out like a radio transmission coming in, then `Press any key to continue...`
 with a blinking cursor. It is the level's loading screen.
 
+The prompt reads `Tap anywhere to continue...` on a mobile platform — `LevelBriefing.Prompt` is a
+property, not a constant, picking between `KeyPrompt` and `TouchPrompt` on
+`MenuInput.IsTouchPlatform` (docs/touch-input.md). The cursor is placed off the string's measured
+width, so the longer sentence needs no other constant.
+
 ## Where the text comes from
 
 Three fields on `CampaignDefinition`, authored next to the seed and the terrain:
@@ -61,7 +66,7 @@ frame of the fade that brought the level in.
 
 Once the last character lands the page waits **two seconds** before the prompt and its cursor fade
 in over 0.35 s. Until they do, the page cannot be dismissed at all: `Update` returns before it
-ever reads a key. The one exception is **space** (or a pad's south button, `MenuInput.ReadSkip`),
+ever reads a key. The one exception is **space** (or a pad's south button, or a tap, `MenuInput.ReadSkip`),
 which completes the print and skips the two-second wait, putting the prompt up at once — a testing
 shortcut, not a designed affordance, and the reason the prompt still has to be dismissed with a
 second press.
@@ -89,8 +94,10 @@ every source until `Open`'s `onDismissed` callback arms it at the black frame of
 (docs/sounds.md). Freezing time would not have done it — the sound system runs on unscaled time —
 and an engine droning under a static briefing page reads as a bug.
 
-Once the prompt is up, any keyboard key, any face button or start on a pad, or a left click
-continues (`MenuInput.ReadAnyKey`); before that only space skips the print, as above. Input is
+Once the prompt is up, any keyboard key, any face button or start on a pad, a left click or a
+screen tap continues (`MenuInput.ReadAnyKey`); before that only space or a tap skips the print, as
+above. A single tap never does both: the skip branch returns for that frame, and the press is
+edge-triggered, so it is gone by the next one. Input is
 ignored while the screen fade is running, so the keypress that started the level from the
 menu cannot fall through into it. Continuing fades to black (`ScreenFade.Swap`), restores the time
 scale and the HUD object at the black frame, fires `onDismissed`, and destroys the canvas. Note

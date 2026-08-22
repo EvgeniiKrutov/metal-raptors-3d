@@ -92,7 +92,9 @@ speed.
 
 ## HUD
 
-A `CooldownSquare` labelled `R` at `(-832, 361)`, directly under the bomb's `H` square with an
-8 px gap, tinted pale blue `(0.62, 0.86, 1)` against the bomb's amber. Its sweep is the same
-clockwise clock-wipe: full and bright while the boost is running or ready, and running 0 → 1
-over the 8-second cooldown. The campaign task list docks below it at y 321.
+A `CooldownSquare` directly under the bomb's in the HUD's action column, labelled `R` on desktop
+and `BOOST` on touch. It is hollow with a white outline while the boost is running or ready, and
+fades to a ghost outline walked by a clock hand and a border arc running 0 → 1 together over the
+8-second cooldown. The
+square is pressable, through `HudPressRelay` on to `PlaneBoost.Request()` — the same method the `R`
+key calls. See docs/hud.md.

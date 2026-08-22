@@ -22,7 +22,7 @@ namespace MetalRaptors
         public bool Interactable { get; private set; }
 
         public static MenuCardView Create(Transform parent, string title, bool interactable,
-            EraEmblem emblem)
+            EraEmblem emblem, CardMetrics metrics)
         {
             var go = new GameObject($"Card ({title})", typeof(RectTransform), typeof(MenuCardView));
             go.transform.SetParent(parent, false);
@@ -34,23 +34,23 @@ namespace MetalRaptors
             rt.anchorMin = new Vector2(0f, 1f);
             rt.anchorMax = new Vector2(0f, 1f);
             rt.pivot = new Vector2(0f, 1f);
-            rt.sizeDelta = new Vector2(MenuTheme.CardSize, MenuTheme.CardSize);
+            rt.sizeDelta = new Vector2(metrics.Size, metrics.Size);
             view._rt = rt;
 
-            view._frame = CreateFrame(rt);
+            view._frame = CreateFrame(rt, metrics.Border);
             CreateFace(rt);
 
-            view.CreateArt(rt, emblem);
+            view.CreateArt(rt, emblem, metrics);
 
-            view._title = UIFactory.CreateBottomLabel(rt, title, MenuTheme.CardTitleSize,
-                MenuTheme.CardPad, MenuTheme.CardTitleRowHeight, MenuTheme.CardPad,
+            view._title = UIFactory.CreateBottomLabel(rt, title, metrics.TitleSize,
+                metrics.Pad, metrics.TitleRowHeight, metrics.Pad,
                 MenuTheme.Colors.Fg, UIFactory.BoldFont);
 
             view.Apply();
             return view;
         }
 
-        public static Image CreateFrame(RectTransform parent)
+        public static Image CreateFrame(RectTransform parent, float border)
         {
             var go = new GameObject("Frame", typeof(Image));
             go.transform.SetParent(parent, false);
@@ -61,12 +61,12 @@ namespace MetalRaptors
             var rt = img.rectTransform;
             rt.anchorMin = Vector2.zero;
             rt.anchorMax = Vector2.one;
-            rt.offsetMin = new Vector2(-MenuTheme.CardBorder, -MenuTheme.CardBorder);
-            rt.offsetMax = new Vector2(MenuTheme.CardBorder, MenuTheme.CardBorder);
+            rt.offsetMin = new Vector2(-border, -border);
+            rt.offsetMax = new Vector2(border, border);
             return img;
         }
 
-        void CreateArt(RectTransform parent, EraEmblem emblem)
+        void CreateArt(RectTransform parent, EraEmblem emblem, CardMetrics metrics)
         {
             var baked = Resources.Load<Sprite>(EraArtFolder + emblem.ToString().ToLowerInvariant());
             RectTransform art;
@@ -91,8 +91,8 @@ namespace MetalRaptors
 
             art.anchorMin = new Vector2(0f, 0f);
             art.anchorMax = new Vector2(1f, 1f);
-            art.offsetMin = new Vector2(MenuTheme.CardPad, MenuTheme.CardArtBottom);
-            art.offsetMax = new Vector2(-MenuTheme.CardPad, -MenuTheme.CardPad);
+            art.offsetMin = new Vector2(metrics.Pad, metrics.ArtBottom);
+            art.offsetMax = new Vector2(-metrics.Pad, -metrics.Pad);
         }
 
         public static void CreateFace(RectTransform parent)

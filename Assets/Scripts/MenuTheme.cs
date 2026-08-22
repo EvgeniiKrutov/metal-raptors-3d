@@ -27,6 +27,49 @@ namespace MetalRaptors
             ColorUtility.TryParseHtmlString(hex, out Color c) ? c : Color.magenta;
     }
 
+    public readonly struct CardMetrics
+    {
+        public readonly float Size;
+        public readonly float Gap;
+        public readonly float Pad;
+        public readonly float Border;
+        public readonly int TitleSize;
+        public readonly float TitleRowHeight;
+        public readonly float ArtBottom;
+
+        public CardMetrics(int visible, int titleLines, float top)
+        {
+            Size = MenuTheme.RowCardSize(visible, top);
+
+            float k = Size / MenuTheme.CardSizeMax;
+            Gap = MenuTheme.CardGap * k;
+            Pad = MenuTheme.CardPad * k;
+            Border = MenuTheme.CardBorder * k;
+            TitleSize = Mathf.RoundToInt(MenuTheme.CardTitleSize * k);
+            TitleRowHeight = (titleLines > 1 ? titleLines * MenuTheme.CardTitleLineHeight
+                                             : MenuTheme.CardTitleRowHeight) * k;
+            ArtBottom = Pad + TitleRowHeight + MenuTheme.CardTitleToArt * k;
+        }
+
+        public float Pitch => Size + Gap;
+    }
+
+    public readonly struct SafeInsets
+    {
+        public readonly float Left;
+        public readonly float Right;
+        public readonly float Top;
+        public readonly float Bottom;
+
+        public SafeInsets(float left, float right, float top, float bottom)
+        {
+            Left = left;
+            Right = right;
+            Top = top;
+            Bottom = bottom;
+        }
+    }
+
     public static class MenuTheme
     {
         static readonly MenuPalette[] Palettes =
@@ -43,10 +86,28 @@ namespace MetalRaptors
         public static MenuPalette Colors => Palettes[(int)Active];
 
         public const float ColumnFraction = 0.4f;
-        public const float PadTopFraction = 0.15f;
+
+        public const float TouchTextScale = 1.4f;
+        public const float TouchArrowScale = 1.4f;
+        public const float TouchArrowPad = 20f;
+        public const float PadTopFractionDesk = 0.15f;
+        public const float PadTopFractionTouch = 0.10f;
+
+        static readonly bool Touch = MenuInput.IsTouchPlatform;
+
+        public static readonly float TextScale = Touch ? TouchTextScale : 1f;
+        public static readonly float WidthScale = 1f + (TextScale - 1f) * 0.5f;
+        public static readonly float ArrowScale = Touch ? TouchArrowScale : 1f;
+        public static readonly float ArrowPad = Touch ? TouchArrowPad : 0f;
+        public static readonly float PadTopFraction = Touch ? PadTopFractionTouch : PadTopFractionDesk;
 
         public const float PadLeft = 120f;
         public const float PadRight = 56f;
+
+        public static float SafeLeft { get; private set; }
+        public static float SafeRight { get; private set; }
+        public static float SafeTop { get; private set; }
+        public static float SafeBottom { get; private set; }
 
         public const int TitleSize = 44;
         public const float TitleRowHeight = 46f;
@@ -55,21 +116,36 @@ namespace MetalRaptors
         public const float BarHeight = 4f;
         public const float BarToList = TitleToBar;
 
-        public const int ItemSize = 30;
-        public const float ItemRowHeight = 44f;
-        public const float ItemGap = 10f;
+        public const int ItemSizeBase = 30;
+        public const float ItemRowHeightBase = 44f;
+        public const float ItemGapBase = 10f;
 
-        public const int OptionSize = 22;
-        public const float OptionRowHeight = 34f;
-        public const float OptionGap = 26f;
+        public static int ItemSize => Scaled(ItemSizeBase);
+        public static float ItemRowHeight => ItemRowHeightBase * TextScale;
+        public static float ItemGap => ItemGapBase * TextScale;
 
-        public const float SelectorLabelWidth = 190f;
-        public const float SelectorValueWidth = 190f;
-        public const float SelectorArrowGap = 22f;
-        public static readonly Vector2 SelectorArrowSize = new Vector2(18f, 20f);
+        public const int OptionSizeBase = 22;
+        public const float OptionRowHeightBase = 34f;
+        public const float OptionGapBase = 26f;
+
+        public static int OptionSize => Scaled(OptionSizeBase);
+        public static float OptionRowHeight => OptionRowHeightBase * TextScale;
+        public static float OptionGap => OptionGapBase * TextScale;
+
+        public const float SelectorLabelWidthBase = 190f;
+        public const float SelectorValueWidthBase = 190f;
+        public const float SelectorArrowGapBase = 22f;
+        static readonly Vector2 SelectorArrowSizeBase = new Vector2(18f, 20f);
+
+        public static float SelectorLabelWidth => SelectorLabelWidthBase * WidthScale;
+        public static float SelectorValueWidth => SelectorValueWidthBase * WidthScale;
+        public static float SelectorArrowGap => SelectorArrowGapBase * WidthScale;
+        public static Vector2 SelectorArrowSize => SelectorArrowSizeBase * ArrowScale;
 
         public static float SelectorRowWidth =>
             SelectorLabelWidth + 2f * (SelectorArrowSize.x + SelectorArrowGap) + SelectorValueWidth;
+
+        static int Scaled(int size) => Mathf.RoundToInt(size * TextScale);
 
         public const int CaptionSize = 14;
         public const float CaptionRowHeight = 20f;
@@ -83,18 +159,25 @@ namespace MetalRaptors
         public const float StatCaptionRowHeight = 26f;
         public const float StatCaptionToValue = 8f;
         public const int StatValueSize = 22;
-        public const float StatValueRowHeight = 28f;
         public const float StatRowGap = 18f;
 
         public const int BadgeSize = 15;
         public const float BadgeHeight = 28f;
         public const float BadgePadX = 14f;
+        public const float BadgeValueGap = 16f;
         public const float BadgeToContent = 16f;
 
-        public const float GaragePadLeft = 200f;
+        public const float GaragePadLeftBase = 200f;
+        public const float GarageArrowToColumn = 80f;
 
-        public static readonly Vector2 GarageArrowSize = new Vector2(30f, 38f);
+        public static float GaragePadLeft => Mathf.Max(GaragePadLeftBase,
+            SafeLeft + GarageArrowInset + GarageArrowSize.x + GarageArrowToColumn);
+
+        static readonly Vector2 GarageArrowSizeBase = new Vector2(30f, 38f);
+
+        public static Vector2 GarageArrowSize => GarageArrowSizeBase * ArrowScale;
         public const float GarageArrowInset = 44f;
+        public const float ArrowToCards = 46f;
         public const float GarageDescriptionWidth = 1080f;
         public const float GarageDescriptionBottom = 124f;
         public const float GarageDescriptionRowHeight = 96f;
@@ -117,21 +200,44 @@ namespace MetalRaptors
         public const float CardTitleRowHeight = 32f;
         public const int RowCards = 4;
 
-        static float _canvasWidth = 1920f;
+        public const float CardTitleToArt = 14f;
+        public const float CardTitleLineHeight = 38f;
+        public const float CardBottomMargin = 48f;
 
-        public static void Fit(float canvasWidth) => _canvasWidth = canvasWidth;
+        const float CardGapRatio = CardGap / CardSizeMax;
+
+        static float _canvasWidth = 1920f;
+        static float _canvasHeight = 1080f;
+
+        public static void Fit(float canvasWidth, float canvasHeight, SafeInsets safe)
+        {
+            _canvasWidth = canvasWidth;
+            _canvasHeight = canvasHeight;
+            SafeLeft = safe.Left;
+            SafeRight = safe.Right;
+            SafeTop = safe.Top;
+            SafeBottom = safe.Bottom;
+        }
+
+        public static float RowArrowLane => GarageArrowInset + GarageArrowSize.x + ArrowToCards;
+
+        public static float PageInsetLeft => SafeLeft + Mathf.Max(PadLeft, RowArrowLane);
+        public static float PageInsetRight => SafeRight + Mathf.Max(PadRight, RowArrowLane);
+
+        public static float RowWidth => _canvasWidth - PageInsetLeft - PageInsetRight;
 
         public static float CardSize => Mathf.Clamp(
             (_canvasWidth - 2f * PadLeft - (RowCards - 1) * CardGap) / RowCards,
             CardSizeMin, CardSizeMax);
 
-        public const float CardTitleToArt = 14f;
-        public const float CardArtBottom = CardPad + CardTitleRowHeight + CardTitleToArt;
+        public static float RowCardSize(int visible, float top)
+        {
+            if (visible <= 0) return CardSizeMax;
 
-        public const float CardTitleLineHeight = 38f;
-        public const float LevelCardTitleRowHeight = 2f * CardTitleLineHeight;
-        public const float LevelCardArtBottom =
-            CardPad + LevelCardTitleRowHeight + CardTitleToArt;
+            float byWidth = RowWidth / (visible + (visible - 1) * CardGapRatio);
+            float byHeight = _canvasHeight * (1f - PadTopFraction) + top - CardBottomMargin;
+            return Mathf.Max(CardSizeMin, Mathf.Min(byWidth, byHeight));
+        }
 
         public const int LevelVisibleCards = RowCards;
         public const float LevelRowSlide = 0.18f;
@@ -140,9 +246,6 @@ namespace MetalRaptors
         public const float LevelDateRowHeight = 24f;
         public const float LevelDateToBrief = 12f;
         public const float LevelBriefRowHeight = 96f;
-
-        public static float LevelRowWidth =>
-            LevelVisibleCards * CardSize + (LevelVisibleCards - 1) * CardGap;
 
         public static float LevelCardsTop =>
             ListTop - LevelDateRowHeight - LevelDateToBrief

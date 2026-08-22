@@ -62,7 +62,9 @@ extra gap under it, so it reads as the first row of the list rather than a heade
 
 Opening any of the three sets `Time.timeScale = 0` and hides the level's HUD canvas; closing
 restores both. So all three screens are a still frame, not a running level behind glass, and
-the health bar / distance / control hints never sit under the overlay.
+the health bar / action squares / control hints never sit under the overlay — and because the
+squares are pressable (docs/hud.md), hiding the canvas is also what stops a tap reaching them,
+including the touch build's own `P` button that opened the pause screen in the first place.
 
 * Music keeps playing — `MusicPlayer` runs on `Time.unscaledDeltaTime` and
   `realtimeSinceStartup`, so it is untouched by the freeze.

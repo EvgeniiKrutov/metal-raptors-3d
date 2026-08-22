@@ -17,6 +17,9 @@ namespace MetalRaptors
         AudioSource _audio;
         AudioClip _shotClip;
         float _cooldown;
+        bool _held;
+
+        public bool IsReady => enabled;
 
         public void Initialize(PlayerConfig config, Transform muzzle, Transform flashPoint,
             Collider planeCollider)
@@ -42,6 +45,8 @@ namespace MetalRaptors
 
         public void Resume() => enabled = true;
 
+        public void SetHeld(bool held) => _held = held;
+
         void Update()
         {
             if (GameMenu.IsOpen || LevelBriefing.IsOpen) return;
@@ -49,7 +54,8 @@ namespace MetalRaptors
             _cooldown -= Time.deltaTime;
 
             var kb = Keyboard.current;
-            if (kb == null || !kb.fKey.isPressed || _cooldown > 0f) return;
+            bool wants = _held || (kb != null && kb.fKey.isPressed);
+            if (!wants || _cooldown > 0f) return;
 
             _cooldown = Mathf.Max(0.01f, _config.fireRate);
             Fire();

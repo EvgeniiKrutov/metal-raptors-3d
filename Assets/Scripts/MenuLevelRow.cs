@@ -11,18 +11,21 @@ namespace MetalRaptors
         public event Action ViewChanged;
 
         readonly List<MenuLevelCard> _cards = new List<MenuLevelCard>();
+        CardMetrics _metrics;
         RectTransform _track;
         int _focus = -1;
         int _offset;
         float _velocity;
 
-        public int Count => _cards.Count;
+        public float CardSize => _metrics.Size;
 
-        static float Pitch => MenuTheme.CardSize + MenuTheme.CardGap;
-
-        static float TrackX(int offset) => MenuTheme.CardBorder - offset * Pitch;
+        float TrackX(int offset) => _metrics.Border - offset * _metrics.Pitch;
 
         int MaxOffset => Mathf.Max(0, _cards.Count - MenuTheme.LevelVisibleCards);
+
+        static float ViewWidth(CardMetrics metrics) =>
+            MenuTheme.LevelVisibleCards * metrics.Size
+            + (MenuTheme.LevelVisibleCards - 1) * metrics.Gap;
 
         public static MenuLevelRow Create(Transform parent, string name, float top)
         {
@@ -30,14 +33,15 @@ namespace MetalRaptors
             go.transform.SetParent(parent, false);
 
             var view = go.GetComponent<MenuLevelRow>();
+            view._metrics = new CardMetrics(MenuTheme.LevelVisibleCards, 2, top);
 
             var rt = (RectTransform)go.transform;
             rt.anchorMin = new Vector2(0f, 1f);
             rt.anchorMax = new Vector2(0f, 1f);
             rt.pivot = new Vector2(0f, 1f);
-            rt.sizeDelta = new Vector2(MenuTheme.LevelRowWidth + 2f * MenuTheme.CardBorder,
-                MenuTheme.CardSize + 2f * MenuTheme.CardBorder);
-            rt.anchoredPosition = new Vector2(-MenuTheme.CardBorder, top + MenuTheme.CardBorder);
+            rt.sizeDelta = new Vector2(ViewWidth(view._metrics) + 2f * view._metrics.Border,
+                view._metrics.Size + 2f * view._metrics.Border);
+            rt.anchoredPosition = new Vector2(-view._metrics.Border, top + view._metrics.Border);
 
             var track = new GameObject("Track", typeof(RectTransform));
             track.transform.SetParent(go.transform, false);
@@ -47,14 +51,14 @@ namespace MetalRaptors
             view._track.anchorMax = new Vector2(0f, 1f);
             view._track.pivot = new Vector2(0f, 1f);
             view._track.sizeDelta = Vector2.zero;
-            view._track.anchoredPosition = new Vector2(TrackX(0), -MenuTheme.CardBorder);
+            view._track.anchoredPosition = new Vector2(view.TrackX(0), -view._metrics.Border);
             return view;
         }
 
         public MenuLevelCard AddCard(CampaignLevelEntry level, bool unlocked, bool completed,
             Action onActivate)
         {
-            MenuLevelCard card = MenuLevelCard.Create(_track, level, unlocked, completed);
+            MenuLevelCard card = MenuLevelCard.Create(_track, level, unlocked, completed, _metrics);
             if (unlocked && onActivate != null) card.Activated += onActivate;
             card.Hovered += Focus;
 
@@ -64,7 +68,7 @@ namespace MetalRaptors
 
         public void Layout()
         {
-            for (int i = 0; i < _cards.Count; i++) _cards[i].SetX(i * Pitch);
+            for (int i = 0; i < _cards.Count; i++) _cards[i].SetX(i * _metrics.Pitch);
         }
 
         public bool CanSlide(int delta) =>

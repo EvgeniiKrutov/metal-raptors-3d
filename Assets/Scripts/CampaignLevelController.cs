@@ -2,7 +2,6 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
-using UnityEngine.UI;
 
 namespace MetalRaptors
 {
@@ -19,9 +18,6 @@ namespace MetalRaptors
         const float FallCamResponse = 3.3f;
         const float CamShakeMagnitude = 7f;
         const float CamShakeDuration = 0.3f;
-
-        const float TaskLeft = -860f;
-        const float TaskTop = 321f;
 
         const float DitchSplashSize = 75f;
         const float SinkSpeed = 26f;
@@ -42,11 +38,7 @@ namespace MetalRaptors
         Transform _ceilingBar;
         SoundSystem _sound;
 
-        HealthBar _healthBar;
-        SearchlightIndicator _lightIndicator;
-        CooldownSquare _bombSquare;
-        CooldownSquare _boostSquare;
-        Text _distanceText;
+        LevelHud _hudView;
         GameObject _hud;
         HudCurtain _curtain;
 
@@ -66,9 +58,6 @@ namespace MetalRaptors
         float _camShake;
         bool _gameOver;
         bool _playerFalling;
-        float _furthestX = StartX;
-
-        float Distance => Mathf.Max(0f, _furthestX - StartX);
 
         public bool IsOver => _gameOver;
 
@@ -271,8 +260,13 @@ namespace MetalRaptors
 
         void Update()
         {
+            if (MenuInput.ReadCancel()) TryPause();
+        }
+
+        void TryPause()
+        {
             if (_gameOver || GameMenu.IsOpen || LevelBriefing.IsOpen || ScreenFade.IsBusy) return;
-            if (MenuInput.ReadCancel()) GameMenu.Open(GameMenuKind.Pause, Subtitle, _hud);
+            GameMenu.Open(GameMenuKind.Pause, Subtitle, _hud);
         }
 
         void FixedUpdate()
@@ -294,18 +288,12 @@ namespace MetalRaptors
             ? $"{CustomBattle.Map.Name} | {DaytimeNames.For(_level.daytime)}"
             : $"level {_levelNumber} | {MapName}";
 
-        string HudTitle => CustomBattle.Requested
-            ? $"CUSTOM BATTLE — {MapName.ToUpperInvariant()}"
-            : $"CAMPAIGN — LEVEL {_levelNumber}";
-
-        string HudHint => "A / D to steer  •  F to fire  •  H to bomb  •  R to boost  •  "
-            + "no turning back  •  don't hit the ground";
+        const string HudObjective = "no turning back  •  don't hit the ground";
 
         void LateUpdate()
         {
             if (_cubeTr == null) return;
 
-            if (!_playerFalling) _furthestX = Mathf.Max(_furthestX, _cubeTr.position.x);
             if (_camShake > 0f)
                 _camShake = Mathf.Max(0f, _camShake - Time.deltaTime / CamShakeDuration);
             if (_cam != null) PositionCamera(instant: false);
@@ -504,40 +492,17 @@ namespace MetalRaptors
             var canvas = UIFactory.CreateCanvas("Campaign HUD");
             _hud = canvas.gameObject;
 
-            UIFactory.CreateText(canvas.transform, HudTitle, 52,
-                new Vector2(0, 480), new Vector2(1000, 90), TextAnchor.MiddleCenter, FontStyle.Bold);
+            _hudView = new LevelHud(canvas.transform, HudObjective, _cube, _shooter, _bomber,
+                _boost, _searchlight, TryPause);
+            _taskCorner = _hudView.TaskCorner;
 
-            UIFactory.CreateText(canvas.transform, HudHint, 28,
-                new Vector2(0, -500), new Vector2(1600, 50));
-
-            _healthBar = new HealthBar(canvas.transform, new Vector2(-660f, 480f));
-            _bombSquare = new CooldownSquare(canvas.transform, new Vector2(-832f, 425f), "H",
-                CooldownSquare.BombTint);
-            _boostSquare = new CooldownSquare(canvas.transform, new Vector2(-832f, 361f), "R",
-                CooldownSquare.BoostTint);
-            if (_searchlight != null)
-                _lightIndicator = new SearchlightIndicator(canvas.transform, new Vector2(-719f, 425f));
-            _distanceText = UIFactory.CreateText(canvas.transform, "0 m", 40,
-                new Vector2(660f, 480f), new Vector2(500, 60), TextAnchor.MiddleRight, FontStyle.Bold);
-
-            _taskCorner = new Vector2(TaskLeft, TaskTop);
             _curtain = HudCurtain.Attach(_hud);
             _curtain.Set(false);
-            UpdateHud();
         }
 
         void UpdateHud()
         {
-            if (_lightIndicator != null && _searchlight != null)
-                _lightIndicator.Set(_searchlight.IsOn);
-            if (_bombSquare != null && _bomber != null)
-                _bombSquare.Set(_bomber.Charge, _bomber.IsReady);
-            if (_boostSquare != null && _boost != null)
-                _boostSquare.Set(_boost.Charge, _boost.IsReady || _boost.IsRunning);
-            if (_cube != null && _healthBar != null)
-                _healthBar.Set(_cube.CurrentHealth, _cube.MaxHealth);
-            if (_distanceText != null)
-                _distanceText.text = $"{Mathf.FloorToInt(Distance)} m";
+            if (_hudView != null) _hudView.Tick();
         }
     }
 }

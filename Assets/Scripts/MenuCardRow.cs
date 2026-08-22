@@ -10,10 +10,13 @@ namespace MetalRaptors
 
         readonly List<MenuCardView> _cards = new List<MenuCardView>();
         readonly RectTransform _root;
+        readonly CardMetrics _metrics;
         int _focus = -1;
 
-        public MenuCardRow(Transform parent, string name, float top)
+        public MenuCardRow(Transform parent, string name, float top, int count)
         {
+            _metrics = new CardMetrics(count, 1, top);
+
             var go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(parent, false);
 
@@ -28,7 +31,7 @@ namespace MetalRaptors
         public MenuCardView AddCard(string title, bool interactable, EraEmblem emblem,
             Action onActivate)
         {
-            MenuCardView card = MenuCardView.Create(_root, title, interactable, emblem);
+            MenuCardView card = MenuCardView.Create(_root, title, interactable, emblem, _metrics);
             if (interactable && onActivate != null) card.Activated += onActivate;
             card.Hovered += Focus;
 
@@ -38,8 +41,7 @@ namespace MetalRaptors
 
         public void Layout()
         {
-            float pitch = MenuTheme.CardSize + MenuTheme.CardGap;
-            for (int i = 0; i < _cards.Count; i++) _cards[i].SetX(i * pitch);
+            for (int i = 0; i < _cards.Count; i++) _cards[i].SetX(i * _metrics.Pitch);
         }
 
         public void MoveFocus(int delta)

@@ -10,12 +10,13 @@ There are **two renderers**, chosen per track file:
 
 | Engine | Selected by | Output | Character |
 | --- | --- | --- | --- |
-| chiptune (default) | no `engine` key | mono | naive oscillators, AD envelope, one noise channel |
-| retrowave | `"engine": "retrowave"` | stereo | supersaw, resonant filter + filter envelope, ADSR, drum kit, ping-pong delay, plate reverb, sidechain |
+| chiptune (default) | no `engine` key | stereo (amplitude-panned per track) | naive oscillators, AD envelope, one noise channel |
+| retrowave | `"engine": "retrowave"` | stereo (pan + width per track, stereo delay/reverb) | supersaw, resonant filter + filter envelope, ADSR, drum kit, ping-pong delay, plate reverb, sidechain |
 
-The chiptune renderer is untouched legacy code. Tracks that do not declare `engine` render
-**byte-for-byte identically** to how they always have — the retrowave features are strictly
-opt-in, so adding one track's worth of new sound cannot disturb the other nineteen.
+Both renderers bake **two-channel** clips — see [Stereo output](#stereo-output). Apart from
+that placement, the chiptune renderer is untouched legacy code: the voices, envelopes and
+noise are the same sample math they always were, and the retrowave features stay strictly
+opt-in.
 
 A track bakes into two clips:
 
@@ -32,9 +33,11 @@ intro→loop handoff is sample-accurate on the DSP clock.
 | `Assets/Music/Resources/Music/*.json` | The soundtracks (note data). |
 | `Json.cs` | Minimal JSON reader (objects, arrays, strings, numbers) — the note tuples mix strings and numbers, which `JsonUtility` cannot read. Shared with the campaign scripts (docs/campaign-scripts.md). |
 | `MusicConfig.cs` | Data model and `MusicLibrary`, which loads + parses + caches configs from `Resources/Music/<id>`. Pitch names resolve to frequencies here (A4 = 440 Hz, `#`/`b` supported). |
-| `MusicSynth.cs` | Bake entry point + the legacy chiptune renderer. `Bake(config, rate)` is pure sample math; `ToClips` wraps the result in `AudioClip`s. |
-| `MusicSynthRetro.cs` | The stereo retrowave renderer. |
+| `MusicSynth.cs` | Bake entry point + the chiptune renderer, including its per-track pan table. `Bake(config, rate)` is pure sample math; `ToClips` wraps the result in `AudioClip`s. |
+| `MusicSynthRetro.cs` | The retrowave renderer. |
 | `MusicPlayer.cs` | Persistent player (bootstraps itself `BeforeSceneLoad`, `DontDestroyOnLoad`). Owns the two `AudioSource`s and the fades, and reacts to scene loads. |
+| `AudioOutput.cs` | Keeps the audio session and the mixer in stereo — see [Output configuration](#output-configuration-audiooutput). |
+| `Assets/Plugins/iOS/MetalRaptorsAudio.mm` | Sets the iOS audio session category to `Playback`, which is what gives an iPhone its second speaker. |
 
 The JSON lives in `Assets/Music/Resources/Music/` rather than `Assets/Resources/` because
 `.gitignore` used to exclude all of `/Assets/Resources` as private content — any folder named
@@ -113,8 +116,12 @@ sound, which is how drum lines encode gaps.
 
 `wave` (`sine` | `square` | `triangle` | `sawtooth` | `noise`), `volume`, optional `detune`
 (cents — spawns two voices at ±half the value), optional `attack` / `release` envelope
-seconds (defaults 0.01 / 0.05; noise attack 0.005). `noise` ignores pitch and plays filtered
-white noise (highpass at 3.5 kHz).
+seconds (defaults 0.01 / 0.05; noise attack 0.005), optional `pan` (−1 left … +1 right).
+`noise` ignores pitch and plays filtered white noise (highpass at 3.5 kHz).
+
+`pan` is read whenever the key is present — including `"pan": 0`, which is how a track opts
+out of the default placement below (`MusicTrack.HasPan` records that the key was written, so
+an authored centre is not confused with an unauthored one).
 
 ## Retrowave engine
 
@@ -206,6 +213,110 @@ delay tails survive the handoff. `RenderedMusic.IntroDuration` still reports the
 length, so the loop is scheduled on the beat while the non-looping intro source plays its
 tail out underneath.
 
+## Stereo output
+
+Both engines bake `Channels = 2`, interleaved L/R, and `MusicSynth.ToClip` divides the sample
+count by that to get the frame count — so an `AudioClip` is always created two-channel.
+
+**Why it matters beyond the mix:** an iPhone drives its second speaker (the earpiece) only
+for stereo playback; anything less comes out of the bottom speaker alone. A one-channel clip
+is one way to land there — what the twelve chiptune tracks used to bake, and what would have
+hit every one of them the moment it played. It was not, however, why the *menu* theme played
+from one speaker: that track is retrowave and has always been two-channel. The rest of that
+story is the audio session, in [Output configuration](#output-configuration-audiooutput).
+
+### Chiptune placement
+
+The chiptune engine has no pan controls in its authored data, so a track's placement comes
+from its **name**, through `MusicSynth.TrackPans`:
+
+| Left | Centre | Right |
+| --- | --- | --- |
+| `lead` −0.20, `hats` −0.30, `organLow` −0.22, `lowbrass` −0.28 | anything not listed — `bass`, `kick`, `snare`, `drums` | `harmony` +0.28, `arp` +0.42, `organMid` +0.26, `organHigh` +0.40, `horns` +0.30, `toms` +0.24, `pulse` +0.30, `grit` +0.30, `drone` +0.22 |
+
+The names are the ones the twelve chiptune files already use, and an unknown name lands in
+the centre, so a new track is centred until it is either named like an existing role or given
+an explicit `pan`. The values are set against each other rather than picked in isolation: no
+file leans to one side once its own tracks are placed (`grit` and `toms` sit right precisely
+because the `lead` in those files is left).
+
+Low end and backbeat stay centred, which is ordinary mixing practice and also what keeps the
+loudest material identical to the old mono bake.
+
+### The panning law
+
+`StereoGain` is a plain balance law: a track panned right keeps `R = 1` and loses the pan
+from the left (`L = 1 − pan`), and the mirror for one panned left — not the equal-power law
+`MusicSynthRetro.PanGains` uses. It is chosen for what it
+does **not** do: neither channel is ever boosted above the mono amplitude, so the final
+`Mathf.Clamp(±1)` over the buffer clips exactly where it used to. A centred track writes the
+full signal to both channels, unchanged from the mono bake.
+
+## Output configuration (`AudioOutput`)
+
+Two things have to be stereo before an iPhone will use its second speaker, and only one of
+them is Unity's:
+
+1. **The iOS audio session category.** This is the one that was actually keeping the earpiece
+   silent. Unity does not set it — `UnityAppController.mm` only touches the session when the
+   audio manager is disabled ("FMOD should have already handled all of this AVAudioSession
+   init"), and FMOD picks the category from Player Settings: `AVAudioSessionCategoryAmbient`
+   with *Mute Other Audio Sources* off, `SoloAmbient` with it on. Ambient audio is *secondary,
+   mixable* audio as far as iOS is concerned, and it is routed to the primary bottom speaker.
+   The stereo pair belongs to `AVAudioSessionCategoryPlayback` — the media-playback category.
+2. **Unity's mixer speaker mode.** `AudioConfiguration.speakerMode`, which is what
+   `AudioSettings.Reset` re-opens the output with.
+
+`AudioOutput.EnsureStereo` does both, in that order — the session first, because the mixer has
+to re-open *against* the corrected route. It runs at `BeforeSplashScreen` (after FMOD has
+initialised, so the category is ours and not overwritten), from `MusicPlayer.Bootstrap`, at
+the top of `MusicPlayer.Play`, on resume (`MusicPlayer.OnApplicationPause`), and on a device
+change. Every one of those is the same idempotent call.
+
+### The plugin
+
+`Assets/Plugins/iOS/MetalRaptorsAudio.mm` sets `Playback`, activates the session, asks for
+`setPreferredOutputNumberOfChannels: 2` when the hardware has them, and returns
+`outputNumberOfChannels` so the managed side can see what the route actually gave. It also
+`NSLog`s the category, options and channel count on the way in and out — the in-line is what
+names the category the platform had chosen, so an Xcode console says in two lines whether the
+route was the problem.
+
+`AllowMixing` (true) keeps `AVAudioSessionCategoryOptionMixWithOthers`, so a podcast or
+Spotify playing behind the game is not stopped — the same courtesy `Mute Other Audio Sources:
+0` was buying under Ambient. If the route comes back with fewer than two channels,
+`ConfigureRoute` retries **without** the option, since a stereo game that interrupts the music
+app is better than a mono one that does not. Set the constant to `false` to skip straight to
+the exclusive route.
+
+### What `Playback` costs
+
+**The ring/silent switch no longer mutes the game.** That behaviour is a property of the
+category, not of the mixing option: `Ambient` is silenced by the switch, `Playback` is not,
+and only `Playback` reaches the second speaker. There is no combination that keeps both, so
+this is the trade the fix makes — the same one every media app makes. Reverting means going
+back to one speaker: delete the plugin call and the game is `Ambient` again.
+
+### Not resetting the mixer twice
+
+`AudioSettings.Reset` stops every source, so it must not fire on an ordinary `Play`.
+`ConfigureRoute` returns `true` only when the channel count **changed** since the last call, so
+the reset happens once at launch and afterwards only on a real route change. The startup
+sequence settles at the first call: the `BeforeSplashScreen` pass configures the session, sees
+the count go from unknown to 2, and resets the mixer while nothing is playing; every later call
+is a no-op.
+
+The path is self-stabilising rather than looping, because the callbacks disagree about what
+they answer: `Apply` ignores the `OnAudioConfigurationChanged` its own reset raises
+(`deviceChanged` is false there), and the one a genuine route change raises finds the channel
+count unchanged and the mode already stereo. `MusicPlayer` listens to the same event and
+restarts the current track, so a reset — ours or the platform's — does not leave the menu
+silent.
+
+`ProjectSettings/AudioManager.asset` already asks for stereo (`Default Speaker Mode: 2`); the
+managed half of this is the backstop for platforms that do not honour it at startup, and the
+plugin is the half that iOS actually needed.
+
 ## Differences from the web engine
 
 * Oscillators are naive shapes, not band-limited like Web Audio's — slight aliasing shimmer
@@ -219,7 +330,7 @@ tail out underneath.
 
 `raptor-march-neon` (in `raptor-march.json`) is the reference template for the format: the
 Raptor March harmony at 108 BPM in C major (≈ 4.4 s intro + ≈ 71.1 s loop). The menu theme
-(`MusicPlayer.MenuThemeId`) is currently `black-tide`. See
+(`MusicPlayer.MenuThemeId`) is currently `flak-parade`. See
 [The Raptor March arrangement](#the-raptor-march-arrangement) below.
 
 `air-assault` is the aerial-combat strain at 152 BPM in A minor, scored as retrowave off the

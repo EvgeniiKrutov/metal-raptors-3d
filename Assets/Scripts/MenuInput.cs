@@ -1,9 +1,26 @@
+using UnityEngine;
 using UnityEngine.InputSystem;
 
 namespace MetalRaptors
 {
+    public readonly struct MenuPointer
+    {
+        public readonly Vector2 Position;
+        public readonly bool Pressed;
+        public readonly bool PressedThisFrame;
+
+        public MenuPointer(Vector2 position, bool pressed, bool pressedThisFrame)
+        {
+            Position = position;
+            Pressed = pressed;
+            PressedThisFrame = pressedThisFrame;
+        }
+    }
+
     public static class MenuInput
     {
+        public static bool IsTouchPlatform => Application.isMobilePlatform;
+
         public static int ReadStep()
         {
             Keyboard kb = Keyboard.current;
@@ -51,6 +68,8 @@ namespace MetalRaptors
                                 || pad.buttonWest.wasPressedThisFrame || pad.buttonNorth.wasPressedThisFrame
                                 || pad.startButton.wasPressedThisFrame)) return true;
 
+            if (ReadTap()) return true;
+
             Mouse mouse = Mouse.current;
             return mouse != null && mouse.leftButton.wasPressedThisFrame;
         }
@@ -60,7 +79,8 @@ namespace MetalRaptors
             Keyboard kb = Keyboard.current;
             Gamepad pad = Gamepad.current;
             return (kb != null && kb.spaceKey.wasPressedThisFrame)
-                   || (pad != null && pad.buttonSouth.wasPressedThisFrame);
+                   || (pad != null && pad.buttonSouth.wasPressedThisFrame)
+                   || ReadTap();
         }
 
         public static bool ReadCancel()
@@ -69,6 +89,27 @@ namespace MetalRaptors
             Gamepad pad = Gamepad.current;
             return (kb != null && kb.escapeKey.wasPressedThisFrame)
                    || (pad != null && pad.buttonEast.wasPressedThisFrame);
+        }
+
+        public static bool ReadTap()
+        {
+            Touchscreen touch = Touchscreen.current;
+            return touch != null && touch.primaryTouch.press.wasPressedThisFrame;
+        }
+
+        public static MenuPointer ReadPointer()
+        {
+            Touchscreen touch = Touchscreen.current;
+            if (touch != null && touch.primaryTouch.press.isPressed)
+                return new MenuPointer(touch.primaryTouch.position.ReadValue(), true,
+                    touch.primaryTouch.press.wasPressedThisFrame);
+
+            Mouse mouse = Mouse.current;
+            if (mouse != null)
+                return new MenuPointer(mouse.position.ReadValue(), mouse.leftButton.isPressed,
+                    mouse.leftButton.wasPressedThisFrame);
+
+            return default;
         }
     }
 }

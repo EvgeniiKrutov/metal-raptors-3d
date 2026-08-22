@@ -7,7 +7,10 @@ namespace MetalRaptors
 {
     public class LevelBriefing : MonoBehaviour
     {
-        public const string Prompt = "Press any key to continue...";
+        public const string KeyPrompt = "Press any key to continue...";
+        public const string TouchPrompt = "Tap anywhere to continue...";
+
+        public static string Prompt => MenuInput.IsTouchPlatform ? TouchPrompt : KeyPrompt;
 
         const int SortingOrder = 300;
 

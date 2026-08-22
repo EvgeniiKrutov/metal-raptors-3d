@@ -26,7 +26,26 @@ namespace MetalRaptors
 
             var view = img.gameObject.AddComponent<MenuArrowView>();
             view._image = img;
+            view.AddTouchPad();
             return view;
+        }
+
+        void AddTouchPad()
+        {
+            float pad = MenuTheme.ArrowPad;
+            if (pad <= 0f) return;
+
+            var go = new GameObject("Touch", typeof(Image));
+            go.transform.SetParent(_image.rectTransform, false);
+
+            var area = go.GetComponent<Image>();
+            area.color = Color.clear;
+
+            var rt = area.rectTransform;
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = new Vector2(-pad, -pad);
+            rt.offsetMax = new Vector2(pad, pad);
         }
 
         public RectTransform RectTransform => _image.rectTransform;

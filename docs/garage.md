@@ -17,9 +17,9 @@ uGUI buttons and the volume steppers are gone, along with `GameManager`'s
 │     SOPWITH CAMEL       │                           │  ← the plane's own name
 │     ───                 │                           │
 │                         │                           │
-│     ▐FIGHTER▌           │                           │  ← type badge
-│     Great Britain       │        the plane,         │
-│                         │   parked, on the ground   │
+│  ▐FIGHTER▌ Great Britain│        the plane,         │  ← badge + country, one row
+│     colour   ◀ green ▶  │   parked, on the ground   │  ← Sopwith only; the value
+│                         │                           │    is centred between them
 │     MAX SPEED           │                           │
 │     ███████████░░░░░    │                           │
 │     ROTATION SPEED      │                           │
@@ -33,9 +33,9 @@ uGUI buttons and the volume steppers are gone, along with `GameManager`'s
 │     HEALTH              │                           │
 │     ██████████░░░░░░    │                           │
 │                         │                           │
-│     colour   ◀ green ▶  │                           │  ← Sopwith only; the value
-│                         │                           │    is centred between them
 │     select plane        │                           │
+│                         │                           │
+│     back                │                           │  ← a SectionGap above it
 │                         │                           │
 ◀                         │                           ▶  ← switch the plane
 │                                                     │
@@ -43,6 +43,8 @@ uGUI buttons and the volume steppers are gone, along with `GameManager`'s
 │      credited with more enemy aircraft downed…      │    not on the column
 └─────────────────────────────────────────────────────┘
       ↑ 200px, not the 120px every other screen uses
+        the badge row is drawn to the column edge here for want of characters;
+        it is really ~256px of the column's 592px
 ```
 
 The column is the same left 40% every other menu screen uses, so the title, the captions,
@@ -51,11 +53,31 @@ the bars and `select plane` all read down one left edge. The two triangles hang 
 only two things in the whole menu that are not composed against a left inset, because they
 belong to the screen rather than to the list.
 
+### The triangles and the notch
+
+Each triangle is inset from its own side by `GarageArrowInset` (44px) **plus that side's
+safe-area inset** — `MenuTheme.SafeLeft` / `SafeRight`, read from `Screen.safeArea` when the
+canvas is built (docs/touch-input.md). On a desktop both are 0 and nothing moves. On an
+iPhone in landscape the Dynamic Island covers ~147 canvas units of one edge, which is where
+the left triangle was sitting: invisible, and unreachable by a finger. Because the value comes
+from `safeArea` rather than a constant, the inset follows the phone through a rotation and
+lands on whichever side the island is on.
+
+On touch the triangles are also `ArrowScale`× bigger and carry an invisible `ArrowPad` hit
+area, since a 30×38 glyph is about 12pt across on a phone (docs/touch-input.md).
+
 The garage is the one screen that does **not** take the shared `PadLeft` (120px). It builds
 its column through `MenuLayout.CreateRegion` with `GaragePadLeft` (200px) instead, because
 it is the only screen with something outside the column on the same side: at 120px the list
 would start just 46px clear of the left triangle and read as crowding it. That leaves 512px
 of inner width, which the 460px stat bars still sit inside.
+
+`GaragePadLeft` is a property rather than that flat 200, because the triangle it is clearing
+does not always start at the same place: it is
+`max(200, SafeLeft + GarageArrowInset + GarageArrowSize.x + GarageArrowToColumn)`, so a
+notched phone in landscape pushes the column to 313 and keeps the 80px of air over the
+triangle (docs/touch-input.md). The `max` is what keeps the bars fitting — 479px of column
+against a 460px bar — where adding the inset to the 200 outright would have left 445.
 
 The description is anchored `GarageDescriptionBottom` (124px) off the bottom and drawn
 `LowerCenter`, so it grows upward from that line rather than down from a top edge — it sits
@@ -63,12 +85,13 @@ under the plane's band (which stops at 24% of the height) and about 40px under t
 **wide** entry in the column, tying the two halves together instead of floating at the page's
 foot.
 
-That constant is set against the column, not chosen for looks, and it moved from 168px when
-the `colour` row was added: the row pushes everything below it 54px down
-(`ItemRowHeight` + `ItemGap`) and, at 460px, it is exactly as wide as the stat bars — so it
-reaches into the description's x-range where `select plane` (~150px of text) never did. The
-description had to drop by the same 54px to keep the clearance it had. The widest low row in
-the column is what this number is solved against; adding another one means moving it again.
+That constant is set against the column, not chosen for looks. It moved from 168px when the
+460px-wide `colour` row was added low in the column — it reached into the description's
+x-range where `select plane` (~150px of text) never did, so the description dropped by the
+row's own 54px to keep the clearance it had. The `colour` row has since moved up under the
+badge, which leaves `select plane` and `back` as the lowest rows and both are narrow again;
+124 stays anyway, because what it now clears is the **plane's band**, which stops at 24% of
+the height. At 168 the description's box would reach past that line and print over the band.
 
 ## The plane
 
@@ -79,7 +102,7 @@ happens to the body differ:
 | | main menu | garage |
 | --- | --- | --- |
 | band | right 60%, full height | from 32.8% across, from 24% of the height up |
-| pose | cursor-driven flight, bob and sway | parked front three-quarter, drag to turn |
+| pose | cursor-driven flight, bob and sway | parked front three-quarter, drag or swipe to turn |
 | framing | height-bound, room reserved for the bank | width-bound, ~86% of the band |
 | propeller | always spinning | still, except during the select animation |
 
@@ -177,7 +200,8 @@ height is read against the ground it stands on, not against the middle of an inv
 
 ### Drag to turn
 
-Holding the left button anywhere over the plane's band and moving left/right turns the plane
+Holding the left button — or a finger, `MenuInput.ReadPointer` reads whichever is down
+(docs/touch-input.md) — anywhere over the plane's band and moving left/right turns the plane
 on the spot, so it can be looked at from any side; letting go eases it back to the parked
 pose. Both ends run through one `Mathf.SmoothDamp` on a single yaw offset, with the only
 difference being how hard it pulls — `DragSmoothing` (0.06) while held so it tracks the hand,
@@ -188,6 +212,8 @@ difference being how hard it pulls — `DragSmoothing` (0.06) while held so it t
   `DragDegreesPerScreen` (480°).
 * The offset is clamped to ±`MaxDragDeg` (180°), which already reaches every side of the
   airframe, so a long drag can never wind up a multi-turn unwind on release.
+* A lifted finger reports no pointer at all, which reads the same as a released button: the
+  drag ends and the position is never used, since it is only read while `_dragging`.
 * A drag only **starts** inside the band (`RectTransformUtility.RectangleContainsScreenPoint`
   against the rig's `RegionRect`), so dragging across the stat bars does not spin the plane.
   Once started it keeps tracking outside the band, which is what makes a fast flick work.
@@ -330,7 +356,7 @@ Camel it always had, so the two planes still read the same way against each othe
 whole scale just moved up. The Albatros arrived after that raise and was written against the
 new scale directly.
 
-Above the bars sit two rows that are not bars, and neither carries a caption:
+Above the bars sits **one** row that is not a bar, carrying two things and no caption:
 
 * the **type badge** — a filled rectangle in the type's own colour with its name in the page
   background colour, built by `MenuBadge`. `PlaneType` pairs the label with the colour and
@@ -338,19 +364,33 @@ Above the bars sit two rows that are not bars, and neither carries a caption:
   a plane needs them); a plane points at one through `PlaneModelConfig.type`. The badge sizes
   itself to its text plus `BadgePadX` either side, so a longer type name just makes a wider
   badge. All three planes are `Fighter` today.
-* the **country** — a bare `Fg` value, no caption over it. It reads fine unlabelled under the
-  plane's name, and the caption would only be in the way of the flag that is going there.
+* the **country**, `BadgeValueGap` (16px) to the right of it — a bare `Fg` value, no caption.
+  It reads fine unlabelled beside the type, and a caption would only be in the way of the flag
+  that is going there.
 
-`MenuStatRow` builds the bar and both value shapes; `MenuPanel.AddStatBar` / `AddStatText` /
-`AddBadge` place them in the panel's cursor flow alongside the entries. None of them is
-registered as focusable — they are content, so the highlight skips them.
+The country used to be its own row under the badge. It is a short value against a short
+badge — `FIGHTER` is ~90px of a 592px column — so a whole 46px row for it was two thirds air,
+and pairing them reads as one line about *what this aeroplane is* before the numbers start.
+It also buys back 46px of column, which is what the taller touch rows spend
+(docs/touch-input.md).
+
+`MenuBadge` owns the value rather than the panel: the badge's width changes with the type
+name, so the label is anchored to the badge's **right edge** with a pivot on its own left
+(`anchorMin = anchorMax = (1, 0.5)`) and follows any resize for free — no reflow pass, and
+`Set` stays the only thing that measures text.
+
+`MenuStatRow` now builds bars only, and `MenuPanel.AddStatBar` / `AddBadge` place them in the
+panel's cursor flow alongside the entries. Neither is registered as focusable — they are
+content, so the highlight skips them. (`AddStatText`, `MenuStatRow.CreateBareValue` and
+`StatValueRowHeight` went with the old row; the badge's value is the only bare value left and
+it keeps `StatValueSize`.)
 
 Stat captions have their **own** size (`StatCaptionSize`, 20px on a 26px row) rather than
 sharing the menu's 14px `CaptionSize`: here the caption names the thing being read, so it
 carries the row, where elsewhere a caption only heads a list. `StatRowGap` (18px) is tuned
-against that height to keep the badge, the country, the six bars and `select plane` inside
-the column — the whole block runs ~536px from `ListTop`, ending ~288px above the bottom of a
-1080 screen, with the description another ~39px below that.
+against that height to keep the badge row, the six bars and `select plane` inside the column —
+the whole block runs ~490px from `ListTop`, ending ~334px above the bottom of a 1080 screen,
+with the description another ~39px below that.
 
 ### The bars are real
 
@@ -386,20 +426,29 @@ The description under each plane is a short history of the real aircraft, held i
 
 ## Colour
 
-Under the bars sits a `colour` selector row — the plane's skin, described in full in
-`docs/plane-skins.md`. It is an ordinary `MenuPanel.AddSelector`, the same widget custom
-battle uses for `map` and `weather`, so it comes with its own pair of triangles that grey out
-at the ends of the list.
+Directly under the badge row, above the first stat caption, sits the `colour` selector — the
+plane's skin, described in full in `docs/plane-skins.md`. It is an ordinary
+`MenuPanel.AddSelector`, the same widget custom battle uses for `map` and `weather`, so it
+comes with its own pair of triangles that grey out at the ends of the list.
+
+It used to sit under the bars, a `SectionGap` above `select plane`. It reads better against
+the badge: what the plane *is* and what it *wears* are both identity, and the six bars below
+are one uninterrupted block of numbers rather than a block with a widget hanging off it. The
+column is no taller for the move — the `SectionGap` that used to be above the row is now above
+`select plane`, so every row below sits exactly where it did.
 
 Three things are particular to it:
 
 * **It is per plane, and only the Sopwith has more than one skin.** `PlaneSkins.Selectable`
   is false for the Fokker (no skins) and for the Albatros (one, `plywood`, which it always
-  wears), so the row is switched off and `select plane` moves up by
-  `ColourRowHeight` (54px) to close the gap it left. `MenuPanel` skips focusables whose
-  GameObject is inactive — that rule lives in `MoveFocus` / `FocusFirst` rather than in the
-  garage, so any panel can hide a row now — and if the hidden row happened to hold the
-  focus, `RefreshColour` hands it to `select plane`.
+  wears), so the row is switched off and **everything below it** — the six bars, `select
+  plane` and `back` — moves up by `ColourRowHeight` (54px) to close the gap it left. That is
+  why `MenuStatRow` builds its caption and bar under a root of its own now: a bar is one
+  transform with a `SetY`, like a `MenuItemView`, so the garage can shift the block by
+  re-anchoring seven things it recorded the tops of at build time. `MenuPanel` skips
+  focusables whose GameObject is inactive — that rule lives in `MoveFocus` / `FocusFirst`
+  rather than in the garage, so any panel can hide a row now — and if the hidden row happened
+  to hold the focus, `RefreshColour` hands it to `select plane`.
 * **Changing it is not a selection.** There is no confirm step: `PickColour` writes straight
   through `GameManager.SetSkin` (persisted to `PlayerPrefs` immediately, like the plane) and
   repaints the preview. `select plane` is unaffected — the colour of a plane you are only
@@ -420,14 +469,27 @@ Three things are particular to it:
 * The list **wraps**: with three planes both triangles are always live, so neither ever greys
   out the way a selector row's do at the end of its values.
 * `↑` / `↓` move the focus inside the column — `colour` (when shown) and `select plane`.
-* **Holding the left button over the plane** and moving left/right turns it (see *Drag to
-  turn* above); releasing eases it back. The band overlaps the right triangle, so a click
+* **Holding the left button (or a finger) over the plane** and moving left/right turns it (see
+  *Drag to turn* above); releasing eases it back. The band overlaps the right triangle, so a click
   there both switches the plane and opens a drag — harmless, since a click travels far too
   little to turn anything visibly.
-* `Enter` / `Space` selects; `Escape` returns to the main menu through `ScreenFade.Load`, so
-  the garage fades to black and the menu fades up out of it (`screen-fade.md`). There is no
-  `back` entry. Stepping planes is not a screen change and never fades — `Update` only bails
-  while `ScreenFade.IsBusy`, which is the departing transition itself.
+* `Enter` / `Space` selects; `Escape` and the `back` row both return to the main menu through
+  the same `GoBack` → `ScreenFade.Load`, so the garage fades to black and the menu fades up out
+  of it (`screen-fade.md`). Stepping planes is not a screen change and never fades — `Update`
+  only bails while `ScreenFade.IsBusy`, which is the departing transition itself.
+
+### The `back` row
+
+The garage used to have no `back` entry, because `Escape` was always at hand. On a phone it is
+not, and nothing else on the screen leaves it — so the row exists for the same reason the era
+and custom-battle pages have one, and is written the same way: a `SectionGap` and a
+`MenuPanel.AddNav`, tappable through `MenuItemView`'s pointer click (docs/touch-input.md).
+
+It sits under `select plane`, which means `RefreshColour` now moves **two** rows by
+`ColourRowHeight` when the `colour` selector is hidden, not one. It does *not* move the
+description: `GarageDescriptionBottom` is solved against the widest low row in the column
+(see *Structure*), and `back` is ~90px of text against the 460px `colour` row — it never
+reaches into the description's centred x-range, so the constant stands.
 
 ## Selecting
 
@@ -506,11 +568,12 @@ the badge from `type`, and the list length from `PlaneModels.All`.
 
 | File | Role |
 | --- | --- |
-| `GarageController.cs` | Composes the screen, owns the plane index, and refreshes everything from it. |
+| `GarageController.cs` | Composes the screen, owns the plane index, refreshes everything from it, and holds `GoBack`. |
+| `MenuInput.cs` | The shared reads, including `ReadPointer` for the drag (docs/touch-input.md). |
 | `GaragePlaneView.cs` | The parked plane: pose, contact shadow, propeller ramp, plane swap. |
 | `PlanePreviewRig.cs` | The camera + render texture + framing shared with `MenuPlaneView`. |
 | `MenuStatRow.cs` | One stat row, as a bar or as a text value (captioned or bare). |
-| `MenuBadge.cs` | The type badge: a filled rectangle sized to its own label. |
+| `MenuBadge.cs` | The type badge: a filled rectangle sized to its own label, plus the country value anchored off its right edge. |
 | `GroundShadowCatcher.shader` | The invisible ground that shows only the plane's cast shadow. |
 | `GarageLighting.cs` | Ambient, sun and shadow distance for the scene, mirroring a level's atmosphere. |
 | `PlaneSkin.cs` | The skins a plane can wear and how one is painted onto a model (`docs/plane-skins.md`). |

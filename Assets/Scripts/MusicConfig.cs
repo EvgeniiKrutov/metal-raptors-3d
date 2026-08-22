@@ -37,6 +37,7 @@ namespace MetalRaptors
         public float Spread;
         public float Width;
         public float Pan;
+        public bool HasPan;
         public float Gate = -1f;
         public float Glide;
         public float Duck;
@@ -233,6 +234,7 @@ namespace MetalRaptors
                 Spread = GetFloat(track, "spread", 0f),
                 Width = GetFloat(track, "width", 0f),
                 Pan = GetFloat(track, "pan", 0f),
+                HasPan = track.ContainsKey("pan"),
                 Gate = GetFloat(track, "gate", -1f),
                 Glide = GetFloat(track, "glide", 0f),
                 Duck = GetFloat(track, "duck", 0f),

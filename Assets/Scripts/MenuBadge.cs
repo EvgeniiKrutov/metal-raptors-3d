@@ -8,12 +8,14 @@ namespace MetalRaptors
         readonly RectTransform _root;
         readonly Image _face;
         readonly Text _text;
+        readonly Text _value;
 
-        MenuBadge(RectTransform root, Image face, Text text)
+        MenuBadge(RectTransform root, Image face, Text text, Text value)
         {
             _root = root;
             _face = face;
             _text = text;
+            _value = value;
         }
 
         public static MenuBadge Create(Transform parent, float top)
@@ -49,7 +51,20 @@ namespace MetalRaptors
             rt.offsetMin = Vector2.zero;
             rt.offsetMax = Vector2.zero;
 
-            return new MenuBadge(root, face, text);
+            return new MenuBadge(root, face, text, CreateValue(root));
+        }
+
+        static Text CreateValue(RectTransform badge)
+        {
+            Text text = UIFactory.CreateInlineLabel(badge, string.Empty, MenuTheme.StatValueSize,
+                Vector2.zero, MenuTheme.BadgeHeight, MenuTheme.Colors.Fg, UIFactory.MediumFont);
+
+            RectTransform rt = text.rectTransform;
+            rt.anchorMin = new Vector2(1f, 0.5f);
+            rt.anchorMax = new Vector2(1f, 0.5f);
+            rt.pivot = new Vector2(0f, 0.5f);
+            rt.anchoredPosition = new Vector2(MenuTheme.BadgeValueGap, 0f);
+            return text;
         }
 
         public void Set(string label, Color color)
@@ -59,6 +74,13 @@ namespace MetalRaptors
             _face.color = color;
             _root.sizeDelta = new Vector2(_text.preferredWidth + 2f * MenuTheme.BadgePadX,
                 MenuTheme.BadgeHeight);
+        }
+
+        public void SetValue(string text)
+        {
+            _value.text = text;
+            _value.rectTransform.sizeDelta =
+                new Vector2(_value.preferredWidth, MenuTheme.BadgeHeight);
         }
     }
 }

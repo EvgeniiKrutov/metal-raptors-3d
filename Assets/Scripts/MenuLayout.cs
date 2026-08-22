@@ -6,7 +6,8 @@ namespace MetalRaptors
     public static class MenuLayout
     {
         public static Transform CreatePage(Transform parent, string name, float widthFraction) =>
-            CreateRegion(parent, name, 0f, widthFraction, MenuTheme.PadLeft);
+            CreateRegion(parent, name, 0f, widthFraction, MenuTheme.PageInsetLeft,
+                MenuTheme.PageInsetRight);
 
         public static Transform CreateRegion(Transform parent, string name, float xMin, float xMax,
             float padLeft) =>

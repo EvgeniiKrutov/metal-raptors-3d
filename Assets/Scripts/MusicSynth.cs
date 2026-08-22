@@ -15,7 +15,7 @@ namespace MetalRaptors
     {
         public float[] Intro;
         public float[] Loop;
-        public int Channels = 1;
+        public int Channels = 2;
         public int Rate;
         public double IntroDuration;
     }
@@ -30,6 +30,36 @@ namespace MetalRaptors
         const float NoiseFilterHz = 3500f;
         const float NoiseMaxGateSec = 0.25f;
         const int NoiseSeed = 1234;
+
+        static readonly Dictionary<string, float> TrackPans = new Dictionary<string, float>
+        {
+            ["lead"] = -0.20f,
+            ["harmony"] = 0.28f,
+            ["arp"] = 0.42f,
+            ["hats"] = -0.30f,
+            ["organLow"] = -0.22f,
+            ["organMid"] = 0.26f,
+            ["organHigh"] = 0.40f,
+            ["horns"] = 0.30f,
+            ["lowbrass"] = -0.28f,
+            ["toms"] = 0.24f,
+            ["pulse"] = 0.30f,
+            ["grit"] = 0.30f,
+            ["drone"] = 0.22f,
+        };
+
+        readonly struct StereoGain
+        {
+            public readonly float L;
+            public readonly float R;
+
+            public StereoGain(float pan)
+            {
+                float p = Mathf.Clamp(pan, -1f, 1f);
+                L = p > 0f ? 1f - p : 1f;
+                R = p < 0f ? 1f + p : 1f;
+            }
+        }
 
         public static RenderedMusic Render(MusicConfig config)
         {
@@ -61,7 +91,7 @@ namespace MetalRaptors
             int from = intro ? 0 : loopStart;
             int to = intro ? loopStart : config.Sequence.Count;
             var durations = PatternDurations(config);
-            var bake = new MusicBake { Rate = rate, Channels = config.IsRetro ? 2 : 1 };
+            var bake = new MusicBake { Rate = rate, Channels = 2 };
 
             float[] samples;
             double lengthSec;
@@ -151,11 +181,11 @@ namespace MetalRaptors
                 if (durations.TryGetValue(config.Sequence[i], out double duration)) bodySec += duration;
             }
 
-            int samples = (int)Math.Round(bodySec * rate);
-            lengthSec = samples / (double)rate;
-            if (samples <= 0) return null;
+            int frames = (int)Math.Round(bodySec * rate);
+            lengthSec = frames / (double)rate;
+            if (frames <= 0) return null;
 
-            var buffer = new float[samples];
+            var buffer = new float[frames * 2];
             double secPerBeat = 60.0 / config.Tempo;
             double time = 0;
 
@@ -167,11 +197,13 @@ namespace MetalRaptors
                     foreach (var line in pattern)
                     {
                         if (!config.Tracks.TryGetValue(line.Key, out var track)) continue;
+                        var gain = new StereoGain(PanOf(line.Key, track));
                         double noteTime = time;
                         foreach (var note in line.Value)
                         {
                             double duration = note.Beats * secPerBeat;
-                            RenderNote(buffer, rate, track, note, noteTime, duration, config.Volume, noise);
+                            RenderNote(buffer, frames, rate, track, note, noteTime, duration,
+                                config.Volume, noise, gain);
                             noteTime += duration;
                         }
                     }
@@ -183,34 +215,41 @@ namespace MetalRaptors
             return buffer;
         }
 
-        static void RenderNote(float[] buffer, int rate, MusicTrack track, MusicNote note,
-            double startSec, double durationSec, float master, float[] noise)
+        static float PanOf(string name, MusicTrack track)
+        {
+            if (track.HasPan) return track.Pan;
+            return TrackPans.TryGetValue(name, out float pan) ? pan : 0f;
+        }
+
+        static void RenderNote(float[] buffer, int frames, int rate, MusicTrack track, MusicNote note,
+            double startSec, double durationSec, float master, float[] noise, StereoGain gain)
         {
             float level = track.Volume * note.Velocity * master;
             if (level <= 0f || durationSec <= 0) return;
 
             if (track.Wave == "noise")
             {
-                RenderNoise(buffer, rate, track, level, startSec, durationSec, noise);
+                RenderNoise(buffer, frames, rate, track, level, startSec, durationSec, noise, gain);
                 return;
             }
             if (note.Frequency <= 0f) return;
 
             if (track.Detune > 0f)
             {
-                RenderVoice(buffer, rate, track, note.Frequency, track.Detune / 2f,
-                    level * DetuneVoiceLevel, startSec, durationSec);
-                RenderVoice(buffer, rate, track, note.Frequency, -track.Detune / 2f,
-                    level * DetuneVoiceLevel, startSec, durationSec);
+                RenderVoice(buffer, frames, rate, track, note.Frequency, track.Detune / 2f,
+                    level * DetuneVoiceLevel, startSec, durationSec, gain);
+                RenderVoice(buffer, frames, rate, track, note.Frequency, -track.Detune / 2f,
+                    level * DetuneVoiceLevel, startSec, durationSec, gain);
             }
             else
             {
-                RenderVoice(buffer, rate, track, note.Frequency, 0f, level, startSec, durationSec);
+                RenderVoice(buffer, frames, rate, track, note.Frequency, 0f, level, startSec,
+                    durationSec, gain);
             }
         }
 
-        static void RenderVoice(float[] buffer, int rate, MusicTrack track, float frequency,
-            float detuneCents, float level, double startSec, double durationSec)
+        static void RenderVoice(float[] buffer, int frames, int rate, MusicTrack track, float frequency,
+            float detuneCents, float level, double startSec, double durationSec, StereoGain gain)
         {
             float attack = track.Attack >= 0f ? track.Attack : DefaultAttack;
             float release = track.Release >= 0f ? track.Release : DefaultRelease;
@@ -219,7 +258,7 @@ namespace MetalRaptors
 
             int start = (int)Math.Round(startSec * rate);
             if (start < 0) return;
-            int count = Math.Min((int)(gate * rate), buffer.Length - start);
+            int count = Math.Min((int)(gate * rate), frames - start);
             if (count <= 0) return;
 
             double phase = 0;
@@ -232,21 +271,26 @@ namespace MetalRaptors
                     t < attack ? (float)(t / attack) :
                     t <= releaseStart ? 1f :
                     (float)((gate - t) / (gate - releaseStart));
-                buffer[start + i] += Sample(track.Wave, phase) * level * env;
+
+                float sample = Sample(track.Wave, phase) * level * env;
+                int o = (start + i) * 2;
+                buffer[o] += sample * gain.L;
+                buffer[o + 1] += sample * gain.R;
+
                 phase += step;
                 if (phase >= 1.0) phase -= 1.0;
             }
         }
 
-        static void RenderNoise(float[] buffer, int rate, MusicTrack track, float level,
-            double startSec, double durationSec, float[] noise)
+        static void RenderNoise(float[] buffer, int frames, int rate, MusicTrack track, float level,
+            double startSec, double durationSec, float[] noise, StereoGain gain)
         {
             float attack = track.Attack >= 0f ? track.Attack : NoiseDefaultAttack;
             double gate = Math.Min(durationSec * GateRatio, NoiseMaxGateSec);
 
             int start = (int)Math.Round(startSec * rate);
             if (start < 0) return;
-            int count = Math.Min((int)(gate * rate), buffer.Length - start);
+            int count = Math.Min((int)(gate * rate), frames - start);
             if (count <= 0) return;
 
             for (int i = 0; i < count; i++)
@@ -255,7 +299,11 @@ namespace MetalRaptors
                 float env = t < attack
                     ? (float)(t / attack)
                     : (float)((gate - t) / (gate - attack));
-                buffer[start + i] += noise[i % noise.Length] * level * env;
+
+                float sample = noise[i % noise.Length] * level * env;
+                int o = (start + i) * 2;
+                buffer[o] += sample * gain.L;
+                buffer[o + 1] += sample * gain.R;
             }
         }
 

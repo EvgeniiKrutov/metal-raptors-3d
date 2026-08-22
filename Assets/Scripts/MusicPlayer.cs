@@ -54,6 +54,8 @@ namespace MetalRaptors
         static void Bootstrap()
         {
             if (Instance != null) return;
+
+            AudioOutput.EnsureStereo();
             var go = new GameObject("MusicPlayer");
             go.AddComponent<MusicPlayer>();
         }
@@ -71,7 +73,22 @@ namespace MetalRaptors
             _introSource = CreateSource(false);
             _loopSource = CreateSource(true);
             SceneManager.sceneLoaded += OnSceneLoaded;
+            AudioSettings.OnAudioConfigurationChanged += OnAudioConfigurationChanged;
             Prewarm(MenuThemeId);
+        }
+
+        void OnApplicationPause(bool paused)
+        {
+            if (!paused) AudioOutput.EnsureStereo();
+        }
+
+        void OnAudioConfigurationChanged(bool deviceChanged)
+        {
+            if (_currentId == null || _stopWhenSilent) return;
+
+            string id = _currentId;
+            _currentId = null;
+            Play(id, FadeInSec);
         }
 
         void Start()
@@ -82,7 +99,9 @@ namespace MetalRaptors
 
         void OnDestroy()
         {
-            if (Instance == this) SceneManager.sceneLoaded -= OnSceneLoaded;
+            if (Instance != this) return;
+            SceneManager.sceneLoaded -= OnSceneLoaded;
+            AudioSettings.OnAudioConfigurationChanged -= OnAudioConfigurationChanged;
         }
 
         void Update()
@@ -102,6 +121,8 @@ namespace MetalRaptors
         public void Play(string id, float fadeSec = FadeInSec)
         {
             if (_currentId == id && !_stopWhenSilent) return;
+
+            AudioOutput.EnsureStereo();
             Stop();
 
             if (RenderCache.TryGetValue(id, out var rendered))

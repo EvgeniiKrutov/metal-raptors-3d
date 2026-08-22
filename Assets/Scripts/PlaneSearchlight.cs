@@ -147,6 +147,12 @@ namespace MetalRaptors
             return mesh;
         }
 
+        public void Toggle()
+        {
+            if (GameMenu.IsOpen || LevelBriefing.IsOpen) return;
+            SetOn(!_on);
+        }
+
         void Update()
         {
             if (GameMenu.IsOpen || LevelBriefing.IsOpen) return;

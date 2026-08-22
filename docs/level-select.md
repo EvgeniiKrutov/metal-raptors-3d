@@ -15,14 +15,15 @@ and hanging a text entry under it would break the single row of focus.
    │  14 April 1916                                                    │  ← its date
    │  lorem ipsum dolor sit amet, consectetur adipiscing elit …        │  ← its brief
    │                                                                   │
-   │ ◀  ╔═════════╗┌─────────┐┌─────────┐┌─────────┐                 ▶ │
-   │    ║  ╱╲__╱╲ ║│ ╱╲_╱╲__ ││ ╱╲__╱╲_ ││ ~~~~~~~ │                   │
-   │    ║         ║│         ││         ││         │                   │
-   │    ║FIRST    ║│THE      ││FIXED    ││THE      │                   │
-   │    ║LIGHT    ║│NUMBERS  ││GROUND   ││RAVEN    │                   │
-   │    ╚═════════╝└─────────┘└─────────┘└─────────┘                   │
+   │ ◀ ╔═══════════╗┌───────────┐┌───────────┐┌───────────┐          ▶ │
+   │   ║  ╱╲__╱╲   ║│ ╱╲_╱╲__   ││ ╱╲__╱╲_   ││ ~~~~~~~   │            │
+   │   ║           ║│           ││           ││           │            │
+   │   ║FIRST      ║│THE        ││FIXED      ││THE        │            │
+   │   ║LIGHT      ║│NUMBERS    ││GROUND     ││RAVEN      │            │
+   │   ╚═══════════╝└───────────┘└───────────┘└───────────┘            │
    └───────────────────────────────────────────────────────────────────┘
-     ↑ 44px from the screen edge — outside the 120px content margin
+     ↑ 44px from the screen edge; the four faces fill everything between
+        the two arrow lanes, whatever the screen is
         ╚═╝ a cleared level keeps a green frame with no highlight on it
 ```
 
@@ -59,17 +60,23 @@ A level card carries two things and nothing else — the terrain art and the lev
 | foot | the title, `CardPad` up from the bottom, exactly where the era card now puts its own — wrapped to at most two lines, so `NOTHING BURNS AT NIGHT` fits the face without shrinking the type |
 
 The foot is **always two lines tall**, on every card, whether the title uses them or not.
-`LevelCardTitleRowHeight` is `2 × CardTitleLineHeight`, and `CardTitleLineHeight` (38) is
-Poppins-Bold's own line height at `CardTitleSize` — the font declares 1050 ascender, −350
-descender and a 100 line gap over 1000 units per em, so a 25px line is 37.5px tall and two
-of them need 75. The row was 66, which is where `NOTHING BURNS AT NIGHT` ran out of card:
-its first line had nowhere to go but up, into the art.
+A level card is built from `new CardMetrics(count, titleLines: 2)`, whose `TitleRowHeight` is
+`2 × CardTitleLineHeight`; `CardTitleLineHeight` (38) is Poppins-Bold's own line height at
+`CardTitleSize` — the font declares 1050 ascender, −350 descender and a 100 line gap over
+1000 units per em, so a 25px line is 37.5px tall and two of them need 75. The row was 66,
+which is where `NOTHING BURNS AT NIGHT` ran out of card: its first line had nowhere to go but
+up, into the art. (Era cards pass `titleLines: 1` and get the flat `CardTitleRowHeight`
+instead.)
 
-`LevelCardArtBottom` then adds `CardTitleToArt` on top of that row, the same 14px of air the
-era card keeps over its own title, so the terrain stops clear of the type rather than resting
-on it. Both numbers are the same on all eight cards, so the art baseline does not jump
-between a one-line and a two-line title — the longest title in the campaign sets the grid
-and the rest sit in it.
+`ArtBottom` then adds `CardTitleToArt` on top of that row, the same 14px of air the era card
+keeps over its own title, so the terrain stops clear of the type rather than resting on it.
+Both numbers are the same on all eight cards, so the art baseline does not jump between a
+one-line and a two-line title — the longest title in the campaign sets the grid and the rest
+sit in it.
+
+Every one of those numbers is scaled by `k = Size / CardSizeMax` inside `CardMetrics`, so a
+face that is not 360px keeps its proportions rather than carrying a 25px title whatever its
+size — 360 is the ratio's origin, not a ceiling (docs/main-menu.md).
 
 The level number, the map name and the `COMPLETED` / `LOCKED` tags are gone. The number was
 the weakest thing on the card (the row is already in order, and the header names the level),
@@ -129,18 +136,21 @@ It is now the *fallback*: an era with a baked render of its own aircraft shows t
 
 ## Scrolling (`MenuLevelRow`)
 
-Eight cards do not fit: `LevelVisibleCards` (4) are visible on the same pitch the era row
-uses — `MenuTheme.CardSize`, which is fitted to the canvas width, plus the 40px gap
-(docs/main-menu.md). `MenuLevelRow` is a `RectMask2D` viewport with a track inside it, and the track slides
-one card at a time.
+Eight cards do not fit: `LevelVisibleCards` (4) are visible, on the same size and pitch the
+era row uses — `new CardMetrics(LevelVisibleCards, titleLines: 2, top)`, whose face is
+`MenuTheme.RowCardSize` fitted to the screen (docs/main-menu.md). `MenuLevelRow` is a
+`RectMask2D` viewport with a track inside it, and the track slides one card at a time.
 
-* the viewport is padded by `CardBorder` on all four sides and the track offset back by the
-  same 4px, so the focus frame of the first and last visible card is not clipped away by the
-  mask;
+* the viewport is `LevelVisibleCards` faces and their gaps wide — which is `RowWidth`
+  exactly, since that is what the face was solved from — padded by `CardMetrics.Border` on all
+  four sides, with the track offset back by the same, so the focus frame of the first and last
+  visible card is not clipped away by the mask;
 * `Slide(±1)` moves the window one card. The triangles at the screen edges call it — they are
-  `MenuTheme.GarageArrowSize`, the garage's big arrows, placed `GarageArrowInset` (44px) from
-  the canvas edges and centred on the row's own vertical middle. They sit **outside** the
-  120px content margin, so they never collide with a card;
+  `MenuTheme.GarageArrowSize`, the garage's big arrows, placed `GarageArrowInset` (44px) plus
+  that side's safe-area inset from the canvas edge and centred on the row's own vertical
+  middle. The row's own margin is `max(PadLeft, RowArrowLane)`, so a card lands exactly
+  `ArrowToCards` (46px) clear of a triangle on both sides, at any width
+  (docs/touch-input.md);
 * the row does **not** wrap, and a triangle greys out (`Muted`) once there is nothing that way
   — the same end-of-list rule the custom battle selectors follow;
 * `←`/`→` (and the d-pad) move the *highlight*, clamped at both ends, and `Reveal` drags the

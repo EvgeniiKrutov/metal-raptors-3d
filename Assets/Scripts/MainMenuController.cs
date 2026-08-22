@@ -112,7 +112,7 @@ namespace MetalRaptors
                 MenuTheme.DescriptionLineSpacing, MenuTheme.Colors.Muted, UIFactory.MediumFont);
 
             float top = MenuTheme.ListTop - MenuTheme.DescriptionRowHeight - MenuTheme.DescriptionToCards;
-            _eras = new MenuCardRow(page, "Era Cards", top);
+            _eras = new MenuCardRow(page, "Era Cards", top, CareerEras.All.Length);
 
             CareerEra[] eras = CareerEras.All;
             for (int i = 0; i < eras.Length; i++)
@@ -179,8 +179,8 @@ namespace MetalRaptors
         {
             Transform band = MenuLayout.CreateRegion(screen, "Level Arrows", 0f, 1f, 0f, 0f);
 
-            _levelLeft = CreateEdgeArrow(band, true);
-            _levelRight = CreateEdgeArrow(band, false);
+            _levelLeft = CreateEdgeArrow(band, true, _levels.CardSize);
+            _levelRight = CreateEdgeArrow(band, false, _levels.CardSize);
 
             _levelLeft.Clicked += () => _levels.Slide(-1);
             _levelRight.Clicked += () => _levels.Slide(1);
@@ -191,20 +191,21 @@ namespace MetalRaptors
             _levelRight.Exited += UpdateLevelArrows;
         }
 
-        static MenuArrowView CreateEdgeArrow(Transform band, bool pointsLeft)
+        static MenuArrowView CreateEdgeArrow(Transform band, bool pointsLeft, float cardSize)
         {
             MenuArrowView view = MenuArrowView.Create(band, pointsLeft, Vector2.zero,
                 MenuTheme.GarageArrowSize);
 
             float anchorX = pointsLeft ? 0f : 1f;
-            float x = pointsLeft ? MenuTheme.GarageArrowInset
-                                 : -(MenuTheme.GarageArrowInset + MenuTheme.GarageArrowSize.x);
+            float x = pointsLeft
+                ? MenuTheme.SafeLeft + MenuTheme.GarageArrowInset
+                : -(MenuTheme.SafeRight + MenuTheme.GarageArrowInset + MenuTheme.GarageArrowSize.x);
 
             RectTransform rt = view.RectTransform;
             rt.anchorMin = new Vector2(anchorX, 1f);
             rt.anchorMax = new Vector2(anchorX, 1f);
             rt.pivot = new Vector2(0f, 0.5f);
-            rt.anchoredPosition = new Vector2(x, MenuTheme.LevelCardsTop - MenuTheme.CardSize * 0.5f);
+            rt.anchoredPosition = new Vector2(x, MenuTheme.LevelCardsTop - cardSize * 0.5f);
             return view;
         }
 

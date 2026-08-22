@@ -71,17 +71,31 @@ namespace MetalRaptors
             scaler.referenceResolution = new Vector2(ReferenceWidth, ReferenceHeight);
             scaler.matchWidthOrHeight = ScaleMatch;
 
-            MenuTheme.Fit(CanvasWidth());
+            float scale = CanvasScale();
+            MenuTheme.Fit(Screen.width > 0 ? Screen.width / scale : ReferenceWidth,
+                Screen.height > 0 ? Screen.height / scale : ReferenceHeight, ScreenSafeInsets(scale));
             return canvas;
         }
 
-        static float CanvasWidth()
+        static float CanvasScale()
         {
-            if (Screen.width <= 0 || Screen.height <= 0) return ReferenceWidth;
+            if (Screen.width <= 0 || Screen.height <= 0) return 1f;
 
             float scale = Mathf.Pow(Screen.width / ReferenceWidth, 1f - ScaleMatch)
                           * Mathf.Pow(Screen.height / ReferenceHeight, ScaleMatch);
-            return scale > 0f ? Screen.width / scale : ReferenceWidth;
+            return scale > 0f ? scale : 1f;
+        }
+
+        static SafeInsets ScreenSafeInsets(float scale)
+        {
+            if (Screen.width <= 0 || Screen.height <= 0) return default;
+
+            Rect safe = Screen.safeArea;
+            return new SafeInsets(
+                Mathf.Max(0f, safe.xMin) / scale,
+                Mathf.Max(0f, Screen.width - safe.xMax) / scale,
+                Mathf.Max(0f, Screen.height - safe.yMax) / scale,
+                Mathf.Max(0f, safe.yMin) / scale);
         }
 
         public static void EnsureEventSystem()
@@ -327,6 +341,66 @@ namespace MetalRaptors
             _solid = Sprite.Create(tex, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f));
             _solid.hideFlags = HideFlags.HideAndDontSave;
             return _solid;
+        }
+
+        static readonly Dictionary<int, Sprite> Rounded = new Dictionary<int, Sprite>();
+
+        public static Sprite RoundedSprite(float radius, float stroke = 0f)
+        {
+            float r = Mathf.Max(1f, radius);
+            int border = Mathf.CeilToInt(r) + 1;
+            return RoundedSprite(border * 2 + 4, r, stroke, border);
+        }
+
+        public static Sprite RoundedSprite(int size, float radius, float stroke)
+            => RoundedSprite(size, Mathf.Max(1f, radius), stroke, 0);
+
+        static Sprite RoundedSprite(int size, float radius, float stroke, int border)
+        {
+            float t = Mathf.Max(0f, stroke);
+            int key = (border > 0 ? 1 << 30 : 0) | (size << 20)
+                      | (Mathf.RoundToInt(radius * 4f) << 10) | Mathf.RoundToInt(t * 4f);
+            if (Rounded.TryGetValue(key, out Sprite cached) && cached != null) return cached;
+
+            float half = size * 0.5f;
+            float inset = half - radius;
+
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            {
+                name = $"Rounded {key}",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+                hideFlags = HideFlags.HideAndDontSave,
+            };
+
+            var pixels = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                float py = Mathf.Abs(y + 0.5f - half);
+                float qy = Mathf.Max(py - inset, 0f);
+                for (int x = 0; x < size; x++)
+                {
+                    float px = Mathf.Abs(x + 0.5f - half);
+                    float qx = Mathf.Max(px - inset, 0f);
+
+                    float d = Mathf.Sqrt(qx * qx + qy * qy) - radius;
+                    float alpha = Mathf.Clamp01(0.5f - d);
+                    if (t > 0f) alpha *= Mathf.Clamp01(d + t + 0.5f);
+
+                    pixels[y * size + x] = new Color32(255, 255, 255, (byte)(alpha * 255f));
+                }
+            }
+
+            tex.SetPixels32(pixels);
+            tex.Apply();
+
+            Sprite sprite = Sprite.Create(tex, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f),
+                100f, 0, SpriteMeshType.FullRect,
+                new Vector4(border, border, border, border));
+            sprite.hideFlags = HideFlags.HideAndDontSave;
+
+            Rounded[key] = sprite;
+            return sprite;
         }
 
         static readonly Dictionary<int, Sprite> Rings = new Dictionary<int, Sprite>();

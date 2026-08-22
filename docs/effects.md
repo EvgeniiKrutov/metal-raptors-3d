@@ -334,9 +334,10 @@ figures from primitives too and now disables the same way.
 
 ## HUD health bar (`HealthBar.cs`)
 
-Shared by both level controllers: a dark plate, a fill anchored to the left edge that drains
-right-to-left as damage comes in (scaled on X by the health fraction) and shades from green to
-red, plus the number on top.
+Shared by both level controllers: a translucent light-grey track with no border or plate, and a
+**white** fill anchored to the left edge that drains right-to-left as damage comes in (scaled on X
+by the health fraction), plus the number on top in near-black. Damage uncovers the grey track
+rather than recolouring the fill. See docs/hud.md.
 
 ## `IDamageable`
 

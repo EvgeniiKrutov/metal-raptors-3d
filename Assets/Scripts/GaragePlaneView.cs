@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.InputSystem;
 using UnityEngine.Rendering;
 
 namespace MetalRaptors
@@ -276,25 +275,22 @@ namespace MetalRaptors
 
         void ReadDrag()
         {
-            var mouse = Mouse.current;
-            if (mouse == null) { _dragging = false; return; }
+            MenuPointer pointer = MenuInput.ReadPointer();
 
-            Vector2 position = mouse.position.ReadValue();
-
-            if (mouse.leftButton.wasPressedThisFrame && OverBand(position))
+            if (pointer.PressedThisFrame && OverBand(pointer.Position))
             {
                 _dragging = true;
-                _dragStartX = position.x;
+                _dragStartX = pointer.Position.x;
                 _dragAnchor = _dragYaw;
             }
-            else if (!mouse.leftButton.isPressed)
+            else if (!pointer.Pressed)
             {
                 _dragging = false;
             }
 
             if (!_dragging || Screen.width <= 0) return;
 
-            float travel = (position.x - _dragStartX) / Screen.width;
+            float travel = (pointer.Position.x - _dragStartX) / Screen.width;
             _dragTarget = Mathf.Clamp(_dragAnchor + travel * DragDegreesPerScreen,
                 -MaxDragDeg, MaxDragDeg);
         }

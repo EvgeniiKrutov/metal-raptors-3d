@@ -201,7 +201,7 @@ MonoBehaviour:
       data:
         m_Version: 0
         m_TerrainDetailLit: {fileID: 4800000, guid: f6783ab646d374f94b199774402a5144, type: 3}
-        m_TerrainDetailGrassBillboard: {fileID: 4800000, guid: 29868e73b638e48ca99a19ea58c48d90, type: 3}
+        m_TerrainDetailGrassBillboard: {fileID: 4800000, guid: fd713985f7dd4f4c820c0eefa1b6c79d, type: 3}
         m_TerrainDetailGrass: {fileID: 4800000, guid: e507fdfead5ca47e8b9a768b51c291a1, type: 3}
     - rid: 3297788625684791306
       type: {class: ScreenSpaceAmbientOcclusionDynamicResources, ns: UnityEngine.Rendering.Universal, asm: Unity.RenderPipelines.Universal.Runtime}

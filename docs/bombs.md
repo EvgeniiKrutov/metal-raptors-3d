@@ -165,18 +165,15 @@ blast radii out. Distance is measured in XY from `_camBasePos`, i.e. as seen on 
 from the camera itself, which sits 420 units back and would flatten the whole curve. It is raised
 with `Mathf.Max`, so a bomb never damps a shake already running.
 
-**HUD.** `CooldownSquare` is a **56 × 56 bordered square** carrying a single letter, used twice:
-`H` for the bomb at `(-832, 425)` in both level scenes, its left edge flush with the health
-bar's at −860, and `R` for the boost 8 px below it (docs/boost.md). The searchlight indicator
-moved right to `(-719, 425)` to sit beside the bomb square.
-
-Inside the square a **radial sweep** fills the cooldown like a clock: an `Image` in
-`Filled` / `Radial360` mode, origin **top**, running **clockwise**, its `fillAmount` driven by
-`PlaneBomber.Charge`. On release the square empties and the sweep travels one full turn over the
-5-second cooldown; the border, the letter and the sweep all brighten from grey to the square's
-tint the moment the weapon is ready — amber `(1, 0.85, 0.55)` for the bomb, pale blue for the
-boost, so the two are told apart at a glance rather than by reading the letter. Radial fill needs
-a sprite (a null-sprite `Image` draws a plain quad and ignores `fillAmount`), so it uses
+**HUD.** The bomb owns the first `CooldownSquare` in the HUD's left-hand action column, labelled
+`H` on desktop and `BOMB` on touch. Inside it a **radial sweep** fills the cooldown like a clock:
+an `Image` in `Filled` / `Radial360` mode, origin **top**, running **clockwise**, its `fillAmount`
+driven by `PlaneBomber.Charge`. While the bomb is ready the square is hollow — a white rounded
+outline and a white letter, nothing inside. On release the outline fades to a ghost, a faint clock
+hand turns inside it, and a grey arc of the **same stroke width as the border** closes round the
+perimeter over the 5-second cooldown; both land on full together and snap back to white the moment
+it is ready (docs/hud.md). Radial fill needs a sprite (a
+null-sprite `Image` draws a plain quad and ignores `fillAmount`), so it uses
 `UIFactory.SolidSprite` — a cached 4 × 4 white texture, the same generate-once pattern as the
 triangle and ring sprites.
 
@@ -184,5 +181,6 @@ It reads not-ready whenever the bomber is stopped, and whenever the cinematic ba
 so it stays honest during the campaign fly-in and radio lines — though in a cutscene the HUD is
 not on screen at all (docs/level-intro.md).
 
-Because both squares are always present, the campaign's task list always docks below them
-(`TaskTop`, 321) instead of moving up when the level has no searchlight.
+The square is also **pressable**, through `HudPressRelay` on to `PlaneBomber.Request()` — the same
+method the `H` key now calls. See docs/hud.md for the column, the colour scheme and the touch
+metrics.

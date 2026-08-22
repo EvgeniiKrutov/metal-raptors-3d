@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
+using UnityEngine.UI;
 
 namespace MetalRaptors
 {
@@ -51,10 +52,7 @@ namespace MetalRaptors
         readonly List<EnemyController> _enemies = new List<EnemyController>();
         SoundSystem _sound;
 
-        HealthBar _healthBar;
-        SearchlightIndicator _lightIndicator;
-        CooldownSquare _bombSquare;
-        CooldownSquare _boostSquare;
+        LevelHud _hudView;
         GameObject _hud;
 
         float _halfViewHeight;
@@ -257,8 +255,13 @@ namespace MetalRaptors
 
         void Update()
         {
+            if (MenuInput.ReadCancel()) TryPause();
+        }
+
+        void TryPause()
+        {
             if (_gameOver || GameMenu.IsOpen || ScreenFade.IsBusy) return;
-            if (MenuInput.ReadCancel()) GameMenu.Open(GameMenuKind.Pause, Subtitle, _hud);
+            GameMenu.Open(GameMenuKind.Pause, Subtitle, _hud);
         }
 
         string Subtitle => $"level {levelNumber} | {TerrainNames.For(_level.terrain.kind)}";
@@ -393,37 +396,23 @@ namespace MetalRaptors
             var canvas = UIFactory.CreateCanvas($"Level{levelNumber} HUD");
             _hud = canvas.gameObject;
 
-            UIFactory.CreateText(canvas.transform, $"LEVEL {levelNumber}", 52,
-                new Vector2(0, 480), new Vector2(1000, 90), TextAnchor.MiddleCenter, FontStyle.Bold);
+            Text piloting = UIFactory.CreateText(canvas.transform,
+                $"Piloting: {GameManager.CurrentPlane.displayName}", 30, Vector2.zero, Vector2.zero);
+            var rt = piloting.rectTransform;
+            rt.anchorMin = new Vector2(0.5f, 1f);
+            rt.anchorMax = new Vector2(0.5f, 1f);
+            rt.pivot = new Vector2(0.5f, 1f);
+            rt.sizeDelta = new Vector2(1200f, HudTheme.BarHeight);
+            rt.anchoredPosition = new Vector2(0f, -HudTheme.ColumnTop);
 
-            UIFactory.CreateText(canvas.transform, $"Piloting: {GameManager.CurrentPlane.displayName}", 30,
-                new Vector2(0, 420), new Vector2(1200, 50));
-
-            UIFactory.CreateText(canvas.transform,
-                "A / D to steer  •  F to fire  •  H to bomb  •  R to boost  •  "
-                + "destroy the enemy  •  don't hit the ground", 28,
-                new Vector2(0, -500), new Vector2(1600, 50));
-
-            _healthBar = new HealthBar(canvas.transform, new Vector2(-660f, 480f));
-            _bombSquare = new CooldownSquare(canvas.transform, new Vector2(-832f, 425f), "H",
-                CooldownSquare.BombTint);
-            _boostSquare = new CooldownSquare(canvas.transform, new Vector2(-832f, 361f), "R",
-                CooldownSquare.BoostTint);
-            if (_searchlight != null)
-                _lightIndicator = new SearchlightIndicator(canvas.transform, new Vector2(-719f, 425f));
-            UpdateHealthHud();
+            _hudView = new LevelHud(canvas.transform,
+                "destroy the enemy  •  don't hit the ground",
+                _cube, _shooter, _bomber, _boost, _searchlight, TryPause);
         }
 
         void UpdateHealthHud()
         {
-            if (_lightIndicator != null && _searchlight != null)
-                _lightIndicator.Set(_searchlight.IsOn);
-            if (_bombSquare != null && _bomber != null)
-                _bombSquare.Set(_bomber.Charge, _bomber.IsReady);
-            if (_boostSquare != null && _boost != null)
-                _boostSquare.Set(_boost.Charge, _boost.IsReady || _boost.IsRunning);
-            if (_cube == null || _healthBar == null) return;
-            _healthBar.Set(_cube.CurrentHealth, _cube.MaxHealth);
+            if (_hudView != null) _hudView.Tick();
         }
     }
 }

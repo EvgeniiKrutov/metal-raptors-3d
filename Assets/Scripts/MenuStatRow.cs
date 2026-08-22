@@ -8,23 +8,33 @@ namespace MetalRaptors
         public const float BarHeight = MenuTheme.StatCaptionRowHeight + MenuTheme.StatCaptionToValue
                                        + MenuTheme.StatBarHeight;
 
-        public const float BareValueHeight = MenuTheme.StatValueRowHeight;
-
+        readonly RectTransform _root;
         readonly RectTransform _fill;
-        readonly Text _value;
 
-        MenuStatRow(RectTransform fill, Text value)
+        MenuStatRow(RectTransform root, RectTransform fill)
         {
+            _root = root;
             _fill = fill;
-            _value = value;
         }
+
+        public float Top => _root.anchoredPosition.y;
 
         public static MenuStatRow CreateBar(Transform parent, string label, float top)
         {
-            CreateCaption(parent, label, top);
+            var go = new GameObject($"Stat ({label})", typeof(RectTransform));
+            go.transform.SetParent(parent, false);
 
-            float barTop = top - MenuTheme.StatCaptionRowHeight - MenuTheme.StatCaptionToValue;
-            Image track = CreateBarImage(parent, "Track", MenuTheme.StatBarWidth, barTop,
+            var root = (RectTransform)go.transform;
+            root.anchorMin = new Vector2(0f, 1f);
+            root.anchorMax = new Vector2(0f, 1f);
+            root.pivot = new Vector2(0f, 1f);
+            root.sizeDelta = new Vector2(MenuTheme.StatBarWidth, BarHeight);
+            root.anchoredPosition = new Vector2(0f, top);
+
+            CreateCaption(root, label, 0f);
+
+            float barTop = -(MenuTheme.StatCaptionRowHeight + MenuTheme.StatCaptionToValue);
+            Image track = CreateBarImage(root, "Track", MenuTheme.StatBarWidth, barTop,
                 MenuTheme.Colors.Border);
             Image fill = CreateBarImage(track.rectTransform, "Fill", 0f, 0f, MenuTheme.Colors.Accent);
 
@@ -35,22 +45,16 @@ namespace MetalRaptors
             rt.sizeDelta = new Vector2(0f, 0f);
             rt.anchoredPosition = Vector2.zero;
 
-            return new MenuStatRow(rt, null);
+            return new MenuStatRow(root, rt);
         }
 
-        public static MenuStatRow CreateBareValue(Transform parent, float top) =>
-            new MenuStatRow(null, UIFactory.CreateLabel(parent, string.Empty, MenuTheme.StatValueSize,
-                top, MenuTheme.StatValueRowHeight, MenuTheme.Colors.Fg, UIFactory.MediumFont));
+        public void SetY(float y) =>
+            _root.anchoredPosition = new Vector2(_root.anchoredPosition.x, y);
 
         public void SetFill(float fraction)
         {
             if (_fill == null) return;
             _fill.sizeDelta = new Vector2(MenuTheme.StatBarWidth * Mathf.Clamp01(fraction), 0f);
-        }
-
-        public void SetValue(string text)
-        {
-            if (_value != null) _value.text = text;
         }
 
         static void CreateCaption(Transform parent, string label, float top)

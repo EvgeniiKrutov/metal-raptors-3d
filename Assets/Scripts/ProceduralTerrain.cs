@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 namespace MetalRaptors
 {
@@ -27,6 +28,7 @@ namespace MetalRaptors
         internal const float WallSeamLift = 3f;
 
         public const string GrassTemplateResource = "GrassTerrainTemplate";
+        public const string GrassBillboardShader = "Hidden/MetalRaptors/BillboardWavingDoublePass";
         public const int GrassTextureSeed = 1917;
 
         const int GrassDetailRes = 1024;
@@ -43,6 +45,7 @@ namespace MetalRaptors
         static readonly Color GrassDry = new Color(0.40f, 0.32f, 0.22f);
 
         static TerrainData _grassTemplate;
+        static bool _grassShaderChecked;
 
         public static System.Func<float, float, bool> Build(int seed, float width,
             float cameraDistance, float playPlaneZ, Daytime daytime, Weather weather)
@@ -98,6 +101,7 @@ namespace MetalRaptors
 
         public static TerrainData NewTerrainData()
         {
+            CheckGrassShader();
             if (_grassTemplate == null) _grassTemplate = Resources.Load<TerrainData>(GrassTemplateResource);
 
             if (_grassTemplate == null)
@@ -108,6 +112,22 @@ namespace MetalRaptors
             }
 
             return Object.Instantiate(_grassTemplate);
+        }
+
+        static void CheckGrassShader()
+        {
+            if (_grassShaderChecked) return;
+            _grassShaderChecked = true;
+
+            if (!GraphicsSettings.TryGetRenderPipelineSettings<UniversalRenderPipelineRuntimeTerrainShaders>(
+                    out var shaders)) return;
+
+            Shader billboard = shaders.terrainDetailGrassBillboardShader;
+            if (billboard != null && billboard.name == GrassBillboardShader) return;
+
+            Debug.LogWarning("ProceduralTerrain: the terrain detail grass billboard shader is "
+                             + $"'{(billboard == null ? "null" : billboard.name)}', not "
+                             + $"'{GrassBillboardShader}'; grass will be invisible on a mobile GPU.");
         }
 
         internal static float FogEndDistance(float cameraDistance, float playPlaneZ)

@@ -20,7 +20,7 @@ namespace MetalRaptors
         public bool Interactable { get; private set; }
 
         public static MenuLevelCard Create(Transform parent, CampaignLevelEntry level,
-            bool unlocked, bool completed)
+            bool unlocked, bool completed, CardMetrics metrics)
         {
             var go = new GameObject($"Level Card ({level.Number})",
                 typeof(RectTransform), typeof(MenuLevelCard));
@@ -33,22 +33,22 @@ namespace MetalRaptors
             rt.anchorMin = new Vector2(0f, 1f);
             rt.anchorMax = new Vector2(0f, 1f);
             rt.pivot = new Vector2(0f, 1f);
-            rt.sizeDelta = new Vector2(MenuTheme.CardSize, MenuTheme.CardSize);
+            rt.sizeDelta = new Vector2(metrics.Size, metrics.Size);
             view._rt = rt;
 
-            view._frame = MenuCardView.CreateFrame(rt);
+            view._frame = MenuCardView.CreateFrame(rt, metrics.Border);
             MenuCardView.CreateFace(rt);
 
             view._art = TerrainSilhouette.Create(rt, "Art");
             RectTransform art = view._art.rectTransform;
             art.anchorMin = new Vector2(0f, 0f);
             art.anchorMax = new Vector2(1f, 1f);
-            art.offsetMin = new Vector2(0f, MenuTheme.LevelCardArtBottom);
-            art.offsetMax = new Vector2(0f, -MenuTheme.CardPad);
+            art.offsetMin = new Vector2(0f, metrics.ArtBottom);
+            art.offsetMax = new Vector2(0f, -metrics.Pad);
             view._art.SetProfile(level.Terrain, level.Seed);
 
-            view._title = UIFactory.CreateBottomWrapLabel(rt, level.Title, MenuTheme.CardTitleSize,
-                MenuTheme.CardPad, MenuTheme.LevelCardTitleRowHeight, MenuTheme.CardPad,
+            view._title = UIFactory.CreateBottomWrapLabel(rt, level.Title, metrics.TitleSize,
+                metrics.Pad, metrics.TitleRowHeight, metrics.Pad,
                 MenuTheme.Colors.Fg, UIFactory.BoldFont);
 
             view._completed = unlocked && completed;

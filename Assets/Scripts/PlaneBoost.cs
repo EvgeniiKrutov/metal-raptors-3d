@@ -36,6 +36,12 @@ namespace MetalRaptors
 
         public void Resume() => enabled = true;
 
+        public void Request()
+        {
+            if (!IsReady || _running > 0f || GameMenu.IsOpen || LevelBriefing.IsOpen) return;
+            Begin();
+        }
+
         void Update()
         {
             if (_config == null || GameMenu.IsOpen || LevelBriefing.IsOpen) return;
@@ -49,12 +55,8 @@ namespace MetalRaptors
 
             _cooldown = Mathf.Max(0f, _cooldown - Time.deltaTime);
 
-            if (CinematicBars.AnyShowing) return;
-
             var kb = Keyboard.current;
-            if (kb == null || !kb.rKey.wasPressedThisFrame || _cooldown > 0f) return;
-
-            Begin();
+            if (kb != null && kb.rKey.wasPressedThisFrame) Request();
         }
 
         void Begin()

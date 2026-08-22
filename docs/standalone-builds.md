@@ -135,3 +135,55 @@ game uses:
 The blade texture is baked once rather than per level seed. Nine randomly placed blades in a
 64×128 sprite is not variety anyone can see at the gameplay camera distance, and a shared
 asset is what the workaround requires.
+
+### Grass is invisible on a mobile GPU
+
+Everything above got grass into a desktop player. On iOS it was still missing — with no error,
+no magenta, and the template and shaders all present in the build (`resources.assets` carries
+`GrassBlades` and `GrassTerrainTemplate`; `globalgamemanagers.assets` carries the detail
+shaders).
+
+The cause is one word in URP's own `Shaders/Terrain/WavingGrassInput.hlsl`, in the distance
+fade every grass vertex runs through:
+
+```hlsl
+half3 offset = vertex.xyz - _CameraPosition.xyz;
+color.a = saturate (2 * (_WaveAndDistance.w - dot (offset, offset)) * _CameraPosition.w);
+```
+
+`offset` is **`half`**. On a desktop GPU `half` compiles to 32-bit float and nothing happens.
+On a mobile GPU it is a real 16-bit float, whose largest finite value is 65504 — so
+`dot(offset, offset)` overflows to infinity as soon as the grass is more than **~255 units**
+from the camera. `_WaveAndDistance.w - inf` is `-inf`, `saturate` clamps it to 0, the vertex
+alpha is 0, and `_ALPHATEST_ON` discards the blade. The billboard is still built and still
+drawn; it is simply transparent.
+
+This battlefield puts the camera 420 units out and the terrain runs 800 deep, so **every**
+blade is past that line: no grass at all on iOS, and no tuning of `detailObjectDistance` can
+bring it back — the number that overflows is the distance to the camera, not the fade radius.
+
+`Assets/Shaders/Resources/MRGrassBillboard.shader` is URP's `WavingGrassBillboard.shader` with
+the same four passes and one substitution: it includes `MRGrassBillboardInput.hlsl`, a copy of
+URP's input file whose `offset` is a `float3`. Nothing else differs, and on a desktop GPU the
+change is a no-op, so both platforms run the same shader.
+
+Wiring it up takes two settings, because the terrain engine picks the detail shaders itself —
+there is no material to override:
+
+* `Assets/Settings/UniversalRenderPipelineGlobalSettings.asset` points
+  `UniversalRenderPipelineRuntimeTerrainShaders.m_TerrainDetailGrassBillboard` at it. That
+  resource can only be written in the **editor** (in a player the setter raises), which is why
+  the swap is a serialized asset edit rather than a line of startup code.
+* **Always Included Shaders** carries it alongside the URP one, so the build keeps it whether
+  or not the settings reference is enough on its own.
+
+`ProceduralTerrain.CheckGrassShader` reads the setting back on the first terrain build and
+warns if it is not `Hidden/MetalRaptors/BillboardWavingDoublePass`. URP's resource system only
+auto-fills **null** fields, so the pointer should survive; a package upgrade that migrates the
+container would silently undo the fix, and this is exactly the kind of failure that is
+otherwise invisible.
+
+Only the billboard shader is patched. `WavingGrass.shader` (`DetailRenderMode.Grass`) shares
+the same faulty include and would need the same treatment if a prototype ever used it;
+`TerrainDetailLit` (`DetailRenderMode.VertexLit`, mesh details) has no distance fade at all.
+

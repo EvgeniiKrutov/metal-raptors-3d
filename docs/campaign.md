@@ -185,7 +185,8 @@ a full-screen page before the level starts. Custom battles skip it. See docs/lev
 - `PlaneFactory` — aircraft rig building (model orientation/mirroring, collider, propeller,
   muzzle mount), moved out of `LevelController` so both controllers spawn identical planes.
   The plane physics layer constant lives there too.
-- `HealthBar` — the HUD health readout used by both level types.
+- `HealthBar` — the HUD health readout used by both level types, now built by the shared
+  `LevelHud` along with the action column and the hint line (docs/hud.md).
 - `ProceduralTerrain` now exposes its shared ingredients (land layer, grass prototype/detail
   setup, cut-wall mesh + material, crater bowl maths, per-daytime fog) for the streamer.
 

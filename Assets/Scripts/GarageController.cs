@@ -5,13 +5,13 @@ namespace MetalRaptors
 {
     public class GarageController : MonoBehaviour
     {
-        const float ColourRowHeight = MenuTheme.ItemRowHeight + MenuTheme.ItemGap;
+        static float ColourRowHeight => MenuTheme.ItemRowHeight + MenuTheme.ItemGap;
 
         MenuPanel _panel;
         MenuItemView _selectItem;
+        MenuItemView _backItem;
         MenuSelectorRow _colour;
         MenuBadge _typeBadge;
-        MenuStatRow _country;
         MenuStatRow[] _bars;
 
         MenuArrowView _left;
@@ -22,7 +22,9 @@ namespace MetalRaptors
         Text _description;
 
         int _index;
+        float[] _barTops;
         float _selectTop;
+        float _backTop;
 
         PlaneModelConfig Plane => PlaneModels.All[_index];
 
@@ -60,23 +62,31 @@ namespace MetalRaptors
             _panel = new MenuPanel(column, "Garage Panel", MenuTheme.ListTop);
 
             _typeBadge = _panel.AddBadge();
-            _country = _panel.AddStatText();
+            _colour = _panel.AddSelector("colour", PlaneSkins.Labels(Plane), 0, PickColour);
 
             _bars = new MenuStatRow[PlaneStatBars.All.Length];
+            _barTops = new float[_bars.Length];
             for (int i = 0; i < _bars.Length; i++)
+            {
                 _bars[i] = _panel.AddStatBar(PlaneStatBars.All[i].label);
+                _barTops[i] = _bars[i].Top;
+            }
 
             _panel.AddGap(MenuTheme.SectionGap);
-            _colour = _panel.AddSelector("colour", PlaneSkins.Labels(Plane), 0, PickColour);
             _selectItem = _panel.AddNav("select plane", SelectPlane);
             _selectTop = _selectItem.RectTransform.anchoredPosition.y;
+
+            _panel.AddGap(MenuTheme.SectionGap);
+            _backItem = _panel.AddNav("back", GoBack);
+            _backTop = _backItem.RectTransform.anchoredPosition.y;
         }
 
         void BuildArrows(Transform screen)
         {
-            _left = CreateArrow(screen, true, 0f, MenuTheme.GarageArrowInset);
+            _left = CreateArrow(screen, true, 0f,
+                MenuTheme.SafeLeft + MenuTheme.GarageArrowInset);
             _right = CreateArrow(screen, false, 1f,
-                -(MenuTheme.GarageArrowInset + MenuTheme.GarageArrowSize.x));
+                -(MenuTheme.SafeRight + MenuTheme.GarageArrowInset + MenuTheme.GarageArrowSize.x));
 
             _left.Clicked += () => Step(-1);
             _right.Clicked += () => Step(1);
@@ -117,8 +127,10 @@ namespace MetalRaptors
             if (step != 0) _panel.MoveFocus(step);
 
             if (MenuInput.ReadSubmit()) _panel.ActivateFocused();
-            if (MenuInput.ReadCancel()) ScreenFade.Load(SceneNames.MainMenu);
+            if (MenuInput.ReadCancel()) GoBack();
         }
+
+        static void GoBack() => ScreenFade.Load(SceneNames.MainMenu);
 
         void Step(int delta)
         {
@@ -150,7 +162,7 @@ namespace MetalRaptors
             _title.text = plane.displayName.ToUpperInvariant();
             _description.text = plane.description;
             _typeBadge.Set(plane.type.label, plane.type.color);
-            _country.SetValue(plane.country);
+            _typeBadge.SetValue(plane.country);
 
             for (int i = 0; i < _bars.Length; i++)
             {
@@ -177,7 +189,11 @@ namespace MetalRaptors
                     PlaneSkins.IndexOf(plane, SkinOf(plane)));
 
             _colour.gameObject.SetActive(selectable);
-            _selectItem.SetY(selectable ? _selectTop : _selectTop + ColourRowHeight);
+
+            float shift = selectable ? 0f : ColourRowHeight;
+            for (int i = 0; i < _bars.Length; i++) _bars[i].SetY(_barTops[i] + shift);
+            _selectItem.SetY(_selectTop + shift);
+            _backItem.SetY(_backTop + shift);
 
             if (!selectable && _panel.Focused == (IMenuFocusable)_colour)
                 _panel.Focus(_selectItem);
