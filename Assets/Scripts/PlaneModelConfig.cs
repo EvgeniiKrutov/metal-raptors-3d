@@ -143,6 +143,9 @@ namespace MetalRaptors
 
         public static readonly PlaneModelConfig[] All = { Sopwith, Fokker, Albatros };
 
+        public static PlaneModelConfig EnemyFor(EnemyRole role) =>
+            role == EnemyRole.Scout ? Fokker : Albatros;
+
         public static PlaneModelConfig ById(string id)
         {
             if (string.IsNullOrEmpty(id)) return null;

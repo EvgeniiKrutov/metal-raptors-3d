@@ -2,9 +2,9 @@
 
 Implemented in `EnemyController`, split by `EnemyConfig.role`. Two assets carry the
 numbers — `Assets/Resources/EnemyScoutConfig.asset` and `EnemyFighterConfig.asset` —
-loaded through `EnemyConfigs.Load` by `CampaignEnemies` (campaign) and `LevelController`
-(custom battle). `DuelPlane`, the companion's scripted foe, is a separate AI and is not
-affected by any of this.
+loaded through `EnemyConfigs.Load` by `CampaignEnemies` (campaign and custom battle) and
+`LevelController` (the fixed Level scenes). `DuelPlane`, the companion's scripted foe, is a
+separate AI and is not affected by any of this.
 
 ## The two fights
 

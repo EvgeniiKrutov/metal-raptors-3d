@@ -95,7 +95,8 @@ is painted, what it decorates with, and what extra meshes ride along with it).
   custom battle screen did it), the controller builds
   `CampaignLevels.Custom(map, daytime)` — the picked map's seed under the picked sky — in
   place of the authored definition. Career's start clears the request first, so the two
-  entry points never bleed into each other.
+  entry points never bleed into each other. It flies no script, so its only enemies are the
+  ones the dev console's spawn buttons launch (docs/dev-stats.md).
 
 ## Streamed Verdun terrain (`VerdunTerrain`)
 

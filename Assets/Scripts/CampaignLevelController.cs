@@ -5,7 +5,7 @@ using UnityEngine.Rendering.Universal;
 
 namespace MetalRaptors
 {
-    public class CampaignLevelController : MonoBehaviour, ICampaignScriptHost
+    public class CampaignLevelController : MonoBehaviour, ICampaignScriptHost, IDevSpawnHost
     {
         const float WorldTop = 650f;
         const float CubeHalf = 15f;
@@ -112,7 +112,11 @@ namespace MetalRaptors
             BeginIntro();
             BeginCompanion(config);
             ShowBriefing();
+
+            if (CustomBattle.Requested) DevSpawn.Register(this);
         }
+
+        void OnDestroy() => DevSpawn.Unregister(this);
 
         bool HasBriefing => !CustomBattle.Requested && !string.IsNullOrEmpty(_level.title);
 
@@ -158,10 +162,17 @@ namespace MetalRaptors
             CampaignScript script = CampaignScript.Load(_level.script);
             if (script == null) return;
 
-            _enemies = new CampaignEnemies(_cube.GetComponent<Rigidbody>(), AiGroundY, WorldTop,
-                _level);
+            EnsureEnemies();
             _dialogue = new DialogueBar(_hud.transform);
             _runner = CampaignScriptRunner.Begin(gameObject, script, this, _dialogue);
+        }
+
+        void EnsureEnemies()
+        {
+            if (_enemies != null) return;
+
+            _enemies = new CampaignEnemies(_cube.GetComponent<Rigidbody>(), AiGroundY, WorldTop,
+                _level);
         }
 
         float AiGroundY => Coast ? SeaSurface.Level : ProceduralTerrain.MaxHeight;
@@ -356,6 +367,18 @@ namespace MetalRaptors
         {
             if (_gameOver || _enemies == null) return;
             _enemies.Spawn(groups, _camBasePos.x, _halfViewWidth);
+        }
+
+        public bool CanDevSpawn =>
+            !_gameOver && !_playerFalling && _cube != null && _cam != null && !Cinematic;
+
+        public void DevSpawnPlane(EnemyRole role)
+        {
+            if (!CanDevSpawn) return;
+
+            EnsureEnemies();
+            _enemies.Spawn(new[] { new EnemyGroup(PlaneModels.EnemyFor(role), 1) },
+                _camBasePos.x, _halfViewWidth);
         }
 
         public float WarnIncoming(int planes)

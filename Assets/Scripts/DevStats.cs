@@ -29,6 +29,12 @@ namespace MetalRaptors
 
         const float MeterWarn = 0.7f;
 
+        const float SpawnRuleGap = 12f;
+        const float SpawnCaptionGap = 8f;
+        const float SpawnButtonHeight = 30f;
+        const float SpawnButtonGap = 8f;
+        const int SpawnFontSize = 14;
+
         static readonly Color PanelColor = new Color(0.04f, 0.05f, 0.07f, 0.84f);
         static readonly Color TitleColor = new Color(0.52f, 0.58f, 0.66f, 1f);
         static readonly Color LabelColor = new Color(0.60f, 0.66f, 0.74f, 1f);
@@ -37,12 +43,22 @@ namespace MetalRaptors
         static readonly Color MeterLow = new Color(0.36f, 0.80f, 0.52f, 1f);
         static readonly Color MeterMid = new Color(0.94f, 0.76f, 0.30f, 1f);
         static readonly Color MeterHigh = new Color(0.90f, 0.32f, 0.26f, 1f);
+        static readonly Color SpawnPendingColor = new Color(0.94f, 0.76f, 0.30f, 1f);
 
         struct Row
         {
             public Text Value;
             public RectTransform Fill;
             public Image FillImage;
+        }
+
+        class SpawnAction
+        {
+            public EnemyRole Role;
+            public string Caption;
+            public Button Button;
+            public Text Label;
+            public float Remaining;
         }
 
         static DevStats _instance;
@@ -56,10 +72,18 @@ namespace MetalRaptors
         bool _hasTiming;
 
         GameObject _panel;
+        RectTransform _panelRt;
         Row _cpu;
         Row _gpu;
         Row _ram;
         Row _fps;
+
+        GameObject _spawnSection;
+        SpawnAction _scoutSpawn;
+        SpawnAction _fighterSpawn;
+        float _statsHeight;
+        float _spawnPanelHeight;
+        bool _spawnShown;
 
         double _frameSum;
         double _cpuSum;
@@ -145,7 +169,63 @@ namespace MetalRaptors
             _ram = CreateRow(content, "RAM", ref y, false);
             _fps = CreateRow(content, "FPS", ref y, false);
 
-            rt.sizeDelta = new Vector2(PanelWidth, -y - RowGap + 2f * PadY);
+            _panelRt = rt;
+            _statsHeight = -y - RowGap + 2f * PadY;
+            BuildSpawnSection(content, y);
+            rt.sizeDelta = new Vector2(PanelWidth, _statsHeight);
+        }
+
+        void BuildSpawnSection(Transform content, float y)
+        {
+            var go = new GameObject("Spawn", typeof(RectTransform));
+            go.transform.SetParent(content, false);
+            _spawnSection = go;
+
+            var rt = (RectTransform)go.transform;
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.pivot = new Vector2(0.5f, 1f);
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+
+            UIFactory.CreateRule(go.transform, y, new Vector2(PanelWidth - 2f * PadX, 1f),
+                MeterTrackColor);
+            y -= SpawnRuleGap;
+
+            UIFactory.CreateLabel(go.transform, "SPAWN", TitleSize, y, TitleRowHeight,
+                TitleColor, UIFactory.MediumFont);
+            y -= TitleRowHeight + SpawnCaptionGap;
+
+            _scoutSpawn = CreateSpawnButton(go.transform, "SPAWN SCOUT", EnemyRole.Scout, ref y);
+            _fighterSpawn = CreateSpawnButton(go.transform, "SPAWN FIGHTER", EnemyRole.Fighter,
+                ref y);
+
+            _spawnPanelHeight = -y - SpawnButtonGap + 2f * PadY;
+            go.SetActive(false);
+        }
+
+        SpawnAction CreateSpawnButton(Transform parent, string caption, EnemyRole role, ref float y)
+        {
+            Button button = UIFactory.CreateButton(parent, caption, Vector2.zero, null,
+                new Vector2(0f, SpawnButtonHeight), fontSize: SpawnFontSize);
+
+            var rt = (RectTransform)button.transform;
+            rt.anchorMin = new Vector2(0f, 1f);
+            rt.anchorMax = new Vector2(1f, 1f);
+            rt.pivot = new Vector2(0.5f, 1f);
+            rt.sizeDelta = new Vector2(0f, SpawnButtonHeight);
+            rt.anchoredPosition = new Vector2(0f, y);
+            y -= SpawnButtonHeight + SpawnButtonGap;
+
+            var action = new SpawnAction
+            {
+                Role = role,
+                Caption = caption,
+                Button = button,
+                Label = button.GetComponentInChildren<Text>(),
+            };
+            button.onClick.AddListener(() => BeginSpawn(action));
+            return action;
         }
 
         static Transform CreateContent(RectTransform panel)
@@ -221,6 +301,8 @@ namespace MetalRaptors
             Keyboard kb = Keyboard.current;
             if (kb != null && kb.tabKey.wasPressedThisFrame) SetVisible(!_visible);
 
+            TickSpawn();
+
             if (!_visible) return;
 
             Sample();
@@ -242,6 +324,65 @@ namespace MetalRaptors
             _samples = 0;
             _gpuSamples = 0;
             _elapsed = 0f;
+        }
+
+        void TickSpawn()
+        {
+            bool available = DevSpawn.Available;
+            if (available != _spawnShown) ShowSpawnSection(available);
+            if (!available) return;
+
+            Countdown(_scoutSpawn);
+            Countdown(_fighterSpawn);
+        }
+
+        void ShowSpawnSection(bool shown)
+        {
+            _spawnShown = shown;
+            if (_spawnSection != null) _spawnSection.SetActive(shown);
+            if (_panelRt != null)
+                _panelRt.sizeDelta =
+                    new Vector2(PanelWidth, shown ? _spawnPanelHeight : _statsHeight);
+
+            if (shown) return;
+
+            ResetSpawn(_scoutSpawn);
+            ResetSpawn(_fighterSpawn);
+        }
+
+        void BeginSpawn(SpawnAction action)
+        {
+            if (action.Remaining > 0f || !DevSpawn.Available) return;
+
+            action.Remaining = DevSpawn.Delay;
+            action.Button.interactable = false;
+            action.Label.color = SpawnPendingColor;
+            action.Label.text = $"{action.Caption}   {action.Remaining:0.0}";
+        }
+
+        void Countdown(SpawnAction action)
+        {
+            if (action == null || action.Remaining <= 0f) return;
+
+            action.Remaining -= Time.unscaledDeltaTime;
+            if (action.Remaining > 0f)
+            {
+                action.Label.text = $"{action.Caption}   {action.Remaining:0.0}";
+                return;
+            }
+
+            ResetSpawn(action);
+            DevSpawn.Spawn(action.Role);
+        }
+
+        static void ResetSpawn(SpawnAction action)
+        {
+            if (action == null) return;
+
+            action.Remaining = 0f;
+            action.Button.interactable = true;
+            action.Label.color = ValueColor;
+            action.Label.text = action.Caption;
         }
 
         void Sample()
