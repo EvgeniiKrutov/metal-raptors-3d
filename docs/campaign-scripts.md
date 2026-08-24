@@ -273,31 +273,35 @@ fighter is in a boundary band often, and the old rate-forcing `EdgeSteer` could 
 against the frame indefinitely (see docs/flight-model.md).
 
 Waves spawn off-screen ahead of the player (camera edge + 110 m, each further plane 90 m behind the
-last, so a group arrives strung out rather than as one clump) at a random altitude between the
-ground's safe margin and 120 m under the ceiling. The AI's ground reference is the terrain's
-maximum height on land and the sea level on Flanders Coast — a flat conservative floor, since the
-streamed ground under an enemy is not sampled.
+last, so a group arrives strung out rather than as one clump) at a random altitude **inside the
+plane's home altitude band** — the deck for scouts, the high band for fighters (docs/enemies.md) —
+so a wave arrives already in position. The AI's ground reference is the terrain's maximum height on
+land and the sea level on Flanders Coast, a flat conservative floor; the scout is the one exception
+and raycasts the streamed ground under itself so its corridor can follow the contour.
 
 `AliveCount` is what makes `wave` blocking; the list also drops planes destroyed by any other
 means, so nothing can wedge the script permanently.
 
-Every wave in a level flies the shared `EnemyConfig` asset, with per-level overrides taken from
-the `CampaignDefinition` — `0` on any of them keeps the asset's own figure, so a level can be
-made softer or tougher without a second config asset:
+The plane named in a wave entry decides its **role**, through `PlaneModelConfig.enemyRole`:
+`albatros` flies as a fighter, `fokker` as a scout. Each role has its own asset —
+`EnemyScoutConfig` and `EnemyFighterConfig` — and the whole of docs/enemies.md is about what
+that changes. Per-level difficulty is a pair of multipliers on `CampaignDefinition`, applied to
+both role assets; `0` on either keeps the asset's own figure:
 
-| Field | Asset default | Level 1 |
+| Field | Level 1 | Level 8 |
 | --- | --- | --- |
-| `enemyHealth` | 100 | 50 |
-| `enemyRotationSpeed` | 105 °/s | 84 °/s (−20%) |
+| `enemyHealthScale` | 0.50 | 1.00 |
+| `enemyRotationScale` | 0.80 | 1.18 |
 
-`CampaignEnemies` takes the whole definition and never touches the loaded asset — it clones it
-once per level and edits the clone, since a Resources asset mutated at runtime stays mutated for
-the rest of the editor session.
+`CampaignEnemies` takes the whole definition and never touches the loaded assets — `EnemyConfigs.
+Load` clones each one per level and the scaling edits the clone, since a Resources asset mutated
+at runtime stays mutated for the rest of the editor session.
 
-Both level 1 overrides pull in the same direction: it is the tutorial for the guns, not a test of
+Both level 1 multipliers pull in the same direction: it is the tutorial for the guns, not a test of
 them. Half health means the opening fight is short against the 150 health the player brings into
-it, and the slower turn rate stops a fighter from simply rotating onto the player's tail faster
-than a new player can answer — at 84°/s the Albatros no longer out-turns the Sopwith's own 120.
+it, and the slower turn rate stops an enemy from simply rotating onto the player's tail faster
+than a new player can answer — at 84°/s it no longer out-turns the Sopwith's own 120. Level 1 also
+flies **only scouts**, so the tutorial is the deck fight and never the fighter's diving pass.
 
 ## Level 1
 

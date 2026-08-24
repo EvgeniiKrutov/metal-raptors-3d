@@ -163,7 +163,7 @@ namespace MetalRaptors
             _roll.Tick(dt, _heading, !left && !right, _config.rotationSpeed);
             ApplyRotation();
 
-            UpdateSpeed(dt);
+            _speed = CruiseSpeed;
             Vector3 vel = new Vector3(Mathf.Cos(_heading), Mathf.Sin(_heading), 0f) * _speed;
 
             Vector3 pos = _rb.position;
@@ -213,15 +213,6 @@ namespace MetalRaptors
 
             _cinematic = value;
             PlaneScrapes.SetGroundCollisions(!value);
-        }
-
-        void UpdateSpeed(float dt)
-        {
-            _speed += -Mathf.Sin(_heading) * _config.diveAcceleration * dt;
-            _speed -= (_speed - CruiseSpeed) * _config.speedDrag * dt;
-
-            _speed = Mathf.Clamp(_speed, CruiseSpeed,
-                CruiseSpeed * Mathf.Max(1f, _config.maxSpeedMultiplier));
         }
 
         float CruiseSpeed => _config.flySpeed * _boost;

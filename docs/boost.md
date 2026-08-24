@@ -30,9 +30,12 @@ cancel a boost early and no way to stack two.
 `boostMultiplier`. Two things read it:
 
 - `MaxTurnRate` — `rotationSpeed × factor`, so 120 °/s becomes 156 °/s.
-- `CruiseSpeed` — `flySpeed × factor`, and since the speed clamp is `[cruise, cruise ×
-  maxSpeedMultiplier]`, both the floor and the dive cap rise together: 180 → 234 m/s cruise,
-  288 → 374 m/s cap.
+- `CruiseSpeed` — `flySpeed × factor`, and since that is now the plane's only speed
+  (docs/flight-model.md), the boost simply moves it: 180 → 234 m/s.
+
+Because both scale by the same factor, the **turn radius is unchanged** by a boost —
+`speed / turnRate` cancels it out. The plane flies the same arc, faster. That is what makes the
+boost safe to press in a tight spot instead of a way to widen yourself into the ground.
 
 The factor is *eased* rather than switched (`BoostResponse`, 3.5/s, snapping to the target
 within 0.001), so the plane surges and settles instead of teleporting into the new speed. The

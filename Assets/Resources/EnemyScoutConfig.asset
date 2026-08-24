@@ -1,0 +1,71 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: acbf914809754ae594859220c6c00b11, type: 3}
+  m_Name: EnemyScoutConfig
+  m_EditorClassIdentifier:
+  role: 0
+  health: 125
+  damage: 6
+  fireRate: 0.18
+  bulletSpeed: 400
+  mass: 1.5
+  turnResponsiveness: 5
+  fireAngleThreshold: 18
+  leadFactor: 1
+  maxFireRange: 560
+  flySpeed: 150
+  rotationSpeed: 135
+  minAltitudeMargin: 150
+  safeAltitudeMargin: 220
+  attackDuration: 4.5
+  flyDuration: 1
+  flyPerchHeight: 90
+  weaveAmplitude: 45
+  weaveHz: 0.4
+  evadeDuration: 1
+  evadeCooldown: 4.5
+  evadeBreakAngle: 65
+  jitterAmplitude: 45
+  jitterHz: 9
+  threatRange: 420
+  threatCone: 18
+  threatTailAngle: 95
+  engageRange: 450
+  engageFactor: 1.15
+  engageResponse: 2
+  deckCeilingMargin: 380
+  pressDelay: 3
+  pressDuration: 10
+  turnBias: 0.65
+  reversalAngle: 120
+  dodgeHealthFraction: 1
+  dodgeAimCone: 22
+  dodgeAimRange: 600
+  dodgeDepth: 120
+  dodgeRoll: 0.35
+  dodgeOut: 0.8
+  dodgeHold: 2.5
+  dodgeBack: 0.8
+  dodgeBank: 75
+  dodgeCooldown: 14
+  loopSeconds: 1.5
+  diveAcceleration: 90
+  speedDrag: 0.9
+  maxSpeedMultiplier: 1.6
+  diveCooldown: 10
+  diveAltitudeAdvantage: 180
+  diveClimbSeconds: 1.5
+  diveRunSeconds: 3
+  diveTrack: 0.25
+  diveExitMargin: 120
+  cubeScale: 30
+  color: {r: 0.62, g: 0.14, b: 0.12, a: 1}

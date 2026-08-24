@@ -417,7 +417,8 @@ It shares the Dr.I's 5.5 fire rate — the same twin Spandaus — which leaves t
 price the player pays for its speed and its health.
 
 **Enemies are unaffected.** An enemy flying an Albatros is initialised from
-`EnemyConfig.asset`, which has its own numbers and its own AI fields; the garage block only
+`EnemyFighterConfig.asset` (a Dr.I from `EnemyScoutConfig.asset` — docs/enemies.md), which has
+its own numbers and its own AI fields; the garage block only
 ever reaches a plane the player selected. Same for the companion wingman, which keeps the
 shared `PlayerConfig` (`docs/companion.md`) — the stats follow the player, not the model.
 
@@ -510,8 +511,8 @@ Enemies are **not** affected: `LevelDefinition` keeps its authored `PlaneModels.
 groups, so picking the Albatros means both sides fly it. They stay distinguishable by the
 mirrored, opposite-pitched build `PlaneFactory` gives an enemy — not by paint, since enemies
 now wear the plane's *default* skin (`docs/plane-skins.md`) and the Albatros has only one.
-They do not borrow the plane's stats either, since an enemy is built from
-`EnemyConfig.asset`.
+They do not borrow the plane's stats either, since an enemy is built from its role's config
+asset (docs/enemies.md).
 
 ## Propeller nodes are per model
 

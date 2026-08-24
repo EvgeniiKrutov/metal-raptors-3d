@@ -10,9 +10,9 @@
     { "op": "taskdone" },
 
     { "op": "task", "line": "l1_task2" },
-    { "op": "wave", "enemies": [ { "plane": "albatros", "count": 1 } ] },
+    { "op": "wave", "enemies": [ { "plane": "fokker", "count": 1 } ] },
     { "op": "wait", "seconds": 4 },
-    { "op": "wave", "enemies": [ { "plane": "albatros", "count": 1 } ] },
+    { "op": "wave", "enemies": [ { "plane": "fokker", "count": 1 } ] },
     { "op": "taskdone" },
 
     { "op": "wait", "seconds": 1.5 },
@@ -21,11 +21,11 @@
     { "op": "say", "speaker": "you", "line": "l1_line6", "seconds": 3.5 },
 
     { "op": "task", "line": "l1_task3" },
-    { "op": "wave", "enemies": [ { "plane": "albatros", "count": 1 } ] },
+    { "op": "wave", "enemies": [ { "plane": "fokker", "count": 1 } ] },
     { "op": "wait", "seconds": 4 },
-    { "op": "wave", "enemies": [ { "plane": "albatros", "count": 1 } ] },
+    { "op": "wave", "enemies": [ { "plane": "fokker", "count": 1 } ] },
     { "op": "wait", "seconds": 4 },
-    { "op": "wave", "enemies": [ { "plane": "albatros", "count": 2 } ] },
+    { "op": "wave", "enemies": [ { "plane": "fokker", "count": 2 } ] },
     { "op": "taskdone" },
 
     { "op": "wait", "seconds": 1.5 },

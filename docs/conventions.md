@@ -14,7 +14,7 @@ who loads it:
 
 | Path | Holds | Tracked? |
 | --- | --- | --- |
-| `Assets/Resources/*.asset` | The `ScriptableObject` tunables — `PlayerConfig`, `EnemyConfig`. | yes |
+| `Assets/Resources/*.asset` | The `ScriptableObject` tunables — `PlayerConfig`, `EnemyScoutConfig`, `EnemyFighterConfig`. | yes |
 | `Assets/Resources/objects/planes/<era>/` | Aircraft FBX, one folder per career era (`world_war_1` today, matching `CareerEras`). | no |
 | `Assets/Resources/objects/trees`, `objects/burned_houses` | Scenery prop FBX (docs/battlefield.md). | no |
 | `Assets/Resources/Sounds/` | Every sound effect (docs/sounds.md). | no |

@@ -34,8 +34,9 @@ lines are lorem ipsum, and its briefing `lore` is lorem ipsum. The scenario desi
 and 7 as fixed-width, stealth, strike and time-attack levels and 4 and 8 as boss fights; none of
 those modes exist yet, so those levels currently fly as ordinary scrollers.
 
-Difficulty is a straight ramp across the eight: `enemyHealth` 50 → 100, `enemyRotationSpeed`
-84 → 124, and `flak` climbing to 1.5 at Hohrupt, where the scenario puts guns on both valley walls.
+Difficulty is a straight ramp across the eight: `enemyHealthScale` 0.50 → 1.00,
+`enemyRotationScale` 0.80 → 1.18 (multipliers on each enemy role's own base, docs/enemies.md), and
+`flak` climbing to 1.5 at Hohrupt, where the scenario puts guns on both valley walls.
 
 ## Progress
 
@@ -147,9 +148,10 @@ builds missing ones up to `camX + (fogEnd + 1.5·chunk)`. Removal destroys the c
 
 `CampaignDefinition.script` names a text script that drives the level's pacing — dialogue at
 the bottom of the screen, timed pauses, enemy waves with their incoming warning, and the win
-condition. `CampaignDefinition.enemyHealth` and `enemyRotationSpeed` set what those waves fly
-with. Level 1 runs
-`level1` — six fighters in five waves, three cutscenes; level 2 and custom battles have none
+condition. `CampaignDefinition.enemyHealthScale` and `enemyRotationScale` scale what those waves
+fly with, and the plane named in the wave decides whether it flies as a scout or a fighter
+(docs/enemies.md). Level 1 runs
+`level1` — six scouts in five waves, three cutscenes; level 2 and custom battles have none
 and stay endless. See
 docs/campaign-scripts.md for the file format, the dialogue bar, and how the enemy AI was
 adapted to a forward-scrolling world, and docs/campaign-ww1-scenario.md for the WW1 era's

@@ -21,6 +21,8 @@ namespace MetalRaptors
 
         public PlaneType type;
 
+        public EnemyRole enemyRole = EnemyRole.Fighter;
+
         public string description;
 
         public Vector3 standUpEuler;
@@ -94,6 +96,7 @@ namespace MetalRaptors
             displayName    = "Fokker Dr.I",
             country        = "Germany",
             type           = PlaneTypes.Fighter,
+            enemyRole      = EnemyRole.Scout,
             description    = FokkerStory,
             standUpEuler   = new Vector3(90f, -90f, 0f),
             rollWheelsDown = true,

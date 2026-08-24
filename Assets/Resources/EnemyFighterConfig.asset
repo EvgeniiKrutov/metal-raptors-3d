@@ -10,19 +10,20 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: acbf914809754ae594859220c6c00b11, type: 3}
-  m_Name: EnemyConfig
+  m_Name: EnemyFighterConfig
   m_EditorClassIdentifier:
-  health: 100
+  role: 1
+  health: 130
   damage: 6
-  fireRate: 0.25
+  fireRate: 0.2
   bulletSpeed: 400
-  flySpeed: 150
-  rotationSpeed: 105
   mass: 1.5
   turnResponsiveness: 5
   fireAngleThreshold: 14
   leadFactor: 1
   maxFireRange: 500
+  flySpeed: 180
+  rotationSpeed: 105
   minAltitudeMargin: 160
   safeAltitudeMargin: 260
   attackDuration: 3.5
@@ -38,5 +39,33 @@ MonoBehaviour:
   threatRange: 420
   threatCone: 18
   threatTailAngle: 95
+  engageRange: 450
+  engageFactor: 1.15
+  engageResponse: 2
+  deckCeilingMargin: 300
+  pressDelay: 5
+  pressDuration: 8
+  turnBias: 0.65
+  reversalAngle: 120
+  dodgeHealthFraction: 1
+  dodgeAimCone: 22
+  dodgeAimRange: 600
+  dodgeDepth: 120
+  dodgeRoll: 0.35
+  dodgeOut: 0.8
+  dodgeHold: 2.5
+  dodgeBack: 0.8
+  dodgeBank: 75
+  dodgeCooldown: 14
+  loopSeconds: 1.5
+  diveAcceleration: 90
+  speedDrag: 0.9
+  maxSpeedMultiplier: 1.6
+  diveCooldown: 10
+  diveAltitudeAdvantage: 180
+  diveClimbSeconds: 1.5
+  diveRunSeconds: 3
+  diveTrack: 0.25
+  diveExitMargin: 120
   cubeScale: 30
   color: {r: 0.62, g: 0.14, b: 0.12, a: 1}

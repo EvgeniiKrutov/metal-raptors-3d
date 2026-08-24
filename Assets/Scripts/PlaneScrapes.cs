@@ -7,7 +7,7 @@ namespace MetalRaptors
     {
         public const float HitboxRadius = 15f;
 
-        static readonly List<EnemyController> Scratch = new List<EnemyController>();
+        const float DepthBand = EnemyDepthDodge.ClearDepth;
 
         public static void DisablePlanePlaneCollisions()
         {
@@ -23,55 +23,24 @@ namespace MetalRaptors
         public static void Check(CubeController player, Transform playerTr,
             IReadOnlyList<EnemyController> enemies)
         {
-            if (enemies == null) return;
+            if (enemies == null || player == null || playerTr == null
+                || player.CurrentHealth <= 0f) return;
 
             float reach = HitboxRadius * 2f;
             float reachSq = reach * reach;
-
-            Scratch.Clear();
+            Vector3 playerPos = playerTr.position;
             for (int i = 0; i < enemies.Count; i++)
-                if (enemies[i] != null) Scratch.Add(enemies[i]);
-
-            if (player != null && playerTr != null && player.CurrentHealth > 0f)
             {
-                Vector2 playerPos = playerTr.position;
-                foreach (var enemy in Scratch)
-                {
-                    if (enemy == null) continue;
-                    if (((Vector2)enemy.transform.position - playerPos).sqrMagnitude > reachSq) continue;
+                EnemyController enemy = enemies[i];
+                if (enemy == null || enemy.OffPlane) continue;
 
-                    player.Scrape();
-                    enemy.Scrape();
-                }
+                Vector3 pos = enemy.transform.position;
+                if (Mathf.Abs(pos.z - playerPos.z) > DepthBand) continue;
+                if (((Vector2)pos - (Vector2)playerPos).sqrMagnitude > reachSq) continue;
+
+                player.Scrape();
+                enemy.Scrape();
             }
-
-            for (int i = 0; i < Scratch.Count; i++)
-                for (int j = i + 1; j < Scratch.Count; j++)
-                {
-                    var a = Scratch[i];
-                    var b = Scratch[j];
-                    if (a == null || b == null) continue;
-                    if (!ModelsOverlap(a, b, reachSq)) continue;
-
-                    a.Scrape();
-                    b.Scrape();
-                }
-        }
-
-        static bool ModelsOverlap(EnemyController a, EnemyController b, float coreReachSq)
-        {
-            float broad = (a.ModelSize + b.ModelSize) * 0.5f;
-            float gapSq = ((Vector2)a.transform.position - (Vector2)b.transform.position).sqrMagnitude;
-            if (gapSq > broad * broad) return false;
-
-            Collider ca = a.Hitbox;
-            Collider cb = b.Hitbox;
-            if (ca == null || cb == null || !ca.enabled || !cb.enabled) return gapSq <= coreReachSq;
-
-            Transform ta = ca.transform;
-            Transform tb = cb.transform;
-            return Physics.ComputePenetration(ca, ta.position, ta.rotation,
-                cb, tb.position, tb.rotation, out _, out _);
         }
     }
 }

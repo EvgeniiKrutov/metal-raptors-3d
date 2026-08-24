@@ -1,56 +1,64 @@
-# Player flight model: cruise + dive energy
+# Player flight model: constant speed, constant turn radius
 
-Implemented in `CubeController` (`UpdateSpeed`), tuned via `PlayerConfig`
+Implemented in `CubeController`, tuned via `PlayerConfig`
 (Assets/Resources/PlayerConfig.asset).
 
 ## Concept
 
-The plane flies at constant throttle. The engine is strong enough that the plane
-never stalls — it can fly a full loop and never drops below cruise speed. But it
-is not a constant *speed*: pointing the nose at the ground trades altitude for
-airspeed, so dives are faster than cruise.
+`_speed = CruiseSpeed` — one line, evaluated every physics step. The plane flies
+at a single speed no matter where its nose is pointing, and the only thing that
+changes it is a skill.
 
-Speed is a single scalar along the heading, and there is **one** branch: the
-cruise/dive model below. There is no air brake and no throttle key — an earlier
-S / DownArrow brake (with its own recovery branch and turn-rate bonus) was
-removed along with its four `PlayerConfig` fields. The only speed the player
-commands directly is the R boost (docs/boost.md).
+This is a deliberate trade. The plane used to run a dive-energy model: gravity
+along the flight path accelerated it nose-down, drag bled the excess off, and a
+straight-down dive tended toward 280 m/s against a 180 m/s cruise. It read well
+and it was the wrong model for this game. **Turn radius is `speed / turnRate`**,
+so a speed that changed with pitch was a radius that changed with pitch: the
+same held turn key described a different arc depending on how the plane had
+entered it, and nothing on screen told the player which arc they were about to
+fly. In a game whose whole difficulty is threading a plane past terrain and
+through a gunsight, a turn you cannot predict is not a challenge, it is a coin
+toss.
 
-## Cruise and dive
+With a constant speed the radius is fixed too, and it is the *same* fixed radius
+every time. You learn one arc and it is true for the rest of the game.
 
-Speed changes by three terms each physics step:
+Speed is a single scalar along the heading. There is no air brake and no
+throttle key — an earlier S / DownArrow brake (with its own recovery branch and
+turn-rate bonus) was removed along with its four `PlayerConfig` fields.
 
-1. **Gravity along the flight path**: `-sin(heading) * diveAcceleration`.
-   Nose-down (sin < 0) accelerates the plane; nose-up decelerates it, which
-   bleeds off dive speed on the way back up (a dive-then-zoom-climb roughly
-   conserves that energy).
-2. **Drag on the excess**: `(speed - cruise) * speedDrag` is shed per second,
-   so extra speed also decays in level flight instead of persisting forever.
-3. **Clamp**: speed never exceeds `cruise * maxSpeedMultiplier` and never drops
-   below `cruise` — the "no stall" rule, now a hard floor rather than an
-   effective one.
+## The one thing that changes it
 
-`cruise` is `flySpeed` scaled by the boost factor, which is 1 outside a boost;
-both the floor and the cap ride it, so boosting shifts the whole speed band up
-rather than just raising the ceiling.
+The R boost (docs/boost.md), and it moves speed and turn rate **together**:
 
-The drag term gives a natural terminal dive speed before the hard cap:
-`cruise + diveAcceleration * |sin(heading)| / speedDrag`.
+```
+speed    = flySpeed      * boost      (CruiseSpeed)
+turnRate = rotationSpeed * boost      (MaxTurnRate)
+```
+
+so `radius = speed / turnRate = flySpeed / rotationSpeed` — independent of the
+boost. Boosting makes the plane cover the same arc faster, not a wider one. That
+is what makes the skill safe to fire in a tight spot: it never widens the turn
+you are already committed to.
 
 ## Tunables (PlayerConfig)
 
 | Field | Default | Meaning |
 |---|---|---|
-| `flySpeed` | 180 (asset) | Cruise speed and the guaranteed minimum (m/s) |
-| `diveAcceleration` | 90 | Gravity pull along the path at straight-down (m/s²) |
-| `speedDrag` | 0.9 | Fraction of excess speed shed per second |
-| `maxSpeedMultiplier` | 1.6 | Hard cap as a multiple of cruise |
+| `flySpeed` | 180 (asset) | The plane's speed, full stop (m/s) |
+| `rotationSpeed` | per plane | Turn rate (°/s); with `flySpeed` it fixes the radius |
+| `turnResponsiveness` | asset | How fast the turn rate eases toward the commanded one |
 
-With the defaults: a straight-down dive tends toward 180 + 90/0.9 = 280 m/s
-(capped at 288), a 45° dive toward ≈ 250 m/s, and after levelling out the
-excess halves roughly every 0.8 s. Keep `bulletSpeed` (400) well above the
-cap so rounds still pull away from the plane in a dive — under boost the cap
-rises to 374, which is still clear of it.
+`diveAcceleration`, `speedDrag` and `maxSpeedMultiplier` are no longer read by
+`CubeController`. They stay on `PlayerConfig` because two other things still use
+them: `PlaneLoadout` divides the garage's `maxSpeed` stat by `maxSpeedMultiplier`
+to get `flySpeed` (see below), and `DuelPlane` — the background companion and its
+foe — still flies the dive-energy model from the same asset. The enemy
+**fighter** keeps its own copy of the model in `EnemyFighterConfig.asset`, so the
+AI can still trade altitude for speed even though the player cannot.
+
+Keep `bulletSpeed` (400) well above the plane's speed so rounds pull away from
+it; at a constant 180 (234 under the 1.3 boost) there is plenty of room.
 
 ## The asset is a baseline, not the whole config
 
@@ -60,19 +68,26 @@ shows as stat bars from the selected plane's `PlaneStats` (docs/garage.md):
 
 | stat bar | `PlayerConfig` field | conversion |
 |---|---|---|
-| max speed | `flySpeed` | `maxSpeed / maxSpeedMultiplier` |
+| max speed | `flySpeed` | `maxSpeed / maxSpeedMultiplier` (see note) |
 | rotation speed | `rotationSpeed` | direct |
 | mass | `mass` | direct |
 | fire rate | `fireRate` | `1 / fireRate` (bar is shots/s, field is seconds between) |
 | damage | `damage` | direct |
 | health | `health` | direct |
 
+The `maxSpeed` conversion is kept as it was on purpose. Under the old model
+`maxSpeed` was the plane's *dive* speed and `flySpeed` its cruise; now that the
+plane only ever flies `flySpeed`, dividing by 1.6 still gives every plane the
+speed it used to cruise at. That keeps the whole enemy balance intact — the
+fighter's 180 m/s is documented as "the player's own cruise", and it still is —
+and the garage bar stays honest as a *comparison* between planes, since every
+plane is scaled by the same factor. Raise `flySpeed` by raising `maxSpeed`.
+
 Everything else on the asset — `diveAcceleration`, `speedDrag`,
 `maxSpeedMultiplier`, `turnResponsiveness`, `bulletSpeed`, every bomb and boost
 field — is shared by every plane and is edited only in the asset. So the numbers
 in the table above still describe the Camel exactly (its stat block is set to the
-asset's own values); the Dr.I cruises at 165 instead of 180, and its dive and
-drag behave identically.
+asset's own values); the Dr.I flies at 165 instead of 180.
 
 It is a **copy** rather than an edit in place because `Resources.Load` hands back
 the asset itself: writing the selected plane's numbers onto it would dirty
@@ -81,9 +96,12 @@ handling into the next session.
 
 ## Scope
 
-Player only. Enemies (`EnemyController`) keep their constant `flySpeed` and are
-built from `EnemyConfig.asset`, which the per-plane loadout never touches — an
-enemy Albatros and a player-selected Albatros have nothing in common but the model.
+The player only. The enemy **fighter** still runs the old dive-energy model from
+its own `EnemyFighterConfig.asset` (docs/enemies.md) — trading altitude for speed
+is the fighter's whole identity, and unlike the player it is not the thing the
+human has to aim — while the enemy **scout** flies a constant `flySpeed` as the
+player now does. Neither is touched by the per-plane loadout: an enemy Albatros
+and a player-selected Albatros have nothing in common but the model.
 The companion wingman is handed the shared `PlayerConfig` rather than a loadout
 (docs/companion.md). The shot-down fall is a separate mode (real rigidbody
 gravity, see `CubeController.BeginFall`) and is untouched by this model.
@@ -328,38 +346,70 @@ contacts. Note the layer opt-out is global Unity state that survives scene
 loads, so playing a skirmish first used to mask the campaign bug.
 
 `PlaneScrapes.Check` runs every physics step from each controller's
-`FixedUpdate` and sweeps two kinds of pair, with **two different hit tests**.
+`FixedUpdate` and sweeps exactly **one** kind of pair: the player against each
+enemy. It is a fuselage-core test — `HitboxRadius` is 15 m against a ~60 m model
+span, so the two origins have to come within 30 m and only a real fuselage
+overlap counts; a wingtip clipping a tail slips past. That tolerance is
+deliberate: the player aims, and a core that reads as "I flew *into* him" is what
+a rammed hit should feel like.
 
-**Player against an enemy** is a fuselage-core test: `HitboxRadius` is 15 m
-against a ~60 m model span, so the two origins have to come within 30 m and
-only a real fuselage overlap counts — a wingtip clipping a tail slips past.
-That tolerance is deliberate: the player aims, and a core that reads as
-"I flew *into* him" is what a rammed hit should feel like.
+**Enemies do not damage each other by contact.** Two of them can fly through the
+same piece of sky and both come out untouched. There was an enemy-against-enemy
+sweep here once, and it was a mistake: no AI plane aims at another, so every
+enemy-enemy contact is incidental — a wave converging on the player from
+different angles crosses itself constantly — and turning that into damage meant
+waves quietly killed themselves off-camera while the player watched. It also made
+the fight unreadable, since the health you saw on a bar was not the health you
+had put there. Enemies are the player's problem to solve, so only the player can
+take them apart.
 
-**Enemy against enemy** is an exact test — a cheap origin-distance broad phase
-at the pair's mean model span, then `Physics.ComputePenetration` on the two
-planes' real convex hulls (`EnemyController.Hitbox`, convex by construction in
-`PlaneFactory.AddPlaneCollider`), so a scrape lands exactly when the two models
-actually intersect. The fuselage core is the *wrong* test here and was why
-enemies flew through each other unharmed while the player's rams worked: no AI
-plane ever aims at another, so two fighters converging on the player cross at
-an angle and their origins rarely close the last 30 m, even as their silhouettes
-plainly collide. Hulls have no such blind spot. If either collider is missing or
-already disabled the pair falls back to the fuselage core.
+The sweep gates on **depth** as well as distance. Enemies normally share the
+player's Z lane, but a scout mid-dodge (docs/enemies.md) is sliding out of it, so
+an enemy more than `EnemyDepthDodge.ClearDepth` (35 m) from the player in Z never
+scrapes. Past that distance the scout is already `OffPlane` and skipped outright;
+the gate covers the stretch of the slide before it gets there, so the manoeuvre
+cannot be punished by a collision it has visibly avoided.
 
-Either way the pair takes a scrape via `CubeController.Scrape` /
-`EnemyController.Scrape`, which shaves off a fixed amount of health on both
-planes, shivers the model and throws sparks, gated by a per-plane cooldown so
-one encounter (which can span several frames of overlap) is a single hit — an
-enemy pair that stays interlocked therefore grinds itself down 10 points every
-0.5 s until one of them falls. A scrape the player is part of also kicks the
-camera with a short, decaying jitter applied on top of the normal follow
-smoothing (kept separate so the jitter can't feed back into the follow itself).
-Ground contact is a separate
-path (`OnCollisionEnter`): bullets never reach it (they already apply damage
-via `TakeDamage`), and plane-plane contact normally can't reach it either since
-collisions are disabled — but the handler swallows a stray contact
+A hit takes a scrape via `CubeController.Scrape` / `EnemyController.Scrape`,
+which shaves off a fixed amount of health on both planes, shivers the model and
+throws sparks, gated by a per-plane cooldown so one encounter (which can span
+several frames of overlap) is a single hit. It also kicks the camera with a
+short, decaying jitter applied on top of the normal follow smoothing (kept
+separate so the jitter can't feed back into the follow itself). Ground contact is
+a separate path (`OnCollisionEnter`): bullets never reach it (they are on their
+own physics layer, below), and plane-plane contact can't reach it either since
+those collisions are disabled — but the handler swallows a stray contact
 defensively so it can never fail the level on its own.
+
+## Bullets only hit the other side (`Bullet`)
+
+**There is no friendly fire.** A round carries the side that fired it
+(`Launch(..., fromEnemy)`) and damages only the opposite one: player fire hurts
+enemies, enemy fire hurts the player, and an enemy round that crosses another
+enemy passes straight through it — no damage, no impact, the round keeps flying.
+`Hostile` is the whole rule, one line against `target is EnemyController`.
+
+Rounds are on their own physics layer (`Bullet.Layer`, 12), and `BuildTemplate`
+turns off collisions between it and `PlaneFactory.PlaneLayer` — and between it
+and itself, so rounds don't knock each other about. So a bullet has **no physical
+contact with any plane at all**, which is what lets a friendly round pass through
+without deflecting off the plane it is not allowed to hurt. Damage is decided
+entirely by an explicit swept sphere: `Bullet.FixedUpdate` runs a
+`SphereCastNonAlloc` of `HitRadius` (3 m) along exactly this step's motion
+(`linearVelocity * fixedDeltaTime`) against the plane layer, takes the nearest
+*hostile* damageable that is not the shooter, and applies the damage.
+
+Doing it by sweep rather than by contact also fixes an accuracy problem. A round
+travels 8 m per physics step and the planes it is aimed at are thin convex mesh
+colliders on scaled transforms, moving at up to 330 m/s themselves; continuous
+detection is supposed to cover that but shots that plainly passed through a
+fuselage were being dropped. A sweep along the step's own path cannot miss by
+geometry, and a 3 m sphere instead of a 2.4 m cylinder is marginally more
+generous — the right direction for a shot the player felt they had earned.
+
+`OnCollisionEnter` still fires for terrain and anything else off the plane layer;
+it just destroys the round. A `_spent` latch makes sure whichever path fires
+first is the only one that counts.
 
 Both planes share one more threshold: below a fixed fraction of health they
 start trailing damage smoke (`SmokeTrail.Arm`, idempotent, see
@@ -375,9 +425,12 @@ scene is left untouched.
 
 ## Enemy AI (`EnemyController`)
 
-A mirrored Albatros D.III (it attacks from the right and flies left) flying the
-same constant-speed physics as the player, tuned via `EnemyConfig` and driven
-by a state machine originally ported from the sibling repo's `FighterPlane`:
+A mirrored plane (it attacks from the right and flies left) driven by a state
+machine originally ported from the sibling repo's `FighterPlane`. Since the
+scout/fighter split it comes in two roles, each with its own config asset, its
+own altitude band, its own reversal profile and one ability apiece — all of that
+is **docs/enemies.md**, and only the shared core is described here. The scout
+flies the constant speed below; the fighter runs the player's dive-energy model.
 
 | State | Behaviour |
 |---|---|
@@ -386,6 +439,11 @@ by a state machine originally ported from the sibling repo's `FighterPlane`:
 | `Evade` | A single hard break: one heading, held for `evadeDuration`, `evadeBreakAngle` off the line directly away from the player — so the fighter crosses the attacker's gunsight instead of running down it — with `jitterAmplitude` of random wobble re-rolled `jitterHz` times a second so tracking fire keeps missing. The side of the break is picked for airspace, whichever of the two candidates has more room before the floor or ceiling, choosing randomly when they are comparable. Then straight back into `Attack`. |
 | `Recover` | Entered whenever altitude drops below `minAltitudeMargin`, overriding every other state: climb hard at a fixed 70° until back above `safeAltitudeMargin`, then return to `Attack`. |
 | `Return` | Entered when the fighter drifts off camera: fly straight back toward the player at `ReturnSpeedFactor` × cruise until it's on screen again, then resume `Attack`. The catch-up speed exists because cruise alone is below the player's, so a fighter that fell behind used to trail off screen for the rest of the level; it only applies while the fighter is off camera, where the speed-up cannot be seen. |
+| `DiveClimb` / `DiveRun` / `DiveZoom` | The fighter's committed diving pass, docs/enemies.md. |
+
+On-screen, a player who runs is chased by the **engagement boost** rather than by
+cruise speed: past `engageRange` and moving away, the enemy's speed target becomes
+the player's own speed × `engageFactor`, ignoring its configured `flySpeed`.
 
 ### What provokes an evade
 

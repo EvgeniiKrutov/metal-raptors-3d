@@ -15,8 +15,8 @@ namespace MetalRaptors
         public string lore;
         public bool companion;
         public float flak = 1f;
-        public float enemyHealth;
-        public float enemyRotationSpeed;
+        public float enemyHealthScale = 1f;
+        public float enemyRotationScale = 1f;
         public int supplyDrops;
         public float supplyHealthFraction = 0.3f;
         public float supplyHeal = 50f;
@@ -53,8 +53,8 @@ namespace MetalRaptors
             script = "level1",
             companion = true,
             flak = 1.0f,
-            enemyHealth = 50f,
-            enemyRotationSpeed = 84f,
+            enemyHealthScale = 0.50f,
+            enemyRotationScale = 0.80f,
             supplyDrops = 1,
             title = "FIRST LIGHT",
             dateline = "14 April 1916 — Verdun sector — dawn",
@@ -71,8 +71,8 @@ namespace MetalRaptors
             script = "level2",
             companion = true,
             flak = 1.1f,
-            enemyHealth = 60f,
-            enemyRotationSpeed = 88f,
+            enemyHealthScale = 0.60f,
+            enemyRotationScale = 0.84f,
             supplyDrops = 1,
             title = "THE NUMBERS",
             dateline = "22 June 1916 — Verdun sector — high midday",
@@ -89,8 +89,8 @@ namespace MetalRaptors
             script = "level3",
             companion = true,
             flak = 0.9f,
-            enemyHealth = 65f,
-            enemyRotationSpeed = 92f,
+            enemyHealthScale = 0.65f,
+            enemyRotationScale = 0.88f,
             supplyDrops = 1,
             title = "FIXED GROUND",
             dateline = "12 February 1917 — Vaux-le-Bois — failing light",
@@ -106,8 +106,8 @@ namespace MetalRaptors
             clouds = new CloudsPart(),
             script = "level4",
             flak = 1.2f,
-            enemyHealth = 75f,
-            enemyRotationSpeed = 104f,
+            enemyHealthScale = 0.75f,
+            enemyRotationScale = 1.00f,
             supplyDrops = 1,
             companionFoe = PlaneModels.Fokker,
             title = "THE RAVEN",
@@ -124,8 +124,8 @@ namespace MetalRaptors
             clouds = new CloudsPart { frequency = CloudLevel.Low },
             script = "level5",
             flak = 1.35f,
-            enemyHealth = 70f,
-            enemyRotationSpeed = 96f,
+            enemyHealthScale = 0.70f,
+            enemyRotationScale = 0.91f,
             supplyDrops = 1,
             title = "NOTHING BURNS AT NIGHT",
             dateline = "19 September 1917 — Wulpendamme, behind the Flanders coast — night",
@@ -142,8 +142,8 @@ namespace MetalRaptors
             script = "level6",
             companion = true,
             flak = 1.5f,
-            enemyHealth = 80f,
-            enemyRotationSpeed = 108f,
+            enemyHealthScale = 0.80f,
+            enemyRotationScale = 1.03f,
             supplyDrops = 1,
             title = "HOHRUPT",
             dateline = "3 October 1917 — Hohrupt, upper Fecht valley — low grey morning",
@@ -159,8 +159,8 @@ namespace MetalRaptors
             clouds = new CloudsPart(),
             script = "level7",
             flak = 1.2f,
-            enemyHealth = 90f,
-            enemyRotationSpeed = 116f,
+            enemyHealthScale = 0.90f,
+            enemyRotationScale = 1.10f,
             supplyDrops = 2,
             title = "TWO FIRES",
             dateline = "24 March 1918 — Rimbach valley — morning into midday",
@@ -177,8 +177,8 @@ namespace MetalRaptors
             script = "level8",
             companion = true,
             flak = 1.4f,
-            enemyHealth = 100f,
-            enemyRotationSpeed = 124f,
+            enemyHealthScale = 1.00f,
+            enemyRotationScale = 1.18f,
             supplyDrops = 2,
             companionFoe = PlaneModels.Fokker,
             title = "IRON BIRDS OF PREY",

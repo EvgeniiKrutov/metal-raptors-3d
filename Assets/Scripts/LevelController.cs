@@ -48,7 +48,8 @@ namespace MetalRaptors
         Transform _cubeTr;
         Camera _cam;
 
-        EnemyConfig _enemyConfig;
+        EnemyConfig _scoutConfig;
+        EnemyConfig _fighterConfig;
         readonly List<EnemyController> _enemies = new List<EnemyController>();
         SoundSystem _sound;
 
@@ -163,8 +164,8 @@ namespace MetalRaptors
 
         void SpawnEnemies()
         {
-            _enemyConfig = Resources.Load<EnemyConfig>("EnemyConfig");
-            if (_enemyConfig == null) _enemyConfig = ScriptableObject.CreateInstance<EnemyConfig>();
+            _scoutConfig = EnemyConfigs.Load(EnemyRole.Scout);
+            _fighterConfig = EnemyConfigs.Load(EnemyRole.Fighter);
 
             var playerBody = _cube.GetComponent<Rigidbody>();
             float aiGroundY = VerdunLand ? ProceduralTerrain.MaxHeight : GroundY;
@@ -172,26 +173,30 @@ namespace MetalRaptors
             foreach (var group in _level.enemies)
                 for (int i = 0; i < group.count; i++)
                 {
+                    EnemyConfig config =
+                        EnemyConfigs.For(group.plane, _scoutConfig, _fighterConfig);
+                    float ceilingY = WorldTop - group.plane.onScreenSize / 2f;
+
                     var go = new GameObject("Enemy");
-                    go.transform.position = RandomEnemySpawn(aiGroundY);
+                    go.transform.position = RandomEnemySpawn(aiGroundY, config, ceilingY);
                     PlaneFactory.BuildPlaneModel(go.transform, group.plane, mirrored: true,
                         skin: PlaneSkins.Default(group.plane));
 
                     var enemy = go.AddComponent<EnemyController>();
-                    enemy.Initialize(_enemyConfig, playerBody,
-                        MinX, MaxX, aiGroundY, WorldTop - group.plane.onScreenSize / 2f, EdgeMargin);
+                    enemy.Initialize(config, playerBody,
+                        MinX, MaxX, aiGroundY, ceilingY, EdgeMargin);
                     enemy.OnDestroyed += OnEnemyDestroyed;
                     _enemies.Add(enemy);
                 }
         }
 
-        Vector3 RandomEnemySpawn(float aiGroundY)
+        Vector3 RandomEnemySpawn(float aiGroundY, EnemyConfig config, float ceilingY)
         {
             float halfViewWidth = _cam != null ? _halfViewWidth : _halfViewHeight * (16f / 9f);
             float camX = _cam != null ? _cam.transform.position.x : 0f;
 
-            float minY = aiGroundY + _enemyConfig.safeAltitudeMargin;
-            float maxY = Mathf.Max(minY, WorldTop - 120f);
+            EnemyConfigs.SpawnBand(config, aiGroundY, ceilingY, out float minY, out float maxY);
+            maxY = Mathf.Max(minY, Mathf.Min(maxY, WorldTop - 160f));
 
             float x = 0f;
             for (int attempt = 0; attempt < 32; attempt++)

@@ -5,6 +5,10 @@ namespace MetalRaptors
     [CreateAssetMenu(fileName = "EnemyConfig", menuName = "Metal Raptors/Enemy Config")]
     public class EnemyConfig : ScriptableObject
     {
+        [Header("Role")]
+        [Tooltip("Which behaviour set this config drives (docs/enemies.md).")]
+        public EnemyRole role = EnemyRole.Fighter;
+
         [Header("Stats (fighter.json stats)")]
         [Tooltip("Hit points (sibling: 100). Player fire subtracts PlayerConfig.damage per hit.")]
         public float health = 100f;
@@ -100,6 +104,97 @@ namespace MetalRaptors
                  "a head-on merge is fought, not dodged.")]
         public float threatTailAngle = 95f;
 
+        [Header("Engagement boost (both roles)")]
+        [Tooltip("Beyond this distance a player flying away is chased with the catch-up speed.")]
+        public float engageRange = 450f;
+
+        [Tooltip("Catch-up speed as a multiple of the player's own speed; ignores flySpeed.")]
+        public float engageFactor = 1.15f;
+
+        [Tooltip("How quickly the catch-up speed eases in and out, per second.")]
+        public float engageResponse = 2f;
+
+        [Header("Scout: deck flying")]
+        [Tooltip("Metres above the terrain contour the scout's corridor is capped at.")]
+        public float deckCeilingMargin = 260f;
+
+        [Tooltip("Seconds of the player staying out of reach before the scout climbs to mid.")]
+        public float pressDelay = 5f;
+
+        [Tooltip("Seconds the scout stays in the mid band before dropping back to the deck.")]
+        public float pressDuration = 8f;
+
+        [Header("Scout: turn bias")]
+        [Tooltip("Turn rate when swinging the nose to the right, as a fraction of the left.")]
+        public float turnBias = 0.65f;
+
+        [Header("Scout: depth dodge")]
+        [Tooltip("Health fraction at or below which the player's aim can trigger the dodge. 1 = always.")]
+        public float dodgeHealthFraction = 1f;
+
+        [Tooltip("Half-angle of the player's fire cone that triggers the dodge, degrees.")]
+        public float dodgeAimCone = 22f;
+
+        [Tooltip("How far down that cone the trigger reaches, metres.")]
+        public float dodgeAimRange = 600f;
+
+        [Tooltip("Metres slid away from the camera, out of the player's plane of fire.")]
+        public float dodgeDepth = 120f;
+
+        [Tooltip("Seconds spent rolling onto the wing, and rolling level again. Four per dodge.")]
+        public float dodgeRoll = 0.35f;
+
+        [Tooltip("Seconds sliding out, wing down.")]
+        public float dodgeOut = 0.8f;
+
+        [Tooltip("Seconds flown straight and level out there before it comes back.")]
+        public float dodgeHold = 2.5f;
+
+        [Tooltip("Seconds sliding back, wing down.")]
+        public float dodgeBack = 0.8f;
+
+        [Tooltip("Bank held through each slide, degrees. Negate to roll the other way.")]
+        public float dodgeBank = 75f;
+
+        [Tooltip("Seconds before another dodge, counted from the moment it returns.")]
+        public float dodgeCooldown = 14f;
+
+        [Header("Fighter: loop reversal")]
+        [Tooltip("Heading change in degrees that becomes a loop instead of a normal turn.")]
+        public float reversalAngle = 120f;
+
+        [Tooltip("Seconds one wide 180 degree loop takes; speed is kept throughout.")]
+        public float loopSeconds = 1.5f;
+
+        [Header("Fighter: dive energy")]
+        [Tooltip("Gravity pull along the flight path in m/s squared, as PlayerConfig.")]
+        public float diveAcceleration = 90f;
+
+        [Tooltip("Fraction of the speed above flySpeed shed per second.")]
+        public float speedDrag = 0.9f;
+
+        [Tooltip("Hard cap on speed as a multiple of flySpeed.")]
+        public float maxSpeedMultiplier = 1.6f;
+
+        [Header("Fighter: diving pass")]
+        [Tooltip("Seconds before another diving pass, counted from the moment it ends.")]
+        public float diveCooldown = 10f;
+
+        [Tooltip("How far below the fighter the player has to be before it commits.")]
+        public float diveAltitudeAdvantage = 180f;
+
+        [Tooltip("Maximum seconds spent climbing for the pass; this is the telegraph.")]
+        public float diveClimbSeconds = 1.5f;
+
+        [Tooltip("Maximum seconds of the dive itself before it pulls out.")]
+        public float diveRunSeconds = 3f;
+
+        [Tooltip("How much the committed dive may still correct toward the player; 0 is a fixed line.")]
+        public float diveTrack = 0.25f;
+
+        [Tooltip("Metres below the player the dive pulls through to before zooming back up.")]
+        public float diveExitMargin = 120f;
+
         [Header("Body (legacy)")]
         [Tooltip("Unused: the enemy is now the Albatros D.III model, sized to the player's plane. " +
                  "Kept only so the existing asset still deserializes cleanly.")]
@@ -107,5 +202,57 @@ namespace MetalRaptors
 
         [Tooltip("Unused: the enemy plane uses the model's own materials, not a flat colour.")]
         public Color color = new Color(0.62f, 0.14f, 0.12f);
+    }
+
+    public static class EnemyConfigs
+    {
+        public const string ScoutAsset = "EnemyScoutConfig";
+        public const string FighterAsset = "EnemyFighterConfig";
+
+        public static EnemyConfig Load(EnemyRole role)
+        {
+            var asset = Resources.Load<EnemyConfig>(
+                role == EnemyRole.Scout ? ScoutAsset : FighterAsset);
+
+            EnemyConfig config = asset != null
+                ? Object.Instantiate(asset)
+                : ScriptableObject.CreateInstance<EnemyConfig>();
+
+            config.role = role;
+            return config;
+        }
+
+        public static void Scale(EnemyConfig config, float health, float rotation)
+        {
+            if (config == null) return;
+            if (health > 0f) config.health = Mathf.Max(1f, config.health * health);
+            if (rotation > 0f)
+                config.rotationSpeed = Mathf.Max(1f, config.rotationSpeed * rotation);
+        }
+
+        public static EnemyConfig For(PlaneModelConfig plane, EnemyConfig scout,
+            EnemyConfig fighter)
+        {
+            return plane != null && plane.enemyRole == EnemyRole.Scout ? scout : fighter;
+        }
+
+        public static void SpawnBand(EnemyConfig config, float groundY, float ceilingY,
+            out float minY, out float maxY)
+        {
+            if (config.role == EnemyRole.Scout)
+            {
+                minY = groundY + config.safeAltitudeMargin;
+                maxY = Mathf.Min(groundY + config.deckCeilingMargin,
+                    AltitudeBands.Ceiling(AltitudeBand.Mid, groundY, ceilingY));
+            }
+            else
+            {
+                minY = Mathf.Max(AltitudeBands.Floor(AltitudeBand.High, groundY, ceilingY),
+                    groundY + config.safeAltitudeMargin);
+                maxY = AltitudeBands.Ceiling(AltitudeBand.High, groundY, ceilingY);
+            }
+
+            maxY = Mathf.Max(minY, maxY);
+        }
     }
 }

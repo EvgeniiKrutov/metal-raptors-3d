@@ -6,6 +6,7 @@ namespace MetalRaptors
     public class PlaneShooter : MonoBehaviour
     {
         const float ShotVolume = 0.36f;
+        const float AimMemory = 0.25f;
 
         PlayerConfig _config;
         Transform _muzzle;
@@ -17,9 +18,12 @@ namespace MetalRaptors
         AudioSource _audio;
         AudioClip _shotClip;
         float _cooldown;
+        float _aimHold;
         bool _held;
 
         public bool IsReady => enabled;
+
+        public bool Firing => _aimHold > 0f;
 
         public void Initialize(PlayerConfig config, Transform muzzle, Transform flashPoint,
             Collider planeCollider)
@@ -41,7 +45,11 @@ namespace MetalRaptors
             _audio.spatialBlend = 0f;
         }
 
-        public void Stop() => enabled = false;
+        public void Stop()
+        {
+            enabled = false;
+            _aimHold = 0f;
+        }
 
         public void Resume() => enabled = true;
 
@@ -49,13 +57,17 @@ namespace MetalRaptors
 
         void Update()
         {
+            _aimHold = Mathf.Max(0f, _aimHold - Time.deltaTime);
             if (GameMenu.IsOpen || LevelBriefing.IsOpen) return;
 
             _cooldown -= Time.deltaTime;
 
             var kb = Keyboard.current;
             bool wants = _held || (kb != null && kb.fKey.isPressed);
-            if (!wants || _cooldown > 0f) return;
+            if (!wants) return;
+
+            _aimHold = AimMemory;
+            if (_cooldown > 0f) return;
 
             _cooldown = Mathf.Max(0.01f, _config.fireRate);
             Fire();
@@ -70,7 +82,7 @@ namespace MetalRaptors
             go.name = "Bullet";
             go.SetActive(true);
             go.GetComponent<Bullet>().Launch(dir, _config.bulletSpeed, _config.damage,
-                _planeCollider);
+                _planeCollider, fromEnemy: false);
 
             MuzzleFlash.Spawn(_flashPoint.position, dir, _bodyRadius);
             if (_shotClip != null) _audio.PlayOneShot(_shotClip, ShotVolume);
