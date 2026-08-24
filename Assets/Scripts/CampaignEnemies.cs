@@ -45,6 +45,8 @@ namespace MetalRaptors
             _minX = camX - halfViewWidth + WindowMargin;
             _maxX = camX + halfViewWidth - WindowMargin;
 
+            float wall = camX - halfViewWidth;
+
             for (int i = _live.Count - 1; i >= 0; i--)
             {
                 if (_live[i] == null)
@@ -53,6 +55,7 @@ namespace MetalRaptors
                     continue;
                 }
                 _live[i].SetBounds(_minX, _maxX);
+                _live[i].SetLeftWall(wall);
             }
         }
 

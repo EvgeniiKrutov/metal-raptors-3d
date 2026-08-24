@@ -83,7 +83,12 @@ is painted, what it decorates with, and what extra meshes ride along with it).
   auto-turns the plane — the pilot keeps full control of the heading. Implemented as
   `CubeController.Initialize(..., hardLeftWall: true)` + `SetLeftWall`, which replaces the
   fixed levels' soft `FlightSteering.EdgeSteer` boundaries. The wall is armed only after the
-  intro, since the plane flies in from behind it (docs/level-intro.md).
+  intro, since the plane flies in from behind it (docs/level-intro.md). **Enemies ride the same
+  wall**: `CampaignEnemies.SetWindow` feeds each live plane `SetLeftWall(camX − halfViewWidth)`
+  every frame and `EnemyController` clamps against it exactly as the player does, offset by its
+  own body radius. Their soft `Contain` push still turns them back well before it — the wall is
+  the backstop that stops a fight from leaking out of the left of the picture, in the one
+  direction the camera can never follow.
 - A level **opens on an intro**: the frame holds still, the plane flies in from off the left
   edge with the controls dead, and the script's first radio call plays between two black film
   bars. Control comes back during the fly-in (docs/level-intro.md).

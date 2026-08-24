@@ -22,8 +22,8 @@ MonoBehaviour:
   fireAngleThreshold: 14
   leadFactor: 1
   maxFireRange: 500
-  flySpeed: 180
-  rotationSpeed: 105
+  flySpeed: 150
+  rotationSpeed: 75
   minAltitudeMargin: 160
   safeAltitudeMargin: 260
   attackDuration: 3.5
@@ -61,11 +61,10 @@ MonoBehaviour:
   diveAcceleration: 90
   speedDrag: 0.9
   maxSpeedMultiplier: 1.6
+  diveSpeedMultiplier: 1.5
   diveCooldown: 10
-  diveAltitudeAdvantage: 180
-  diveClimbSeconds: 1.5
-  diveRunSeconds: 3
-  diveTrack: 0.25
-  diveExitMargin: 120
+  diveTriggerHeight: 180
+  diveClimbSeconds: 3
+  diveRunSeconds: 6
   cubeScale: 30
   color: {r: 0.62, g: 0.14, b: 0.12, a: 1}

@@ -8,7 +8,7 @@ than a maneuvering trade.
 | Script | Role |
 | --- | --- |
 | `PlaneBoost.cs` | The R key, the duration, the cooldown. Lives on the player's body next to `PlaneShooter` and `PlaneBomber`. |
-| `BoostTrails.cs` | The two wingtip streaks. |
+| `WingStreaks.cs` | The two wingtip streaks. Shared — the fighter's diving pass mounts the same component in red (docs/enemies.md). |
 | `CooldownSquare.cs` | The HUD square, shared with the bomb. |
 
 ## Configuration
@@ -57,7 +57,7 @@ The cooldown does not tick while the component is stopped (a disabled `MonoBehav
 `Update`), so an intro or a pause never eats into it; a radio line does let it tick, since the
 game is running.
 
-## The wingtip streaks (`BoostTrails`)
+## The wingtip streaks (`WingStreaks`)
 
 Two `TrailRenderer`s, one per wingtip, emitting only while the boost runs. They are the reason
 the boost reads on screen at all — the speed change alone is easy to miss on a scrolling map.
@@ -68,9 +68,12 @@ bounds and returns the two extremes **in Z** (the wings run into and out of the 
 of the semi-span so it starts behind the leading edge rather than on it. Being children of the
 plane body, they follow its heading for free.
 
-Each trail is 2.1 units wide at the plane and lives 0.55 s, on a white
+Each trail is 2.1 units wide at the plane and lives 0.55 s, on a
 `Universal Render Pipeline/Unlit` material at 0.8 alpha made transparent through
-`UIFactory.MakeTransparent`. `alignment = View` keeps the ribbon facing the camera, so it reads
+`UIFactory.MakeTransparent`. The colour is a caller's choice (`Mount`'s optional `tint`) but
+both users take the default white: the player's boost and the enemy fighter's diving pass
+(docs/enemies.md) put up the same streak, so on screen it reads as *a plane running its engine
+hard*, whoever is flying it. `alignment = View` keeps the ribbon facing the camera, so it reads
 the same from any bank angle.
 
 The width is a *curve*, not a straight `startWidth`/`endWidth` taper: full width at the plane,

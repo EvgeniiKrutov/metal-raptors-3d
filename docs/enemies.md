@@ -71,6 +71,26 @@ Spawning matches: `EnemyConfigs.SpawnBand` gives each spawner the role's altitud
 `groundY + 220 …` the mid/high boundary for scouts, the high band for fighters — so a wave arrives
 already in position.
 
+## Skills wait for the first appearance
+
+A wave spawns off the right edge of the frame (`CampaignEnemies.SpawnPoint`: `SpawnAhead` 110 m
+past the edge, plus 90 m of stagger per plane), so every enemy flies for a second or two before
+the player can see it. **Nothing role-specific may run in that window.** `_appeared` latches the
+first physics step on which `IsOnCamera` is true, and until then `CanDodge`, `WantsDive` and
+`WantsReversal` all refuse:
+
+| Refused before the first appearance | Why it could fire off screen |
+| --- | --- |
+| the scout's depth dodge | `TickDodge` runs before the state machine's camera branch, and `UnderAim`'s cone reaches 600 m — a scout just past the edge is inside it |
+| the fighter's diving pass | it could otherwise commit on the frame it appears |
+| the fighter's loop reversal | same |
+
+Only *starting* a manoeuvre is gated. The cooldowns keep counting, so an enemy that has been in
+the air a while is not also made to wait once it does appear — it just cannot spend the wait
+performing. The ordinary flying, the guns and the containment are all untouched; this is about
+the declared moves, which exist to be *read*, and a move the player never saw is a move that
+only ever felt like a cheat.
+
 ## Scout
 
 150 m/s, 135 °/s to the left and 88 °/s to the right, 125 health, 6 damage a round. It is the pressure role, so its gun discipline is
@@ -166,7 +186,9 @@ If the raycast misses (unstreamed chunk, open water on the coast) it falls back 
 
 ### Off camera
 
-An enemy that falls off the camera enters `Return` and flies back at `1.35 ×` cruise. `Return` used
+An enemy that falls off the camera enters `Return` and flies back at `1.35 ×` cruise — unless it is
+recovering from the ground or running the fighter's diving pass, both of which are declared
+manoeuvres and are left alone to finish. `Return` used
 to switch off everything role-specific: it aimed at the player's raw position rather than through
 `ClampToBand`, and it skipped `ChooseTurn` entirely. It also **preempted `Recover`** — ground
 avoidance releases at `minAltitudeMargin` while `Recover` only exits at `safeAltitudeMargin`, so on
@@ -217,8 +239,9 @@ while it is out there: far enough to read as a different plane of flight, close 
 of the same fight.
 
 **It breaks on your aim, not on your hits.** `CanDodge` is checked every physics step and needs
-three things at once: `dodgeCooldown` expired, health at or below `dodgeHealthFraction`, and
-`UnderAim` — the player holding the trigger with the scout inside the fire cone. That cone is an
+four things at once: it has been on camera at least once (above), `dodgeCooldown` expired,
+health at or below `dodgeHealthFraction`, and `UnderAim` — the player holding the trigger with
+the scout inside the fire cone. That cone is an
 *area*, not the bullet line: `dodgeAimCone` (22° either side of the player's nose) out to
 `dodgeAimRange` (600 m), so it widens with distance the way a torch beam does. `PlaneShooter`
 publishes `Firing`, a 0.25 s latch on the trigger being held, which is what makes a single tap
@@ -262,7 +285,8 @@ could not reach you anyway.
 **The dodge and the ordinary evade do not stack.** `TakeDamage` skips `EnterEvade` while a dodge is
 running, so a round that lands in the first phases — before `ClearDepth` (35 m) makes it
 untouchable, about 0.65 s in — does not also kick off a break turn. The ordinary evade is otherwise unchanged: same
-`threatRange` trigger, same `evadeDuration` and `evadeCooldown`.
+`threatRange` trigger, same `evadeDuration` and `evadeCooldown` — what it *flies* now comes from
+the repertoire below.
 
 The cost is symmetrical, which is what keeps it fair: the 5.5 s manoeuvre is 5.5 s in which the
 scout cannot be hit *and* cannot shoot, on a ~20 s cycle. You lose the kill you had lined up; it
@@ -278,14 +302,22 @@ its firing range. So parking high buys you a lull, not immunity.
 
 ## Fighter
 
-Bumped over the historical enemy: 180 m/s (the player's own cruise, so running level does not
-break contact), 130 health, a shot every 0.20 s, still 6 damage, still 105 °/s.
+150 m/s, 75 °/s, 130 health, a shot every 0.20 s, 6 damage. It used to cruise at the player's
+own 180 and turn at 105 °/s; it is now the widest-turning thing in the air, with a **115 m turn
+radius** (`v / ω` — 150 ÷ 1.31 rad/s) against the scout's 64 m one way and 98 m the other, and
+the player's 86 m at cruise. It cannot follow you round a corner and it is not supposed to try:
+a level runaway is answered by the engagement boost below, and a turning fight by the loop
+reversal or a dive, never by matching your arc. Dropping the cruise under the player's 180 also
+means a Camel flying level away from it is genuinely leaving, which is what pushes the fighter
+onto the vertical instead of onto your tail.
 
 ### Dive energy
 
 The fighter runs the dive-energy model — gravity along the flight path (`diveAcceleration` 90),
 drag on the excess (`speedDrag` 0.9), a floor at cruise and a cap at `maxSpeedMultiplier` (1.6),
-so 180 to 288 m/s — from its own `EnemyFighterConfig.asset`. Altitude really is energy for it; the
+so 150 to 240 m/s — from its own `EnemyFighterConfig.asset`. The cap still clears the player's
+boosted 234, so the one thing a slower fighter has not lost is the ability to run you down on
+the way through. Altitude really is energy for it; the
 diving pass below is that model being spent, not a scripted speed multiplier. The scout keeps a
 flat constant speed.
 
@@ -294,40 +326,187 @@ turn radius, and the human is the one who has to predict their own arc. So the f
 now something only it can do, which is the point of the role — it is the enemy that owns the
 vertical, and the player answers it with position rather than by out-diving it.
 
-### The diving pass
+### The diving pass — the fighter's skill
 
-Entered from Attack or Fly when the fighter is high, the player is at least
-`diveAltitudeAdvantage` (180 m) below it, the range is inside `maxFireRange × 1.6` (800 m) and
-`diveCooldown` (10 s) has expired.
+The whole manoeuvre is one declared skill with a visual tell: **two white wingtip streaks**
+(`WingStreaks`, the same component and the same white as the player's boost — docs/boost.md)
+light up the moment it commits and stay lit until the pass is over. They are the only warning
+you get, and they are on for the climb as well as the dive, so the tell arrives before the
+danger does.
 
-1. **DiveClimb**, up to `diveClimbSeconds` 1.5 s — climbs at 62° *away* from the player, to the
-   top of the band. This is the telegraph, and the separation the dive needs.
-2. **DiveRun**, up to `diveRunSeconds` 3 s — commits. The aim point is the intercept computed at
-   the moment of commitment, blended only `diveTrack` (25%) toward the live intercept, so it will
-   not turn to follow you. It fires all the way down. It pulls out `diveExitMargin` (120 m) below
-   the player, or when the timer runs out.
-3. **DiveZoom**, up to 3 s — climbs at 70° back into the high band. The energy model bleeds the
-   dive speed off on the way up.
+**It only runs against a low player.** `WantsDive` asks whether the *player* is within
+`diveTriggerHeight` (180 m) of the ground — 265 m on Verdun — not whether the fighter already
+has a height advantage, because the climb is part of the skill. Stay up in the high fight and
+the fighter never runs it: you get the ordinary attack / break-away / evade cycle and nothing
+else. Come down and you are on its board. The other gates: the range is inside
+`maxFireRange × 1.6` (800 m), `diveCooldown` (10 s) has expired, and the fighter has been on
+camera at least once since it spawned (above).
 
-The cooldown is charged when the pass ends, including when ground avoidance or the camera bound
-aborts it, so a cancelled dive cannot immediately retry.
+| # | Phase | Flies to | Ends when |
+| --- | --- | --- | --- |
+| 1 | `DiveClimb`, ≤ `diveClimbSeconds` 3 s | the top corner **away** from the player | it is within `DiveCornerReach` (90 m) of that corner |
+| 2 | *wingover* | — | the 180° loop finishes (1.5 s) |
+| 3 | `DiveRun`, ≤ `diveRunSeconds` 6 s | **the player**, then on to the opposite bottom corner, firing all the way | it reaches that corner |
+| 4 | `DiveZoom`, ≤ 3 s | back up at 70° | it is in the high band again |
 
-Its floor throughout is `groundY + minAltitudeMargin` (245 m on Verdun) — the same line ground
-avoidance defends. A player down among the craters is below it, which is why the low fight is the
-fighter-free one.
+Then `EndDive` charges the 10 s cooldown and puts the streaks out.
+
+**The corners are the screen's, not the world's.** `CameraBounds` reads the view rectangle at
+the plane's own depth (`ViewportToWorldPoint`), and both corners are pulled in from it by
+`DiveCornerInset` (70 m):
+
+- **x** — the camera's left or right edge, clamped to the enemy window `CampaignEnemies`
+  already maintains, so the pass spans the picture the player is actually looking at, at any
+  aspect ratio, and can never be set up off screen. Containment uses the same bounds while
+  diving (`DiveSideMargin` 40 m instead of the usual 90 m edge margin), so the fighter is not
+  fighting its own corridor on the way to a corner it was told to reach.
+- **top y** — the top of the view, capped by `ceilingY − ManoeuvreTopMargin` (580 m on Verdun).
+  Containment during the climb still uses that world roof rather than the screen, so a fighter
+  that is *already* above the top of the frame — which is normal, its band is 379 – 490 and the
+  camera sits low when the player is low — is not shoved back down; it simply slides out to the
+  corner and starts the run from there.
+- **bottom y** — `minAltitudeMargin + ManoeuvreFloorLift` (160 + 40 = 200 m above the ground, 285 m
+  on Verdun): a bit above the line ground avoidance defends, which is the whole reason that line
+  is there. Note this is the *emergency* margin and not `safeAltitudeMargin` (260 → 345 m),
+  which sits above the entire low fight and would have left the pass flying over the player it
+  is aimed at.
+
+The corner line is the pass's *shape* — the top corner it starts from and the bottom corner it
+leaves through are both the camera's business rather than numbers in the asset, and the length
+is always the full width of the frame. What the fighter actually flies between them is aimed at
+the player; see below.
+
+**The wingover is the loop reversal, borrowed.** Turning ~180° at the top with ordinary steering
+would take 2.4 s at 75 °/s and drift half the screen; `EnterDiveRun` clears `_reversalCooldown`
+and `WantsReversal` is allowed in `DiveRun`, so the fighter flicks over the top on `EnemyLoop`'s
+1.5 s constant-rate arc instead — at the dive's own speed that is a ~110 m radius, so it may
+clip a couple of hundred metres above the top of the frame for under a second before the nose
+comes down. It holds its fire through the loop — a plane spraying a full
+circle at the top of the screen reads as noise, not as a threat — and opens up again as the nose
+comes down.
+
+**The run is aimed at you, not at the corner.** `DiveRunAim` returns the player's own position
+while the fighter is still short of them in the run direction (`PastTargetX`), clamped so the
+nose never comes up and never goes below the bottom line; only once it has passed them does the
+aim become the far bottom corner it exits through. Because the player is much closer than that
+corner, the nose goes *down*, hard — 20 – 40° instead of the corner line's 12 — and the pass
+reads as a dive at you that carries on across the screen, rather than a line that happens to
+sweep past. Two things sharpen it further while `Diving` is up: the steering limit is
+`DiveTurnFactor` (1.7 ×) of the fighter's ordinary 75 °/s, so the nose actually snaps onto the
+new aim instead of easing onto it, and the speed floor is `diveSpeedMultiplier` (1.5 ×
+`flySpeed` = 225 m/s, capped by `maxSpeedMultiplier` at 240) for the whole manoeuvre — climb
+included, so even the set-up is quick. The 108 m turn radius that comes out of those two is
+*tighter* than its 115 m cruise radius despite the extra speed. When the pass ends the floor
+drops back to cruise and `speedDrag` bleeds the energy off, so it does not carry the dive speed
+into the next turning fight.
+
+**It fires down the whole run**, not at a firing solution: `UpdateFiring` skips the range check,
+the aim cone and the intercept while `DiveRun` is up, and shoots at `fireRate` along its nose,
+which is by then pointed at you. It does not re-aim for the guns — the nose is set by the flight
+path — so the danger is still the *line* it is flying, and getting out of that line is the
+answer. The one gate left is that the fighter itself must be on camera.
+
+**A declared manoeuvre now finishes.** An enemy that leaves the camera is normally thrown into
+`Return`; `Diving` is exempt from that, the way `Recover` already was. That exemption is what
+makes the skill possible at all. The old pass climbed at a fixed 62° toward `ceilingY − 40`
+(580 m) with no reference to the camera, and 580 m is above the top of the screen whenever the
+player is low enough to trigger a dive — so every pass was thrown into `Return` a fraction of a
+second into its climb, and every abort charged the full 10 s cooldown. The dive triggered
+constantly and never once ran. Now the corners keep it in frame by construction, and the brief
+excursions that remain (the wingover, a fighter starting the run from above the top edge) are
+left alone to finish.
 
 ### Loop reversal
 
 The fighter's reversal is a declared manoeuvre too (`EnemyLoop`): a constant-rate 180° through
-the vertical over `loopSeconds` (1.5 s), on a wide radius, at unchanged speed. It triggers on a
+the vertical over `loopSeconds` (1.5 s), at unchanged speed. It triggers on a
 heading change of `reversalAngle` (120°) or more, with `ReversalCooldown` (2.5 s) stopping it from
-chaining; the scout has no equivalent. It
+chaining; the scout has no equivalent. At 75 °/s the loop is now the *only* quick way it has of
+turning around — 120°/s through the loop against 75 °/s of ordinary steering, a 72 m radius
+against 115 — so the manoeuvre is no longer an alternative to a hard turn, it is the hard turn.
+That is also why the diving pass borrows it for the wingover at the top. It
 is hard to punish — it keeps all its energy — but it takes a while and it is legible, so it is a
 beat you can reposition into rather than a corner you get turned in.
 
+## Breaking the turning circle (both roles)
+
+Two planes that both turn toward each other at a similar rate settle into a co-rotating circle
+— a Lufbery — and nothing resolves it: the enemy's `Attack` heading is a lead pursuit onto the
+player, so as long as the player keeps turning, the enemy keeps turning with them at a constant
+radius. It is the one shape a real pilot would never fly for long, because the answer to a
+stalemated circle is always to change the *plane* of the fight rather than to keep pulling in
+this one. The old state machine did not: `attackDuration` (3.5 s) broke the attack off into
+`Fly`, but `Fly` perches 90 m above the player, which from inside a circle is just more circle.
+
+`TickCircle` watches for it. Every physics step, while `Attack` or `Fly` and inside
+`threatRange`, it checks the enemy's own turn rate: turning at `CircleRateFraction` (50%) or
+more of its maximum, in the same direction as the step before, adds to `_circleTimer`; a
+direction flip, a slack turn or the player opening the range zeroes it. `CircleSeconds` (2.5 s)
+of that is a circle, and the enemy breaks out of it with a manoeuvre from the repertoire below.
+The break is not free: it shares `evadeCooldown` with the ordinary evade, so a player who keeps
+re-establishing the circle gets a *different* manoeuvre thrown at them roughly every 4 – 5 s
+rather than a twitch every second.
+
+The turn rate is read straight off `_angularVelocity`, not from any comparison with the player.
+That is deliberate — it means the same detector catches every version of the stalemate (both
+planes circling, or the enemy hauled around by a player who is simply flying a circle) without
+needing to model what the player is doing.
+
+## The evade repertoire
+
+`EnemyEvade` owns the manoeuvres; `EnemyController` picks one and steps it while `AiState.Evade`
+is up, and `ComputeHeading` just returns `_evade.Heading`. Each move is a short sequence of
+phases whose target heading is recomputed every step from the *live* positions, so a move stays
+aimed at where the player actually is rather than at where they were when it started. All of
+them still pass through `Contain`, `ChooseTurn` and `KeepNoseUp` afterwards, so no manoeuvre can
+fly a plane out of its band or into a hill.
+
+| Move | Shape | Why it breaks the circle |
+| --- | --- | --- |
+| `Break` | away from the player at `evadeBreakAngle`, with the old heading jitter, for `evadeDuration` | the original reactive dodge; kept as the answer to *being shot at*, not to a stalemate |
+| `Scissors` | three 0.7 s crosses, alternating ±50° either side of the line to the player | stays engaged and forces an overshoot instead of fleeing — the aggressive break, and the nose sweeps the player twice on the way through, so it shoots |
+| `Chandelle` | 1.1 s climbing at 62° in the current direction, then 0.9 s pulling back down onto the player | trades speed for height and re-enters from above: the circle becomes vertical |
+| `SplitDive` | 0.9 s nose-down at 48° *the other way*, then 0.8 s back toward the player | the mirror of the chandelle — reverses and trades height for speed, which the fighter's energy model then keeps |
+| `Extend` | 1.5 s flat out away from the player (pitch clamped to ±12°), then a hard turn back | resets the geometry completely and ends in a head-on merge; on the fighter the turn-back is big enough to trip `WantsReversal`, so it comes back round the loop |
+
+**Both roles fly all five.** Nothing in the trigger, the picker or the moves is role-specific —
+the scout evades out of the repertoire exactly as the fighter does, and its own manoeuvre, the
+depth dodge, is untouched and still runs on its own trigger and its own 14 s cooldown. The two
+do not interfere: the dodge only moves the plane in **Z**, out of your plane of fire, while the
+evade owns the X/Y path, so a scout can be sliding out of the firing plane and flying a scissors
+at the same time. What differs between the roles is only what the airspace allows.
+
+**The vertical pair get room to work.** A chandelle climbs ~146 m and a split-dive drops ~100 m,
+and *neither band is that tall* — the fighter's is 111 m (379 – 490) and the scout's corridor
+about 140 — so with plain containment both moves were quietly flattened into nothing. While one
+of them is running, `Contain` gives the band `EvadeBandGive` (120 m) in the direction the move
+needs:
+
+- `Chandelle` raises the roof to `EvadeRoof` — the band ceiling + 120, hard-capped at
+  `ceilingY − ManoeuvreTopMargin`, the same 40 m ceiling the fighter's dive climbs to.
+- `SplitDive` lowers the floor to `EvadeFloor` — the band floor − 120, but **never below**
+  `minAltitudeMargin + ManoeuvreFloorLift` above the ground, measured against `GroundRef`: the
+  flat conservative `groundY` for the fighter and the *sampled terrain contour* for the scout.
+  The scout's floor is the one number in this system that is never relaxed, because it is the
+  one that is measured against real ground.
+
+`PickEvade` then draws only from what fits: `Chandelle` needs `EvadeClimbRoom` (140 m) of
+headroom under the raised roof, `SplitDive` needs `EvadeDiveRoom` (110 m) over the lowered
+floor. That makes the pair complementary rather than always-on, and differently so per role — a
+fighter near its band roof cannot chandelle, a scout low in its corridor cannot split-dive but
+can climb, a scout high in it can do the reverse, and a scout squeezed over a hilltop draws
+neither. `Break`, `Scissors` and `Extend` are always available, so there is never an empty pool.
+
+From what is left the pick is random, skipping whatever it did last time. Repeating a manoeuvre
+is the one thing that makes a repertoire read as a script, so it is the one outcome the picker
+refuses.
+
+A circle break never draws `Break`: flying away at an angle is a fine answer to a gun on your
+tail and a poor answer to a stalemate, which is the whole distinction between the two triggers.
+
 ## Engagement boost (both roles)
 
-Without this, a player who simply flies away is uncatchable: the scout cruises at 150 and the
+Without this, a player who simply flies away is uncatchable: both roles cruise at 150 and the
 player cruises at 180, or 234 on a boost. So when the player is beyond `engageRange` (450 m) **and** moving away
 (`dot(playerVelocity, enemy → player) > 0`), the enemy's speed target becomes the player's own
 speed × `engageFactor` (1.15), ignoring its configured `flySpeed` entirely. It eases in and out at

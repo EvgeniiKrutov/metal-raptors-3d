@@ -3,7 +3,7 @@ using UnityEngine.Rendering;
 
 namespace MetalRaptors
 {
-    public class BoostTrails : MonoBehaviour
+    public class WingStreaks : MonoBehaviour
     {
         const float Width = 2.1f;
         const float Life = 0.55f;
@@ -17,15 +17,15 @@ namespace MetalRaptors
         TrailRenderer[] _trails;
         Material _material;
 
-        public static BoostTrails Mount(GameObject body, Transform model)
+        public static WingStreaks Mount(GameObject body, Transform model, Color? tint = null)
         {
             PlaneFactory.WingTipsLocal(body, model, out Vector3 near, out Vector3 far);
 
-            var go = new GameObject("Boost Trails");
+            var go = new GameObject("Wing Streaks");
             go.transform.SetParent(body.transform, false);
 
-            var trails = go.AddComponent<BoostTrails>();
-            trails._material = BuildMaterial();
+            var trails = go.AddComponent<WingStreaks>();
+            trails._material = BuildMaterial(tint ?? Color.white);
             trails._trails = new[]
             {
                 trails.Streak(near, "Wingtip Near"),
@@ -68,13 +68,13 @@ namespace MetalRaptors
             return trail;
         }
 
-        static Material BuildMaterial()
+        static Material BuildMaterial(Color tint)
         {
             var shader = Shader.Find("Universal Render Pipeline/Unlit");
             if (shader == null) shader = Shader.Find("Universal Render Pipeline/Lit");
 
-            var mat = new Material(shader) { name = "Boost Streak (runtime)" };
-            mat.SetColor("_BaseColor", new Color(1f, 1f, 1f, Alpha));
+            var mat = new Material(shader) { name = "Wing Streak (runtime)" };
+            mat.SetColor("_BaseColor", new Color(tint.r, tint.g, tint.b, Alpha));
             UIFactory.MakeTransparent(mat);
             return mat;
         }

@@ -120,7 +120,8 @@ unchanged. Campaign mode replaces this with a hard left wall instead (see
 docs/campaign.md).
 
 **Enemies** use `FlightSteering.Contain`, which limits the *heading the AI
-asks for* rather than the turn rate it gets. Penetration into each band (both
+asks for* rather than the turn rate it gets. In campaign mode they also carry
+the player's hard left wall (docs/campaign.md). Penetration into each band (both
 sides, the ceiling, and the soft altitude floor) becomes a push vector, which
 is added to the desired direction with enough weight that a full-depth
 intrusion dominates it; the result is re-normalised back into a heading. Deep

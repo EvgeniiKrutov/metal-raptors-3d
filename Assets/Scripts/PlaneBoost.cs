@@ -17,7 +17,7 @@ namespace MetalRaptors
 
         PlayerConfig _config;
         CubeController _plane;
-        BoostTrails _trails;
+        WingStreaks _trails;
         float _running;
         float _cooldown;
 
@@ -25,7 +25,7 @@ namespace MetalRaptors
         {
             _config = config;
             _plane = plane;
-            _trails = BoostTrails.Mount(gameObject, model);
+            _trails = WingStreaks.Mount(gameObject, model);
         }
 
         public void Stop()

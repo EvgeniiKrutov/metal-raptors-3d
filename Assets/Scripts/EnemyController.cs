@@ -13,6 +13,12 @@ namespace MetalRaptors
         const float BreakRoomCap = 300f;
         const float BreakRoomTie = 60f;
 
+        const float CircleSeconds = 2.5f;
+        const float CircleRateFraction = 0.5f;
+        const float EvadeClimbRoom = 140f;
+        const float EvadeDiveRoom = 110f;
+        const float EvadeBandGive = 120f;
+
         const float CollisionDamage = 10f;
         const float CollisionCooldown = 0.5f;
 
@@ -29,10 +35,13 @@ namespace MetalRaptors
         const float PressBreakFraction = 0.6f;
         const float ReversalCooldown = 2.5f;
         const float DiveRangeFactor = 1.6f;
-        const float DiveTopMargin = 20f;
-        const float DiveClimbAngleDeg = 62f;
-        const float DiveCeilingMargin = 40f;
+        const float ManoeuvreTopMargin = 40f;
         const float DiveZoomSeconds = 3f;
+        const float DiveCornerReach = 90f;
+        const float DiveCornerInset = 70f;
+        const float DiveSideMargin = 40f;
+        const float ManoeuvreFloorLift = 40f;
+        const float DiveTurnFactor = 1.7f;
         const float AimReach = 150f;
 
         const float TurnChoiceAngleDeg = 30f;
@@ -77,13 +86,15 @@ namespace MetalRaptors
         bool _standDown;
 
         float _minX, _maxX, _groundY, _ceilingY, _edgeMargin;
+        float _wallX = float.NegativeInfinity;
 
         AiState _state = AiState.Attack;
         float _stateTimer;
-        float _evadeHeading;
         float _evadeCooldown;
-        float _jitterTimer;
-        float _jitterOffset;
+        float _circleTimer;
+        float _circleDir;
+        EvadeMove _lastEvade = EvadeMove.Break;
+        readonly EvadeMove[] _evadePool = new EvadeMove[5];
         float _flyWeaveT;
         float _flyBaseX;
         float _fireCooldown;
@@ -95,6 +106,7 @@ namespace MetalRaptors
 
         readonly EnemyLoop _loop = new EnemyLoop();
         readonly EnemyDepthDodge _dodge = new EnemyDepthDodge();
+        readonly EnemyEvade _evade = new EnemyEvade();
 
         float _deck;
         float _baseZ;
@@ -108,8 +120,10 @@ namespace MetalRaptors
         float _turnDir;
         float _turnCheck;
         bool _turnClimb;
-        Vector2 _diveAim;
-        float _diveExitY;
+        float _diveSide;
+        bool _onCamera = true;
+        bool _appeared;
+        WingStreaks _streaks;
 
         GameObject _bulletTemplate;
         AudioSource _audio;
@@ -154,6 +168,7 @@ namespace MetalRaptors
             _targetRadius = target != null
                 ? Mathf.Clamp(MeasureRadius(target.gameObject), 8f, 40f)
                 : DefaultTargetRadius;
+            if (!Scouting) _streaks = WingStreaks.Mount(gameObject, transform);
             _smoke = gameObject.AddComponent<SmokeTrail>();
             _bulletTemplate = Bullet.BuildTemplate(Bullet.RoundColor);
 
@@ -172,6 +187,8 @@ namespace MetalRaptors
         public void StandDown()
         {
             _standDown = true;
+            SetStreaks(false);
+            _evade.Cancel();
             _loop.Cancel();
         }
 
@@ -180,6 +197,8 @@ namespace MetalRaptors
             _minX = minX;
             _maxX = maxX;
         }
+
+        public void SetLeftWall(float x) => _wallX = Mathf.Max(_wallX, x);
 
         EnemyRole Role => _config != null ? _config.role : EnemyRole.Fighter;
 
@@ -207,15 +226,18 @@ namespace MetalRaptors
             }
 
             _stateTimer = Mathf.Max(0f, _stateTimer - dt);
-            _jitterTimer = Mathf.Max(0f, _jitterTimer - dt);
             _evadeCooldown = Mathf.Max(0f, _evadeCooldown - dt);
             _reversalCooldown = Mathf.Max(0f, _reversalCooldown - dt);
             _diveCooldown = Mathf.Max(0f, _diveCooldown - dt);
             _fireCooldown -= dt;
 
+            _onCamera = IsOnCamera(transform.position);
+            _appeared |= _onCamera;
+
             TickDeck();
             TickDodge(dt);
             TickPress(dt);
+            TickCircle(dt);
 
             if (_standDown)
             {
@@ -226,9 +248,8 @@ namespace MetalRaptors
             {
                 CancelReversal();
             }
-            else if (!IsOnCamera(transform.position) && _state != AiState.Recover)
+            else if (!_onCamera && _state != AiState.Recover && !Diving)
             {
-                EndDive();
                 _state = AiState.Return;
                 CancelReversal();
             }
@@ -345,14 +366,13 @@ namespace MetalRaptors
 
             if (_state == AiState.DiveClimb)
             {
-                if (_stateTimer <= 0f || transform.position.y >= BandCeiling() - DiveTopMargin)
-                    EnterDiveRun();
+                if (_stateTimer <= 0f || AtDiveTop()) EnterDiveRun();
                 return;
             }
 
             if (_state == AiState.DiveRun)
             {
-                if (_stateTimer <= 0f || transform.position.y <= _diveExitY) EnterDiveZoom();
+                if (_stateTimer <= 0f || AtDiveBottom()) EnterDiveZoom();
                 return;
             }
 
@@ -373,7 +393,11 @@ namespace MetalRaptors
                 {
                     _evadeCooldown = _config.evadeCooldown;
                     EnterAttack();
+                    return;
                 }
+
+                _evade.Step(dt, transform.position,
+                    _target != null ? (Vector2)_target.position : (Vector2)transform.position);
                 return;
             }
 
@@ -400,7 +424,13 @@ namespace MetalRaptors
 
             if (_evadeCooldown <= 0f && UnderThreat())
             {
-                EnterEvade();
+                EnterEvade(circling: false);
+                return;
+            }
+
+            if (_evadeCooldown <= 0f && _appeared && _circleTimer >= CircleSeconds)
+            {
+                EnterEvade(circling: true);
                 return;
             }
 
@@ -423,12 +453,12 @@ namespace MetalRaptors
 
         bool WantsDive()
         {
+            if (!_appeared) return false;
             if (Scouting || _target == null) return false;
             if (_diveCooldown > 0f) return false;
             if (_state != AiState.Attack && _state != AiState.Fly) return false;
 
-            if (transform.position.y - _target.position.y < _config.diveAltitudeAdvantage)
-                return false;
+            if (_target.position.y - _groundY > _config.diveTriggerHeight) return false;
 
             return TargetDistance() <= _config.maxFireRange * DiveRangeFactor;
         }
@@ -437,15 +467,15 @@ namespace MetalRaptors
         {
             _state = AiState.DiveClimb;
             _stateTimer = _config.diveClimbSeconds;
+            _diveSide = _target != null && _target.position.x > transform.position.x ? -1f : 1f;
+            SetStreaks(true);
         }
 
         void EnterDiveRun()
         {
             _state = AiState.DiveRun;
             _stateTimer = _config.diveRunSeconds;
-            _diveAim = PredictIntercept();
-            _diveExitY = (_target != null ? _target.position.y : transform.position.y)
-                       - _config.diveExitMargin;
+            _reversalCooldown = 0f;
         }
 
         void EnterDiveZoom()
@@ -458,9 +488,77 @@ namespace MetalRaptors
         {
             if (!Diving) return;
             _diveCooldown = _config.diveCooldown;
+            SetStreaks(false);
         }
 
-        void EnterEvade()
+        void SetStreaks(bool on)
+        {
+            if (_streaks != null) _streaks.SetEmitting(on);
+        }
+
+        bool CameraBounds(out Vector3 min, out Vector3 max)
+        {
+            min = max = Vector3.zero;
+            if (_cam == null) return false;
+
+            float depth = transform.position.z - _cam.transform.position.z;
+            if (depth <= 0f) return false;
+
+            min = _cam.ViewportToWorldPoint(new Vector3(0f, 0f, depth));
+            max = _cam.ViewportToWorldPoint(new Vector3(1f, 1f, depth));
+            return true;
+        }
+
+        float DiveEdgeX(float side)
+        {
+            if (!CameraBounds(out Vector3 min, out Vector3 max))
+                return side > 0f ? _maxX : _minX;
+
+            float view = (side > 0f ? max.x : min.x) - side * DiveCornerInset;
+            return side > 0f ? Mathf.Min(_maxX, view) : Mathf.Max(_minX, view);
+        }
+
+        float DiveTopY()
+        {
+            float roof = _ceilingY - ManoeuvreTopMargin;
+            return CameraBounds(out Vector3 _, out Vector3 max)
+                ? Mathf.Min(roof, max.y - DiveCornerInset)
+                : roof;
+        }
+
+        float DiveBottomY() => _groundY + _config.minAltitudeMargin + ManoeuvreFloorLift;
+
+        Vector2 DiveRunAim()
+        {
+            float bottom = DiveBottomY();
+            if (_target == null || PastTargetX()) return new Vector2(DiveEdgeX(-_diveSide), bottom);
+
+            Vector3 aim = _target.position;
+            return new Vector2(aim.x,
+                Mathf.Max(bottom, Mathf.Min(aim.y, transform.position.y)));
+        }
+
+        bool PastTargetX()
+        {
+            float run = -_diveSide;
+            return run > 0f ? transform.position.x >= _target.position.x
+                            : transform.position.x <= _target.position.x;
+        }
+
+        bool AtDiveTop() =>
+            transform.position.y >= DiveTopY() - DiveCornerReach && AtDiveEdge(_diveSide);
+
+        bool AtDiveBottom() =>
+            transform.position.y <= DiveBottomY() + DiveCornerReach && AtDiveEdge(-_diveSide);
+
+        bool AtDiveEdge(float side)
+        {
+            float edge = DiveEdgeX(side);
+            return side > 0f ? transform.position.x >= edge - DiveCornerReach
+                             : transform.position.x <= edge + DiveCornerReach;
+        }
+
+        void EnterEvade(bool circling)
         {
             Vector3 away = transform.position
                          - (_target != null ? _target.position : transform.position - Vector3.right);
@@ -475,14 +573,82 @@ namespace MetalRaptors
             float highRoom = BreakRoom(high, roomUp, roomDown);
             float lowRoom = BreakRoom(low, roomUp, roomDown);
 
-            _evadeHeading = Mathf.Abs(highRoom - lowRoom) < BreakRoomTie
-                ? (UnityEngine.Random.value < 0.5f ? high : low)
-                : (highRoom > lowRoom ? high : low);
+            bool breakHigh = Mathf.Abs(highRoom - lowRoom) < BreakRoomTie
+                ? UnityEngine.Random.value < 0.5f
+                : highRoom > lowRoom;
 
-            _jitterTimer = 0f;
-            _jitterOffset = 0f;
-            _stateTimer = _config.evadeDuration;
+            var plan = new EvadePlan
+            {
+                move = PickEvade(circling),
+                side = breakHigh ? 1f : -1f,
+                breakHeading = breakHigh ? high : low,
+                breakSeconds = _config.evadeDuration,
+                jitterAmplitude = _config.jitterAmplitude,
+                jitterHz = _config.jitterHz,
+            };
+
+            _evade.Begin(plan, _heading, transform.position,
+                _target != null ? (Vector2)_target.position : (Vector2)transform.position);
+
+            _circleTimer = 0f;
+            _circleDir = 0f;
+            _stateTimer = _evade.Seconds;
             _state = AiState.Evade;
+        }
+
+        float EvadeRoof() =>
+            Mathf.Min(_ceilingY - ManoeuvreTopMargin, BandCeiling() + EvadeBandGive);
+
+        float EvadeFloor() =>
+            Mathf.Max(GroundRef + _config.minAltitudeMargin + ManoeuvreFloorLift,
+                BandFloor() - EvadeBandGive);
+
+        EvadeMove PickEvade(bool circling)
+        {
+            float y = transform.position.y;
+            int count = 0;
+
+            if (!circling) _evadePool[count++] = EvadeMove.Break;
+            _evadePool[count++] = EvadeMove.Scissors;
+            _evadePool[count++] = EvadeMove.Extend;
+            if (EvadeRoof() - y >= EvadeClimbRoom) _evadePool[count++] = EvadeMove.Chandelle;
+            if (y - EvadeFloor() >= EvadeDiveRoom) _evadePool[count++] = EvadeMove.SplitDive;
+
+            int index = UnityEngine.Random.Range(0, count);
+            if (count > 1 && _evadePool[index] == _lastEvade) index = (index + 1) % count;
+
+            _lastEvade = _evadePool[index];
+            return _lastEvade;
+        }
+
+        void TickCircle(float dt)
+        {
+            bool fighting = !_standDown && _target != null
+                         && (_state == AiState.Attack || _state == AiState.Fly);
+
+            if (!fighting || TargetDistance() > _config.threatRange)
+            {
+                _circleTimer = 0f;
+                _circleDir = 0f;
+                return;
+            }
+
+            float rate = _angularVelocity;
+            if (Mathf.Abs(rate) < _config.rotationSpeed * Mathf.Deg2Rad * CircleRateFraction)
+            {
+                _circleTimer = 0f;
+                _circleDir = 0f;
+                return;
+            }
+
+            if (_circleDir == 0f || Mathf.Sign(rate) != _circleDir)
+            {
+                _circleDir = Mathf.Sign(rate);
+                _circleTimer = 0f;
+                return;
+            }
+
+            _circleTimer += dt;
         }
 
         static float BreakRoom(float heading, float roomUp, float roomDown)
@@ -526,7 +692,7 @@ namespace MetalRaptors
 
         float BandCeiling()
         {
-            if (_state == AiState.DiveClimb) return _ceilingY - DiveCeilingMargin;
+            if (_state == AiState.DiveClimb) return _ceilingY - ManoeuvreTopMargin;
 
             float roof;
             if (Scouting)
@@ -547,13 +713,25 @@ namespace MetalRaptors
         {
             float floor = BandFloor();
             float roof = Mathf.Max(floor + 1f, BandCeiling());
+
+            if (_state == AiState.Evade)
+            {
+                if (_evade.Move == EvadeMove.Chandelle) roof = EvadeRoof();
+                else if (_evade.Move == EvadeMove.SplitDive) floor = EvadeFloor();
+                roof = Mathf.Max(floor + 1f, roof);
+            }
+
             float margin = Mathf.Min(BandPushMargin, (roof - floor) * BandPushFraction);
             float floorMargin = Scouting
                 ? Mathf.Max(margin, _config.safeAltitudeMargin - _config.minAltitudeMargin)
                 : margin;
 
+            float minX = Diving ? DiveEdgeX(-1f) : _minX;
+            float maxX = Diving ? DiveEdgeX(1f) : _maxX;
+            float sideMargin = Diving ? DiveSideMargin : _edgeMargin;
+
             return FlightSteering.Contain(heading, _rb.position,
-                _minX, _maxX, _edgeMargin,
+                minX, maxX, sideMargin,
                 floor, floorMargin, roof, margin);
         }
 
@@ -568,19 +746,10 @@ namespace MetalRaptors
                 }
 
                 case AiState.DiveClimb:
-                {
-                    float climb = DiveClimbAngleDeg * Mathf.Deg2Rad;
-                    float away = _target != null && _target.position.x > transform.position.x
-                        ? -1f : 1f;
-                    return away > 0f ? climb : Mathf.PI - climb;
-                }
+                    return HeadingTo(new Vector2(DiveEdgeX(_diveSide), DiveTopY()));
 
                 case AiState.DiveRun:
-                {
-                    Vector2 aim = Vector2.Lerp(_diveAim, PredictIntercept(),
-                        Mathf.Clamp01(_config.diveTrack));
-                    return HeadingTo(aim);
-                }
+                    return HeadingTo(DiveRunAim());
 
                 case AiState.DiveZoom:
                 {
@@ -589,15 +758,7 @@ namespace MetalRaptors
                 }
 
                 case AiState.Evade:
-                {
-                    if (_jitterTimer <= 0f)
-                    {
-                        _jitterOffset = UnityEngine.Random.Range(-1f, 1f)
-                                      * _config.jitterAmplitude * Mathf.Deg2Rad;
-                        _jitterTimer = 1f / Mathf.Max(0.01f, _config.jitterHz);
-                    }
-                    return _evadeHeading + _jitterOffset;
-                }
+                    return _evade.Heading;
 
                 case AiState.Fly:
                 {
@@ -631,8 +792,10 @@ namespace MetalRaptors
 
         bool WantsReversal(float desired)
         {
+            if (!_appeared) return false;
             if (Scouting || _reversalCooldown > 0f || _standDown) return false;
-            if (_state == AiState.Recover || _state == AiState.Return || Diving) return false;
+            if (_state == AiState.Recover || _state == AiState.Return) return false;
+            if (Diving && _state != AiState.DiveRun) return false;
 
             float error = Mathf.Abs(Mathf.DeltaAngle(_heading * Mathf.Rad2Deg,
                 desired * Mathf.Rad2Deg));
@@ -756,6 +919,7 @@ namespace MetalRaptors
         void SteerToHeading(float targetHeading, float dt)
         {
             float maxRate = _config.rotationSpeed * Mathf.Deg2Rad;
+            if (Diving) maxRate *= DiveTurnFactor;
 
             float error = Mathf.DeltaAngle(_heading * Mathf.Rad2Deg, targetHeading * Mathf.Rad2Deg)
                         * Mathf.Deg2Rad;
@@ -788,12 +952,18 @@ namespace MetalRaptors
 
             Vector3 vel = new Vector3(Mathf.Cos(_heading), Mathf.Sin(_heading), 0f) * speed;
             Vector3 pos = _rb.position;
+            float wall = _wallX + _bodyRadius;
 
             if (pos.y >= _ceilingY && vel.y > 0f) vel.y = 0f;
+            if (pos.x <= wall && vel.x < 0f) vel.x = 0f;
             if (_dodge.Active && dt > 0f) vel.z = (_dodge.Z - pos.z) / dt;
 
             _rb.linearVelocity = vel;
-            if (pos.y > _ceilingY) { pos.y = _ceilingY; _rb.position = pos; }
+
+            bool clamped = false;
+            if (pos.y > _ceilingY) { pos.y = _ceilingY; clamped = true; }
+            if (pos.x < wall) { pos.x = wall; clamped = true; }
+            if (clamped) _rb.position = pos;
         }
 
         float UpdateSpeed(float dt)
@@ -806,10 +976,14 @@ namespace MetalRaptors
             }
             else
             {
+                float cap = cruise * Mathf.Max(1f, _config.maxSpeedMultiplier);
+                float floor = Diving
+                    ? Mathf.Min(cap, cruise * Mathf.Max(1f, _config.diveSpeedMultiplier))
+                    : cruise;
+
                 _speed += -Mathf.Sin(_heading) * _config.diveAcceleration * dt;
                 _speed -= (_speed - cruise) * _config.speedDrag * dt;
-                _speed = Mathf.Clamp(_speed, cruise,
-                    cruise * Mathf.Max(1f, _config.maxSpeedMultiplier));
+                _speed = Mathf.Clamp(_speed, floor, cap);
             }
 
             _engageSpeed = Mathf.Lerp(_engageSpeed, EngageTarget(),
@@ -863,12 +1037,20 @@ namespace MetalRaptors
         void UpdateFiring()
         {
             if (_dodge.Active) return;
-            if (_target == null || !IsOnCamera(_target.position)) return;
 
-            if (TargetDistance() > _config.maxFireRange) return;
+            if (_state == AiState.DiveRun)
+            {
+                if (!_onCamera || Reversing) return;
+            }
+            else
+            {
+                if (_target == null || !IsOnCamera(_target.position)) return;
 
-            if (!HasFiringSolution(PredictIntercept())
-                && !HasFiringSolution(_target.position)) return;
+                if (TargetDistance() > _config.maxFireRange) return;
+
+                if (!HasFiringSolution(PredictIntercept())
+                    && !HasFiringSolution(_target.position)) return;
+            }
 
             if (_fireCooldown > 0f) return;
             _fireCooldown = Mathf.Max(0.01f, _config.fireRate);
@@ -929,11 +1111,12 @@ namespace MetalRaptors
             if (_falling || _dodge.Active) return;
 
             if (_evadeCooldown <= 0f
-                && (_state == AiState.Attack || _state == AiState.Fly)) EnterEvade();
+                && (_state == AiState.Attack || _state == AiState.Fly)) EnterEvade(circling: false);
         }
 
         bool CanDodge()
         {
+            if (!_appeared) return false;
             if (!Scouting || _standDown || _dodge.Active || _dodgeCooldown > 0f) return false;
             if (CurrentHealth > _config.health * _config.dodgeHealthFraction) return false;
             return UnderAim();
@@ -971,6 +1154,7 @@ namespace MetalRaptors
             if (_dead || _falling) return;
             _falling = true;
 
+            SetStreaks(false);
             CancelReversal();
             if (_dodge.Active)
             {
