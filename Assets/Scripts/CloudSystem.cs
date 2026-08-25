@@ -165,7 +165,7 @@ namespace MetalRaptors
                     s * Random.Range(0.8f, 1.15f),
                     s * Random.Range(1.1f, 1.7f));
 
-                go.AddComponent<MeshFilter>().sharedMesh = BlobMesh.Build();
+                go.AddComponent<MeshFilter>().sharedMesh = BlobMesh.Pick();
                 var renderer = go.AddComponent<MeshRenderer>();
                 if (mat != null) renderer.sharedMaterial = mat;
                 renderer.shadowCastingMode = ShadowCastingMode.Off;
@@ -215,12 +215,6 @@ namespace MetalRaptors
         static void DestroyCloud(Cloud cloud)
         {
             if (cloud.mat != null) Destroy(cloud.mat);
-            foreach (var blob in cloud.blobs)
-            {
-                if (blob.tr == null) continue;
-                var filter = blob.tr.GetComponent<MeshFilter>();
-                if (filter != null && filter.sharedMesh != null) Destroy(filter.sharedMesh);
-            }
             if (cloud.root != null) Destroy(cloud.root.gameObject);
         }
 

@@ -1,6 +1,8 @@
 using System;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 namespace MetalRaptors
 {
@@ -13,10 +15,21 @@ namespace MetalRaptors
 
         static readonly Color Scrim = new Color(0f, 0f, 0f, 0.6f);
 
+        const float ExpandSec = 0.28f;
+        const float MaxStep = 0.05f;
+
         static bool _pending;
 
         MenuPanel _panel;
+        MenuItemView _optionsItem;
         GameObject _hud;
+        Image _band;
+        Image _scrim;
+        CanvasGroup _columnGroup;
+        OptionsPage _options;
+        CanvasGroup _optionsGroup;
+        bool _optionsOpen;
+        bool _sliding;
         bool _closable;
         int _openedFrame;
 
@@ -60,11 +73,12 @@ namespace MetalRaptors
             if (_hud != null) _hud.SetActive(false);
             Time.timeScale = 0f;
 
-            MenuLayout.CreateBand(canvas.transform, "Menu Band", 0f, MenuTheme.ColumnFraction,
+            _band = MenuLayout.CreateBand(canvas.transform, "Menu Band", 0f, MenuTheme.ColumnFraction,
                 MenuTheme.Colors.Bg);
-            MenuLayout.CreateBand(canvas.transform, "Scrim Band", MenuTheme.ColumnFraction, 1f, Scrim);
+            _scrim = MenuLayout.CreateBand(canvas.transform, "Scrim Band", MenuTheme.ColumnFraction, 1f, Scrim);
 
             Transform column = MenuLayout.CreatePage(canvas.transform, "Menu Column", MenuTheme.ColumnFraction);
+            _columnGroup = column.gameObject.AddComponent<CanvasGroup>();
             MenuLayout.BuildTitle(column, TitleFor(kind));
 
             _panel = new MenuPanel(column, "Menu Panel", MenuTheme.ListTop);
@@ -83,7 +97,7 @@ namespace MetalRaptors
                     : null, hasNext);
             }
 
-            _panel.AddNav("options", null, interactable: false);
+            _optionsItem = _panel.AddNav("options", OpenOptions);
 
             _panel.AddGap(MenuTheme.SectionGap);
             _panel.AddNav("quit to menu", () => Load(SceneNames.MainMenu));
@@ -101,9 +115,87 @@ namespace MetalRaptors
             }
         }
 
+        void OpenOptions()
+        {
+            if (_sliding || _optionsOpen) return;
+
+            if (_options == null)
+            {
+                _options = new OptionsPage(transform, CloseOptions);
+                _optionsGroup = _options.Root.AddComponent<CanvasGroup>();
+            }
+
+            _optionsOpen = true;
+            _options.SetActive(true);
+            StartCoroutine(Slide(MenuTheme.ColumnFraction, 1f, _columnGroup, _optionsGroup));
+        }
+
+        void CloseOptions()
+        {
+            if (_sliding || !_optionsOpen) return;
+
+            _optionsOpen = false;
+            StartCoroutine(Slide(1f, MenuTheme.ColumnFraction, _optionsGroup, _columnGroup));
+        }
+
+        IEnumerator Slide(float from, float to, CanvasGroup fadeOut, CanvasGroup fadeIn)
+        {
+            _sliding = true;
+
+            fadeIn.gameObject.SetActive(true);
+            fadeIn.alpha = 0f;
+            fadeIn.blocksRaycasts = false;
+            fadeOut.blocksRaycasts = false;
+
+            for (float t = 0f; t < ExpandSec; t += Mathf.Min(Time.unscaledDeltaTime, MaxStep))
+            {
+                float k = Ease(Mathf.Clamp01(t / ExpandSec));
+                SetSplit(Mathf.Lerp(from, to, k));
+                fadeOut.alpha = Mathf.Clamp01(1f - 2f * k);
+                fadeIn.alpha = Mathf.Clamp01(2f * k - 1f);
+                yield return null;
+            }
+
+            SetSplit(to);
+            fadeOut.alpha = 0f;
+            fadeOut.gameObject.SetActive(false);
+            fadeIn.alpha = 1f;
+            fadeIn.blocksRaycasts = true;
+            _sliding = false;
+
+            if (_optionsOpen) _options.Enter();
+            else _panel.Focus(_optionsItem);
+        }
+
+        void SetSplit(float x)
+        {
+            _band.rectTransform.anchorMax = new Vector2(x, 1f);
+            _scrim.rectTransform.anchorMin = new Vector2(x, 0f);
+        }
+
+        static float Ease(float t) => t * t * (3f - 2f * t);
+
+        void UpdateOptions()
+        {
+            int step = MenuInput.ReadStep();
+            if (step != 0) _options.MoveFocus(step);
+
+            int adjust = MenuInput.ReadAdjust();
+            if (adjust != 0) _options.Adjust(adjust);
+
+            if (MenuInput.ReadSubmit()) _options.ActivateFocused();
+            if (MenuInput.ReadCancel() && !_options.Cancel()) CloseOptions();
+        }
+
         void Update()
         {
-            if (_panel == null || ScreenFade.IsBusy) return;
+            if (_panel == null || ScreenFade.IsBusy || _sliding) return;
+
+            if (_optionsOpen)
+            {
+                UpdateOptions();
+                return;
+            }
 
             int step = MenuInput.ReadStep();
             if (step != 0) _panel.MoveFocus(step);

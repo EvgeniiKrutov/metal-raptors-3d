@@ -207,7 +207,7 @@ namespace MetalRaptors
             var audio = go.AddComponent<AudioSource>();
             audio.playOnAwake = false;
             audio.spatialBlend = 0f;
-            audio.PlayOneShot(clip, ChimeVolume);
+            audio.PlayOneShot(clip, ChimeVolume * AudioOptions.Sfx);
             Destroy(go, clip.length + 0.1f);
         }
 

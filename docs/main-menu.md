@@ -37,6 +37,9 @@ UI — the `MainMenu` scene only holds a camera, a light and the controller obje
 | `MenuPlaneView.cs` | The flying plane in the main list's right band: the shared preview rig plus mouse-driven flight. |
 | `PlanePreviewRig.cs` | The preview band itself — its camera, render texture and framing — shared with the garage. |
 | `MenuStatRow.cs` | One garage stat row: a caption over a bar, or a caption over a text value. |
+| `MenuVolumeRow.cs` | A garage stat bar made steppable — triangles either side, percentage after (docs/options.md). |
+| `OptionsPage.cs` | The options screen: categories on the left, the focused category's rows on the right. |
+| `AudioOptions.cs` | The three volumes behind that screen, on a 5% grid, persisted to `PlayerPrefs`. |
 | `IMenuFocusGroup.cs` | What the navigation keys drive (`MenuPanel`, `MenuCardRow`, `MenuLevelRow`) and, as `IMenuFocusable`, what a panel can highlight. |
 | `CustomBattle.cs` | The maps a custom battle can pick, and the pick itself, read by the endless scene. |
 | `CareerEras.cs` | The four eras: title, years, description, emblem, unlocked. |
@@ -70,7 +73,7 @@ transition on the first. `screen-fade.md` has the rest.
 │  custom battle          │      → custom battle page │
 │  garage                 │      → Garage scene       │
 │  online battles         │      (muted, no click)    │
-│  options                │      (muted, no click)    │
+│  options                │                           │
 └─────────────────────────┴───────────────────────────┘
  ↑ 120px left margin — the edge every row on every screen starts on
 ```
@@ -365,8 +368,8 @@ future boxed control
 (a dropdown, a slider) inherits the right colours.
 
 Switching is one assignment, `MenuTheme.Active = MenuThemeId.WW2`, made before the menu
-scene loads. There is no UI for it yet; when `options` becomes real, that is where it
-belongs (persist through `GameManager` / `PlayerPrefs` like the daytime settings).
+scene loads. There is no UI for it yet; the options page (docs/options.md) is where a theme
+category belongs when there is one, next to `sound`.
 
 The main menu, the garage (`docs/garage.md`) and the in-level menu (`docs/game-menu.md`) all
 use these palettes — the garage takes `Border` for its stat bar tracks and `Accent` for
@@ -389,7 +392,8 @@ that did is now a selector instead, and `MenuPanel.AddOptionRow` waits for the n
 
 A selector row follows the Nav rule on its value (`Fg`, `Accent` bold while focused) and
 its label stays `Muted`. Its triangles are `Fg`, `Accent` while the row holds the highlight,
-and `Muted` once there is nothing left that way.
+and `Muted` once there is nothing left that way — or while its row is only previewed, which
+is the options page's third triangle state (docs/options.md).
 
 A card is the same idea in two parts: its title is `Fg`, `Accent` when highlighted, `Muted`
 when locked; its years stay `Muted`; and a 4px frame — `Accent`, or `Muted` when locked —

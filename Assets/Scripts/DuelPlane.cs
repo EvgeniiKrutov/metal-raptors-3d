@@ -711,7 +711,7 @@ namespace MetalRaptors
 
             Tracer.Spawn(muzzle, dir, TracerSpeed);
             MuzzleFlash.Spawn(muzzle, dir, _size);
-            if (_shotClip != null && _audio != null) _audio.PlayOneShot(_shotClip, ShotVolume);
+            if (_shotClip != null && _audio != null) _audio.PlayOneShot(_shotClip, ShotVolume * AudioOptions.Sfx);
         }
 
         void Remove()

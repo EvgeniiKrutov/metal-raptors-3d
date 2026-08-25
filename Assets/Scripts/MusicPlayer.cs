@@ -50,6 +50,8 @@ namespace MetalRaptors
 
         BakeJob _job;
 
+        static float MusicTarget => MusicVolume * AudioOptions.Music;
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         static void Bootstrap()
         {
@@ -70,6 +72,7 @@ namespace MetalRaptors
 
             Instance = this;
             DontDestroyOnLoad(gameObject);
+            AudioOptions.Changed += OnVolumeChanged;
             _introSource = CreateSource(false);
             _loopSource = CreateSource(true);
             SceneManager.sceneLoaded += OnSceneLoaded;
@@ -100,6 +103,7 @@ namespace MetalRaptors
         void OnDestroy()
         {
             if (Instance != this) return;
+            AudioOptions.Changed -= OnVolumeChanged;
             SceneManager.sceneLoaded -= OnSceneLoaded;
             AudioSettings.OnAudioConfigurationChanged -= OnAudioConfigurationChanged;
         }
@@ -116,6 +120,12 @@ namespace MetalRaptors
             _loopSource.volume = _volume;
 
             if (_stopWhenSilent && _volume <= 0f) Stop();
+        }
+
+        void OnVolumeChanged()
+        {
+            if (_currentId == null || _stopWhenSilent) return;
+            _volumeTarget = MusicTarget;
         }
 
         public void Play(string id, float fadeSec = FadeInSec)
@@ -231,7 +241,7 @@ namespace MetalRaptors
 
             _currentId = job.Id;
             _volume = 0f;
-            _volumeTarget = MusicVolume;
+            _volumeTarget = MusicTarget;
             _fadeSec = job.Fade;
             _fadeAfterDsp = start;
         }
@@ -291,7 +301,7 @@ namespace MetalRaptors
 
             _currentId = id;
             _volume = 0f;
-            _volumeTarget = MusicVolume;
+            _volumeTarget = MusicTarget;
             _fadeSec = fadeSec;
             _fadeAfterDsp = start;
         }

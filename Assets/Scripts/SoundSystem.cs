@@ -197,7 +197,7 @@ namespace MetalRaptors
 
             protected override void Apply()
             {
-                float bed = Envelope.Value * Attenuation * PauseGain;
+                float bed = Envelope.Value * Attenuation * PauseGain * AudioOptions.Sfx;
                 float duck = Mathf.Lerp(1f, BoostDuck, _boostLevel.Value);
 
                 if (_idle != null) _idle.volume = IdleVolume * bed * _idleLevel.Value * duck;
@@ -230,7 +230,8 @@ namespace MetalRaptors
             protected override void Apply()
             {
                 if (_throttle != null)
-                    _throttle.volume = EnemyThrottleVolume * Envelope.Value * Attenuation * PauseGain;
+                    _throttle.volume = EnemyThrottleVolume * Envelope.Value * Attenuation
+                                       * PauseGain * AudioOptions.Sfx;
             }
 
             public override void Dispose()
@@ -320,6 +321,7 @@ namespace MetalRaptors
         public void PlayStutter()
         {
             if (_stutter == null || _stutter.clip == null || _stutter.isPlaying) return;
+            _stutter.volume = StutterVolume * AudioOptions.Sfx;
             _stutter.Play();
         }
 
@@ -406,7 +408,8 @@ namespace MetalRaptors
 
         void ApplyAmbient()
         {
-            if (_wind != null && !_windStopped) _wind.volume = WindVolume * _pauseGain.Value;
+            if (_wind != null && !_windStopped)
+                _wind.volume = WindVolume * _pauseGain.Value * AudioOptions.Sfx;
         }
 
         void StopWind()

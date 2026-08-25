@@ -22,9 +22,11 @@ atmosphere does not need a new branch inside the cloud system
 
 ## Structure
 
-Each cloud is a root GameObject carrying 5–9 blobs built from the shared `BlobMesh.Build()`
-icosphere (the explosion's mesh family — see `docs/effects.md`). Cloud-like shapes come from
-the transforms, not new geometry:
+Each cloud is a root GameObject carrying 5–9 blobs taken from the shared `BlobMesh.Pick()`
+pool (the explosion's mesh family — see `docs/effects.md`). Clouds spawn and scroll off
+continuously, so they take pooled variants rather than building a mesh per blob, and
+`DestroyCloud` releases only the material and the root. Cloud-like shapes come from the
+transforms, not new geometry:
 
 - blob offsets spread mostly along X (±0.5 × width) with a Y band (±0.22) and a slight Z
   scatter (±0.08), so the cluster reads as a wide but bulky puff;

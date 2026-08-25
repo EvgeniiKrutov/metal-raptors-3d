@@ -70,7 +70,7 @@ namespace MetalRaptors
                     Random.Range(-LateralSpread, LateralSpread) * size);
                 go.transform.localRotation = Random.rotation;
 
-                go.AddComponent<MeshFilter>().sharedMesh = BlobMesh.Build();
+                go.AddComponent<MeshFilter>().sharedMesh = BlobMesh.Pick();
                 var renderer = go.AddComponent<MeshRenderer>();
                 renderer.shadowCastingMode = ShadowCastingMode.Off;
 
@@ -146,9 +146,6 @@ namespace MetalRaptors
             foreach (var flame in _flames)
             {
                 if (flame.mat != null) Destroy(flame.mat);
-                if (flame.tr == null) continue;
-                var filter = flame.tr.GetComponent<MeshFilter>();
-                if (filter != null && filter.sharedMesh != null) Destroy(filter.sharedMesh);
             }
         }
     }

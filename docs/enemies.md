@@ -428,6 +428,41 @@ That is also why the diving pass borrows it for the wingover at the top. It
 is hard to punish — it keeps all its energy — but it takes a while and it is legible, so it is a
 beat you can reposition into rather than a corner you get turned in.
 
+## Taking your six (both roles)
+
+`Attack` is a lead pursuit onto an *intercept* point — it aims where you will be, which makes it
+a slashing head-on attacker and means a player flying straight and level is repeatedly passed
+rather than hunted. `AiState.Tail` is the answer: once an enemy is already behind you and you
+are not threatening it, it stops intercepting and settles into your six.
+
+**Getting there.** `WantsTail` needs the enemy `_appeared`, not scouting, not diving, not
+standing down, currently in `Attack` or `Fly`, inside `maxFireRange × 1.4`, not `UnderThreat`,
+and — the real test — `TailOffAngle() <= 75°`. That angle is between your velocity and the
+vector from you to the enemy, so it is literally "how far off my six are they": 0° is directly
+astern, 180° is directly ahead. An enemy that is already behind you latches on; one merging
+head-on does not, and keeps its slashing attack.
+
+**Holding it.** The slot is `your position − your heading × 95`, clamped into the enemy's
+altitude band. Outside `TailSlotTolerance` (55 m) the enemy steers straight at that point;
+inside it, `TailHeading` blends from chasing the slot to *copying your heading* — matching what
+you fly rather than pointing at where you are, which is what stops the pendulum you get from
+pure point-chasing. `TailSpeed` does the same job for throttle: it lerps from a 1.3× closing
+speed down to exactly your own speed as the gap shuts, so the enemy settles instead of
+overrunning. Firing needs no special case — `UpdateFiring` already fires whenever there is a
+solution, and sitting in the six with the nose matched means there always is one.
+
+**Breaking it.** `TickTail` gives up when the range opens past `maxFireRange × 1.4`, when
+`TailSeconds` (10 s) runs out, when it comes `UnderThreat` (which sends it straight to evade),
+or when `TailOffAngle()` exceeds 105° for a continuous `TailBreakSeconds` (1.1 s) — you have to
+actually get out of the line and *stay* out, not just jink. Two things are deliberately
+suppressed while tailing: `WantsReversal` returns false, so the enemy will not flip away from a
+tail it has earned, and `TickCircle` does not count (it only accumulates in `Attack`/`Fly`), so
+a tailing enemy never randomly breaks into the circling evade. Both restore the moment the tail
+breaks and normal combat resumes.
+
+The heading still goes through `Contain`, so an enemy copying your movements will not follow you
+into the ground or out through the level edge — it holds the band and loses the tail instead.
+
 ## Breaking the turning circle (both roles)
 
 Two planes that both turn toward each other at a similar rate settle into a co-rotating circle

@@ -72,7 +72,7 @@ namespace MetalRaptors
                 light.spotAngle = ConeAngle;
                 light.innerSpotAngle = ConeAngle * InnerConeFraction;
                 light.intensity = total / count;
-                light.shadows = LightShadows.Soft;
+                GraphicsOptions.Track(light, LightShadows.Soft);
                 light.shadowStrength = 0.85f;
                 light.shadowNormalBias = 0.5f;
                 light.renderMode = LightRenderMode.ForcePixel;

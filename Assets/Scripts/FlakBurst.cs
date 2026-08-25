@@ -266,7 +266,7 @@ namespace MetalRaptors
             audio.playOnAwake = false;
             audio.spatialBlend = 0f;
             audio.pitch = Random.Range(PitchMin, PitchMax);
-            audio.PlayOneShot(clip, volume);
+            audio.PlayOneShot(clip, volume * AudioOptions.Sfx);
             Destroy(go, clip.length / audio.pitch + 0.1f);
         }
     }

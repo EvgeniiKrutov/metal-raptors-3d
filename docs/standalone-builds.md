@@ -187,3 +187,37 @@ Only the billboard shader is patched. `WavingGrass.shader` (`DetailRenderMode.Gr
 the same faulty include and would need the same treatment if a prototype ever used it;
 `TerrainDetailLit` (`DetailRenderMode.VertexLit`, mesh details) has no distance fade at all.
 
+## iOS project settings that cost frames for nothing
+
+Three settings were left at values that only make sense in development, and one that only
+makes sense at a higher frame rate than the game targets:
+
+| Setting | Was | Now | Why |
+| --- | --- | --- | --- |
+| `accelerometerFrequency` | 60 | 0 | Nothing in the project reads `Input.acceleration` or the gyro, so this was polling hardware 60×/s for a value nobody consumes. |
+| `metalAPIValidation` | 1 | 0 | Metal API validation in the generated Xcode scheme. A debugging aid, not something to ship. |
+| `Fixed Timestep` | 0.02 | 0.02 | **Reverted.** It was briefly 0.03 to cut physics CPU, but that is the rate the flight model integrates at (docs/flight-model.md) and it widens every collision step by 50%. Not worth the risk near the ground; left at 50 Hz. |
+
+`m_SupportsLightLayers` is **off** on the mobile asset — nothing in the project sets a
+`renderingLayerMask`, so it was only costing shader variants and per-light work.
+
+## `m_SupportsHDR` on mobile: the one lever left, and why it is still on
+
+With bloom fixed to `off` on mobile (docs/options.md) the usual argument for HDR is gone, so
+this looks like free bandwidth to reclaim. It is not, because every sky's `BuildPostFx` ends
+with `tonemapping.mode.Override(TonemappingMode.ACES)`, and ACES is a curve designed for HDR
+input. Feed it an LDR buffer where everything is already clamped at 1 and it darkens the
+midtones and crushes the highlights — the iOS build would simply *look different* from the
+desktop one, with no way to tell from the device that a graphics setting caused it.
+
+If you want the bandwidth anyway, it is one line in `Assets/Settings/Mobile_RPAsset.asset`:
+
+```
+m_SupportsHDR: 0
+```
+
+Change the tonemapper to `TonemappingMode.Neutral` at the same time, or expect the mobile
+build to look flatter than the desktop one.
+
+The remaining dial after that is `m_RenderScale`, already at 0.8 on the mobile asset. Going to
+0.7 is a real saving and a visible softening; it was left where it was deliberately tuned.

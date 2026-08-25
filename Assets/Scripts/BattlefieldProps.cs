@@ -65,6 +65,7 @@ namespace MetalRaptors
 
         Battlefield _field;
         int _seed;
+        float _treeCell = TreeCellSize;
 
         public static BattlefieldProps Begin(Battlefield field, int seed)
         {
@@ -74,6 +75,7 @@ namespace MetalRaptors
             var props = go.AddComponent<BattlefieldProps>();
             props._field = field;
             props._seed = seed;
+            props._treeCell = TreeCellSize * GraphicsOptions.TreeCellScale;
 
             Physics.IgnoreLayerCollision(Layer, 0, true);
 
@@ -84,13 +86,13 @@ namespace MetalRaptors
         public void Tick(float camX)
         {
             UpdateGrid(_houses, HouseModels, HouseCellSize, 11, camX, tree: false);
-            UpdateGrid(_trees, TreeModels, TreeCellSize, 12, camX, tree: true);
+            UpdateGrid(_trees, TreeModels, _treeCell, 12, camX, tree: true);
         }
 
         public bool Blocks(float x, float z, float margin, out Vector2 centre)
         {
             if (Nearest(_houses, HouseCellSize, x, z, margin, out centre)) return true;
-            return Nearest(_trees, TreeCellSize, x, z, margin, out centre);
+            return Nearest(_trees, _treeCell, x, z, margin, out centre);
         }
 
         void UpdateGrid(Dictionary<int, Prop> grid, string[] models, float cellSize, int salt,

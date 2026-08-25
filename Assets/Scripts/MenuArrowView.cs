@@ -50,13 +50,16 @@ namespace MetalRaptors
 
         public RectTransform RectTransform => _image.rectTransform;
 
-        public void SetState(bool interactable, bool focused)
+        public void SetState(bool interactable, bool focused) => SetState(interactable, focused, false);
+
+        public void SetState(bool interactable, bool focused, bool dimmed)
         {
             _interactable = interactable;
             _focused = focused;
 
             MenuPalette palette = MenuTheme.Colors;
-            _image.color = !interactable ? palette.Muted : focused ? palette.Accent : palette.Fg;
+            _image.color = !interactable || dimmed ? palette.Muted
+                : focused ? palette.Accent : palette.Fg;
         }
 
         public void OnPointerEnter(PointerEventData eventData) => Hovered?.Invoke();

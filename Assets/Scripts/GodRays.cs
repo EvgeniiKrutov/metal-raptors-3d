@@ -29,6 +29,8 @@ namespace MetalRaptors
             float density = 0.85f, float weight = 0.6f, float decay = 0.97f,
             int samples = 48, float radialFalloff = 1.1f)
         {
+            if (GraphicsOptions.Mobile && !GraphicsOptions.GodRays) return null;
+
             var shader = Shader.Find("Hidden/StylizedGodRays");
             if (shader == null)
             {
@@ -72,6 +74,7 @@ namespace MetalRaptors
         void OnBeginCamera(ScriptableRenderContext context, Camera cam)
         {
             if (cam != _cam || _mat == null || _pass == null) return;
+            if (!GraphicsOptions.GodRays) return;
 
             _mat.SetVector(SunScreenPosId, TrackSun());
 

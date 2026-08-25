@@ -42,6 +42,12 @@ Base volumes: throttle 0.2, stutter 0.3, wind 0.35, enemy throttle 0.15 — all 
 in the 2D library. Idle was raised from the 2D 0.7 to 0.95 so the idle bed sits
 close enough to the revs layer that the crossfade is not heard as a dip.
 
+Every one of those is a **base** volume: the options page's `sfx` row multiplies all of them,
+along with the wind and every `PlayOneShot` in the game, and the `general` row rides over the
+lot on `AudioListener.volume` (docs/options.md). `SoundSystem` recomputes its voice volumes
+every `Update`, so a change lands on the next frame with nothing to subscribe to; the
+one-shots read `AudioOptions.Sfx` as they fire.
+
 ## Player engine
 
 Three looping voices: idle, throttle (revs) and boost. Idle and throttle are

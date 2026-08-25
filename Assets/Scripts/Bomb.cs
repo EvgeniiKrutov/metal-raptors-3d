@@ -16,6 +16,7 @@ namespace MetalRaptors
         const float AlignResponse = 4f;
         const float MaxLife = 12f;
         const float FloorY = -300f;
+        const float GroundSweepPad = 4f;
 
         static readonly Color BodyColor = new Color(0.19f, 0.20f, 0.22f);
         static readonly List<IDamageable> Struck = new List<IDamageable>();
@@ -88,6 +89,12 @@ namespace MetalRaptors
             v.y -= Gravity * dt;
             _rb.linearVelocity = v;
 
+            if (SweepGround(_rb.position, v * dt, out Vector3 ground))
+            {
+                Detonate(ground, airburst: false);
+                return;
+            }
+
             if (v.sqrMagnitude < 0.01f) return;
 
             float target = Mathf.Atan2(v.y, v.x) * Mathf.Rad2Deg;
@@ -139,6 +146,21 @@ namespace MetalRaptors
 
             _onDetonated?.Invoke(point, _radius);
             Destroy(gameObject);
+        }
+
+        static bool SweepGround(Vector3 from, Vector3 step, out Vector3 point)
+        {
+            point = from;
+
+            float distance = step.magnitude + GroundSweepPad;
+            if (distance <= GroundSweepPad) return false;
+
+            if (!Physics.Raycast(from, step.normalized, out RaycastHit info, distance,
+                    1 << ProceduralTerrain.GroundLayer, QueryTriggerInteraction.Ignore))
+                return false;
+
+            point = info.point;
+            return true;
         }
 
         static bool InWater(Vector3 point)

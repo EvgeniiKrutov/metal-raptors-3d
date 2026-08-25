@@ -161,6 +161,26 @@ namespace MetalRaptors
         public const int StatValueSize = 22;
         public const float StatRowGap = 18f;
 
+        public const float VolumeBarWidthBase = 420f;
+        public const float VolumeArrowGapBase = 20f;
+        public const float VolumeValueGapBase = 24f;
+        public const float VolumeValueWidthBase = 96f;
+        public const float VolumeRowGapBase = 30f;
+        public const float VolumePadLeftBase = 40f;
+
+        public static float VolumeBarWidth => VolumeBarWidthBase * WidthScale;
+        public static float VolumeArrowGap => VolumeArrowGapBase * WidthScale;
+        public static float VolumeValueGap => VolumeValueGapBase * WidthScale;
+        public static float VolumeValueWidth => VolumeValueWidthBase * WidthScale;
+        public static float VolumeRowGap => VolumeRowGapBase * TextScale;
+        public static float VolumePadLeft => VolumePadLeftBase * WidthScale;
+
+        public static float VolumeRowHeight => StatCaptionRowHeight + StatCaptionToValue
+                                               + Mathf.Max(StatBarHeight, SelectorArrowSize.y);
+
+        public static float VolumeRowWidth => 2f * (SelectorArrowSize.x + VolumeArrowGap)
+                                              + VolumeBarWidth + VolumeValueGap + VolumeValueWidth;
+
         public const int BadgeSize = 15;
         public const float BadgeHeight = 28f;
         public const float BadgePadX = 14f;

@@ -5,6 +5,24 @@ namespace MetalRaptors
 {
     public static class BlobMesh
     {
+        const int Variants = 12;
+
+        static Mesh[] _pool;
+
+        public static Mesh Pick()
+        {
+            if (_pool == null || _pool[0] == null)
+            {
+                _pool = new Mesh[Variants];
+                for (int i = 0; i < Variants; i++)
+                {
+                    _pool[i] = Build();
+                    _pool[i].name = $"Blob {i}";
+                }
+            }
+            return _pool[Random.Range(0, Variants)];
+        }
+
         public static Mesh Build()
         {
             float t = (1f + Mathf.Sqrt(5f)) / 2f;

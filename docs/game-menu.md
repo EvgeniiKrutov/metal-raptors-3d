@@ -12,7 +12,7 @@ shows. It is built from the same pieces as the main menu (`MenuTheme`, `MenuLayo
 │  ───                    │   darkened (black 60%)    │  ← 72×4 accent rule
 │  level 1 | verdun       │                           │  (muted, no click)
 │  restart                │                           │
-│  options                │                           │  (muted, no click)
+│  options                │                           │
 │                         │                           │
 │  quit to menu           │                           │
 └─────────────────────────┴───────────────────────────┘
@@ -41,7 +41,8 @@ entry that leaves the scene goes through `ScreenFade.Load`. See `screen-fade.md`
   `CustomBattle` is static and survives the reload.
 * **next level** loads the next scene when there is one (Level 1 → Level 2) and is drawn
   muted otherwise. `GameMenu.Open` takes that scene name; passing null is what mutes it.
-* **options** is muted everywhere for now, like `challenges` in the main menu.
+* **options** widens the band to the whole screen and slides the options page in
+  (docs/options.md); `back` or `Escape` shrinks it again.
 * **quit to menu** loads `MainMenu`.
 
 ## Subtitle
@@ -49,7 +50,7 @@ entry that leaves the scene goes through `ScreenFade.Load`. See `screen-fade.md`
 The line under the accent rule names the flight, lowercase. It is not a caption — it is the
 panel's **first entry, added disabled** (`AddNav(subtitle, null, interactable: false)`), so it
 carries the entry size (`ItemSize`) and the disabled entry's `Muted` weight and colour, and
-the highlight skips it exactly as it skips `options`. It sits on the list's own pitch — no
+the highlight skips it. It sits on the list's own pitch — no
 extra gap under it, so it reads as the first row of the list rather than a header over it:
 
 * an authored level — `level 1 | verdun`, the level number and its terrain generator
@@ -75,7 +76,9 @@ including the touch build's own `P` button that opened the pause screen in the f
   `OnDestroy` resets it too — a frozen menu can never leak its freeze into the next scene.
 
 `Escape` closes only the pause menu; on fail and win it does nothing, so the screen has to be
-answered. The frame guard in `GameMenu.Update` is why the keypress that opens the pause menu
+answered. With the options page open (docs/options.md) `Escape` belongs to that page first —
+it steps out of the selectors, then shrinks the page away — and only reaches the pause menu
+once the page is gone. The frame guard in `GameMenu.Update` is why the keypress that opens the pause menu
 does not immediately close it again.
 
 ## Files
@@ -86,6 +89,7 @@ does not immediately close it again.
 | `MenuLayout.cs` | `CreatePage` / `CreateRegion` / `CreateScreen` / `CreateBand` / `BuildTitle`, shared with the main menu. |
 | `MenuInput.cs` | `ReadStep` / `ReadAdjust` / `ReadSubmit` / `ReadCancel`, shared with the main menu. |
 | `ScreenFade.cs` | The fade to black either side of the fail/win screens and of every scene this menu loads. |
+| `OptionsPage.cs` | The options screen this menu widens itself into (docs/options.md). |
 
 `MenuLayout` and `MenuInput` were lifted out of `MainMenuController` when this screen landed
 — it needs the same 15%-down, 120px-inset column and the same navigation keys, and neither

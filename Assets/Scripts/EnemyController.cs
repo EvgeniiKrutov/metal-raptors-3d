@@ -44,6 +44,16 @@ namespace MetalRaptors
         const float DiveTurnFactor = 1.7f;
         const float AimReach = 150f;
 
+        const float TailStandoff = 95f;
+        const float TailSlotTolerance = 55f;
+        const float TailEnterConeDeg = 75f;
+        const float TailBreakConeDeg = 105f;
+        const float TailBreakSeconds = 1.1f;
+        const float TailSeconds = 10f;
+        const float TailRangeFactor = 1.4f;
+        const float TailCloseRange = 220f;
+        const float TailChaseFactor = 1.3f;
+
         const float TurnChoiceAngleDeg = 30f;
         const float TurnCheckInterval = 0.35f;
         const float TurnSimStep = 0.15f;
@@ -65,7 +75,7 @@ namespace MetalRaptors
 
         public float ModelSize => _bodyRadius > 0f ? _bodyRadius * 2f : 30f;
 
-        enum AiState { Attack, Fly, Evade, Recover, Return, DiveClimb, DiveRun, DiveZoom }
+        enum AiState { Attack, Fly, Evade, Recover, Return, DiveClimb, DiveRun, DiveZoom, Tail }
 
         EnemyConfig _config;
         Rigidbody _target;
@@ -97,6 +107,7 @@ namespace MetalRaptors
         readonly EvadeMove[] _evadePool = new EvadeMove[5];
         float _flyWeaveT;
         float _flyBaseX;
+        float _tailLost;
         float _fireCooldown;
         float _lastCollisionTime = -999f;
         ShakeEffect _shake;
@@ -401,9 +412,21 @@ namespace MetalRaptors
                 return;
             }
 
+            if (_state == AiState.Tail)
+            {
+                TickTail(dt);
+                return;
+            }
+
             if (WantsDive())
             {
                 EnterDiveClimb();
+                return;
+            }
+
+            if (_evadeCooldown <= 0f && WantsTail())
+            {
+                EnterTail();
                 return;
             }
 
@@ -441,6 +464,92 @@ namespace MetalRaptors
         {
             _state = AiState.Attack;
             _stateTimer = _config.attackDuration;
+        }
+
+        void EnterTail()
+        {
+            _state = AiState.Tail;
+            _stateTimer = TailSeconds;
+            _tailLost = 0f;
+        }
+
+        bool WantsTail()
+        {
+            if (!_appeared || Scouting || _standDown || _target == null) return false;
+            if (_state != AiState.Attack && _state != AiState.Fly) return false;
+            if (Diving || UnderThreat()) return false;
+            if (TargetDistance() > _config.maxFireRange * TailRangeFactor) return false;
+
+            return TailOffAngle() <= TailEnterConeDeg;
+        }
+
+        void TickTail(float dt)
+        {
+            if (_target == null || _stateTimer <= 0f
+                || TargetDistance() > _config.maxFireRange * TailRangeFactor)
+            {
+                EnterAttack();
+                return;
+            }
+
+            if (_evadeCooldown <= 0f && UnderThreat())
+            {
+                EnterEvade(circling: false);
+                return;
+            }
+
+            _tailLost = TailOffAngle() > TailBreakConeDeg ? _tailLost + dt : 0f;
+            if (_tailLost >= TailBreakSeconds) EnterAttack();
+        }
+
+        float TailOffAngle()
+        {
+            if (_target == null) return 180f;
+
+            Vector2 run = _target.linearVelocity;
+            if (run.sqrMagnitude < 1f) return 0f;
+
+            return Vector2.Angle(run, (Vector2)transform.position - (Vector2)_target.position);
+        }
+
+        Vector2 TailSlot()
+        {
+            if (_target == null) return transform.position;
+
+            Vector2 run = _target.linearVelocity;
+            Vector2 back = run.sqrMagnitude > 1f
+                ? run.normalized
+                : new Vector2(Mathf.Cos(_heading), Mathf.Sin(_heading));
+            return (Vector2)_target.position - back * TailStandoff;
+        }
+
+        float TailHeading()
+        {
+            Vector2 slot = ClampToBand(TailSlot());
+            float toSlot = HeadingTo(slot);
+
+            float gap = Vector2.Distance(transform.position, slot);
+            if (gap >= TailSlotTolerance) return toSlot;
+
+            Vector2 run = _target != null ? (Vector2)_target.linearVelocity : Vector2.zero;
+            if (run.sqrMagnitude < 1f) return toSlot;
+
+            float match = Mathf.Atan2(run.y, run.x);
+            float blend = gap / TailSlotTolerance;
+            return Mathf.LerpAngle(match * Mathf.Rad2Deg, toSlot * Mathf.Rad2Deg, blend)
+                   * Mathf.Deg2Rad;
+        }
+
+        float TailSpeed(float speed)
+        {
+            if (_target == null) return speed;
+
+            float run = ((Vector2)_target.linearVelocity).magnitude;
+            if (run < 1f) return speed;
+
+            float gap = Vector2.Distance(transform.position, ClampToBand(TailSlot()));
+            float closing = Mathf.Clamp01(gap / TailCloseRange);
+            return Mathf.Lerp(run, Mathf.Max(speed, run * TailChaseFactor), closing);
         }
 
         void EnterFly(float baseX)
@@ -777,6 +886,9 @@ namespace MetalRaptors
                         ? HeadingTo(ClampToBand((Vector2)_target.position))
                         : _heading;
 
+                case AiState.Tail:
+                    return TailHeading();
+
                 case AiState.Attack:
                 default:
                     return HeadingTo(ClampToBand(PredictIntercept()));
@@ -795,6 +907,7 @@ namespace MetalRaptors
             if (!_appeared) return false;
             if (Scouting || _reversalCooldown > 0f || _standDown) return false;
             if (_state == AiState.Recover || _state == AiState.Return) return false;
+            if (_state == AiState.Tail) return false;
             if (Diving && _state != AiState.DiveRun) return false;
 
             float error = Mathf.Abs(Mathf.DeltaAngle(_heading * Mathf.Rad2Deg,
@@ -997,6 +1110,7 @@ namespace MetalRaptors
             float speed = Mathf.Max(_speed, _engageSpeed);
             if (_state == AiState.Return)
                 speed = Mathf.Max(speed, _config.flySpeed * ReturnSpeedFactor);
+            if (_state == AiState.Tail) speed = TailSpeed(speed);
             return Mathf.Max(1f, speed);
         }
 
@@ -1065,7 +1179,7 @@ namespace MetalRaptors
                 fromEnemy: true);
 
             MuzzleFlash.Spawn(muzzle, dir, _bodyRadius);
-            if (_shotClip != null) _audio.PlayOneShot(_shotClip, ShotVolume);
+            if (_shotClip != null) _audio.PlayOneShot(_shotClip, ShotVolume * AudioOptions.Sfx);
         }
 
         bool HasFiringSolution(Vector2 point)

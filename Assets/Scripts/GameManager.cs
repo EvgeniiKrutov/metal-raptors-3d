@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace MetalRaptors
 {
@@ -18,7 +19,7 @@ namespace MetalRaptors
             Instance != null ? Instance.SkinFor(Instance.SelectedPlane)
                              : PlaneSkins.Default(PlaneModels.All[0]);
 
-        public float MasterVolume { get; private set; } = 1f;
+        public float MasterVolume => AudioOptions.Master;
 
         public int HighestUnlockedLevel { get; private set; } = 1;
 
@@ -28,7 +29,6 @@ namespace MetalRaptors
 
         public Daytime CampaignDaytime { get; private set; } = Daytime.Midday;
 
-        const string PrefVolume = "mr_master_volume";
         const string PrefUnlocked = "mr_highest_unlocked_level";
         const string PrefCampaign = "mr_campaign_progress";
         const string PrefPlane = "mr_selected_plane";
@@ -56,7 +56,14 @@ namespace MetalRaptors
             DontDestroyOnLoad(gameObject);
             Load();
             ApplyAudio();
+            GraphicsOptions.Apply();
         }
+
+        void OnEnable() => SceneManager.sceneLoaded += OnSceneLoaded;
+
+        void OnDisable() => SceneManager.sceneLoaded -= OnSceneLoaded;
+
+        void OnSceneLoaded(Scene scene, LoadSceneMode mode) => GraphicsOptions.Rescan();
 
         public void SetSelectedPlane(int index)
         {
@@ -81,13 +88,7 @@ namespace MetalRaptors
             PlayerPrefs.Save();
         }
 
-        public void SetMasterVolume(float volume)
-        {
-            MasterVolume = Mathf.Clamp01(volume);
-            ApplyAudio();
-            PlayerPrefs.SetFloat(PrefVolume, MasterVolume);
-            PlayerPrefs.Save();
-        }
+        public void SetMasterVolume(float volume) => AudioOptions.SetMaster(volume);
 
         public void SetLevel1Daytime(Daytime daytime)
         {
@@ -121,11 +122,10 @@ namespace MetalRaptors
             PlayerPrefs.Save();
         }
 
-        void ApplyAudio() => AudioListener.volume = MasterVolume;
+        void ApplyAudio() => AudioOptions.Apply();
 
         void Load()
         {
-            MasterVolume = PlayerPrefs.GetFloat(PrefVolume, 1f);
             HighestUnlockedLevel = PlayerPrefs.GetInt(PrefUnlocked, 1);
             CampaignLevelsCompleted = Mathf.Clamp(PlayerPrefs.GetInt(PrefCampaign, 0),
                 0, CampaignRun.LastLevel);

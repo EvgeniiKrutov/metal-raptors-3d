@@ -58,12 +58,22 @@ or materials in the project, no colliders anywhere in the effect.
 ### Structure
 
 One root `Explosion` GameObject carrying 6–7 child blobs. Each blob is a procedurally built
-low-poly rock-like shape from the shared `BlobMesh.Build()` builder
+low-poly rock-like shape from the shared `BlobMesh` builder
 (`Assets/Scripts/BlobMesh.cs`, also used by the cloud layer — see `docs/clouds.md`): an
 icosahedron subdivided once (80 faces), every shared vertex displaced radially by a random
 0.72–1.3×, then vertices split per triangle so `RecalculateNormals` gives flat, faceted
 shading. The mesh has a 0.5 base radius so `localScale` reads as diameter, matching Unity's
 primitive-sphere convention.
+
+`Build()` is random, so every call returns a differently lumpy blob — which is the point, and
+also why the mesh cannot simply be a single shared asset. `Pick()` is the way to ask for one:
+it builds a pool of 12 variants on first use and hands back a random member, so the variety
+survives while the allocation happens once per session. Call `Pick()`, never `Build()`, from
+anything that spawns during play — `Build()` runs a `List<Vector3>` + `Dictionary<long,int>`
+subdivision and two `Recalculate` passes, and the explosion, fire and cloud spawners used to
+pay that on every single blob and then `Destroy` the mesh again on teardown. `FlakBurst`,
+`GroundBlast` and `WaterSplash` keep their own six-variant arrays, which predate the pool and
+cost nothing extra.
 
 Blobs spawn at random offsets inside `0.5 × size` around the impact point with random
 rotations, so the cluster overlaps into one big irregular fireball.

@@ -213,6 +213,45 @@ speed, nowhere near the 13 s a column needs to build itself. `Prewarm` derives
 its puff count from `PuffLife / EmitInterval`, so it follows any retune of those
 two on its own.
 
+## Ground contact is a raycast, not a contact
+
+Both the player and its bombs decide they have hit the ground with an explicit raycast against
+`ProceduralTerrain.GroundLayer`, not by waiting for PhysX to report a contact.
+
+`CubeController.GroundUnder` already existed and was already trusted — it is what held the plane
+off the deck during cinematics — but ordinary flight relied on `OnCollisionEnter` between the
+plane's convex `MeshCollider` (a deep child on `PlaneLayer`) and the terrain heightfield. That
+same probe now runs every `FixedUpdate` in normal flight too: below the deck and out of a
+cinematic, the plane crashes. `Crash()` was split out of `OnCollisionEnter` so both routes end
+in one place, and it latches on `_active` so a crash cannot fire twice.
+
+`Bomb.SweepGround` is the same idea swept along the fall: each `FixedUpdate` it raycasts from the
+bomb's position along `velocity × dt` (plus a 4 m pad) and detonates at the hit point. A bomb
+under gravity 200 is doing several hundred metres a second by the time it arrives, and a missed
+contact used to mean it fell silently to `FloorY` and was destroyed with no explosion at all —
+indistinguishable from passing through the world.
+
+The colliders are all still there and still correct — `Terrain.CreateTerrainGameObject` brings a
+`TerrainCollider` on the Verdun and campaign paths, the flat-slab levels keep the primitive's
+`BoxCollider`, and the layer collision matrix excludes nothing. The raycast is not a workaround
+for a missing collider; it is there because the ground is the one surface in this game that must
+never be passed through, and a query is deterministic where contact generation between a convex
+hull and a heightfield at flight speed is not.
+
+## Ground detail tier
+
+Both systems below are scaled by the `ground detail` row in the options page
+(docs/options.md). `BattlefieldPeople` multiplies its `MaxGroups` cap by
+`GraphicsOptions.PeopleScale` (0.35 / 0.65 / 1) and clamps each group's size with
+`PeopleGroupCap` (4 / 6 / unlimited); `BattlefieldProps` multiplies `TreeCellSize` by
+`TreeCellScale` (2.2 / 1.5 / 1), so a lower tier spreads the tree grid out rather than
+deleting from it.
+
+Both read the tier **once, in `Begin`** — `_treeCell` and `_targetGroups` are fixed for the
+level. The tree grid is a spatial hash keyed by cell size, so changing that size while the
+grid holds entries would invalidate every `Nearest` lookup; fixing it at the start also means
+`Tick` never has to reconcile a target that shrank underneath it.
+
 ## Scenery props (`BattlefieldProps.cs`)
 
 Dead trees and burned-out houses, the only solid things on the battlefield. The

@@ -92,8 +92,10 @@ fade is never spent counting down through silence before the DSP-scheduled start
   menu appears on first load and instantly on every later return.
 * **Any other scene loads** → **0.8 s fade-out**, then the sources stop.
 
-Fades scale both sources' `volume` and run on unscaled time. `GameManager`'s master volume
-still applies on top, via `AudioListener.volume`.
+Fades scale both sources' `volume` and run on unscaled time. The options page's `music` row
+scales the 0.45 bed those fades aim at, and re-aims `_volumeTarget` live from
+`AudioOptions.Changed` — so a 5% step is a fast ramp on the same `MoveTowards`, not a jump.
+The `general` row still applies on top, via `AudioListener.volume` (docs/options.md).
 
 To give a level its own soundtrack, call `MusicPlayer.Instance.Play("<id>", fadeSec)`.
 
@@ -323,8 +325,8 @@ plugin is the half that iOS actually needed.
   on high square/saw harmonics.
 * The noise source is seeded, so a bake is deterministic.
 * The web `MusicSystem`'s pause/game-over/toggle plumbing is not ported. The music on/off
-  preference (`mr_music_enabled`) has no equivalent here — volume control is `GameManager`'s
-  master volume.
+  preference (`mr_music_enabled`) has no equivalent here — the options page's `music` row is
+  the control, and 0% is the off switch (docs/options.md).
 
 ## The tracks
 

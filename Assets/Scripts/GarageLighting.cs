@@ -40,7 +40,7 @@ namespace MetalRaptors
                 light.color = SunLightColor;
                 light.intensity = SunLightIntensity;
                 light.transform.rotation = SunLightRotation;
-                light.shadows = LightShadows.Soft;
+                GraphicsOptions.Track(light, LightShadows.Soft);
                 light.shadowStrength = ShadowStrength;
                 light.shadowNormalBias = ShadowNormalBias;
 

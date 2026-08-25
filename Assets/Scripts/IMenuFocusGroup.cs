@@ -18,4 +18,11 @@ namespace MetalRaptors
 
         bool Adjust(int delta);
     }
+
+    public interface IMenuOptionRow : IMenuFocusable
+    {
+        event Action<IMenuOptionRow> Engaged;
+
+        void SetLive(bool live);
+    }
 }

@@ -96,6 +96,8 @@ namespace MetalRaptors
             bloom.intensity.Override(0.9f);
             bloom.scatter.Override(0.6f);
 
+            GraphicsOptions.TrackBloom(bloom);
+
             var whiteBalance = profile.Add<WhiteBalance>();
             whiteBalance.temperature.Override(-4f);
 

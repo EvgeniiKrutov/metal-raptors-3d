@@ -52,7 +52,7 @@ namespace MetalRaptors
                 go.transform.localRotation = Random.rotation;
                 go.transform.localScale = Vector3.zero;
 
-                go.AddComponent<MeshFilter>().sharedMesh = BlobMesh.Build();
+                go.AddComponent<MeshFilter>().sharedMesh = BlobMesh.Pick();
                 var renderer = go.AddComponent<MeshRenderer>();
                 Material mat = null;
                 if (shader != null)
@@ -106,9 +106,6 @@ namespace MetalRaptors
             foreach (var b in _blobs)
             {
                 if (b.mat != null) Destroy(b.mat);
-                if (b.tr == null) continue;
-                var filter = b.tr.GetComponent<MeshFilter>();
-                if (filter != null && filter.sharedMesh != null) Destroy(filter.sharedMesh);
             }
         }
 
@@ -145,7 +142,7 @@ namespace MetalRaptors
             var audio = go.AddComponent<AudioSource>();
             audio.playOnAwake = false;
             audio.spatialBlend = 0f;
-            audio.PlayOneShot(clip, SoundVolume);
+            audio.PlayOneShot(clip, SoundVolume * AudioOptions.Sfx);
             Destroy(go, clip.length + 0.1f);
         }
     }

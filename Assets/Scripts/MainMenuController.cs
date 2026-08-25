@@ -5,7 +5,7 @@ namespace MetalRaptors
 {
     public class MainMenuController : MonoBehaviour
     {
-        enum MenuScreen { Home, Eras, Era, Levels, Custom }
+        enum MenuScreen { Home, Eras, Era, Levels, Custom, Options }
 
         MenuPanel _main;
         MenuPanel _challenges;
@@ -19,6 +19,7 @@ namespace MetalRaptors
         GameObject _eraPage;
         GameObject _levelsPage;
         GameObject _customPage;
+        OptionsPage _options;
 
         MenuPlaneView _planeView;
 
@@ -56,6 +57,7 @@ namespace MetalRaptors
             _eraPage = BuildEraPage(canvas.transform);
             _levelsPage = BuildLevelsPage(canvas.transform);
             _customPage = BuildCustomPage(canvas.transform);
+            _options = new OptionsPage(canvas.transform, GoHome);
 
             ShowHome(_main);
         }
@@ -82,7 +84,7 @@ namespace MetalRaptors
             panel.AddNav("custom battle", () => ScreenFade.Swap(ShowCustom));
             panel.AddNav("garage", () => ScreenFade.Load(SceneNames.Garage));
             panel.AddNav("online battles", null, interactable: false);
-            panel.AddNav("options", null, interactable: false);
+            panel.AddNav("options", () => ScreenFade.Swap(ShowOptions));
             return panel;
         }
 
@@ -324,6 +326,12 @@ namespace MetalRaptors
             _group = _customPanel;
         }
 
+        void ShowOptions()
+        {
+            SetScreen(MenuScreen.Options);
+            _group = _options;
+        }
+
         void SetScreen(MenuScreen screen)
         {
             _screen = screen;
@@ -332,6 +340,7 @@ namespace MetalRaptors
             _eraPage.SetActive(screen == MenuScreen.Era);
             _levelsPage.SetActive(screen == MenuScreen.Levels);
             _customPage.SetActive(screen == MenuScreen.Custom);
+            _options.SetActive(screen == MenuScreen.Options);
             _planeView.SetActive(screen == MenuScreen.Home);
         }
 
@@ -340,6 +349,12 @@ namespace MetalRaptors
             if (_screen == MenuScreen.Levels)
             {
                 ScreenFade.Swap(ShowEraPage);
+                return;
+            }
+            if (_screen == MenuScreen.Options)
+            {
+                if (_options.Cancel()) return;
+                GoHome();
                 return;
             }
             if (_screen != MenuScreen.Home || _homePanel != _main) GoHome();

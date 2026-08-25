@@ -176,8 +176,10 @@ namespace MetalRaptors
             if (pos.y > _ceilingY) { pos.y = _ceilingY; clamped = true; }
             if (_hardLeftWall && pos.x < _wallX) { pos.x = _wallX; clamped = true; }
 
-            if (_cinematic && GroundUnder(pos, out float deck) && pos.y < deck)
+            if (GroundUnder(pos, out float deck) && pos.y < deck)
             {
+                if (!_cinematic) { Crash(); return; }
+
                 pos.y = deck;
                 clamped = true;
                 if (vel.y < 0f)
@@ -292,6 +294,14 @@ namespace MetalRaptors
             if (collision.gameObject.GetComponentInParent<EnemyController>() != null) return;
 
             if (_cinematic) { Scrape(); return; }
+
+            Crash();
+        }
+
+        void Crash()
+        {
+            if (!_active) return;
+            _active = false;
 
             Explosion.Spawn(transform.position, ExplosionSize);
             StartCoroutine(HideModelAfter(Explosion.RemovalDelay));

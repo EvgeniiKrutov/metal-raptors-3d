@@ -115,7 +115,8 @@ namespace MetalRaptors
             float width = _field.Bounded
                 ? BandMaxX - BandMinX
                 : ScrollerBehind + ScrollerAhead;
-            return Mathf.Clamp(Mathf.RoundToInt(width / GroupSpacing), 2, MaxGroups);
+            int cap = Mathf.RoundToInt(MaxGroups * GraphicsOptions.PeopleScale);
+            return Mathf.Clamp(Mathf.RoundToInt(width / GroupSpacing), 2, Mathf.Max(2, cap));
         }
 
         float InitialX(int index)
@@ -208,7 +209,8 @@ namespace MetalRaptors
                 noisePhase = Random.Range(0f, 100f),
             };
 
-            int count = Random.Range(GroupSizeMin, GroupSizeMax + 1);
+            int count = Mathf.Min(Random.Range(GroupSizeMin, GroupSizeMax + 1),
+                GraphicsOptions.PeopleGroupCap);
             for (int i = 0; i < count; i++)
             {
                 var tr = BuildFigure(root.transform, group.faction, Random.Range(0, SkinColors.Length));
