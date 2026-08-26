@@ -19,6 +19,10 @@ namespace MetalRaptors
         readonly CooldownSquare _fireSquare;
         readonly CooldownSquare _lightSquare;
 
+        readonly TouchStick _stick;
+        readonly HeadingArrow _arrow;
+        Camera _cam;
+
         public Vector2 TaskCorner { get; }
 
         public LevelHud(Transform parent, string objective, CubeController plane,
@@ -45,6 +49,13 @@ namespace MetalRaptors
                 _lightSquare = Square(parent, x, ref y, HudTheme.Label("T", "LIGHT"), ToggleLight);
 
             TaskCorner = new Vector2(x, -y);
+
+            if (HudTheme.IsTouch && _plane != null)
+            {
+                _plane.EnableHeadingSteering();
+                _stick = TouchStick.Create(parent);
+                _arrow = new HeadingArrow(parent);
+            }
 
             if (HudTheme.IsTouch && onPause != null)
                 new CooldownSquare(parent, new Vector2(-HudTheme.ColumnRight, -HudTheme.ColumnTop),
@@ -86,6 +97,22 @@ namespace MetalRaptors
                 _lightSquare.Set(0f, _searchlight.IsOn);
             if (_health != null && _plane != null)
                 _health.Set(_plane.CurrentHealth, _plane.MaxHealth);
+
+            TickSteering();
+        }
+
+        void TickSteering()
+        {
+            if (_stick == null || _plane == null) return;
+
+            bool steerable = _plane.Steerable && !GameMenu.IsOpen;
+            _stick.SetVisible(steerable);
+
+            if (!steerable) _plane.SetTargetHeading(_plane.Heading);
+            else if (_stick.Steering) _plane.SetTargetHeading(_stick.Angle);
+
+            if (_cam == null) _cam = Camera.main;
+            _arrow.Tick(_cam, _plane.transform.position, _plane.TargetHeading, steerable);
         }
 
         void RequestBomb()

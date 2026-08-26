@@ -117,7 +117,10 @@ the desired turn rate is forced to bank it back toward the centre, scaled by
 how deep the plane has pushed into the band (0 at the inner lip, full rate at
 the edge). Outside the bands the pilot's own input rate passes through
 unchanged. Campaign mode replaces this with a hard left wall instead (see
-docs/campaign.md).
+docs/campaign.md). On a touch build "the pilot's own input rate" is what
+`FlightSteering.SteerToHeading` derives from the on-screen stick rather than what
+`A` / `D` set, and `EdgeSteer` still gets the last word over it
+(docs/mobile-steering.md).
 
 **Enemies** use `FlightSteering.Contain`, which limits the *heading the AI
 asks for* rather than the turn rate it gets. In campaign mode they also carry

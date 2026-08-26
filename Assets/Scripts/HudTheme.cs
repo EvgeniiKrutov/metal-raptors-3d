@@ -29,6 +29,20 @@ namespace MetalRaptors
         public static readonly float SquareHitPad = Touch ? 10f : 0f;
         public static readonly int SquareLabelSize = Touch ? 22 : 26;
 
+        public static readonly float StickThumbSize = 150f;
+        public static readonly float StickThumbStroke = 4f;
+        public static readonly float StickClampRadius = 210f;
+        public static readonly float StickInsetRight = 260f;
+        public static readonly float StickInsetBottom = 250f;
+        public static readonly Vector2 StickGrabSize = new Vector2(720f, 620f);
+        public static readonly float StickDeadzone = 0.20f;
+        public static readonly float StickReturn = 0.12f;
+        public static readonly Color Stick = new Color(0.88f, 0.89f, 0.91f, 0.5f);
+
+        public static readonly float ArrowOrbit = 110f;
+        public static readonly float ArrowArm = 26f;
+        public static readonly float ArrowStroke = 5f;
+
         public static readonly int HintSize = Touch ? 34 : 28;
         public static readonly float HintRowHeight = Touch ? 56f : 50f;
 

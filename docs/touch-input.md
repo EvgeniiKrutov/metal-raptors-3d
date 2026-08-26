@@ -112,9 +112,12 @@ on:
   `MenuCardRow` / `MenuLevelRow` rows with no `back` entry — `MainMenuController.Cancel` is
   the only way out of either (docs/main-menu.md, docs/level-select.md). The panel-based pages
   (`era`, `custom battle`, `challenges`) all have one, and the garage now does too.
-* **Steering.** `CubeController` reads `A` / `D` off `Keyboard.current`; there is no on-screen
-  stick yet, so the touch build's bottom hint says nothing about steering rather than naming keys
-  a phone does not have.
+
+Steering used to be on this list too. A touch build now gets a virtual stick in the bottom-right
+corner and a `>` arrow orbiting the plane, and the plane follows the arrow rather than turning
+while a key is held — see docs/mobile-steering.md. It is deliberately **not** a `MenuInput` read:
+the stick is a uGUI widget tracking its own `pointerId`, so it and the `FIRE` square can be held
+by two fingers at once, which `MenuInput.ReadPointer`'s single `primaryTouch` could not do.
 
 The pause menu used to be on this list — `ReadCancel` is `Escape`-only and a phone has no key for
 it. A touch build now puts a `P` button in the HUD's top-right corner instead, calling the same
@@ -122,6 +125,7 @@ it. A touch build now puts a `P` button in the HUD's top-right corner instead, c
 
 ## In-game controls
 
+Steering is the virtual stick in the bottom-right corner (docs/mobile-steering.md).
 The weapon squares in the HUD's top-left column are tappable — bomb, boost, fire and, on night
 levels, the searchlight — plus a pause button in the top-right corner. `PlaneShooter`,
 `PlaneBomber`, `PlaneBoost` and `PlaneSearchlight` each gained one public entry point that both the

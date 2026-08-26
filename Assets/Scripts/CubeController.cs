@@ -68,6 +68,9 @@ namespace MetalRaptors
         bool _hardLeftWall;
         float _wallX = float.NegativeInfinity;
 
+        bool _headingSteering;
+        float _targetHeading;
+
         public void Initialize(PlayerConfig config, float startHeadingRad, float minX, float maxX,
             float ceilingY, float edgeMargin, bool hardLeftWall = false)
         {
@@ -101,6 +104,18 @@ namespace MetalRaptors
         }
 
         public void SetControlled(bool value) => _controlled = value;
+
+        public bool Steerable => _active && _controlled && !_falling;
+
+        public float TargetHeading => _targetHeading;
+
+        public void EnableHeadingSteering()
+        {
+            _headingSteering = true;
+            _targetHeading = _heading;
+        }
+
+        public void SetTargetHeading(float headingRad) => _targetHeading = headingRad;
 
         public void Stop()
         {
@@ -146,12 +161,27 @@ namespace MetalRaptors
                 ? _boostTarget
                 : _boost + (_boostTarget - _boost) * (1f - Mathf.Exp(-BoostResponse * dt));
 
-            var kb = _controlled ? Keyboard.current : null;
-            bool left  = kb != null && (kb.aKey.isPressed || kb.leftArrowKey.isPressed);
-            bool right = kb != null && (kb.dKey.isPressed || kb.rightArrowKey.isPressed);
-
             float maxRate = MaxTurnRate;
-            float desiredRate = (left ? maxRate : 0f) - (right ? maxRate : 0f);
+            float desiredRate;
+            bool steady;
+
+            if (_headingSteering)
+            {
+                desiredRate = _controlled
+                    ? FlightSteering.SteerToHeading(_heading, _targetHeading, maxRate,
+                        _rb.mass / Mathf.Max(0.0001f, _config.turnResponsiveness), _angularVelocity)
+                    : 0f;
+                steady = PlaneRoll.Steady(desiredRate, maxRate);
+            }
+            else
+            {
+                var kb = _controlled ? Keyboard.current : null;
+                bool left  = kb != null && (kb.aKey.isPressed || kb.leftArrowKey.isPressed);
+                bool right = kb != null && (kb.dKey.isPressed || kb.rightArrowKey.isPressed);
+
+                desiredRate = (left ? maxRate : 0f) - (right ? maxRate : 0f);
+                steady = !left && !right;
+            }
 
             if (!_hardLeftWall)
                 desiredRate = FlightSteering.EdgeSteer(_rb.position.x, _heading,
@@ -160,7 +190,7 @@ namespace MetalRaptors
             float approach = 1f - Mathf.Exp(-(_config.turnResponsiveness / _rb.mass) * dt);
             _angularVelocity += (desiredRate - _angularVelocity) * approach;
             _heading += _angularVelocity * dt;
-            _roll.Tick(dt, _heading, !left && !right, _config.rotationSpeed);
+            _roll.Tick(dt, _heading, steady, _config.rotationSpeed);
             ApplyRotation();
 
             _speed = CruiseSpeed;

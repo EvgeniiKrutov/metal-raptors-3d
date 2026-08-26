@@ -25,6 +25,23 @@ namespace MetalRaptors
             return pilotRate;
         }
 
+        const float ReverseGuard = 0.15f;
+
+        public static float SteerToHeading(float heading, float target, float maxRate,
+            float lag, float angularVelocity)
+        {
+            if (lag <= 0f) return 0f;
+
+            float error = Mathf.DeltaAngle(heading * Mathf.Rad2Deg, target * Mathf.Rad2Deg)
+                          * Mathf.Deg2Rad;
+
+            if (Mathf.PI - Mathf.Abs(error) < ReverseGuard && Mathf.Abs(angularVelocity) > 1e-3f)
+                error = Mathf.Sign(angularVelocity) * Mathf.Abs(error);
+
+            float residual = error - angularVelocity * lag;
+            return Mathf.Clamp(residual / lag, -maxRate, maxRate);
+        }
+
         public static float TurnToward(float heading, float targetXDir)
         {
             float target = targetXDir > 0f ? 0f : Mathf.PI;

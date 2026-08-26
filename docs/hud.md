@@ -13,6 +13,8 @@ from their own `LateUpdate`. Everything it makes is a direct child of the HUD ca
 | Health bar | Top-left, hung from the top-left corner of the canvas. |
 | Action column | Directly under the bar: **bomb**, **boost**, **fire** (touch only), and **light** on night levels — one square per row. |
 | Pause | Top-**right** corner, touch only — a `P` square wired to the controller's `TryPause`. |
+| Steering stick | Bottom-right corner, touch only — a ring on an invisible base (docs/mobile-steering.md). |
+| Heading arrow | Orbiting the plane, touch only — a `>` at the heading the stick last set. |
 | Objective hint | Bottom edge, centred, stretched to the canvas width less the side inset. |
 | `Piloting: …` | Top-centre, on the authored levels only. |
 | Task list | Docks under the last square, at `LevelHud.TaskCorner` (campaign only, docs/campaign-scripts.md). |
@@ -202,7 +204,9 @@ The **fire** square has no cooldown, so its sweep is always full; it only greys 
 shooter is stopped (shot down, or the campaign fly-in, docs/level-intro.md). It is drawn on desktop
 too, where it doubles as the legend for the `F` key next to `H`, `R` and `T`.
 
-## Still not on a phone
+## Steering
 
-Steering is still `A` / `D` with no touch equivalent, so the touch hint deliberately says nothing
-about it (docs/touch-input.md).
+`LevelHud` also builds the touch-only steering pair — a virtual stick in the bottom-right corner
+and a `>` arrow orbiting the plane — and drives both from `Tick`, which is why the objective hint
+still says nothing about steering: there are no keys to name. The stick, the arrow and the
+heading-follow branch they feed in `CubeController` are all in docs/mobile-steering.md.
