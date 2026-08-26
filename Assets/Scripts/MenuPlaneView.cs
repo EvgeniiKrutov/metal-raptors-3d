@@ -60,7 +60,7 @@ namespace MetalRaptors
                 verticalMarginFraction = VerticalMarginFraction,
                 regionLeftFraction = MenuTheme.ColumnFraction,
                 regionBottomFraction = 0f,
-            }, plane.onScreenSize);
+            }, plane.OnScreenSize);
 
             _body = new GameObject("Menu Plane");
             _body.transform.position = PlanePreviewRig.Origin;

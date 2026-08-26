@@ -35,7 +35,8 @@ namespace MetalRaptors
             float pitch = mirrored ? -nosePitch : nosePitch;
             model.transform.localRotation = Quaternion.Euler(0f, 0f, pitch) * standUp;
 
-            NormalizeSize(model.transform, plane.onScreenSize);
+            NormalizeLength(model.transform, Quaternion.Inverse(standUp) * Vector3.right,
+                plane.LengthUnits);
 
             foreach (var r in model.GetComponentsInChildren<Renderer>())
                 r.shadowCastingMode = ShadowCastingMode.On;
@@ -101,18 +102,48 @@ namespace MetalRaptors
             far = new Vector3(x, y, bounds.max.z - origin.z);
         }
 
-        static void NormalizeSize(Transform model, float targetSize)
+        static void NormalizeLength(Transform model, Vector3 lengthAxis, float targetLength)
         {
-            var renderers = model.GetComponentsInChildren<Renderer>();
-            if (renderers.Length == 0) return;
+            if (!ModelBounds(model, out Bounds bounds)) return;
 
-            var bounds = renderers[0].bounds;
-            for (int i = 1; i < renderers.Length; i++) bounds.Encapsulate(renderers[i].bounds);
-
-            float longest = Mathf.Max(bounds.size.x, bounds.size.y, bounds.size.z);
-            if (longest > 0.0001f)
-                model.localScale *= targetSize / longest;
+            float length = ExtentAlong(bounds, lengthAxis) * model.localScale.x;
+            if (length > 0.0001f)
+                model.localScale *= targetLength / length;
         }
+
+        static bool ModelBounds(Transform model, out Bounds bounds)
+        {
+            Matrix4x4 toModel = model.worldToLocalMatrix;
+            bounds = default;
+            bool any = false;
+
+            foreach (var r in model.GetComponentsInChildren<Renderer>())
+            {
+                Mesh mesh = r is SkinnedMeshRenderer skinned
+                    ? skinned.sharedMesh
+                    : r.TryGetComponent(out MeshFilter filter) ? filter.sharedMesh : null;
+                if (mesh == null) continue;
+
+                Bounds local = mesh.bounds;
+                Matrix4x4 toRoot = toModel * r.localToWorldMatrix;
+                for (int corner = 0; corner < 8; corner++)
+                {
+                    Vector3 point = toRoot.MultiplyPoint3x4(new Vector3(
+                        (corner & 1) == 0 ? local.min.x : local.max.x,
+                        (corner & 2) == 0 ? local.min.y : local.max.y,
+                        (corner & 4) == 0 ? local.min.z : local.max.z));
+
+                    if (any) bounds.Encapsulate(point);
+                    else { bounds = new Bounds(point, Vector3.zero); any = true; }
+                }
+            }
+            return any;
+        }
+
+        static float ExtentAlong(Bounds bounds, Vector3 axis) =>
+            Mathf.Abs(axis.x) * bounds.size.x
+          + Mathf.Abs(axis.y) * bounds.size.y
+          + Mathf.Abs(axis.z) * bounds.size.z;
 
         static void AddPlaneCollider(Transform model)
         {

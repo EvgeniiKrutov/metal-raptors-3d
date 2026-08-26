@@ -42,8 +42,8 @@ looking, and the banner only competed with it.
 ## The crate (`SupplyCrate`)
 
 The model is `Assets/Resources/objects/supply_crate.fbx` — one FBX carrying both the `Crate` and
-the `Parachute` nodes. It is normalised to 56 units on its longest axis (just under a
-60-unit plane) and every collider on it is stripped: nothing about the crate is physical, it
+the `Parachute` nodes. It is normalised to 56 units on its longest axis (a little under a
+plane's length, docs/plane-scale.md) and every collider on it is stripped: nothing about the crate is physical, it
 cannot soak a bullet, brush a plane or land on terrain.
 
 ### Standing it up

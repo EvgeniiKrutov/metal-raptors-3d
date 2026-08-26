@@ -188,8 +188,8 @@ Over a fifth of a plane's length of travel between two entries in the same list 
 visibly jumped, and only the Dr.I sat at a natural height. 0.213 is the Dr.I's number, so it
 is the one plane the change leaves where it was.
 
-The fraction is of `GarageSize` — `onScreenSize / garageZoom`, the same figure the camera
-distance is solved from — not of `onScreenSize`. Scaling it by the raw size would put the
+The fraction is of `GarageSize` — `OnScreenSize / garageZoom`, the same figure the camera
+distance is solved from — not of `OnScreenSize`. Scaling it by the raw size would put the
 ground at a fixed *world* offset, which a zoomed-in plane would then render further down the
 screen; against the framed size it lands on the same **screen** row for every plane.
 
@@ -226,22 +226,23 @@ untouched, so the model's lowest point — and with it the ground plane placed a
 height — never moves. The body sits at the rig origin and the model's bounds are centred on
 it, so the plane turns on its own axis rather than orbiting.
 
-The framing solves the camera distance from `onScreenSize`, and `PlaneFactory.NormalizeSize`
-already scales every model to that same longest-dimension size — so planes of very
-different real dimensions all arrive framed identically. All three share `onScreenSize` 60.
+The framing solves the camera distance from `OnScreenSize` — the plane's real wingspan in
+world units — and `PlaneFactory.NormalizeLength` sizes every model off the one
+metres-to-units figure (`docs/plane-scale.md`). Each plane is therefore framed to its own
+span (66 units for the Camel, 55.8 for the Fokker, 69.9 for the Albatros) and they all still
+arrive at the same width on screen.
 
-That normalisation is on the **longest** dimension, which for every plane here is the
-wingspan, and it is the only thing the framing knows about. A flatter airframe therefore
+That span is the only thing the framing knows about. A flatter airframe therefore
 arrives at the same width but fills less of the band's height and reads as further away:
 the Camel stands 0.365 of its span tall, the Albatros only 0.287. `PlaneModelConfig.garageZoom`
-is the correction — the garage frames the camera from `onScreenSize / garageZoom`, so 1.1
-puts the camera 10% closer and the plane 10% larger. It is **garage-only**: `onScreenSize`
+is the correction — the garage frames the camera from `OnScreenSize / garageZoom`, so 1.1
+puts the camera 10% closer and the plane 10% larger. It is **garage-only**: `OnScreenSize`
 itself is the plane's real size in a level and its hitbox, so it must not be touched for
 framing. The Albatros is 1.1; the other two are 1.
 
 There is not much room above that. At 1920×1080 the Camel spans x 719–1775 with ~59px clear
 to the stat bars and ~71px to the right triangle — about 12% of headroom in total, shared by
-every plane, since they all normalise to the same width.
+every plane, since each one is framed to its own span.
 
 The garage frames **wider than the main menu**: `FillHeight` is deliberately set past 1
 (1.5), which makes the height constraint slack so `FillWidth` (0.93) is always what binds.
@@ -554,7 +555,9 @@ which is the bar a fourth plane should also clear:
    (`docs/standalone-builds.md`) — copy an existing plane's `.meta` and give it a fresh guid.
 2. Add a `PlaneModelConfig` to `PlaneModels` and append it to `PlaneModels.All`, which is the
    `←` / `→` order. `resourceName` is the file's bare name and doubles as the id campaign
-   scripts spawn it by, matched in full or on its first segment.
+   scripts spawn it by, matched in full or on its first segment. `lengthMeters`,
+   `wingspanMeters` and `heightMeters` are the real aircraft's dimensions and are what size
+   it in the world — see `docs/plane-scale.md`.
 3. Name its propeller nodes in `propPivotNode` / `propBladesNode`, and **check they hold
    geometry** — see *Propeller nodes are per model* above for what an empty one costs.
 4. Give it a `PlaneStats` block. It is what the player flies, not a spec sheet — see
@@ -562,7 +565,7 @@ which is the bar a fourth plane should also clear:
 5. Skins, if any: `docs/plane-skins.md`. One skin means no `colour` row and the plane simply
    always wears it.
 
-Everything else is derived: the pose is solved from the mesh, the framing from `onScreenSize`,
+Everything else is derived: the pose is solved from the mesh, the framing from its wingspan,
 the badge from `type`, and the list length from `PlaneModels.All`.
 
 ## Files
@@ -580,4 +583,4 @@ the badge from `type`, and the list length from `PlaneModels.All`.
 | `PlaneSkin.cs` | The skins a plane can wear and how one is painted onto a model (`docs/plane-skins.md`). |
 | `PlaneStats.cs` | The stat block a plane carries, and the bar list with its ceilings. |
 | `PlaneLoadout.cs` | Turns the selected plane's stat block into the `PlayerConfig` it is flown with. |
-| `PlaneModelConfig.cs` | Each plane's model, display name, country, description, stats and `garageZoom`; `PlaneModels.All` is the switch order. |
+| `PlaneModelConfig.cs` | Each plane's model, display name, country, description, real dimensions, stats and `garageZoom`; `PlaneModels.All` is the switch order. |

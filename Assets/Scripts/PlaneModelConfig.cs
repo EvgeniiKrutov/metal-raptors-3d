@@ -7,6 +7,8 @@ namespace MetalRaptors
     {
         public const string WorldWar1 = "objects/planes/world_war_1";
 
+        public const float UnitsPerMeter = 66f / 8.5f;
+
         public string resourceName;
 
         public string folder = WorldWar1;
@@ -31,7 +33,15 @@ namespace MetalRaptors
 
         public float pitchTrimDeg;
 
-        public float onScreenSize;
+        public float lengthMeters;
+
+        public float wingspanMeters;
+
+        public float heightMeters;
+
+        public float LengthUnits => lengthMeters * UnitsPerMeter;
+
+        public float OnScreenSize => wingspanMeters * UnitsPerMeter;
 
         public float garageZoom = 1f;
 
@@ -74,7 +84,9 @@ namespace MetalRaptors
             description    = SopwithStory,
             standUpEuler   = new Vector3(90f, -90f, 0f),
             rollWheelsDown = true,
-            onScreenSize   = 60f,
+            lengthMeters   = 5.72f,
+            wingspanMeters = 8.5f,
+            heightMeters   = 2.59f,
             propPivotNode  = "propPivot",
             propBladesNode = "propBlades",
             skins          = PlaneSkins.SopwithCamel,
@@ -100,7 +112,9 @@ namespace MetalRaptors
             description    = FokkerStory,
             standUpEuler   = new Vector3(90f, -90f, 0f),
             rollWheelsDown = true,
-            onScreenSize   = 60f,
+            lengthMeters   = 5.77f,
+            wingspanMeters = 7.19f,
+            heightMeters   = 2.95f,
             propPivotNode  = "propPivot",
             propBladesNode = "propBlades",
             stats = new PlaneStats
@@ -125,7 +139,9 @@ namespace MetalRaptors
             standUpEuler   = new Vector3(90f, -90f, 0f),
             rollWheelsDown = true,
             pitchTrimDeg   = 9.4f,
-            onScreenSize   = 60f,
+            lengthMeters   = 7.35f,
+            wingspanMeters = 9f,
+            heightMeters   = 2.8f,
             garageZoom     = 1.1f,
             propPivotNode  = "propAssembly",
             propBladesNode = "prop",

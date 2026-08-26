@@ -38,7 +38,8 @@ carrying:
   length, width and angle are randomised per shot so no two flashes look identical.
 
 `size` is the firing plane's body radius (half its longest renderer extent, ~30 for the
-`onScreenSize = 60` models), so the flash scales to the plane. `PlaneShooter` measures it once
+Camel's 66-unit span; every plane now has its own — `docs/plane-scale.md`), so the flash
+scales to the plane. `PlaneShooter` measures it once
 in `Initialize` the same way `EnemyController` does.
 
 ### Animation

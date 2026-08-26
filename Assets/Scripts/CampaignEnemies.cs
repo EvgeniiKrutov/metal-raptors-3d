@@ -70,7 +70,7 @@ namespace MetalRaptors
                 for (int i = 0; i < group.count; i++, index++)
                 {
                     EnemyConfig config = EnemyConfigs.For(group.plane, _scout, _fighter);
-                    float ceilingY = _worldTop - group.plane.onScreenSize / 2f;
+                    float ceilingY = _worldTop - group.plane.OnScreenSize / 2f;
 
                     var go = new GameObject("Enemy");
                     go.transform.position =

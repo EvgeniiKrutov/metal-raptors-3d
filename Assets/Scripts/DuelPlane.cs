@@ -178,7 +178,7 @@ namespace MetalRaptors
             foreach (Collider col in go.GetComponentsInChildren<Collider>()) Destroy(col);
 
             var duel = go.AddComponent<DuelPlane>();
-            duel._size = plane.onScreenSize;
+            duel._size = plane.OnScreenSize;
             duel._leadSpeed = Mathf.Max(1f, flight.flySpeed);
             duel._turnRate = flight.rotationSpeed * Mathf.Deg2Rad;
             duel._turnResponse = flight.turnResponsiveness / Mathf.Max(0.0001f, flight.mass);

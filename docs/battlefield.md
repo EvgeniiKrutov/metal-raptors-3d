@@ -326,12 +326,12 @@ source scene will bring the white back unless the material is fixed there too.
 ### Scale, seating and colliders
 
 The models are authored in metres (a tree is about 5 m, a house 7.5 m wide) and
-the game runs at roughly **7.2 units per metre** — a 13-unit soldier is 1.8 m and
-a 60-unit plane is an 8.5 m wingspan. A prop's root is scaled by `MetreScale`
+the game runs at roughly **7.2 units per metre** — a 13-unit soldier is 1.8 m.
+A prop's root is scaled by `MetreScale`
 7.2, then by an oversize factor of **1.5** (`TreeOversize` / `HouseOversize`,
 tunable per kind), then by ±25 % per-instance jitter — which keeps the models'
-relative sizes. Trees land around 45–65 units tall, near the plane's own 60-unit
-length; houses around 70–90 wide. Deliberately larger than life, so they read at
+relative sizes. Trees land around 45–65 units tall, around the length of a plane
+(44–57 units, docs/plane-scale.md); houses around 70–90 wide. Deliberately larger than life, so they read at
 the camera's 420-unit standoff.
 
 Trees get one extra factor on top: a **depth boost** of
@@ -405,7 +405,7 @@ that dives low through a tree takes the same 10-point scrape the player would.
 
 ### The figure
 
-13 units tall — roughly 1.8 m against the 60-unit planes — built from three
+13 units tall — roughly 1.8 m, against a 66-unit Camel wingspan — built from three
 stacked boxes, top to bottom: **hat** (uniform colour), **face** (skin), **body**
 (uniform colour). Uniform is one of two: French horizon blue `(0.40, 0.47, 0.56)`
 or German feldgrau `(0.36, 0.39, 0.32)`. Skin is picked per figure from three

@@ -175,7 +175,7 @@ namespace MetalRaptors
                 {
                     EnemyConfig config =
                         EnemyConfigs.For(group.plane, _scoutConfig, _fighterConfig);
-                    float ceilingY = WorldTop - group.plane.onScreenSize / 2f;
+                    float ceilingY = WorldTop - group.plane.OnScreenSize / 2f;
 
                     var go = new GameObject("Enemy");
                     go.transform.position = RandomEnemySpawn(aiGroundY, config, ceilingY);

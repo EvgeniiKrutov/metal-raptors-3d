@@ -71,7 +71,7 @@ namespace MetalRaptors
         }
 
         static float GarageSize(PlaneModelConfig plane) =>
-            plane.onScreenSize / Mathf.Max(0.01f, plane.garageZoom);
+            plane.OnScreenSize / Mathf.Max(0.01f, plane.garageZoom);
 
         public void SetSkin(PlaneSkin skin)
         {
@@ -225,7 +225,7 @@ namespace MetalRaptors
         {
             if (_ground == null) _ground = CreateGround();
 
-            float size = _plane.onScreenSize * GroundSizeFactor;
+            float size = _plane.OnScreenSize * GroundSizeFactor;
             _ground.localScale = new Vector3(size, size, 1f);
             _ground.position = new Vector3(bounds.center.x, groundY, bounds.center.z);
         }
