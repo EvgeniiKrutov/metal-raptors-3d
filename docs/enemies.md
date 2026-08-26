@@ -58,7 +58,7 @@ A role leaves its band only during a declared manoeuvre. The fighter's practical
 
 **The scout's band is terrain-relative, not a fraction.** The fractions above are fixed slices of
 the world, and the deck slice is only 80 m tall — less than the scout's own turn *radius*
-(150 m/s ÷ 135 °/s ≈ 64 m), so a scout held inside it could not complete a turn without flying
+(150 m/s ÷ 88 °/s ≈ 98 m), so a scout held inside it could not complete a turn without flying
 into the ground. Instead the scout's corridor rides the contour under it: floor at
 `contour + safeAltitudeMargin` (220 m), roof at `contour + deckCeilingMargin` (380 m) but never
 above the mid/high boundary, so it stays out of the fighter's airspace. On Verdun that is 240 – 379
@@ -93,7 +93,12 @@ only ever felt like a cheat.
 
 ## Scout
 
-150 m/s, 135 °/s to the left and 88 °/s to the right, 125 health, 6 damage a round. It is the pressure role, so its gun discipline is
+150 m/s cruising and 240 flat out, 88 °/s to the left and 57 °/s to the right, 125 health,
+6 damage a round. **Both of those numbers sit under the whole garage**: 240 is below the Dr.I's
+264, the slowest plane the player can buy, and 88 is below the Albatros's 104 °/s, the widest
+turner of the three. Whatever the player flies, they can out-run a scout and out-turn a scout —
+the fight is winnable by flying, not only by shooting, and every escape and every break the AI
+below offers is one the airframe can actually take. It is the pressure role, so its gun discipline is
 loose and its runs are long — where the fighter arrives, hurts and leaves, the scout is simply
 always shooting at you:
 
@@ -212,8 +217,9 @@ so a scout climbing out off camera shoots exactly as it did before.
 
 Rotary-engine torque, as a rule rather than as flavour. **Swinging the nose to the right is the
 weak side**, at `turnBias` (0.65) of the full `rotationSpeed`; swinging it to the left runs at the
-full 135 °/s. Both sides are quicker than the player's 120 °/s on the strong side and slower on
-the weak one, so which way you break decides who wins the turn. `TurnLimitAt` decides which by asking whether the turn is increasing the nose's
+full 88 °/s. Both sides are slower than every plane in the garage — the widest-turning of those is
+the Albatros at 104 °/s — so a player who turns always wins the turn; which way the scout breaks
+only decides by how much. `TurnLimitAt` decides which by asking whether the turn is increasing the nose's
 x-component (`-sin(heading) × sign(turnRate)`), so it is the *direction the nose is heading
 toward* that is penalised, not a fixed rotational sign — and the penalty scales with that same
 term, biting hardest through the vertical and vanishing in level flight, where no turn is either
@@ -221,12 +227,13 @@ left or right yet.
 
 Since a wave attacks from the right flying left, the turn a scout most needs is the one back to
 the right to chase a player who has run past it. That is the slow one. It is the scout's
-exploitable weak spot, and the engagement boost below is what stops it from being a free escape.
+exploitable weak spot, and the engagement boost below is what stops it from being a free escape —
+as far as its 240 cap allows, which against a player at full throttle is not far.
 
 This asymmetry *is* the scout's reversal cost — there is no separate manoeuvre for it. A scout
 turning around simply takes longer one way than the other, through ordinary steering. It also
-feeds the terrain check below: the slow side's turn radius is half again as wide (98 m against
-64 m), so it is the side more likely to be refused when the ground is close.
+feeds the terrain check below: the slow side's turn radius is half again as wide (150 m against
+98 m), so it is the side more likely to be refused when the ground is close.
 
 ### Depth dodge
 
@@ -276,11 +283,29 @@ seamless — the plane never snaps from one to the next. `ApplyRotation` adds `B
 roll it the other way.
 
 Mechanically the rigidbody's `FreezePositionZ` is cleared for the duration and the Z is driven to
-the dodge's curve; it is restored and the plane snapped back to its lane when the dodge ends.
+the dodge's curve; it is restored and the plane snapped back to its lane when the dodge ends — a
+snap that lands on the lane it is already sitting in, because phase 7 ends there.
+
 Once displaced more than `EnemyDepthDodge.ClearDepth` (35 m, half a plane) it is `OffPlane`:
 `TakeDamage` and `Scrape` both refuse, so bombs and mid-air collisions miss it as cleanly as
 bullets do. It does not fire while dodging — its own rounds are Z-frozen at its own depth and
 could not reach you anyway.
+
+**Cutting it short still flies it home (`Release`).** Something else in the AI can want the dodge
+over before phase 7 — the run-down lock is the one that does. `Cancel` is the hard version: it
+drops `Z` and `Bank` to zero on the spot, and `EnemyController.ReturnToPlane` teleports the
+rigidbody with them. From the far lane that is 120 m of depth and 75° of bank gone in a single
+step, which reads as the plane snapping *toward the camera* and jumping a size — the same
+manoeuvre, ruined at the end. `Release` replaces it with the last three phases of the ordinary
+return, re-timed from wherever the plane actually is: roll onto the other wing from its current
+bank, slide back over `dodgeBack × (remaining depth ÷ dodgeDepth)`, roll level. Cut short at the
+far lane it is the full 1.5 s; cut short halfway out it is proportionally shorter; cut short
+before it has left the lane at all it is only the wings coming level. `Active` stays true
+throughout, so the Z is still driven by velocity and the dodge finishes through the normal
+`TickDodge` path — cooldown set, constraint restored, and the snap that restores it is a no-op
+because the plane flew itself back to the lane first. The hard `CancelDodge` is now reached only from
+`BeginFall`, where the plane is already dead and — since `TakeDamage` refuses while `OffPlane` —
+inside `ClearDepth` of the lane anyway.
 
 **The dodge and the ordinary evade do not stack.** `TakeDamage` skips `EnterEvade` while a dodge is
 running, so a round that lands in the first phases — before `ClearDepth` (35 m) makes it
@@ -435,33 +460,182 @@ a slashing head-on attacker and means a player flying straight and level is repe
 rather than hunted. `AiState.Tail` is the answer: once an enemy is already behind you and you
 are not threatening it, it stops intercepting and settles into your six.
 
-**Getting there.** `WantsTail` needs the enemy `_appeared`, not scouting, not diving, not
-standing down, currently in `Attack` or `Fly`, inside `maxFireRange × 1.4`, not `UnderThreat`,
-and — the real test — `TailOffAngle() <= 75°`. That angle is between your velocity and the
-vector from you to the enemy, so it is literally "how far off my six are they": 0° is directly
-astern, 180° is directly ahead. An enemy that is already behind you latches on; one merging
-head-on does not, and keeps its slashing attack.
+`Tail` is the punishment for disengaging. A player who turns and fights is answered by the
+slashing attack, the loop reversal and the diving pass; a player who simply flies away gets
+something on their six that closes the range, comes to their altitude and shoots.
 
-**Holding it.** The slot is `your position − your heading × 95`, clamped into the enemy's
-altitude band. Outside `TailSlotTolerance` (55 m) the enemy steers straight at that point;
-inside it, `TailHeading` blends from chasing the slot to *copying your heading* — matching what
-you fly rather than pointing at where you are, which is what stops the pendulum you get from
-pure point-chasing. `TailSpeed` does the same job for throttle: it lerps from a 1.3× closing
-speed down to exactly your own speed as the gap shuts, so the enemy settles instead of
-overrunning. Firing needs no special case — `UpdateFiring` already fires whenever there is a
-solution, and sitting in the six with the nose matched means there always is one.
+**Getting there.** `WantsTail` needs the enemy `_appeared`, not diving, not standing down,
+currently in `Attack` or `Fly`, inside `maxFireRange × 1.4`, not `UnderThreat`,
+and — the real test — `TailOffAngle() <= 75°`. That angle is between the **reverse** of your
+velocity and the vector from you to the enemy, so it is literally "how far off my six are
+they": 0° is directly astern, 180° is directly ahead. An enemy that is already behind you
+latches on; one merging head-on does not, and keeps its slashing attack.
 
-**Breaking it.** `TickTail` gives up when the range opens past `maxFireRange × 1.4`, when
-`TailSeconds` (10 s) runs out, when it comes `UnderThreat` (which sends it straight to evade),
-or when `TailOffAngle()` exceeds 105° for a continuous `TailBreakSeconds` (1.1 s) — you have to
-actually get out of the line and *stay* out, not just jink. Two things are deliberately
-suppressed while tailing: `WantsReversal` returns false, so the enemy will not flip away from a
-tail it has earned, and `TickCircle` does not count (it only accumulates in `Attack`/`Fly`), so
-a tailing enemy never randomly breaks into the circling evade. Both restore the moment the tail
-breaks and normal combat resumes.
+The reverse matters. Measured against your velocity instead, the whole state is inverted: an
+enemy sitting perfectly in the slot reads 180°, so `WantsTail` never fires for one that is
+actually behind you, and `TickTail`'s 105° break trigger fires the moment it gets there. The
+tell that this is wrong is that it contradicts `TailSlot`, which subtracts your heading and so
+puts the slot **astern**: the two cannot both be right.
 
-The heading still goes through `Contain`, so an enemy copying your movements will not follow you
-into the ground or out through the level edge — it holds the band and loses the tail instead.
+**Both roles fly it identically.** The scout is not excluded, and it is not a watered-down
+version either: the phases and the overrides below are the same for both.
+
+**One at a time.** Only **one** enemy runs you down: `ClaimRunDown` holds a single static claim, taken by the nearest candidate and handed over only to something at least
+`TailHandover` (60 m) closer, so the claim does not flicker between two planes at similar range.
+Everything else in the flight flies normal AI in its own band, which keeps the picture readable
+and leaves them as a separate threat rather than a queue on your six.
+
+**Two phases: join, then lock.** A run-down does **not** switch the safety off the moment it
+starts. `AiState.Tail` runs in two phases, and `RunningDown` — the flag every override is gated
+on — is only true in the second.
+
+**Join.** Everything is normal. The enemy flies the ordinary tail approach to
+`ClampToBand(TailSlot())`, inside its own band, with `KeepNoseUp`, `ChooseTurn`,
+`CheckGroundAvoidance` and `Contain`'s floor all doing their jobs. It manoeuvres onto your six
+the safe way, checking terrain as it goes. Nothing about this phase is new.
+
+**Lock.** `TickTailLock` grants the lock when the enemy is genuinely *established* astern:
+
+- `TailBehind()` — how far behind you it is, projected onto **your** direction of travel — is
+  positive and no more than `TailLockReach` (260 m), and
+- `NoseOnTrack()` — its heading is within `TailLockHeadingDeg` (45°) of your track, i.e. it has
+  finished turning and is flying the way you are.
+
+It holds until it drops more than `TailLockReach × TailLockGive` (416 m) behind, or ends up in
+front of you. Both are measured **along your track only, never in altitude** — deliberately, or
+the thing would deadlock: an enemy held two hundred metres above you by its own band would never
+satisfy an altitude-aware test, so it could never earn the right to descend and fix exactly the
+problem the lock exists to fix.
+
+**Only then is the ground ignored.** While `RunningDown`:
+
+| | Ordinarily | Locked on your six |
+| --- | --- | --- |
+| Tail slot | `ClampToBand(TailSlot())` | pure pursuit onto your centre |
+| `Contain` | floor and ceiling push the nose back into the band | X containment only |
+| `CheckGroundAvoidance` | below `minAltitudeMargin`, abort and climb | never fires |
+| `KeepNoseUp` *(scout)* | below `contour + safeAltitudeMargin` any descent is **flattened to level** | off |
+| `ChooseTurn` *(scout)* | picks the turn by probing arcs against the corridor floor, climbs out at 55° when both are blocked | off — turns the short way, like a fighter |
+| Depth dodge *(scout)* | slides out of your plane of fire | off, and an active one is flown home (`Release`) when the lock is taken |
+
+`KeepNoseUp` is the one that made the scout look immovable. It runs **after** `Contain`, as the
+last step before `SteerToHeading`, so it overrides everything upstream: no amount of lowering the
+band floor or unclamping the slot could get a scout below `contour + 260`, because the final
+clamp simply deleted the downward component of its heading.
+
+The depth dodge has to go for a different reason: `UpdateFiring` returns early while
+`_dodge.Active`, and the dodge slides the plane out of the Z lane the bullets are fired in — a
+dodging scout is one that has stopped shooting at you. It is **released, not cancelled**
+(`ReleaseDodge`): the lock takes effect immediately, but the depth is flown back over up to 1.5 s
+instead of teleporting, so the guns come back a beat later and the plane never pops. See the
+depth dodge above.
+
+What is **not** suspended is the scout's turn bias (`turnBias`, 0.65× to the right). That is the
+plane's handling, like the fighter's 115 m turn radius, not a following behaviour.
+
+**It corrects altitude, it does not dive.** `EaseDescent` caps the locked heading at
+`TailDescentDeg` (35°) below horizontal, keeping the horizontal direction. So closing a two
+hundred metre height difference is a steady descent onto your six over ground you have just
+flown over, not a nose-down plunge from wherever the chase happened to begin — and with
+`TailSpeed` running up to 1.3×, the horizontal component still exceeds your speed at full
+descent (1.3 cos 35° = 1.06×), so it keeps closing while it comes down. A **scout** is the
+exception: its top speed is capped below every garage plane's (see the engagement boost), so
+against a player holding full throttle its 1.3× is clamped away and the range opens instead —
+that is deliberate, and it is the other way out of a scout's run-down.
+
+Once it is down there it will follow you into a hill. That is the point, and it is fair: the
+slot is behind you on your own track, so an enemy that hits terrain is one you deliberately
+dragged there, and by the geometry you were about to hit it first. Dropping onto the deck and
+pulling up late is the intended counter, and the only one that does not require turning to
+fight. **Props do not touch it** while locked — `OnTriggerEnter` ignores
+`BattlefieldProps.Layer`, so trees and burned houses cannot chip away at a chase that is by
+design flying through the scenery. Terrain still kills it.
+
+**Holding it — pure pursuit onto your centre.** A run-down does not chase the slot and it does
+not copy your heading. `TailHeading` points the nose **straight at `_target.position`**, the
+centre of your plane, every step. Both roles, no blending, no special case for the scout.
+
+That is what makes "same altitude" and "shoots at you" the same statement. The guns fire down
+the nose (`UpdateFiring` launches along `_heading`), so a nose that is on your centre is a
+firing solution by construction, and `HasFiringSolution` waves it through — at the 95 m standoff
+the miss window allows 39° of error, well outside the 26° cone.
+
+Pure pursuit at matched speed is also what closes the altitude gap on its own: an enemy pointing
+at you and flying your speed converges onto your six at constant range, whatever height you pick.
+`TailSpeed` supplies the throttle — it lerps from a 1.3× closing speed down to exactly your own
+as `TargetDistance() − TailStandoff` shuts, so it settles at 95 m instead of overrunning, and
+measuring the gap from the *range* rather than from the slot means it never accelerates when it
+is already too close.
+
+In the join phase none of this applies: the heading is still the old slot-chase, blending to
+copying your heading inside `TailSlotTolerance` (55 m), which is what puts the nose on your
+track and earns the lock in the first place.
+
+**Breaking it — get off the gun line.** There is **no timer**, and **no requirement that you
+shoot**: a run-down lasts as long as you keep flying where its guns already point, which is the
+whole point of it. `TickTail` gives up on four things, and the first is the one you will use:
+
+- **`OffGunLine()`** for a continuous `TailBreakSeconds` (1.1 s) — you moved far enough off the
+  line of fire, measured the same way `HasFiringSolution` measures a miss: `range × sin(error)`
+  between the enemy's nose and your centre, against `_targetRadius × TailGunLineFactor`
+  (about 180 m). Because a locked enemy flies pure pursuit, its nose is on you by construction,
+  so this can only open up when you **out-turn its rotation speed**. Out-manoeuvre it and it
+  lets go — no shooting required. Checked only while locked; during the join phase the nose is
+  on the slot, not on you, so the test would be meaningless.
+- **`UnderThreat()`** — your velocity within `threatCone` (18°) of the enemy inside
+  `threatRange` (420 m), with its own nose swung away from you. It matters mostly in the join
+  phase; a locked enemy is already pointed at you, so the test rarely fires.
+- **Range** opening past `maxFireRange × 1.4` (700 m), which `TailSpeed`'s 1.3× closing speed
+  is there to prevent.
+- **`TailOffAngle()` past 105°** for the same 1.1 s — you turned hard enough that it is no
+  longer behind you at all, so there is nothing to tail. This is what catches a full reversal.
+
+Whichever fires, it goes straight back to `EnterAttack`, which clears `_tailLocked`. Every
+override is gated on `RunningDown`, so on that single line the enemy loses the ground exemption,
+the prop immunity, the pure pursuit and the 1.3× closing speed all at once, and the scout gets
+`KeepNoseUp`, `ChooseTurn` and its depth dodge back. Its throttle eases to cruise through
+`UpdateSpeed`'s ordinary drag and its turn rate was never touched, so it is flying stock
+`flySpeed` and `rotationSpeed` under stock AI from the next tick.
+
+Two things are deliberately suppressed while tailing: `WantsReversal` returns false, so the
+enemy will not flip away from a tail it has earned, and `TickCircle` does not count (it only
+accumulates in `Attack`/`Fly`), so a tailing enemy never randomly breaks into the circling
+evade. Both restore the moment the tail breaks and normal combat resumes.
+
+The heading still goes through `Contain`, but during a run-down `Contain` is doing only half its
+job: the level's **X** edges still turn the enemy back, and the vertical margins are zero. It
+will not follow you out through the side of the level. It will absolutely follow you into the
+ground.
+
+## When an enemy is allowed to shoot (`HasFiringSolution`)
+
+Every shot outside the diving pass has to clear two gates, and the second one is the one that
+matters: the round must actually pass close to the target.
+
+1. **Cone.** The heading error against the aim point (`PredictIntercept`, falling back to your
+   raw position) must be inside `fireAngleThreshold` — or inside the wider snap window
+   `SnapFireConeDeg` (26°), which exists so a nose sweeping across the sky can still take the
+   shot as it passes.
+2. **Miss distance.** `range × sin(error)` — the perpendicular distance the round misses your
+   centre by — must be within `_targetRadius × SnapWindowFactor` (2), about 60 m for a plane
+   measuring 60 m across.
+
+The second gate is what makes the cone range-aware, and it used to apply only to the snap
+window: an error inside `fireAngleThreshold` returned true on the spot, with no reference to
+how far away you were. A 14° cone is a fine gate at 200 m and a useless one at 450, where it
+lets the enemy open fire aimed 109 m off — three plane-lengths clear of you. The result was a
+stream of tracer flying dead level well above or below the player, which is what it looks like
+on screen. Perversely it also made the *wider* snap branch the stricter of the two, since that
+one did check the miss distance.
+
+Applying it to both branches turns the fixed cone into an effective cone that closes with
+range: the full `fireAngleThreshold` is usable inside about 240 m, and at 450 m the enemy has
+to be within 7.7° before it will pull the trigger. Up close nothing changes — at the tail
+standoff of 95 m the geometry allows 39°, so the cone is the binding limit again and the enemy
+shoots as freely as it ever did.
+
+The diving pass is the deliberate exception: it fires down the whole run without a solution at
+all (see above).
 
 ## Breaking the turning circle (both roles)
 
@@ -549,7 +723,18 @@ speed × `engageFactor` (1.15), ignoring its configured `flySpeed` entirely. It 
 closes.
 
 It is folded in with a `Max` against everything else that can raise speed — the `Return` catch-up
-for an off-camera enemy, the fighter's dive — so whichever is fastest at that moment wins.
+for an off-camera enemy, the fighter's dive, `TailSpeed`'s 1.3× — so whichever is fastest at that
+moment wins.
+
+**The scout is capped; the fighter is not.** Everything above is a *target*, and none of it
+respected a ceiling: a scout chasing a fleeing Camel took 288 × 1.15 = 331 and simply outran it —
+and the Albatros's 300 the same way — for as long as the player kept running — most visibly right after
+shaking off a run-down, which is exactly the moment the range is open and the boost is at full.
+`FlightSpeed` now clamps a scout to `flySpeed × maxSpeedMultiplier` (150 × 1.6 = **240**) after
+every one of those terms, which is under the Dr.I's 264 — the slowest thing the garage sells. A
+scout can still close on a player who is not running flat out, and can never overhaul one who is.
+The fighter keeps the uncapped boost: it is the role that is *supposed* to catch you, and its
+own `_speed` is already clamped to the same 240 by `UpdateSpeed`.
 
 ## Per-level difficulty
 
@@ -567,5 +752,9 @@ is preserved and each role keeps its identity at every level.
 scaling — a Resources asset mutated at runtime stays mutated for the rest of the editor session.
 
 Level 1 flies **all scouts**: the tutorial teaches the low fight and the guns against a 63-health
-Fokker that turns at 84 °/s, not against a diving fighter. Levels 3, 5, 7 and 8 already mixed
+Fokker that turns at 70 °/s, not against a diving fighter. Levels 3, 5, 7 and 8 already mixed
 Fokkers into their waves, so those levels now mix the two fights without a line of script changing.
+
+The scout's base 88 °/s is picked so the **top** of that ramp still clears the garage: 88 × 1.18 =
+103.8, under the Albatros's 104. The player can out-turn a scout on level 8 as surely as on level
+1. Speed is not scaled at all, so the 240 cap holds everywhere by construction.

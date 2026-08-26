@@ -75,6 +75,8 @@ namespace MetalRaptors
                 tGo.layer = GroundLayer;
                 tGo.transform.SetParent(root.transform);
                 tGo.transform.position = new Vector3(x0, 0f, 0f);
+                AttachCollider(tGo, data);
+
                 var terrain = tGo.GetComponent<Terrain>();
                 terrain.materialTemplate = terrainMat;
                 terrain.heightmapPixelError = 2f;
@@ -97,6 +99,22 @@ namespace MetalRaptors
 
             return (x, z) => InCrater(
                 new Vector2(Mathf.Repeat(x + width / 2f, width), z), craters, width);
+        }
+
+        public static void AttachCollider(GameObject terrain, TerrainData data)
+        {
+            var collider = terrain.GetComponent<TerrainCollider>();
+            if (collider == null) collider = terrain.AddComponent<TerrainCollider>();
+
+            if (collider == null)
+            {
+                Debug.LogError("ProceduralTerrain: no TerrainCollider in this build; nothing "
+                               + "collides with the ground. See docs/standalone-builds.md.");
+                return;
+            }
+
+            collider.terrainData = data;
+            collider.enabled = true;
         }
 
         public static TerrainData NewTerrainData()

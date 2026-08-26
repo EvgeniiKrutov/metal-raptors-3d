@@ -49,10 +49,15 @@ namespace MetalRaptors
         const float TailEnterConeDeg = 75f;
         const float TailBreakConeDeg = 105f;
         const float TailBreakSeconds = 1.1f;
-        const float TailSeconds = 10f;
         const float TailRangeFactor = 1.4f;
         const float TailCloseRange = 220f;
         const float TailChaseFactor = 1.3f;
+        const float TailHandover = 60f;
+        const float TailLockReach = 260f;
+        const float TailLockHeadingDeg = 45f;
+        const float TailLockGive = 1.6f;
+        const float TailDescentDeg = 35f;
+        const float TailGunLineFactor = 6f;
 
         const float TurnChoiceAngleDeg = 30f;
         const float TurnCheckInterval = 0.35f;
@@ -108,6 +113,7 @@ namespace MetalRaptors
         float _flyWeaveT;
         float _flyBaseX;
         float _tailLost;
+        bool _tailLocked;
         float _fireCooldown;
         float _lastCollisionTime = -999f;
         ShakeEffect _shake;
@@ -213,7 +219,11 @@ namespace MetalRaptors
 
         EnemyRole Role => _config != null ? _config.role : EnemyRole.Fighter;
 
+        static EnemyController _runDown;
+
         bool Scouting => Role == EnemyRole.Scout;
+
+        public bool RunningDown => _state == AiState.Tail && _runDown == this && _tailLocked;
 
         bool Reversing => _loop.Active;
 
@@ -328,6 +338,11 @@ namespace MetalRaptors
             if (_dodge.Active) return;
 
             _dodgeCooldown = _config.dodgeCooldown;
+            ReturnToPlane();
+        }
+
+        void ReturnToPlane()
+        {
             _rb.constraints |= RigidbodyConstraints.FreezePositionZ;
 
             Vector3 pos = _rb.position;
@@ -361,6 +376,7 @@ namespace MetalRaptors
 
         bool CheckGroundAvoidance()
         {
+            if (RunningDown) return false;
             if (transform.position.y - GroundRef >= _config.minAltitudeMargin) return false;
             EndDive();
             _state = AiState.Recover;
@@ -463,43 +479,125 @@ namespace MetalRaptors
         void EnterAttack()
         {
             _state = AiState.Attack;
+            _tailLocked = false;
             _stateTimer = _config.attackDuration;
         }
 
         void EnterTail()
         {
             _state = AiState.Tail;
-            _stateTimer = TailSeconds;
+            _stateTimer = 0f;
             _tailLost = 0f;
+            _tailLocked = false;
+        }
+
+        void CancelDodge()
+        {
+            if (!_dodge.Active) return;
+
+            _dodge.Cancel();
+            ReturnToPlane();
+        }
+
+        void ReleaseDodge()
+        {
+            if (!_dodge.Active) return;
+
+            _dodge.Release();
+            if (_dodge.Active) return;
+
+            _dodgeCooldown = _config.dodgeCooldown;
+            ReturnToPlane();
         }
 
         bool WantsTail()
         {
-            if (!_appeared || Scouting || _standDown || _target == null) return false;
+            if (!_appeared || _standDown || _target == null) return false;
             if (_state != AiState.Attack && _state != AiState.Fly) return false;
             if (Diving || UnderThreat()) return false;
             if (TargetDistance() > _config.maxFireRange * TailRangeFactor) return false;
+            if (TailOffAngle() > TailEnterConeDeg) return false;
 
-            return TailOffAngle() <= TailEnterConeDeg;
+            return ClaimRunDown();
+        }
+
+        bool ClaimRunDown()
+        {
+            if (_runDown != null && (!_runDown.IsAlive || _runDown._state != AiState.Tail))
+                _runDown = null;
+
+            if (_runDown == this) return true;
+            if (_runDown != null
+                && TargetDistance() >= _runDown.TargetDistance() - TailHandover) return false;
+
+            _runDown = this;
+            return true;
         }
 
         void TickTail(float dt)
         {
-            if (_target == null || _stateTimer <= 0f
+            if (_target == null || UnderThreat()
                 || TargetDistance() > _config.maxFireRange * TailRangeFactor)
             {
                 EnterAttack();
                 return;
             }
 
-            if (_evadeCooldown <= 0f && UnderThreat())
+            bool lost = TailOffAngle() > TailBreakConeDeg || (RunningDown && OffGunLine());
+            _tailLost = lost ? _tailLost + dt : 0f;
+            if (_tailLost >= TailBreakSeconds) { EnterAttack(); return; }
+
+            TickTailLock();
+        }
+
+        void TickTailLock()
+        {
+            float behind = TailBehind();
+            if (behind <= 0f) { _tailLocked = false; return; }
+
+            if (_tailLocked)
             {
-                EnterEvade(circling: false);
+                _tailLocked = behind <= TailLockReach * TailLockGive;
                 return;
             }
 
-            _tailLost = TailOffAngle() > TailBreakConeDeg ? _tailLost + dt : 0f;
-            if (_tailLost >= TailBreakSeconds) EnterAttack();
+            if (behind > TailLockReach || !NoseOnTrack()) return;
+
+            _tailLocked = true;
+            ReleaseDodge();
+        }
+
+        bool OffGunLine()
+        {
+            float range = TargetDistance();
+            if (range < 1f) return false;
+
+            float errorDeg = Mathf.Abs(Mathf.DeltaAngle(_heading * Mathf.Rad2Deg,
+                HeadingTo((Vector2)_target.position) * Mathf.Rad2Deg));
+
+            return range * Mathf.Sin(errorDeg * Mathf.Deg2Rad)
+                > _targetRadius * TailGunLineFactor;
+        }
+
+        float TailBehind()
+        {
+            if (_target == null) return 0f;
+
+            Vector2 run = _target.linearVelocity;
+            if (run.sqrMagnitude < 1f) return 0f;
+
+            return Vector2.Dot((Vector2)transform.position - (Vector2)_target.position,
+                -run.normalized);
+        }
+
+        bool NoseOnTrack()
+        {
+            Vector2 run = _target.linearVelocity;
+            if (run.sqrMagnitude < 1f) return false;
+
+            float track = Mathf.Atan2(run.y, run.x) * Mathf.Rad2Deg;
+            return Mathf.Abs(Mathf.DeltaAngle(_heading * Mathf.Rad2Deg, track))
+                <= TailLockHeadingDeg;
         }
 
         float TailOffAngle()
@@ -509,7 +607,7 @@ namespace MetalRaptors
             Vector2 run = _target.linearVelocity;
             if (run.sqrMagnitude < 1f) return 0f;
 
-            return Vector2.Angle(run, (Vector2)transform.position - (Vector2)_target.position);
+            return Vector2.Angle(-run, (Vector2)transform.position - (Vector2)_target.position);
         }
 
         Vector2 TailSlot()
@@ -525,6 +623,9 @@ namespace MetalRaptors
 
         float TailHeading()
         {
+            if (RunningDown && _target != null)
+                return EaseDescent(HeadingTo((Vector2)_target.position));
+
             Vector2 slot = ClampToBand(TailSlot());
             float toSlot = HeadingTo(slot);
 
@@ -540,6 +641,17 @@ namespace MetalRaptors
                    * Mathf.Deg2Rad;
         }
 
+        static float EaseDescent(float heading)
+        {
+            float sink = Mathf.Sin(heading);
+            float limit = -Mathf.Sin(TailDescentDeg * Mathf.Deg2Rad);
+            if (sink >= limit) return heading;
+
+            float run = (Mathf.Cos(heading) >= 0f ? 1f : -1f)
+                        * Mathf.Cos(TailDescentDeg * Mathf.Deg2Rad);
+            return Mathf.Atan2(limit, run);
+        }
+
         float TailSpeed(float speed)
         {
             if (_target == null) return speed;
@@ -547,7 +659,9 @@ namespace MetalRaptors
             float run = ((Vector2)_target.linearVelocity).magnitude;
             if (run < 1f) return speed;
 
-            float gap = Vector2.Distance(transform.position, ClampToBand(TailSlot()));
+            float gap = RunningDown
+                ? Mathf.Max(0f, TargetDistance() - TailStandoff)
+                : Vector2.Distance(transform.position, ClampToBand(TailSlot()));
             float closing = Mathf.Clamp01(gap / TailCloseRange);
             return Mathf.Lerp(run, Mathf.Max(speed, run * TailChaseFactor), closing);
         }
@@ -835,6 +949,8 @@ namespace MetalRaptors
                 ? Mathf.Max(margin, _config.safeAltitudeMargin - _config.minAltitudeMargin)
                 : margin;
 
+            if (RunningDown) { floorMargin = 0f; margin = 0f; }
+
             float minX = Diving ? DiveEdgeX(-1f) : _minX;
             float maxX = Diving ? DiveEdgeX(1f) : _maxX;
             float sideMargin = Diving ? DiveSideMargin : _edgeMargin;
@@ -935,7 +1051,7 @@ namespace MetalRaptors
 
         float ChooseTurn(float desired, float dt)
         {
-            if (!Scouting || _standDown || _state == AiState.Recover)
+            if (!Scouting || RunningDown || _standDown || _state == AiState.Recover)
             {
                 _turnDir = 0f;
                 _turnClimb = false;
@@ -987,7 +1103,7 @@ namespace MetalRaptors
 
         float KeepNoseUp(float heading)
         {
-            if (!Scouting) return heading;
+            if (!Scouting || RunningDown) return heading;
             if (_rb.position.y - _deck >= _config.safeAltitudeMargin) return heading;
             if (Mathf.Sin(heading) >= 0f) return heading;
 
@@ -1089,7 +1205,7 @@ namespace MetalRaptors
             }
             else
             {
-                float cap = cruise * Mathf.Max(1f, _config.maxSpeedMultiplier);
+                float cap = TopSpeed;
                 float floor = Diving
                     ? Mathf.Min(cap, cruise * Mathf.Max(1f, _config.diveSpeedMultiplier))
                     : cruise;
@@ -1111,8 +1227,11 @@ namespace MetalRaptors
             if (_state == AiState.Return)
                 speed = Mathf.Max(speed, _config.flySpeed * ReturnSpeedFactor);
             if (_state == AiState.Tail) speed = TailSpeed(speed);
+            if (Scouting) speed = Mathf.Min(speed, TopSpeed);
             return Mathf.Max(1f, speed);
         }
+
+        float TopSpeed => _config.flySpeed * Mathf.Max(1f, _config.maxSpeedMultiplier);
 
         float EngageTarget()
         {
@@ -1189,8 +1308,7 @@ namespace MetalRaptors
 
             float errorDeg = Mathf.Abs(Mathf.DeltaAngle(_heading * Mathf.Rad2Deg,
                 HeadingTo(point) * Mathf.Rad2Deg));
-            if (errorDeg <= _config.fireAngleThreshold) return true;
-            if (errorDeg > SnapFireConeDeg) return false;
+            if (errorDeg > Mathf.Max(_config.fireAngleThreshold, SnapFireConeDeg)) return false;
 
             return range * Mathf.Sin(errorDeg * Mathf.Deg2Rad)
                 <= _targetRadius * SnapWindowFactor;
@@ -1231,7 +1349,8 @@ namespace MetalRaptors
         bool CanDodge()
         {
             if (!_appeared) return false;
-            if (!Scouting || _standDown || _dodge.Active || _dodgeCooldown > 0f) return false;
+            if (!Scouting || RunningDown || _standDown || _dodge.Active
+                || _dodgeCooldown > 0f) return false;
             if (CurrentHealth > _config.health * _config.dodgeHealthFraction) return false;
             return UnderAim();
         }
@@ -1270,15 +1389,7 @@ namespace MetalRaptors
 
             SetStreaks(false);
             CancelReversal();
-            if (_dodge.Active)
-            {
-                _dodge.Cancel();
-                _rb.constraints |= RigidbodyConstraints.FreezePositionZ;
-
-                Vector3 pos = _rb.position;
-                pos.z = _baseZ;
-                _rb.position = pos;
-            }
+            CancelDodge();
 
             if (_smoke != null) _smoke.Ignite(ModelSize);
             _fire = PlaneFire.Ignite(gameObject, ModelSize);
@@ -1324,6 +1435,7 @@ namespace MetalRaptors
 
         void OnTriggerEnter(Collider other)
         {
+            if (RunningDown) return;
             if (other.gameObject.layer == BattlefieldProps.Layer) Scrape();
         }
 
@@ -1407,6 +1519,7 @@ namespace MetalRaptors
 
         void OnDestroy()
         {
+            if (_runDown == this) _runDown = null;
             if (_bar != null) Destroy(_bar.gameObject);
         }
     }

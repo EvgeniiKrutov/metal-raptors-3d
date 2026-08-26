@@ -82,6 +82,40 @@ A bomb that never hits anything is removed silently after `MaxLife` (12 s) or on
 `FloorY` (−300), the same idea as `PlaneFall.Timeout` for wrecks: on the campaign scroller a bomb
 can be dropped over ground that has not streamed in, and it must not hang in the scene forever.
 
+## Finding the ground
+
+The ground contact is **decided by raycasts, not by PhysX**, exactly as it already is for the
+player (`CubeController.GroundUnder`), the enemies (`EnemyController.TerrainAt`) and the supply
+crates (`SupplyCrate.GroundY`). `Bomb.SweepGround` runs two tests per physics step, both on
+`ProceduralTerrain.GroundLayer` with triggers excluded:
+
+1. A **forward sweep** from the bomb's centre along its velocity, `|v × dt| + GroundSweepPad`
+   (4) long. Consecutive steps overlap, so the swept path is continuous, and the hit point it
+   returns is the real contact point on a slope the bomb is diving into.
+2. A **height probe**: one long ray straight down from `ProbeTop` (1200) through the whole
+   world, at the position the bomb will occupy after this step. It detonates when the bomb's
+   lowest point reaches that height. `Belly()` gets that lowest point from the bomb's own Z
+   angle — half its girth when it is flying level, half its length once it has swung
+   nose-down — so the detonation looks right at both attitudes.
+
+The second test is what makes this reliable. A forward sweep can only find ground that is
+still *ahead* of the bomb, so once a bomb is under the surface for any reason it can never
+recover: a downward ray from underneath a PhysX heightfield returns no hit
+(`m_QueriesHitBackfaces` is 0), and the bomb falls to `FloorY` and vanishes — flying through
+the ground. A ray that starts above the world always finds the surface, whatever the bomb did
+to get below it. `ContinuousDynamic` is left on as a third line of defence, but nothing depends
+on it; the bomb writes its own rotation every step, and a rigidbody whose pose is set by hand
+gets no CCD sweep from PhysX.
+
+For the same reason the rotation is written through `Rigidbody.rotation` rather than
+`transform.rotation`. Writing the Transform of an **interpolated** rigidbody makes Unity push
+that Transform back into the physics body on the next sync, and the Transform of an
+interpolated body holds the *render* position, which lags the physics position by up to a full
+step. The bomb was quietly teleporting backwards once per step.
+
+None of this helps if the terrain has no collider at all, which is what it had on iOS — see
+docs/standalone-builds.md.
+
 ## What a bomb hits
 
 Bombs sit on **layer 10**, their own layer, and the choice matters:

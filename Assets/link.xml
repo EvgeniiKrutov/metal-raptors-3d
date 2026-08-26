@@ -1,0 +1,3 @@
+<linker>
+  <assembly fullname="UnityEngine.TerrainPhysicsModule" preserve="all"/>
+</linker>

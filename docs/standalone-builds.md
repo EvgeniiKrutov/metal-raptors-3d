@@ -25,6 +25,46 @@ from renderer bounds, which needs no mesh data.
 `AddPlaneCollider` also falls back to a box hitbox and logs a warning if it is ever handed
 a non-readable mesh again, so the failure is loud instead of invisible.
 
+## The terrain has no collider on iOS: `TerrainPhysics` is stripped
+
+**This is what let bombs fall straight through the ground in career levels and custom
+battles, and it disabled every other ground query with them.**
+
+`Player Settings ▸ Strip Engine Code` is on. Unity decides which native engine modules to
+register in the player from the managed types that survive the linker, and no scene in this
+project contains a `TerrainCollider` — `Terrain.CreateTerrainGameObject` adds one at runtime,
+from inside `UnityEngine.TerrainModule`, which the analysis does not follow. The whole
+`TerrainPhysics` module was therefore dropped from the iOS build. It is visible in the
+generated Xcode project, in `Il2CppOutputProject/Source/il2cppOutput/UnityClassRegistration.cpp`:
+
+```cpp
+RegisterModule_Terrain();                        // present
+RegisterUnityClass<Terrain>("Terrain");          // present
+RegisterUnityClass<TerrainData>("Terrain");      // present
+RegisterUnityClass<TerrainLayer>("Terrain");     // present
+// no RegisterModule_TerrainPhysics, no TerrainCollider
+```
+
+`UnityEngine.TerrainPhysicsModule.dll` still appears in `Data/ScriptingAssemblies.json`; that
+list is not what decides the matter, the registration file is. With the native class gone,
+`AddComponent<TerrainCollider>()` returns null and the terrain is a purely visual surface:
+nothing collides with it and **no raycast on `ProceduralTerrain.GroundLayer` ever hits**. That
+takes out `Bomb`, `CubeController.GroundUnder` (the player's crash and deck clamp),
+`EnemyController.TerrainAt` and `SupplyCrate.GroundY` in one go — silently, with a clean log,
+and only on device.
+
+Two things keep the module now, either of which is enough on its own:
+
+- `Assets/link.xml` preserves `UnityEngine.TerrainPhysicsModule`. **Do not delete it.**
+- `ProceduralTerrain.AttachCollider` names `TerrainCollider` from `Assembly-CSharp`, which the
+  linker does follow. Both terrain systems call it right after
+  `Terrain.CreateTerrainGameObject`, and it logs an error instead of failing silently if the
+  component still cannot be created.
+
+The check to run after any build-settings or Unity version change is a grep for
+`TerrainCollider` in `UnityClassRegistration.cpp`. Zero hits means the ground is back to being
+decoration.
+
 ## Fog variants are stripped when no scene enables fog
 
 `ProceduralTerrain.ApplyFog` turns fog on from script. Every scene asset ships with

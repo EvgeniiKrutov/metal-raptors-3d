@@ -300,7 +300,7 @@ at runtime stays mutated for the rest of the editor session.
 Both level 1 multipliers pull in the same direction: it is the tutorial for the guns, not a test of
 them. Half health means the opening fight is short against the 150 health the player brings into
 it, and the slower turn rate stops an enemy from simply rotating onto the player's tail faster
-than a new player can answer — at 84°/s it no longer out-turns the Sopwith's own 120. Level 1 also
+than a new player can answer — at 70°/s it no longer out-turns the Sopwith's own 120. Level 1 also
 flies **only scouts**, so the tutorial is the deck fight and never the fighter's diving pass.
 
 ## Level 1

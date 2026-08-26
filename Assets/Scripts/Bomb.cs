@@ -17,6 +17,9 @@ namespace MetalRaptors
         const float MaxLife = 12f;
         const float FloorY = -300f;
         const float GroundSweepPad = 4f;
+        const float ProbeTop = 1200f;
+        const float ProbeDepth = 1600f;
+        const int GroundMask = 1 << ProceduralTerrain.GroundLayer;
 
         static readonly Color BodyColor = new Color(0.19f, 0.20f, 0.22f);
         static readonly List<IDamageable> Struck = new List<IDamageable>();
@@ -102,7 +105,12 @@ namespace MetalRaptors
             ApplyRotation();
         }
 
-        void ApplyRotation() => transform.rotation = Quaternion.Euler(0f, 0f, _angle);
+        void ApplyRotation()
+        {
+            var rotation = Quaternion.Euler(0f, 0f, _angle);
+            if (_rb != null) _rb.rotation = rotation;
+            else transform.rotation = rotation;
+        }
 
         void OnCollisionEnter(Collision collision)
         {
@@ -148,19 +156,44 @@ namespace MetalRaptors
             Destroy(gameObject);
         }
 
-        static bool SweepGround(Vector3 from, Vector3 step, out Vector3 point)
+        bool SweepGround(Vector3 from, Vector3 step, out Vector3 point)
         {
             point = from;
 
             float distance = step.magnitude + GroundSweepPad;
-            if (distance <= GroundSweepPad) return false;
+            if (distance > GroundSweepPad
+                && Physics.Raycast(from, step.normalized, out RaycastHit info, distance,
+                    GroundMask, QueryTriggerInteraction.Ignore))
+            {
+                point = info.point;
+                return true;
+            }
 
-            if (!Physics.Raycast(from, step.normalized, out RaycastHit info, distance,
-                    1 << ProceduralTerrain.GroundLayer, QueryTriggerInteraction.Ignore))
-                return false;
+            Vector3 next = from + step;
+            if (!GroundHeight(next, out float deck) || next.y - Belly() > deck) return false;
 
-            point = info.point;
+            point = new Vector3(next.x, deck, next.z);
             return true;
+        }
+
+        float Belly()
+        {
+            float radians = _angle * Mathf.Deg2Rad;
+            return Mathf.Abs(Mathf.Sin(radians)) * Length * 0.5f
+                 + Mathf.Abs(Mathf.Cos(radians)) * Girth * 0.5f;
+        }
+
+        static bool GroundHeight(Vector3 at, out float y)
+        {
+            if (Physics.Raycast(new Vector3(at.x, ProbeTop, at.z), Vector3.down,
+                    out RaycastHit info, ProbeDepth, GroundMask, QueryTriggerInteraction.Ignore))
+            {
+                y = info.point.y;
+                return true;
+            }
+
+            y = 0f;
+            return false;
         }
 
         static bool InWater(Vector3 point)

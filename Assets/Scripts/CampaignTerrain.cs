@@ -169,6 +169,8 @@ namespace MetalRaptors
             tGo.layer = ProceduralTerrain.GroundLayer;
             tGo.transform.SetParent(root.transform);
             tGo.transform.position = new Vector3(x0, TerrainY, 0f);
+            ProceduralTerrain.AttachCollider(tGo, data);
+
             var terrain = tGo.GetComponent<Terrain>();
             terrain.materialTemplate = _terrainMat;
             terrain.heightmapPixelError = 2f;
