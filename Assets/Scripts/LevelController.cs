@@ -192,7 +192,8 @@ namespace MetalRaptors
 
         Vector3 RandomEnemySpawn(float aiGroundY, EnemyConfig config, float ceilingY)
         {
-            float halfViewWidth = _cam != null ? _halfViewWidth : _halfViewHeight * (16f / 9f);
+            float halfViewWidth = _cam != null
+                ? _halfViewWidth : _halfViewHeight * LevelCamera.ReferenceAspect;
             float camX = _cam != null ? _cam.transform.position.x : 0f;
 
             EnemyConfigs.SpawnBand(config, aiGroundY, ceilingY, out float minY, out float maxY);
@@ -249,8 +250,7 @@ namespace MetalRaptors
                 _cam.farClipPlane = 2200f;
             }
 
-            _halfViewHeight = CameraDistance * Mathf.Tan(_cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
-            _halfViewWidth = _halfViewHeight * _cam.aspect;
+            LevelCamera.Frame(_cam, CameraDistance, out _halfViewWidth, out _halfViewHeight);
 
             PositionCamera(instant: true);
 

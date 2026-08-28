@@ -22,7 +22,7 @@ MonoBehaviour:
   fireAngleThreshold: 18
   leadFactor: 1
   maxFireRange: 560
-  flySpeed: 150
+  flySpeed: 160
   rotationSpeed: 88
   minAltitudeMargin: 150
   safeAltitudeMargin: 220

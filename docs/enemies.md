@@ -58,7 +58,7 @@ A role leaves its band only during a declared manoeuvre. The fighter's practical
 
 **The scout's band is terrain-relative, not a fraction.** The fractions above are fixed slices of
 the world, and the deck slice is only 80 m tall — less than the scout's own turn *radius*
-(150 m/s ÷ 88 °/s ≈ 98 m), so a scout held inside it could not complete a turn without flying
+(160 m/s ÷ 88 °/s ≈ 104 m), so a scout held inside it could not complete a turn without flying
 into the ground. Instead the scout's corridor rides the contour under it: floor at
 `contour + safeAltitudeMargin` (220 m), roof at `contour + deckCeilingMargin` (380 m) but never
 above the mid/high boundary, so it stays out of the fighter's airspace. On Verdun that is 240 – 379
@@ -93,8 +93,8 @@ only ever felt like a cheat.
 
 ## Scout
 
-150 m/s cruising and 240 flat out, 88 °/s to the left and 57 °/s to the right, 125 health,
-6 damage a round. **Both of those numbers sit under the whole garage**: 240 is below the Dr.I's
+160 m/s cruising and 256 flat out, 88 °/s to the left and 57 °/s to the right, 125 health,
+6 damage a round. **Both of those numbers sit under the whole garage**: 256 is below the Dr.I's
 264, the slowest plane the player can buy, and 88 is below the Albatros's 104 °/s, the widest
 turner of the three. Whatever the player flies, they can out-run a scout and out-turn a scout —
 the fight is winnable by flying, not only by shooting, and every escape and every break the AI
@@ -147,9 +147,9 @@ eased steering as every other plane; what the turn choice changes is not *how fa
 
 ### Choosing which way to turn (`ChooseTurn`)
 
-A turn in a side-scroller costs altitude: half of it is spent pointing downward, and at 150 m/s the
-scout's turn radius is 64 m one way and 98 m the other, so a reversal taken the wrong way round
-drops it 127 – 196 m — straight through the corridor floor and into the ground.
+A turn in a side-scroller costs altitude: half of it is spent pointing downward, and at 160 m/s the
+scout's turn radius is 104 m one way and 160 m the other, so a reversal taken the wrong way round
+drops it 208 – 320 m — straight through the corridor floor and into the ground.
 
 So before committing to a turn of more than 30°, the scout works out whether it can survive it.
 `TurnClear` runs a short forward simulation of the arc — 2 s at 0.15 s steps, using the *actual*
@@ -157,7 +157,7 @@ asymmetric turn rate at each simulated heading, so the wide slow right turn is m
 slow — and probes the terrain under every sample. The arc is flown at the speed the plane is
 *actually* making (`FlightSpeed` — cruise, the engagement boost, or the `Return` catch-up,
 whichever is highest), not at the configured `flySpeed`: a scout chasing a boosting Camel is doing
-270 m/s, not 150, and at that speed the real arc is nearly twice as wide and sinks nearly twice as
+256 m/s, not 160, and at that speed the real arc is nearly twice as wide and sinks nearly twice as
 deep as the cruise figure. The simulated turn rate also ramps in on the same
 `turnResponsiveness / mass` curve the real steering uses, so the ~0.3 s of near-straight flight at
 the start of a turn — where the plane is deepest — is part of the model. Then:
@@ -228,12 +228,12 @@ left or right yet.
 Since a wave attacks from the right flying left, the turn a scout most needs is the one back to
 the right to chase a player who has run past it. That is the slow one. It is the scout's
 exploitable weak spot, and the engagement boost below is what stops it from being a free escape —
-as far as its 240 cap allows, which against a player at full throttle is not far.
+as far as its 256 cap allows, which against a player at full throttle is not far.
 
 This asymmetry *is* the scout's reversal cost — there is no separate manoeuvre for it. A scout
 turning around simply takes longer one way than the other, through ordinary steering. It also
-feeds the terrain check below: the slow side's turn radius is half again as wide (150 m against
-98 m), so it is the side more likely to be refused when the ground is close.
+feeds the terrain check below: the slow side's turn radius is half again as wide (160 m against
+104 m), so it is the side more likely to be refused when the ground is close.
 
 ### Depth dodge
 
@@ -327,9 +327,9 @@ its firing range. So parking high buys you a lull, not immunity.
 
 ## Fighter
 
-150 m/s, 75 °/s, 130 health, a shot every 0.20 s, 6 damage. It used to cruise at the player's
-own 180 and turn at 105 °/s; it is now the widest-turning thing in the air, with a **115 m turn
-radius** (`v / ω` — 150 ÷ 1.31 rad/s) against the scout's 64 m one way and 98 m the other, and
+160 m/s, 75 °/s, 130 health, a shot every 0.20 s, 6 damage. It used to cruise at the player's
+own 180 and turn at 105 °/s; it is now the widest-turning thing in the air, with a **122 m turn
+radius** (`v / ω` — 160 ÷ 1.31 rad/s) against the scout's 104 m one way and 160 m the other, and
 the player's 86 m at cruise. It cannot follow you round a corner and it is not supposed to try:
 a level runaway is answered by the engagement boost below, and a turning fight by the loop
 reversal or a dive, never by matching your arc. Dropping the cruise under the player's 180 also
@@ -340,7 +340,7 @@ onto the vertical instead of onto your tail.
 
 The fighter runs the dive-energy model — gravity along the flight path (`diveAcceleration` 90),
 drag on the excess (`speedDrag` 0.9), a floor at cruise and a cap at `maxSpeedMultiplier` (1.6),
-so 150 to 240 m/s — from its own `EnemyFighterConfig.asset`. The cap still clears the player's
+so 160 to 256 m/s — from its own `EnemyFighterConfig.asset`. The cap still clears the player's
 boosted 234, so the one thing a slower fighter has not lost is the ability to run you down on
 the way through. Altitude really is energy for it; the
 diving pass below is that model being spent, not a scripted speed multiplier. The scout keeps a
@@ -419,9 +419,9 @@ reads as a dive at you that carries on across the screen, rather than a line tha
 sweep past. Two things sharpen it further while `Diving` is up: the steering limit is
 `DiveTurnFactor` (1.7 ×) of the fighter's ordinary 75 °/s, so the nose actually snaps onto the
 new aim instead of easing onto it, and the speed floor is `diveSpeedMultiplier` (1.5 ×
-`flySpeed` = 225 m/s, capped by `maxSpeedMultiplier` at 240) for the whole manoeuvre — climb
-included, so even the set-up is quick. The 108 m turn radius that comes out of those two is
-*tighter* than its 115 m cruise radius despite the extra speed. When the pass ends the floor
+`flySpeed` = 240 m/s, capped by `maxSpeedMultiplier` at 256) for the whole manoeuvre — climb
+included, so even the set-up is quick. The 108 – 115 m turn radius that comes out of those two is
+*tighter* than its 122 m cruise radius despite the extra speed. When the pass ends the floor
 drops back to cruise and `speedDrag` bleeds the energy off, so it does not carry the dive speed
 into the next turning fight.
 
@@ -447,8 +447,8 @@ The fighter's reversal is a declared manoeuvre too (`EnemyLoop`): a constant-rat
 the vertical over `loopSeconds` (1.5 s), at unchanged speed. It triggers on a
 heading change of `reversalAngle` (120°) or more, with `ReversalCooldown` (2.5 s) stopping it from
 chaining; the scout has no equivalent. At 75 °/s the loop is now the *only* quick way it has of
-turning around — 120°/s through the loop against 75 °/s of ordinary steering, a 72 m radius
-against 115 — so the manoeuvre is no longer an alternative to a hard turn, it is the hard turn.
+turning around — 120°/s through the loop against 75 °/s of ordinary steering, a 76 m radius
+against 122 — so the manoeuvre is no longer an alternative to a hard turn, it is the hard turn.
 That is also why the diving pass borrows it for the wingover at the top. It
 is hard to punish — it keeps all its energy — but it takes a while and it is legible, so it is a
 beat you can reposition into rather than a corner you get turned in.
@@ -531,7 +531,7 @@ instead of teleporting, so the guns come back a beat later and the plane never p
 depth dodge above.
 
 What is **not** suspended is the scout's turn bias (`turnBias`, 0.65× to the right). That is the
-plane's handling, like the fighter's 115 m turn radius, not a following behaviour.
+plane's handling, like the fighter's 122 m turn radius, not a following behaviour.
 
 **It corrects altitude, it does not dive.** `EaseDescent` caps the locked heading at
 `TailDescentDeg` (35°) below horizontal, keeping the horizontal direction. So closing a two
@@ -715,7 +715,7 @@ tail and a poor answer to a stalemate, which is the whole distinction between th
 
 ## Engagement boost (both roles)
 
-Without this, a player who simply flies away is uncatchable: both roles cruise at 150 and the
+Without this, a player who simply flies away is uncatchable: both roles cruise at 160 and the
 player cruises at 180, or 234 on a boost. So when the player is beyond `engageRange` (450 m) **and** moving away
 (`dot(playerVelocity, enemy → player) > 0`), the enemy's speed target becomes the player's own
 speed × `engageFactor` (1.15), ignoring its configured `flySpeed` entirely. It eases in and out at
@@ -730,11 +730,66 @@ moment wins.
 respected a ceiling: a scout chasing a fleeing Camel took 288 × 1.15 = 331 and simply outran it —
 and the Albatros's 300 the same way — for as long as the player kept running — most visibly right after
 shaking off a run-down, which is exactly the moment the range is open and the boost is at full.
-`FlightSpeed` now clamps a scout to `flySpeed × maxSpeedMultiplier` (150 × 1.6 = **240**) after
+`FlightSpeed` now clamps a scout to `flySpeed × maxSpeedMultiplier` (160 × 1.6 = **256**) after
 every one of those terms, which is under the Dr.I's 264 — the slowest thing the garage sells. A
 scout can still close on a player who is not running flat out, and can never overhaul one who is.
 The fighter keeps the uncapped boost: it is the role that is *supposed* to catch you, and its
-own `_speed` is already clamped to the same 240 by `UpdateSpeed`.
+own `_speed` is already clamped to the same 256 by `UpdateSpeed`.
+
+## Keeping station in the scroller
+
+The campaign camera ratchets: `CampaignLevelController.PositionCamera` takes
+`Max(camX, lerp → playerX)`, so the frame scrolls right at roughly the player's 180 m/s cruise and
+never comes back. Everything in the air is therefore flying against a moving frame, and an enemy
+that cruises at 160 loses ground simply by flying straight. A single loop reversal costs it
+another 270 m of frame — a third of the screen — and a break-away costs more.
+
+The old answer was a hard left wall: `CampaignEnemies` pushed
+`SetLeftWall(camX − halfViewWidth)` every frame and `ApplyVelocity` pinned the enemy's x to it.
+**That wall was the bug.** `IsOnCamera` accepts `vp.x > −0.05`, so a pinned enemy counted as on
+camera forever, the `Return` branch that exists for exactly this case never fired, and the enemy
+ground against the left edge running its attack cycle from a position it could not leave, with
+`Contain`'s edge push fighting its own heading. What the player saw was a plane stuck in the
+bottom-left corner turning in circles for the rest of the level.
+
+Four things replace it. All four are keyed off `Behind()` — 0 at the camera's centre line, 1 at
+the left edge of the enemy window — and `Behind()` returns 0 unless `_scroll` is positive, so the
+fixed `Level` scenes, whose window never moves, are untouched by all of it. `_scroll` is the
+smoothed rate the window itself is moving at, measured in `SetBounds` (`ScrollResponse` 3 /s).
+
+**1. No wall.** Enemies are no longer walled at the left edge — only the player is
+(`CubeController`, which still needs it). An enemy that loses the race slides off the frame,
+which is what `Return` has always been waiting for: 1.35 × cruise, aimed back through
+`ClampToBand`. The recovery was already written; it just could not be reached.
+
+**2. Station keeping** (`StationTarget`). The engagement boost above arms on *range* — 450 m,
+which at a ~431 m half-view is barely a screen edge away, and only while the player is actively
+running. Station keeping arms on *screen position* instead: the speed target ramps from cruise at
+the centre line to `TopSpeed` (256) at the left edge, and is folded into `_engageSpeed` with the
+same `Max` and the same `engageResponse` easing as everything else. At the centre it does nothing,
+so a dogfight still ebbs and flows; at the edge it is +76 m/s against the scroll, which is a plane
+visibly clawing its way back into frame. It never exceeds a ceiling the engagement boost could not
+already reach, so the escape ceiling is unchanged: a player at full throttle still gets away.
+
+**3. The break-away no longer pays for the drift.** `EnterFly` used to freeze the player's x at
+the moment of the break and hold that stale point for `flyDuration` — 290 m of give-away per
+cycle, while the perch *height* tracked the player live. It now tracks live in x too
+(`FlyBaseX`), and when the enemy is behind it breaks away **downstream**: `_flyLeadX` puts the
+perch up to half a half-view ahead of the player, and `flyDuration` shrinks to
+`FlyBehindFraction` (0.35) of itself. So the further behind it is, the shorter its break-away and
+the further forward it ends — the disengage doubles as the reposition.
+
+**4. A leash** (`Reappear`). A plane that is more than `LeashScreens` (2) half-views left of the
+camera has lost the fight for good — a player boosting flat out can drag one there, and no
+catch-up speed under the cap will ever close it. `CampaignEnemies.SetWindow` recycles it: it is
+placed off the right edge at the ordinary `SpawnAhead` distance, at a fresh height from its own
+`SpawnBand`, with its speed, heading, evade, dodge and dive state reset and `_appeared` cleared,
+so it re-enters exactly like a newly spawned plane and waits for the first appearance again
+before it may spend a skill. It reads as another plane joining, not as a teleport: the leash is
+two half-views out of frame, so the move is never visible.
+
+Nothing here changes the reversal loop or the turn rates. The looping was never caused by turning
+too fast — it was caused by losing station and having no way back.
 
 ## Per-level difficulty
 
@@ -757,4 +812,4 @@ Fokkers into their waves, so those levels now mix the two fights without a line 
 
 The scout's base 88 °/s is picked so the **top** of that ramp still clears the garage: 88 × 1.18 =
 103.8, under the Albatros's 104. The player can out-turn a scout on level 8 as surely as on level
-1. Speed is not scaled at all, so the 240 cap holds everywhere by construction.
+1. Speed is not scaled at all, so the 256 cap holds everywhere by construction.

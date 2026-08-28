@@ -59,6 +59,11 @@ namespace MetalRaptors
         const float TailDescentDeg = 35f;
         const float TailGunLineFactor = 6f;
 
+        const float ScrollFloor = 1f;
+        const float ScrollResponse = 3f;
+        const float FlyLeadFraction = 0.5f;
+        const float FlyBehindFraction = 0.35f;
+
         const float TurnChoiceAngleDeg = 30f;
         const float TurnCheckInterval = 0.35f;
         const float TurnSimStep = 0.15f;
@@ -101,7 +106,7 @@ namespace MetalRaptors
         bool _standDown;
 
         float _minX, _maxX, _groundY, _ceilingY, _edgeMargin;
-        float _wallX = float.NegativeInfinity;
+        float _scroll;
 
         AiState _state = AiState.Attack;
         float _stateTimer;
@@ -111,7 +116,9 @@ namespace MetalRaptors
         EvadeMove _lastEvade = EvadeMove.Break;
         readonly EvadeMove[] _evadePool = new EvadeMove[5];
         float _flyWeaveT;
-        float _flyBaseX;
+        float _flyAnchorX;
+        float _flyLeadX;
+        bool _flyTrack;
         float _tailLost;
         bool _tailLocked;
         float _fireCooldown;
@@ -211,11 +218,45 @@ namespace MetalRaptors
 
         public void SetBounds(float minX, float maxX)
         {
+            float dt = Time.deltaTime;
+            if (dt > 0f)
+            {
+                float rate = Mathf.Max(0f, (minX - _minX) / dt);
+                _scroll = Mathf.Lerp(_scroll, rate, 1f - Mathf.Exp(-ScrollResponse * dt));
+            }
+
             _minX = minX;
             _maxX = maxX;
         }
 
-        public void SetLeftWall(float x) => _wallX = Mathf.Max(_wallX, x);
+        public void Reappear(float x)
+        {
+            if (_dead || _falling || _config == null) return;
+
+            EnemyConfigs.SpawnBand(_config, _groundY, _ceilingY, out float minY, out float maxY);
+
+            CancelDodge();
+            CancelReversal();
+            _evade.Cancel();
+            EndDive();
+
+            var pos = new Vector3(x, UnityEngine.Random.Range(minY, maxY), _baseZ);
+            _rb.position = pos;
+            transform.position = pos;
+            _rb.linearVelocity = Vector3.zero;
+
+            _speed = _config.flySpeed;
+            _engageSpeed = 0f;
+            _angularVelocity = 0f;
+            _heading = _target != null
+                ? Mathf.Atan2(_target.position.y - pos.y, _target.position.x - pos.x)
+                : Mathf.PI;
+
+            _onCamera = false;
+            _appeared = false;
+            EnterAttack();
+            ApplyRotation();
+        }
 
         EnemyRole Role => _config != null ? _config.role : EnemyRole.Fighter;
 
@@ -262,7 +303,7 @@ namespace MetalRaptors
 
             if (_standDown)
             {
-                if (_state != AiState.Fly) EnterFly(transform.position.x);
+                if (_state != AiState.Fly) EnterFly(transform.position.x, track: false);
                 _flyWeaveT += dt;
             }
             else if (CheckGroundAvoidance())
@@ -449,7 +490,8 @@ namespace MetalRaptors
             if (_state == AiState.Attack && _stateTimer <= 0f)
             {
                 if (TargetDistance() <= _config.maxFireRange)
-                    EnterFly(_target != null ? _target.position.x : transform.position.x);
+                    EnterFly(_target != null ? _target.position.x : transform.position.x,
+                        track: _target != null);
                 else
                     EnterAttack();
                 return;
@@ -666,12 +708,23 @@ namespace MetalRaptors
             return Mathf.Lerp(run, Mathf.Max(speed, run * TailChaseFactor), closing);
         }
 
-        void EnterFly(float baseX)
+        void EnterFly(float anchorX, bool track)
         {
+            float behind = track ? Behind() : 0f;
+
             _state = AiState.Fly;
-            _stateTimer = _config.flyDuration;
+            _stateTimer = _config.flyDuration * Mathf.Lerp(1f, FlyBehindFraction, behind);
             _flyWeaveT = 0f;
-            _flyBaseX = baseX;
+            _flyTrack = track;
+            _flyAnchorX = anchorX;
+            _flyLeadX = behind * (_maxX - _minX) * 0.5f * FlyLeadFraction;
+        }
+
+        float FlyBaseX()
+        {
+            return _flyTrack && _target != null
+                ? _target.position.x + _flyLeadX
+                : _flyAnchorX;
         }
 
         bool WantsDive()
@@ -902,6 +955,16 @@ namespace MetalRaptors
                 : float.MaxValue;
         }
 
+        float Behind()
+        {
+            if (_scroll <= ScrollFloor) return 0f;
+
+            float half = (_maxX - _minX) * 0.5f;
+            if (half <= 1f) return 0f;
+
+            return Mathf.Clamp01((_minX + half - transform.position.x) / half);
+        }
+
         float BandFloor()
         {
             if (_state == AiState.DiveRun || _state == AiState.DiveZoom)
@@ -992,8 +1055,9 @@ namespace MetalRaptors
                     float perch = (_target != null ? _target.position.y : transform.position.y)
                                 + _config.flyPerchHeight;
                     float targetY = Mathf.Clamp(perch, floor, roof);
-                    float weaveX = _flyBaseX + Mathf.Sin(_flyWeaveT * Mathf.PI * 2f * _config.weaveHz)
-                                             * _config.weaveAmplitude;
+                    float weaveX = FlyBaseX()
+                                 + Mathf.Sin(_flyWeaveT * Mathf.PI * 2f * _config.weaveHz)
+                                   * _config.weaveAmplitude;
                     return HeadingTo(new Vector2(weaveX, targetY));
                 }
 
@@ -1181,18 +1245,17 @@ namespace MetalRaptors
 
             Vector3 vel = new Vector3(Mathf.Cos(_heading), Mathf.Sin(_heading), 0f) * speed;
             Vector3 pos = _rb.position;
-            float wall = _wallX + _bodyRadius;
 
             if (pos.y >= _ceilingY && vel.y > 0f) vel.y = 0f;
-            if (pos.x <= wall && vel.x < 0f) vel.x = 0f;
             if (_dodge.Active && dt > 0f) vel.z = (_dodge.Z - pos.z) / dt;
 
             _rb.linearVelocity = vel;
 
-            bool clamped = false;
-            if (pos.y > _ceilingY) { pos.y = _ceilingY; clamped = true; }
-            if (pos.x < wall) { pos.x = wall; clamped = true; }
-            if (clamped) _rb.position = pos;
+            if (pos.y > _ceilingY)
+            {
+                pos.y = _ceilingY;
+                _rb.position = pos;
+            }
         }
 
         float UpdateSpeed(float dt)
@@ -1215,7 +1278,8 @@ namespace MetalRaptors
                 _speed = Mathf.Clamp(_speed, floor, cap);
             }
 
-            _engageSpeed = Mathf.Lerp(_engageSpeed, EngageTarget(),
+            _engageSpeed = Mathf.Lerp(_engageSpeed,
+                Mathf.Max(EngageTarget(), StationTarget()),
                 1f - Mathf.Exp(-_config.engageResponse * dt));
 
             return FlightSpeed();
@@ -1244,6 +1308,14 @@ namespace MetalRaptors
             if (Vector2.Dot(run, to) <= 0f) return 0f;
 
             return run.magnitude * _config.engageFactor;
+        }
+
+        float StationTarget()
+        {
+            if (_standDown) return 0f;
+
+            float behind = Behind();
+            return behind > 0f ? Mathf.Lerp(_config.flySpeed, TopSpeed, behind) : 0f;
         }
 
         void ApplyRotation()

@@ -66,6 +66,9 @@ then multiplies by a deliberate 1.5 oversize, so trees and houses read at the ca
 standoff (`docs/battlefield.md`). It is not tied to `UnitsPerMeter` and was not raised with
 it — raising both would have left the planes looking exactly as small as before.
 
+How much of the screen a plane fills is a camera question, not a model one — see
+`docs/level-camera.md` for the framing, which is where the mobile size problem was.
+
 `garageZoom` is untouched and still garage-only — it corrects for how much of the band's
 *height* a flat airframe fills, which real span cannot answer (`docs/garage.md`).
 

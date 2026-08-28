@@ -252,8 +252,7 @@ namespace MetalRaptors
             }
             _cam.farClipPlane = 2600f;
 
-            _halfViewHeight = CameraDistance * Mathf.Tan(_cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
-            _halfViewWidth = _halfViewHeight * _cam.aspect;
+            LevelCamera.Frame(_cam, CameraDistance, out _halfViewWidth, out _halfViewHeight);
 
             PositionCamera(instant: true);
 

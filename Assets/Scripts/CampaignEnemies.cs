@@ -10,6 +10,7 @@ namespace MetalRaptors
         const float WindowMargin = 70f;
         const float EdgeMargin = 90f;
         const float CeilingPad = 160f;
+        const float LeashScreens = 2f;
 
         readonly List<EnemyController> _live = new List<EnemyController>();
         readonly EnemyConfig _scout;
@@ -45,7 +46,8 @@ namespace MetalRaptors
             _minX = camX - halfViewWidth + WindowMargin;
             _maxX = camX + halfViewWidth - WindowMargin;
 
-            float wall = camX - halfViewWidth;
+            float leash = camX - halfViewWidth * LeashScreens;
+            float ahead = camX + halfViewWidth + SpawnAhead;
 
             for (int i = _live.Count - 1; i >= 0; i--)
             {
@@ -55,7 +57,7 @@ namespace MetalRaptors
                     continue;
                 }
                 _live[i].SetBounds(_minX, _maxX);
-                _live[i].SetLeftWall(wall);
+                if (_live[i].transform.position.x < leash) _live[i].Reappear(ahead);
             }
         }
 
