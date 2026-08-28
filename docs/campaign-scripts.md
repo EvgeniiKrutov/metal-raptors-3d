@@ -31,13 +31,15 @@ is what career progression is built on (docs/campaign.md). A level with no `scri
 custom battle — behaves as before: endless flight with no dialogue, no waves and no win
 condition.
 
-These eight are **structure, not content**: the same scroller shape each time (opening exchange →
-objective → waves → closing exchange → `finish`), with wave counts and enemy mix climbing from four
-Albatros scouts in level 1 to eleven mixed machines in level 8. Level 4 is the one variation, using
-`spawn` + `waitclear` for a running fight instead of blocking waves. Every line they speak is
-placeholder Latin, and the real levels are designed in
-`Assets/Resources/docs/campaign-ww1-scenario.md` — including four modes and two boss fights this
-grammar cannot express yet.
+**Level 1 is written; levels 2–8 are structure.** Level 1 speaks the three cutscenes of the
+campaign's story source verbatim — eleven lines climbing out, ten after the first two Fokkers, ten
+flying home — and its objectives and ground scene are written with them. The other seven are still
+the same scroller shape each time (opening exchange → objective → waves → closing exchange →
+`finish`) with placeholder Latin in every line, wave counts and enemy mix climbing from seven
+Albatros scouts in level 2 to eleven mixed machines in level 8. Level 4 is the one variation,
+using `spawn` + `waitclear` for a running fight instead of blocking waves. The real levels are
+designed in `Assets/Resources/docs/campaign-ww1-scenario.md` — including four modes and two boss
+fights this grammar cannot express yet.
 
 ## Grammar
 
@@ -49,7 +51,7 @@ step rather than the whole level.
 | Step | Effect |
 | --- | --- |
 | `{ "op": "wait", "seconds": 2.5 }` | Pause the script for N seconds. |
-| `{ "op": "say", "speaker": "hq", "line": "l1_line1" }` | Speak a line; the duration is derived from its word count. |
+| `{ "op": "say", "speaker": "roussel", "line": "l1_line1" }` | Speak a line; the duration is derived from its word count. |
 | `{ "op": "say", "speaker": "you", "line": "l1_line6", "seconds": 3.5 }` | Same, but hold it for exactly 3.5 s. |
 | `{ "op": "task", "line": "l1_task1" }` | Show the current objective under the health bar. |
 | `{ "op": "taskdone" }` | Tick the objective, cross it out and fade it away; blocks for the animation. |
@@ -57,7 +59,7 @@ step rather than the whole level.
 | `{ "op": "wave", "enemies": [ { "plane": "albatros", "count": 2 }, { "plane": "sopwith", "count": 1 } ] }` | A wave of mixed types. |
 | `{ "op": "spawn", "enemies": [ … ] }` | Same spawn, but the script continues immediately. |
 | `{ "op": "waitclear" }` | Block until no scripted enemy is alive (pairs with `spawn`). |
-| `{ "op": "finish" }` | End the level: LEVEL COMPLETED overlay, and stop reading the script. |
+| `{ "op": "finish" }` | End the level, and stop reading the script. It does not open LEVEL COMPLETED directly any more — it starts the outro, which flies the patrol out and shows the ground scene and the journal first (docs/level-outro.md). |
 
 `count` defaults to 1. Plane ids are matched against `PlaneModelConfig.resourceName` either in full
 (`albatros_d3`) or by its first segment (`albatros`), so `PlaneModels` stays the one place a plane is
@@ -111,18 +113,24 @@ script mid-line and resuming continues it.
 
 ```json
 {
-  "l1_line1": "Dawn patrol, you are cleared to depart. Stay on Blue Two's wing until you are over the lines.",
-  "l1_task1": "Follow the flight leader"
+  "l1_line1": "Vasseur, my right wing. Not that close — I'm fond of my wingtips.",
+  "l1_task1": "Stay on Roussel's wing",
+  "l1_after1": "Six machines, two hundred and ten rounds. The armourer counted them back out of your belt and then came and found me about it."
 }
 ```
 
-Keys are `l<level>_line<n>` for radio calls and `l<level>_task<n>` for objectives — prefixing by
-level keeps one file usable for the whole campaign while staying greppable. It holds 79 keys, one
-block per level, each used by exactly one script step. The `_line` entries are lorem ipsum and the
-`_task` entries are plain objective text, so an objective reads correctly on the HUD while the
-dialogue is still visibly placeholder. Objectives share the
-table with dialogue on purpose: it is the *displayed text* file, not the *speech* file, and a
-translation pass wants both.
+Keys are `l<level>_line<n>` for radio calls, `l<level>_task<n>` for objectives and
+`l<level>_after<n>` for the lines of the ground scene played after the level (docs/level-outro.md)
+— prefixing by level keeps one file usable for the whole campaign while staying greppable. It
+holds 144 keys, one block per level, each used by exactly one script step or one entry in the
+level's `outro`. Level 1's block is written; levels 2–8 are lorem ipsum apart from their `_task`
+entries, which are plain objective text throughout, so an objective reads correctly on the HUD
+while the dialogue is still visibly placeholder. Objectives and the ground scene share the table
+with radio dialogue on purpose: it is the *displayed text* file, not the *speech* file, and a
+translation pass wants all of it.
+
+The `_after` lines are the one group the script never names — they hang off `outro` on the level
+definition instead, because they are spoken after `finish` has stopped the runner.
 
 `DialogueLines.For(key)` resolves a key, caching the parsed table on first use. A missing key logs
 an error and returns **the key itself**, so the miss is visible on screen while the level keeps
@@ -138,12 +146,22 @@ Adding a language later means a second file next to this one and a switch on whi
 `say` names a speaker id, not a display name. `CampaignSpeakers` maps the id to what appears on
 screen and to whether the line is the player's:
 
-| Id | Shown as | Player |
-| --- | --- | --- |
-| `you` | YOU | yes |
-| `hq` | FLIGHT CONTROL | no |
-| `wing` | BLUE TWO | no |
-| `ace` | RED BARON | no |
+| Id | Shown as | Player | Used by |
+| --- | --- | --- | --- |
+| `you` | VASSEUR | yes | everywhere — the player is Émile Vasseur in every level |
+| `roussel` | ROUSSEL | no | level 1 |
+| `marchand` | MARCHAND | no | level 1's ground scene |
+| `crane` | CRANE | no | — |
+| `lasalle` | LASALLE | no | level 1 |
+| `ravensberg` | RAVENSBERG | no | — |
+| `hq` | FLIGHT CONTROL | no | the placeholder levels |
+| `wing` | BLUE TWO | no | the placeholder levels |
+| `ace` | RED BARON | no | the placeholder levels |
+
+The first six are the campaign's cast, named as the story source labels them on the wireless. The
+last three are the generic placeholders levels 2–8 still speak through; they go when those levels
+are written. `crane` and `ravensberg` are in the table ahead of the levels that need them, so a
+script can be written without touching C#.
 
 A new character is one entry in that array. An unknown id logs an error and falls back to the
 player so the level still runs.
@@ -156,11 +174,65 @@ cinematic bars (docs/level-intro.md), waits for the wingman to finish flying bac
 a 0.55 s lead-in, and only then starts typing; the next op that is not a `say` lowers them again.
 The bars are the bar — there is no separate stripe any more.
 
-The line itself sits in the bottom bar, 150 px tall at the 1920×1080 reference resolution: the
-speaker's display name on its own 28 px row — tinted blue for the player and amber for anyone else,
-which is the only visual difference between the two — and the message wrapping under it inside a
-180 px side padding. Between two lines of the same block the text is cleared and the bars stay put,
-so a conversation plays as one shot instead of flickering.
+**The two bars are not the same height.** `CinematicBars.Height` (150) is the top one; the bottom
+is `BottomHeight` (214), enough to hold the 176 px avatar with the row's own 20/18 paddings above
+and below it. Sizing the portrait to fit a 150 px bar instead capped it at 112, which read as a
+thumbnail next to 28 px type, and growing both bars to fit one would have cropped the flying for
+nothing — the top bar carries no content. The bottom bar is the one with something in it, so it
+is the one that is sized to its contents; both still slide on the same `SmoothStep`, so they
+arrive together.
+
+The line itself sits in the bottom bar, 214 px tall at the 1920×1080 reference resolution: the
+speaker's avatar in a left gutter, their display name on its own 28 px row — tinted blue for the
+player and amber for anyone else, which is the only visual difference between the two — and the
+message wrapping under it inside a 180 px side padding. Between two lines of the same block the
+text is cleared and the bars stay put, so a conversation plays as one shot instead of flickering.
+
+### The avatar (`CampaignAvatars`)
+
+A square portrait sits to the left of the name and the text, 176 px and `preserveAspect`, anchored
+to the **bottom** of the row 18 px up from the bar's lower edge. It is loaded by **speaker id**, so
+an avatar is
+added by dropping a file into a `Resources` folder and naming it after the speaker
+(`roussel.png`, `marchand.png`, `you.png` for the player) — no wiring, no table to keep in step
+with `CampaignSpeakers`.
+
+`CampaignAvatars.For` probes four paths in order and caches the result — hit or miss — per
+speaker: `Avatars/<id>`, `Avatars/<name lowercased>`, `<id>`, `<name lowercased>`. It asks for a
+`Sprite` first and falls back to loading a `Texture2D` and building a full-rect sprite from it, so
+a PNG left on the default texture importer works as well as one imported as a sprite.
+
+**The gutter only exists when the portrait does.** With an avatar the row's left padding drops
+from 180 to 40 and the text starts 238 px in — so the text column keeps most of the width it had,
+and the avatar is paid for out of the margin rather than out of the line. With no avatar found,
+the indent is zero and the row is the old full-width layout in a taller bar. `Split` measures the
+width and height it is actually given, so the line breaks follow both the gutter and the bar. The same rule runs on the after-level journal
+(docs/level-outro.md).
+
+### A line too long for the bar
+
+The bottom bar leaves 142 px for the message under the name row — about three wrapped lines of
+28 px text, and only about one in the 78 px the bar had before it was made taller. Level 1 is
+written with radio calls that run well past either. They used to spill straight out of the black
+and over the game.
+
+`DialogueBar.Split` measures the message against the bar it will actually be shown in — the live
+`Text`, at the live width, *after* the avatar gutter has been applied for that speaker — and
+returns the segments to speak one after another. Each is its own line: shown, typed, held and
+skipped exactly like any other, so a long call reads as a pilot pausing for breath rather than as
+a wall of text.
+
+Splitting prefers **sentence boundaries**: the message is cut into sentences and they are packed
+greedily into as few segments as fit, so a break lands on a full stop wherever one is available.
+Only a single sentence that is too long for the bar on its own falls back to packing words. The
+measurement is Unity's own (`GetPreferredHeight` against the generation settings the `Text` will
+be generated with), not a character count, so it stays right whatever the resolution and whether
+or not the speaker has an avatar.
+
+`CampaignScriptRunner.Say` divides the step's duration between the segments in proportion to
+their length, and each segment still gets the `HoldMin` (0.8 s) floor, so a split line takes
+slightly longer overall than an unsplit one of the same `seconds` — which is the right answer for
+a line that is now genuinely two beats. One tap of space advances one segment.
 
 `DialogueBar` owns the `CinematicBars` instance, which is nested in the HUD canvas, so the
 pause/fail/completed overlay hides the whole thing along with the rest of the HUD. While a line is
@@ -303,30 +375,41 @@ it, and the slower turn rate stops an enemy from simply rotating onto the player
 than a new player can answer — at 70°/s it no longer out-turns the Sopwith's own 120. Level 1 also
 flies **only scouts**, so the tutorial is the deck fight and never the fighter's diving pass.
 
-## Level 1
+## Level 1 — Warming Engines
 
 ```
-say  l1_line1 … l1_line4     (hq / you / hq / you, over the intro fly-in)
+say  l1_line1 … l1_line11    cutscene 1, climb-out, over the intro fly-in
 task l1_task1 → wait 2.5 → taskdone
-task l1_task2 → wave albatros ×1 → wait 4 → wave albatros ×1 → taskdone
+task l1_task2 → wave fokker ×1 → wait 4 → wave fokker ×1 → taskdone
 wait 1.5
-say  l1_line5, l1_line6
-task l1_task3 → wave albatros ×1 → wait 4 → wave albatros ×1 → wave albatros ×2 → taskdone
+say  l1_line12 … l1_line21   cutscene 2, the first one
+task l1_task3 → wave fokker ×1 → wait 4 → wave fokker ×1 → wait 4 → wave fokker ×2 → taskdone
 wait 1.5
-say  l1_line7, l1_line8
-finish
+say  l1_line22 … l1_line31   cutscene 3, home
+finish                        → the outro (docs/level-outro.md)
 ```
 
-Six fighters in five waves, one at a time until the last: **cutscene → 1 → breather → 2 →
-cutscene → 3 → breather → 4 → 5 and 6 together → cutscene**. Every `wave` blocks, so each
-`wait` between two of them is a breather that starts when the previous fighter goes down, not a
-timer running under the fight. The two `wait 1.5`s are different — they are the beat between the
-last kill of a phase and the radio opening up, so the cinematic bars don't slide in over a
-falling wreck.
+Six machines in five waves, one at a time until the last: **cutscene → 1 → breather → 2 →
+cutscene → 3 → breather → 4 → 5 and 6 together → cutscene**. Every enemy is a Fokker monoplane —
+one gun and slower than the Sopwith — because level 1 is the tutorial for the guns and the deck
+fight, not the fighter's diving pass; the Albatros does not exist for these men until June.
+`companionFoe` is a Fokker too, so the duel Roussel fights in the background layer is the same
+machine the player is being handed.
 
-`finish` stops the plane, stands the enemies down, and opens LEVEL COMPLETED. Because one scene
-serves every campaign level (docs/campaign.md), **next level** bumps the static `CampaignRun` and
-reloads `CampaignLevel1` rather than loading a different scene; it is disabled on
+Every `wave` blocks, so each `wait` between two of them is a breather that starts when the previous
+machine goes down, not a timer running under the fight. The two `wait 1.5`s are different — they
+are the beat between the last kill of a phase and the radio opening up, so the cinematic bars don't
+slide in over a falling wreck.
+
+The three `say` blocks are the level's spine, and they are long on purpose: eleven lines is the
+flying lesson, ten more turn the level by naming the pair that is coming, and ten fly it home. The
+one pair in the level is the only wave with two machines in it, which is why cutscene 2 says out
+loud that it is coming. A block that long is skippable a line at a time with space.
+
+`finish` stops the script and hands over to the outro, which flies the patrol out, plays the
+armourer's count on the ground and a page of the journal, and only then opens LEVEL COMPLETED.
+Because one scene serves every campaign level (docs/campaign.md), **next level** bumps the static
+`CampaignRun` and reloads `CampaignLevel1` rather than loading a different scene; it is disabled on
 `CampaignRun.LastLevel`. Campaign completion deliberately does not touch
 `GameManager.UnlockLevel` — that counter gates the fixed `Level1`/`Level2` scenes, and the career
 level list is not gated by it.

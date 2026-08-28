@@ -53,7 +53,7 @@ namespace MetalRaptors
             Seed = level.seed;
         }
 
-        static string DatePart(string dateline)
+        public static string DatePart(string dateline)
         {
             if (string.IsNullOrEmpty(dateline)) return string.Empty;
 

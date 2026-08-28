@@ -21,11 +21,19 @@ namespace MetalRaptors
         const int DatelineSize = 22;
         const float DatelineY = 310f;
         const float RuleY = 266f;
-        const int LoreSize = 26;
+        const int LoreSize = 24;
         const float LoreTop = 214f;
-        const float LoreWidth = 1120f;
+
+        const float LoreWidth = 1180f;
         const float LoreHeight = 520f;
-        const float LoreLineSpacing = 1.5f;
+        const float LoreLineSpacing = 1.15f;
+
+        const int JournalTitleSize = 42;
+        const float JournalTitleY = 424f;
+        const float JournalDatelineY = 366f;
+        const float JournalRuleY = 322f;
+        const float JournalLoreTop = 272f;
+
         const int PromptSize = 24;
         const float PromptY = -400f;
         const float PromptGap = 56f;
@@ -52,6 +60,29 @@ namespace MetalRaptors
         public static bool IsOpen => Current != null;
 
         static LevelBriefing Current;
+
+        readonly struct Page
+        {
+            public readonly int HeadSize;
+            public readonly float HeadTop;
+            public readonly float DateTop;
+            public readonly float RuleTop;
+            public readonly float BodyTop;
+
+            public Page(int headSize, float headTop, float dateTop, float ruleTop, float bodyTop)
+            {
+                HeadSize = headSize;
+                HeadTop = headTop;
+                DateTop = dateTop;
+                RuleTop = ruleTop;
+                BodyTop = bodyTop;
+            }
+        }
+
+        static Page LevelPage => new Page(TitleSize, TitleY, DatelineY, RuleY, LoreTop);
+
+        static Page JournalPage => new Page(JournalTitleSize, JournalTitleY, JournalDatelineY,
+            JournalRuleY, JournalLoreTop);
 
         struct Printed
         {
@@ -81,7 +112,16 @@ namespace MetalRaptors
         bool _printed;
 
         public static void Open(string caption, string title, string dateline, string lore,
-            GameObject hud, Action onDismissed = null)
+            GameObject hud, Action onDismissed = null) =>
+            Open("Level Briefing", LevelPage, caption, title, dateline, lore, hud, onDismissed);
+
+        public static void OpenJournal(string title, string dateline, string text,
+            Action onDismissed = null) =>
+            Open("Journal Page", JournalPage, string.Empty, title, dateline, text, null,
+                onDismissed);
+
+        static void Open(string name, Page page, string caption, string title, string dateline,
+            string lore, GameObject hud, Action onDismissed)
         {
             if (IsOpen || string.IsNullOrEmpty(title))
             {
@@ -89,16 +129,17 @@ namespace MetalRaptors
                 return;
             }
 
-            Canvas canvas = UIFactory.CreateCanvas("Level Briefing");
+            Canvas canvas = UIFactory.CreateCanvas(name);
             canvas.sortingOrder = SortingOrder;
 
             var briefing = canvas.gameObject.AddComponent<LevelBriefing>();
             Current = briefing;
             briefing._onDismissed = onDismissed;
-            briefing.Build(canvas, caption, title, dateline, lore, hud);
+            briefing.Build(canvas, page, caption, title, dateline, lore, hud);
         }
 
-        void Build(Canvas canvas, string caption, string title, string dateline, string lore, GameObject hud)
+        void Build(Canvas canvas, Page page, string caption, string title, string dateline,
+            string lore, GameObject hud)
         {
             _hud = hud;
             _openedFrame = Time.frameCount;
@@ -107,25 +148,26 @@ namespace MetalRaptors
             Time.timeScale = 0f;
 
             MenuPalette colors = MenuTheme.Colors;
-            Transform page = canvas.transform;
+            Transform root = canvas.transform;
 
-            UIFactory.CreateBackground(page, colors.Bg);
+            UIFactory.CreateBackground(root, colors.Bg);
 
-            Print(Centered(page, caption, CaptionSize, CaptionY, colors.Muted, UIFactory.MediumFont),
-                caption, 1f, LineGapSec);
-            Print(Centered(page, title, TitleSize, TitleY, colors.Fg, UIFactory.BoldFont),
+            if (!string.IsNullOrEmpty(caption))
+                Print(Centered(root, caption, CaptionSize, CaptionY, colors.Muted, UIFactory.MediumFont),
+                    caption, 1f, LineGapSec);
+            Print(Centered(root, title, page.HeadSize, page.HeadTop, colors.Fg, UIFactory.BoldFont),
                 title, 1f, LineGapSec);
-            Print(Centered(page, dateline, DatelineSize, DatelineY, colors.Muted, UIFactory.RegularFont),
+            Print(Centered(root, dateline, DatelineSize, page.DateTop, colors.Muted, UIFactory.RegularFont),
                 dateline, 1f, RuleGapSec);
 
             _ruleAfter = _lines.Count;
-            _rule = BuildRule(page, colors.Accent);
+            _rule = BuildRule(root, colors.Accent, page.RuleTop);
             _rule.enabled = false;
 
-            Text body = BuildLore(page, lore, colors.Fg, out float loreBottom);
+            Text body = BuildLore(root, lore, colors.Fg, page.BodyTop, out float loreBottom);
             Print(body, lore, LoreSpeedFactor, 0f);
 
-            BuildPrompt(page, PromptRow(loreBottom), colors.Muted, colors.Accent);
+            BuildPrompt(root, PromptRow(loreBottom), colors.Muted, colors.Accent);
         }
 
         void Print(Text text, string content, float speed, float gapAfter)
@@ -162,7 +204,7 @@ namespace MetalRaptors
             return text;
         }
 
-        static Image BuildRule(Transform parent, Color color)
+        static Image BuildRule(Transform parent, Color color, float y)
         {
             var go = new GameObject("Rule", typeof(Image));
             go.transform.SetParent(parent, false);
@@ -173,11 +215,12 @@ namespace MetalRaptors
 
             var rt = image.rectTransform;
             rt.sizeDelta = RuleSize;
-            rt.anchoredPosition = new Vector2(0f, RuleY);
+            rt.anchoredPosition = new Vector2(0f, y);
             return image;
         }
 
-        static Text BuildLore(Transform parent, string lore, Color color, out float bottom)
+        static Text BuildLore(Transform parent, string lore, Color color, float top,
+            out float bottom)
         {
             Text text = UIFactory.CreateText(parent, lore, LoreSize, Vector2.zero,
                 new Vector2(LoreWidth, LoreHeight), TextAnchor.UpperCenter);
@@ -188,9 +231,9 @@ namespace MetalRaptors
 
             var rt = text.rectTransform;
             rt.pivot = new Vector2(0.5f, 1f);
-            rt.anchoredPosition = new Vector2(0f, LoreTop);
+            rt.anchoredPosition = new Vector2(0f, top);
 
-            bottom = LoreTop - text.preferredHeight;
+            bottom = top - text.preferredHeight;
             return text;
         }
 

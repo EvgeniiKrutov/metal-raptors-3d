@@ -839,24 +839,26 @@ namespace MetalRaptors
             Vector3 away = transform.position
                          - (_target != null ? _target.position : transform.position - Vector3.right);
             float awayHeading = Mathf.Atan2(away.y, away.x);
+            float towardHeading = awayHeading + Mathf.PI;
             float breakAngle = _config.evadeBreakAngle * Mathf.Deg2Rad;
+            float scissorAngle = EnemyEvade.ScissorsAngle * Mathf.Deg2Rad;
 
             float high = awayHeading + breakAngle;
             float low = awayHeading - breakAngle;
             float roomUp = Mathf.Max(0f, BandCeiling() - transform.position.y);
             float roomDown = Mathf.Max(0f, transform.position.y - BandFloor());
 
-            float highRoom = BreakRoom(high, roomUp, roomDown);
-            float lowRoom = BreakRoom(low, roomUp, roomDown);
-
-            bool breakHigh = Mathf.Abs(highRoom - lowRoom) < BreakRoomTie
-                ? UnityEngine.Random.value < 0.5f
-                : highRoom > lowRoom;
+            EvadeMove move = PickEvade(circling);
+            bool breakHigh = PickSide(high, low, roomUp, roomDown);
+            bool sideHigh = move == EvadeMove.Scissors
+                ? PickSide(towardHeading + scissorAngle, towardHeading - scissorAngle,
+                    roomUp, roomDown)
+                : breakHigh;
 
             var plan = new EvadePlan
             {
-                move = PickEvade(circling),
-                side = breakHigh ? 1f : -1f,
+                move = move,
+                side = sideHigh ? 1f : -1f,
                 breakHeading = breakHigh ? high : low,
                 breakSeconds = _config.evadeDuration,
                 jitterAmplitude = _config.jitterAmplitude,
@@ -925,6 +927,16 @@ namespace MetalRaptors
             }
 
             _circleTimer += dt;
+        }
+
+        static bool PickSide(float high, float low, float roomUp, float roomDown)
+        {
+            float highRoom = BreakRoom(high, roomUp, roomDown);
+            float lowRoom = BreakRoom(low, roomUp, roomDown);
+
+            return Mathf.Abs(highRoom - lowRoom) < BreakRoomTie
+                ? UnityEngine.Random.value < 0.5f
+                : highRoom > lowRoom;
         }
 
         static float BreakRoom(float heading, float roomUp, float roomDown)
@@ -1183,7 +1195,7 @@ namespace MetalRaptors
 
         bool TurnClear(float target, float dir)
         {
-            float maxRate = _config.rotationSpeed * Mathf.Deg2Rad;
+            float maxRate = _config.rotationSpeed * Mathf.Deg2Rad * TurnBoost();
             float travel = FlightSpeed() * TurnSimStep;
             float ease = _config.turnResponsiveness / Mathf.Max(0.0001f, _rb.mass);
             float floor = _config.safeAltitudeMargin;
@@ -1211,8 +1223,9 @@ namespace MetalRaptors
 
         void SteerToHeading(float targetHeading, float dt)
         {
-            float maxRate = _config.rotationSpeed * Mathf.Deg2Rad;
-            if (Diving) maxRate *= DiveTurnFactor;
+            float boost = TurnBoost();
+            if (Diving) boost = Mathf.Max(boost, DiveTurnFactor);
+            float maxRate = _config.rotationSpeed * Mathf.Deg2Rad * boost;
 
             float error = Mathf.DeltaAngle(_heading * Mathf.Rad2Deg, targetHeading * Mathf.Rad2Deg)
                         * Mathf.Deg2Rad;
@@ -1231,9 +1244,20 @@ namespace MetalRaptors
             ApplyRotation();
         }
 
+        float TurnBoost()
+        {
+            float cap = Mathf.Max(1f, _config.catchUpTurnMultiplier);
+            float span = TopSpeed - _config.flySpeed;
+            if (cap <= 1f || span <= 0f) return 1f;
+
+            float over = (FlightSpeed() - _config.flySpeed) / span;
+            return Mathf.Lerp(1f, cap, Mathf.Clamp01(over));
+        }
+
         float TurnLimitAt(float heading, float dir, float maxRate)
         {
             if (!Scouting) return maxRate;
+            if (Mathf.Sin(heading) < 0f && Mathf.Cos(heading) * dir >= 0f) return maxRate;
 
             float rightward = Mathf.Clamp01(-Mathf.Sin(heading) * dir);
             return maxRate * Mathf.Lerp(1f, Mathf.Clamp01(_config.turnBias), rightward);

@@ -114,6 +114,10 @@ namespace MetalRaptors
         [Tooltip("How quickly the catch-up speed eases in and out, per second.")]
         public float engageResponse = 2f;
 
+        [Tooltip("Turn rate at full catch-up speed as a multiple of rotationSpeed. Match it to "
+                 + "maxSpeedMultiplier to hold the turn radius constant while boosting.")]
+        public float catchUpTurnMultiplier = 1.6f;
+
         [Header("Scout: deck flying")]
         [Tooltip("Metres above the terrain contour the scout's corridor is capped at.")]
         public float deckCeilingMargin = 260f;

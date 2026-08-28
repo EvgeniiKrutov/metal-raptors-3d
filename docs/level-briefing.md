@@ -16,16 +16,34 @@ Three fields on `CampaignDefinition`, authored next to the seed and the terrain:
 | Field | Level 1 | Shown as |
 | --- | --- | --- |
 | — | — | `LEVEL 1`, the caption above the title (the run's level number, not a field) |
-| `title` | `FIRST LIGHT` | the big centred title |
-| `dateline` | `14 April 1916 — Verdun sector — dawn` | a muted line under the title |
-| `lore` | lorem ipsum, two paragraphs | the body, split on a blank line |
+| `title` | `WARMING ENGINES` | the big centred title |
+| `dateline` | `14 April 1916` | a muted line under the title |
+| `lore` | the journal's *Before* page, three paragraphs and a signature | the body, split on a blank line |
 
 All eight career levels carry a written `title` and `dateline` — the same two fields the level
-select cards and their header read (docs/level-select.md) — while the `lore` bodies are still
-placeholder lorem ipsum, two paragraphs each, waiting to be written.
+select cards and their header read (docs/level-select.md). Level 1's `lore` is the written page;
+the other seven are still placeholder lorem ipsum, two paragraphs each, waiting for the same
+treatment. The card on the level-select page shows the body's first paragraph
+(`CampaignLevelEntry.FirstParagraph`), so writing a level's `lore` writes its card blurb too.
+
+Level 1's dateline is the **bare date**. The other seven still read as
+`22 June 1916 — Verdun sector — high midday`, and the level-select card has always shown only the
+part before the first em dash (`CampaignLevelEntry.DatePart`), so shortening the field changes the
+briefing and nothing else.
 
 A definition with an empty `title` shows no briefing, and **custom battles never show one** — they
 drop straight into the flight as before.
+
+## The same page, twice
+
+`LevelBriefing` also draws the **journal page** at the end of a level (docs/level-outro.md).
+`OpenJournal(title, dateline, text, onDismissed)` is the same build with a second layout preset:
+no caption row, a 42 pt title instead of 62, and the dateline, rule and body shifted up into the
+space the caption left. Everything else — the parchment palette, the typewriter reveal, the space
+skip, the two-second wait, the blinking caret, the closing fade — is shared, which is the whole
+reason the outro does not have a page class of its own.
+
+`_hud` is null on that call: there is no HUD left to hide or restore by then.
 
 ## Layout
 
@@ -34,10 +52,18 @@ with the active menu palette (docs/main-menu.md), so it reads as one of the game
 an overlay on the level behind it. Everything is centred on the 1920×1080 reference resolution.
 
 The block is **top-weighted**: caption at +452, title at +376 (62 pt bold), dateline at +310, a
-96×4 accent rule at +266, and the lore hanging from +214 at 1120 px wide with 1.5 line spacing.
-That puts the caption's top edge 70 px below the screen's, which is the padding — the page is not
-flush to the edge, it just no longer floats in the middle with the lore running down into the
-prompt.
+96×4 accent rule at +266, and the lore hanging from +214 at 1180 px wide, 24 pt, with 1.15 line
+spacing. That puts the caption's top edge 70 px below the screen's, which is the padding — the page
+is not flush to the edge, it just no longer floats in the middle with the lore running down into
+the prompt.
+
+The body is **set tight**: it was 26 pt at 1120 px with 1.5 line spacing, which is comfortable for
+two paragraphs of lorem and impossible for the real thing. A written page runs three or four
+paragraphs, and at the old metrics level 1's ran about 875 px from +214 — past the prompt and off
+the bottom of the screen. Narrower leading and a slightly wider, slightly smaller measure bring the
+same text to roughly 550 px, which clears the prompt at −400 with room to spare and still leaves
+the body a step larger than the dateline. The same three constants set the journal page, so both
+written pages tighten together.
 
 The prompt does not sit at a fixed height. Lore text has `verticalOverflow = Overflow`, so it
 renders past its rect and a constant would eventually be overrun by a long briefing — which is

@@ -14,7 +14,7 @@ terrains and skies come from the campaign's story source, `Assets/Resources/docs
 
 | # | Title | Date | Terrain | Daytime |
 | --- | --- | --- | --- | --- |
-| 1 | FIRST LIGHT | 14 Apr 1916 | `Verdun` | Morning |
+| 1 | WARMING ENGINES | 14 Apr 1916 | `Verdun` | Morning |
 | 2 | THE NUMBERS | 22 Jun 1916 | `Verdun` | Midday |
 | 3 | FIXED GROUND | 12 Feb 1917 | `Verdun` | Evening |
 | 4 | THE RAVEN | 6 Apr 1917 | `Flanders` | Morning |
@@ -27,16 +27,27 @@ The scenario's `Mountain` sector is `TerrainKind.Dolomites`, the alpine streamer
 (docs/dolomites.md) — so all three terrain kinds are now flown in career and none is
 custom-battle-only.
 
-**Everything below the title is placeholder.** Each level has a script (`level1` … `level8`) so
-that it can be *finished*, which is what career progression is built on — but every script is the
-same scroller shape (opening exchange → objective → waves → closing exchange → `finish`), its radio
-lines are lorem ipsum, and its briefing `lore` is lorem ipsum. The scenario designs levels 3, 5, 6
-and 7 as fixed-width, stealth, strike and time-attack levels and 4 and 8 as boss fights; none of
-those modes exist yet, so those levels currently fly as ordinary scrollers.
+**Level 1 is written; levels 2–8 are still placeholder.** Level 1 speaks the scenario's three
+cutscenes, carries its written objectives, opens on the journal's *Before* page and ends on the
+ground scene and the journal's closing page (docs/level-outro.md). Its briefing shows
+`WARMING ENGINES` over the bare date — no sector, no light — above three paragraphs of Vasseur
+being turned down twice by the recruiting board.
+
+Levels 2–8 each have a script (`level2` … `level8`) so that they can be *finished*, which is what
+career progression is built on — but every one is the same scroller shape (opening exchange →
+objective → waves → closing exchange → `finish`), its radio lines and ground scene are lorem ipsum,
+and its briefing `lore` is lorem ipsum. The scenario designs levels 3, 5, 6 and 7 as fixed-width,
+stealth, strike and time-attack levels and 4 and 8 as boss fights; none of those modes exist yet,
+so those levels currently fly as ordinary scrollers.
+
+Level 1 also flies **only Fokker monoplanes**, on both sides of the frame: the waves are Fokkers
+and so is `companionFoe`, the machine the wingman duels in the background layer. The Albatros
+arrives in level 2, which is the whole of what level 2 has to say to level 1.
 
 Difficulty is a straight ramp across the eight: `enemyHealthScale` 0.50 → 1.00,
 `enemyRotationScale` 0.80 → 1.18 (multipliers on each enemy role's own base, docs/enemies.md), and
-`flak` climbing to 1.5 at Hohrupt, where the scenario puts guns on both valley walls.
+`flak` climbing to 1.5 at Hohrupt, where the scenario puts guns on both valley walls. The counts
+ramp with them, six machines in level 1 to eleven in level 8.
 
 ## Progress
 
@@ -71,7 +82,9 @@ is painted, what it decorates with, and what extra meshes ride along with it).
 ## Rules of the level
 
 - The plane flies left to right; a level ends when its script says so (docs/campaign-scripts.md),
-  and a level with no script flies forever. Touching the ground
+  and a level with no script flies forever. `finish` does not open LEVEL COMPLETED directly — it
+  starts the outro, which flies the patrol out of frame and plays the ground scene and the journal
+  page first (docs/level-outro.md). Touching the ground
   fails the run and the overlay shows the distance flown (RETRY / BACK TO MENU). Scoring is a
   separate future feature — nothing is persisted. On Flanders Coast, touching the *water*
   fails the run too, but by sinking rather than exploding (docs/flanders-coast.md).

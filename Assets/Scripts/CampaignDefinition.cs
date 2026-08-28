@@ -2,6 +2,18 @@ using UnityEngine;
 
 namespace MetalRaptors
 {
+    public readonly struct CampaignOutroLine
+    {
+        public readonly string Speaker;
+        public readonly string Line;
+
+        public CampaignOutroLine(string speaker, string line)
+        {
+            Speaker = speaker;
+            Line = line;
+        }
+    }
+
     public class CampaignDefinition
     {
         public int seed;
@@ -13,6 +25,8 @@ namespace MetalRaptors
         public string title;
         public string dateline;
         public string lore;
+        public CampaignOutroLine[] outro;
+        public string journal;
         public bool companion;
         public float flak = 1f;
         public float enemyHealthScale = 1f;
@@ -43,6 +57,66 @@ namespace MetalRaptors
             + "Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed "
             + "quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt.";
 
+        const string Before1 =
+            "They turned me down twice. Flat feet the first time. The second time a doctor in "
+            + "Amiens listened to my chest for a long minute and wrote something down that I was "
+            + "not allowed to read.\n\n"
+            + "So I went to the aerodrome at Vaux-le-Bois as a mechanic, because a mechanic is "
+            + "allowed to stand next to aeroplanes. I stood next to them for eleven months. In "
+            + "March a capitaine named Roussel found me sitting in a cold Sopwith at two in the "
+            + "morning, working the controls against nothing. He did not report me. He signed a "
+            + "form instead.\n\n"
+            + "This morning there is a machine standing on the field with my name written against "
+            + "it, and at first light I am taking it up the line to look over the sector. Eleven "
+            + "months of warming other men's engines and holding their wingtips out of the mud. I "
+            + "did not sleep, and I do not care, because I have wanted this since I was fourteen "
+            + "years old without ever once being able to say why.\n\n"
+            + "— É. Vasseur";
+
+        const string Journal1 =
+            "I ate nothing. I sat down on the grass beside the machine and did not get up for a "
+            + "long time.\n\n"
+            + "There were forty-one holes in it. I know because I counted them, and then counted "
+            + "them again, because the first number felt as though it belonged to somebody else's "
+            + "aeroplane. Two through the tailplane. A line of them along the underside of the "
+            + "port wing where the fabric had gone soft and grey. One through the seat back, six "
+            + "inches above my right shoulder. I had not heard a single one of them arrive.\n\n"
+            + "The fitters worked around me all evening. They had known me for eleven months as "
+            + "the boy who warmed their engines and swept their shed, and not one of them said a "
+            + "word about any of it, which I understood then and understand now to be the highest "
+            + "thing they had to give. At some point it was dark. At some point after that a "
+            + "sergeant put his hand on my shoulder and told me to go away.\n\n"
+            + "I have flown a great many first mornings since, other people's as well as my own. "
+            + "I have never got that one back.";
+
+        const string JournalLorem =
+            "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor "
+            + "incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud "
+            + "exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.\n\n"
+            + "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu "
+            + "fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in "
+            + "culpa qui officia deserunt mollit anim id est laborum.";
+
+        static CampaignOutroLine[] Outro1 => new[]
+        {
+            new CampaignOutroLine("roussel", "l1_after1"),
+            new CampaignOutroLine("you", "l1_after2"),
+            new CampaignOutroLine("roussel", "l1_after3"),
+            new CampaignOutroLine("marchand", "l1_after4"),
+            new CampaignOutroLine("roussel", "l1_after5"),
+            new CampaignOutroLine("marchand", "l1_after6"),
+            new CampaignOutroLine("roussel", "l1_after7"),
+        };
+
+        static CampaignOutroLine[] OutroLorem(int level) => new[]
+        {
+            new CampaignOutroLine("hq", $"l{level}_after1"),
+            new CampaignOutroLine("you", $"l{level}_after2"),
+            new CampaignOutroLine("wing", $"l{level}_after3"),
+            new CampaignOutroLine("you", $"l{level}_after4"),
+            new CampaignOutroLine("hq", $"l{level}_after5"),
+        };
+
         public static CampaignDefinition Level1 => new CampaignDefinition
         {
             seed = 1917,
@@ -56,9 +130,12 @@ namespace MetalRaptors
             enemyHealthScale = 0.50f,
             enemyRotationScale = 0.80f,
             supplyDrops = 1,
-            title = "FIRST LIGHT",
-            dateline = "14 April 1916 — Verdun sector — dawn",
-            lore = Lore1,
+            companionFoe = PlaneModels.Fokker,
+            title = "WARMING ENGINES",
+            dateline = "14 April 1916",
+            lore = Before1,
+            outro = Outro1,
+            journal = Journal1,
         };
 
         public static CampaignDefinition Level2 => new CampaignDefinition
@@ -77,6 +154,8 @@ namespace MetalRaptors
             title = "THE NUMBERS",
             dateline = "22 June 1916 — Verdun sector — high midday",
             lore = Lore2,
+            outro = OutroLorem(2),
+            journal = JournalLorem,
         };
 
         public static CampaignDefinition Level3 => new CampaignDefinition
@@ -95,6 +174,8 @@ namespace MetalRaptors
             title = "FIXED GROUND",
             dateline = "12 February 1917 — Vaux-le-Bois — failing light",
             lore = Lore1,
+            outro = OutroLorem(3),
+            journal = JournalLorem,
         };
 
         public static CampaignDefinition Level4 => new CampaignDefinition
@@ -113,6 +194,8 @@ namespace MetalRaptors
             title = "THE RAVEN",
             dateline = "6 April 1917 — Flanders — hard spring light",
             lore = Lore2,
+            outro = OutroLorem(4),
+            journal = JournalLorem,
         };
 
         public static CampaignDefinition Level5 => new CampaignDefinition
@@ -130,6 +213,8 @@ namespace MetalRaptors
             title = "NOTHING BURNS AT NIGHT",
             dateline = "19 September 1917 — Wulpendamme, behind the Flanders coast — night",
             lore = Lore1,
+            outro = OutroLorem(5),
+            journal = JournalLorem,
         };
 
         public static CampaignDefinition Level6 => new CampaignDefinition
@@ -148,6 +233,8 @@ namespace MetalRaptors
             title = "HOHRUPT",
             dateline = "3 October 1917 — Hohrupt, upper Fecht valley — low grey morning",
             lore = Lore2,
+            outro = OutroLorem(6),
+            journal = JournalLorem,
         };
 
         public static CampaignDefinition Level7 => new CampaignDefinition
@@ -165,6 +252,8 @@ namespace MetalRaptors
             title = "TWO FIRES",
             dateline = "24 March 1918 — Rimbach valley — morning into midday",
             lore = Lore1,
+            outro = OutroLorem(7),
+            journal = JournalLorem,
         };
 
         public static CampaignDefinition Level8 => new CampaignDefinition
@@ -184,6 +273,8 @@ namespace MetalRaptors
             title = "IRON BIRDS OF PREY",
             dateline = "15 May 1918 — over the passes, towards the Belfort gap — last light",
             lore = Lore2,
+            outro = OutroLorem(8),
+            journal = JournalLorem,
         };
 
         public static CampaignDefinition Custom(BattleMap map, Daytime daytime) => new CampaignDefinition

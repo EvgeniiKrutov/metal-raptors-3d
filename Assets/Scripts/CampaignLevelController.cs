@@ -19,6 +19,11 @@ namespace MetalRaptors
         const float CamShakeMagnitude = 7f;
         const float CamShakeDuration = 0.3f;
 
+        const float OutroFlySec = 4f;
+        const float OutroExitMaxSec = 4f;
+        const float OutroExitMargin = 120f;
+        const float OutroFadeSec = 1.2f;
+
         const float DitchSplashSize = 75f;
         const float SinkSpeed = 26f;
         const float SinkDriftKeep = 0.15f;
@@ -58,6 +63,8 @@ namespace MetalRaptors
         float _camShake;
         bool _gameOver;
         bool _playerFalling;
+        bool _outro;
+        bool _camHold;
 
         public bool IsOver => _gameOver;
 
@@ -177,7 +184,7 @@ namespace MetalRaptors
 
         float AiGroundY => Coast ? SeaSurface.Level : ProceduralTerrain.MaxHeight;
 
-        bool Cinematic => IntroActive || CinematicBars.AnyShowing;
+        bool Cinematic => IntroActive || _outro || CinematicBars.AnyShowing;
 
         void ConfigureShadows()
         {
@@ -306,7 +313,7 @@ namespace MetalRaptors
 
             if (_camShake > 0f)
                 _camShake = Mathf.Max(0f, _camShake - Time.deltaTime / CamShakeDuration);
-            if (_cam != null) PositionCamera(instant: false);
+            if (_cam != null && !_camHold) PositionCamera(instant: false);
 
             if (_cube != null && !IntroActive)
                 _cube.SetLeftWall(_camBasePos.x - _halfViewWidth + CubeHalf);
@@ -321,7 +328,7 @@ namespace MetalRaptors
             if (!_gameOver && !Cinematic && _sea != null && PlayPlaneZ >= SeaSurface.NearEdge
                 && _cubeTr.position.y <= SeaSurface.Level) Ditch();
 
-            UpdateHud();
+            if (!_outro) UpdateHud();
             if (!_gameOver && _supply != null)
                 _supply.Tick(_camBasePos, _halfViewWidth, _halfViewHeight, Cinematic);
             if (_enemies != null) _enemies.SetWindow(_camBasePos.x, _halfViewWidth);
@@ -408,17 +415,66 @@ namespace MetalRaptors
         {
             if (_gameOver) return;
             _gameOver = true;
+            _outro = true;
 
-            _cube.Stop();
             StopWeapons();
             if (_enemies != null) _enemies.StandDown();
-            if (_wing != null) _wing.StandDown();
             if (_supply != null) _supply.StandDown();
             if (_dialogue != null) _dialogue.Hide();
-            if (_sound != null) _sound.EnterGameOver();
+            if (_cube != null) _cube.FlyLevel();
 
             if (!CustomBattle.Requested) CampaignProgress.Complete(_levelNumber);
 
+            StartCoroutine(FlyOut());
+        }
+
+        IEnumerator FlyOut()
+        {
+            yield return Wait(OutroFlySec);
+
+            _camHold = true;
+            if (_wing != null) _wing.StandDown();
+
+            float left = OutroExitMaxSec;
+            while (left > 0f && !PlaneGone)
+            {
+                left -= Time.deltaTime;
+                yield return null;
+            }
+
+            if (_sound != null) _sound.FadeOut(OutroFadeSec);
+            ScreenFade.Swap(ShowGroundScene, OutroFadeSec);
+        }
+
+        bool PlaneGone => _cubeTr == null
+            || _cubeTr.position.x > _camBasePos.x + _halfViewWidth + OutroExitMargin;
+
+        static IEnumerator Wait(float seconds)
+        {
+            float left = seconds;
+            while (left > 0f)
+            {
+                left -= Time.deltaTime;
+                yield return null;
+            }
+        }
+
+        void ShowGroundScene()
+        {
+            if (_cube != null) _cube.Stop();
+            LevelOutro.Open(_level.outro, ShowJournal);
+        }
+
+        void ShowJournal()
+        {
+            if (string.IsNullOrEmpty(_level.journal)) { ShowCompleted(); return; }
+
+            LevelBriefing.OpenJournal(LevelOutro.JournalTitle,
+                CampaignLevelEntry.DatePart(_level.dateline), _level.journal, ShowCompleted);
+        }
+
+        void ShowCompleted()
+        {
             bool hasNext = _levelNumber < CampaignRun.LastLevel;
             GameMenu.Open(GameMenuKind.Completed, Subtitle, _hud,
                 hasNext ? SceneNames.CampaignLevel1 : null,

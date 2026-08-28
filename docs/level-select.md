@@ -24,7 +24,7 @@ and hanging a text entry under it would break the single row of focus.
    └───────────────────────────────────────────────────────────────────┘
      ↑ 44px from the screen edge; the four faces fill everything between
         the two arrow lanes, whatever the screen is
-        ╚═╝ a cleared level keeps a green frame with no highlight on it
+        ╚═╝ a cleared level keeps a green frame, green art and a dark green title
 ```
 
 ## The header
@@ -92,7 +92,7 @@ State lives entirely in the frame and the title colour:
 | --- | --- | --- | --- |
 | locked | `Muted`, only while highlighted | `Muted` | stays grey — nothing turns accent |
 | next | `Accent`, only while highlighted | `Fg` | title and frame go accent |
-| completed | `CardDone` green, **always** | `Fg` | frame and title go accent, the usual hover |
+| completed | `CardDone` green, **always** | `CardDoneInk` dark green | frame, title **and art** go accent, the usual hover |
 
 `CardDone` is a fixed sage green (`#5F9159`) held next to `CardFace` rather than inside the
 palettes: like the white card face it means the same thing under every theme, and none of
@@ -100,6 +100,16 @@ the five palettes carries a success colour to theme it against. A cleared level 
 wears its green until you point at it, at which point it behaves like any other card — the
 green is a state of the level, not a second kind of highlight competing with the one you are
 driving.
+
+**The whole card goes green, not just its frame.** The terrain silhouette is tinted from the
+same `mark` colour the frame uses, and that `mark` used to be the palette `Accent` whatever the
+state — so a cleared level sat in a green frame with a mauve skyline inside it and a plain white
+title, three colours saying three different things. `mark` is now `CardDone` while the card is
+completed and unfocused, which carries the green into the art's front and back ridges, and the
+title takes `CardDoneInk` (`#274422`) — dark enough to read as ink on the white face rather than
+as a second highlight. Take the highlight and every one of them snaps back to the palette
+(`Accent` frame and title, `Accent` art), so hover is still the theme's own colour and the green
+is what the card looks like when you are not pointing at it.
 
 Everything on a locked card is still legible (title, art): the campaign is a list of places
 you will go, not a mystery box. Only the colours change — a locked card's title, art and

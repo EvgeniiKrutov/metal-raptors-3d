@@ -210,6 +210,7 @@ namespace MetalRaptors
 
         public static readonly Color CardFace = Color.white;
         public static readonly Color CardDone = new Color32(0x5F, 0x91, 0x59, 0xFF);
+        public static readonly Color CardDoneInk = new Color32(0x27, 0x44, 0x22, 0xFF);
 
         public const float CardSizeMax = 360f;
         public const float CardSizeMin = 280f;

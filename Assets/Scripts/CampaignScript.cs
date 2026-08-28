@@ -174,7 +174,7 @@ namespace MetalRaptors
         static float Number(Dictionary<string, object> obj, string key, float fallback) =>
             Value(obj, key) is double number ? (float)number : fallback;
 
-        static float ReadingTime(string text)
+        public static float ReadingTime(string text)
         {
             int words = text.Split(Space, StringSplitOptions.RemoveEmptyEntries).Length;
             return Mathf.Clamp(ReadBase + words * ReadPerWord, ReadMin, ReadMax);

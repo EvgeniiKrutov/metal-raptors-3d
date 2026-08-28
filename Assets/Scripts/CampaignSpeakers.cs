@@ -20,11 +20,17 @@ namespace MetalRaptors
     public static class CampaignSpeakers
     {
         public static readonly CampaignSpeaker Player =
-            new CampaignSpeaker("you", "YOU", true);
+            new CampaignSpeaker("you", "VASSEUR", true);
 
         public static readonly CampaignSpeaker[] All =
         {
             Player,
+            new CampaignSpeaker("roussel", "ROUSSEL", false),
+            new CampaignSpeaker("marchand", "MARCHAND", false),
+            new CampaignSpeaker("crane", "CRANE", false),
+            new CampaignSpeaker("lasalle", "LASALLE", false),
+            new CampaignSpeaker("ravensberg", "RAVENSBERG", false),
+
             new CampaignSpeaker("hq", "FLIGHT CONTROL", false),
             new CampaignSpeaker("wing", "BLUE TWO", false),
             new CampaignSpeaker("ace", "RED BARON", false),

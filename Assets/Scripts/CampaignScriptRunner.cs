@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace MetalRaptors
@@ -126,7 +127,23 @@ namespace MetalRaptors
                 if (!Running) yield break;
             }
 
-            _bar.Show(step.speaker, step.text);
+            List<string> parts = _bar.Split(step.speaker, step.text);
+
+            int chars = 0;
+            foreach (string part in parts) chars += part.Length;
+
+            foreach (string part in parts)
+            {
+                if (!Running) yield break;
+                yield return Speak(step, part, chars > 0 ? (float)part.Length / chars : 1f);
+            }
+
+            _bar.ClearLine();
+        }
+
+        IEnumerator Speak(CampaignStep step, string part, float share)
+        {
+            _bar.Show(step.speaker, part);
 
             float typing = 0f;
             bool skipped = false;
@@ -139,7 +156,7 @@ namespace MetalRaptors
                 yield return null;
             }
 
-            float hold = skipped ? 0f : Mathf.Max(step.seconds - typing, HoldMin);
+            float hold = skipped ? 0f : Mathf.Max(step.seconds * share - typing, HoldMin);
             while (hold > 0f && Running)
             {
                 if (Skipped()) { skipped = true; break; }
@@ -148,7 +165,6 @@ namespace MetalRaptors
                 yield return null;
             }
 
-            _bar.ClearLine();
             if (skipped) yield return null;
         }
 

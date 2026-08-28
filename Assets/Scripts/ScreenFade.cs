@@ -20,7 +20,9 @@ namespace MetalRaptors
 
         Image _sheet;
 
-        public static void Swap(Action change)
+        public static void Swap(Action change) => Swap(change, FadeSec);
+
+        public static void Swap(Action change, float outSec)
         {
             if (change == null) return;
 
@@ -30,7 +32,7 @@ namespace MetalRaptors
                 return;
             }
 
-            Rig().Begin(change, null);
+            Rig().Begin(change, null, outSec);
         }
 
         public static void Load(string scene, Action atBlack = null)
@@ -44,19 +46,19 @@ namespace MetalRaptors
                 return;
             }
 
-            Rig().Begin(atBlack, scene);
+            Rig().Begin(atBlack, scene, FadeSec);
         }
 
-        void Begin(Action atBlack, string scene)
+        void Begin(Action atBlack, string scene, float outSec)
         {
             _busy = true;
             _sheet.raycastTarget = true;
-            StartCoroutine(Run(atBlack, scene));
+            StartCoroutine(Run(atBlack, scene, Mathf.Max(0.01f, outSec)));
         }
 
-        IEnumerator Run(Action atBlack, string scene)
+        IEnumerator Run(Action atBlack, string scene, float outSec)
         {
-            yield return Ramp(0f, 1f);
+            yield return Ramp(0f, 1f, outSec);
 
             atBlack?.Invoke();
 
@@ -66,17 +68,17 @@ namespace MetalRaptors
                 yield return null;
             }
 
-            yield return Ramp(1f, 0f);
+            yield return Ramp(1f, 0f, FadeSec);
 
             _sheet.raycastTarget = false;
             _busy = false;
         }
 
-        IEnumerator Ramp(float from, float to)
+        IEnumerator Ramp(float from, float to, float seconds)
         {
-            for (float t = 0f; t < FadeSec; t += Mathf.Min(Time.unscaledDeltaTime, MaxStep))
+            for (float t = 0f; t < seconds; t += Mathf.Min(Time.unscaledDeltaTime, MaxStep))
             {
-                SetAlpha(Mathf.Lerp(from, to, t / FadeSec));
+                SetAlpha(Mathf.Lerp(from, to, t / seconds));
                 yield return null;
             }
 

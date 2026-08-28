@@ -72,10 +72,14 @@ namespace MetalRaptors
         void Apply()
         {
             MenuPalette palette = MenuTheme.Colors;
-            Color mark = Interactable ? palette.Accent : palette.Muted;
+            bool done = _completed && !_focused;
 
-            _title.color = Interactable ? (_focused ? palette.Accent : palette.Fg) : palette.Muted;
-            _frame.color = _completed && !_focused ? MenuTheme.CardDone : mark;
+            Color mark = done ? MenuTheme.CardDone
+                : Interactable ? palette.Accent : palette.Muted;
+
+            _title.color = done ? MenuTheme.CardDoneInk
+                : Interactable ? (_focused ? palette.Accent : palette.Fg) : palette.Muted;
+            _frame.color = mark;
             _frame.enabled = _focused || _completed;
 
             _art.SetTint(mark, Color.Lerp(mark, MenuTheme.CardFace, 0.62f));

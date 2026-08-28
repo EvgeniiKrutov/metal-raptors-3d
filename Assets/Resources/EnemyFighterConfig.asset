@@ -42,6 +42,7 @@ MonoBehaviour:
   engageRange: 450
   engageFactor: 1.15
   engageResponse: 2
+  catchUpTurnMultiplier: 1.6
   deckCeilingMargin: 300
   pressDelay: 5
   pressDuration: 8

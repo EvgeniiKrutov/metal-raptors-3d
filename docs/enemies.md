@@ -93,7 +93,7 @@ only ever felt like a cheat.
 
 ## Scout
 
-160 m/s cruising and 256 flat out, 88 °/s to the left and 57 °/s to the right, 125 health,
+160 m/s cruising and 256 flat out, 88 °/s to the left and 57 °/s to the right, 137.5 health,
 6 damage a round. **Both of those numbers sit under the whole garage**: 256 is below the Dr.I's
 264, the slowest plane the player can buy, and 88 is below the Albatros's 104 °/s, the widest
 turner of the three. Whatever the player flies, they can out-run a scout and out-turn a scout —
@@ -105,13 +105,48 @@ always shooting at you:
 | | Scout | Fighter |
 | --- | --- | --- |
 | `fireRate` | 0.18 s | 0.20 s |
-| `fireAngleThreshold` | 18° | 14° |
+| `fireAngleThreshold` | 22° | 14° |
 | `maxFireRange` | 560 | 500 |
-| `attackDuration` / `flyDuration` | 4.5 s / 1.0 s | 3.5 s / 1.6 s |
-| `evadeDuration` / `evadeCooldown` | 1.0 s / 4.5 s | 1.3 s / 3.0 s |
+| `attackDuration` / `flyDuration` | 5.5 s / 0.7 s | 3.5 s / 1.6 s |
+| `evadeDuration` / `evadeCooldown` | 0.85 s / 6.5 s | 1.3 s / 3.0 s |
+| `threatRange` / `threatTailAngle` | 340 m / 115° | 420 m / 95° |
+| `engageRange` | 380 m | 450 m |
 
 Longer runs, shorter break-aways, shorter and rarer evades: the scout spends most of an engagement
 pointed at you, and its 6 damage a round is what keeps that survivable.
+
+### How the pressure was raised
+
+The scout was the pressure role on paper and a fairly polite one in the air: it broke off every
+4.5 s, evaded off almost any round that landed, and took a 5.5 s depth dodge on top of that. The
+tuning below leans on **how much of the fight it spends pointed at you**, and deliberately not on
+its gun — `fireRate`, `maxFireRange`, `bulletSpeed` and the 6 damage a round are all
+untouched, so a second spent under its guns costs exactly what it did before. There are simply more
+of them.
+
+- **Longer runs, shorter breaks.** `attackDuration` 4.5 → **5.5** s, `flyDuration` 1.0 → **0.7** s.
+  The attack/break cycle goes from 82 % attacking to 89 %, and at 0.7 s the break-away is barely a
+  repositioning swing rather than a lull you can use.
+- **It flinches less.** `evadeCooldown` 4.5 → **6.5** s and `evadeDuration` 1.0 → **0.85** s, so a
+  hit is less likely to buy a break turn and the break is shorter when it does. `threatRange`
+  420 → **340** m and `threatTailAngle` 95 → **115**° narrow `UnderThreat` to a gun genuinely on
+  its six at close range, instead of anyone pointing roughly its way from half the screen out.
+  The same narrowing lets it hold a tail run-down through fire it used to break off from.
+- **It commits to the chase sooner.** `engageRange` 450 → **380** m, so the catch-up speed arms
+  while the player is still on screen rather than after they have already opened the range. The
+  256 cap is unchanged, so a player at full throttle still gets away — it just starts trying
+  earlier.
+- **It gives up on you slower.** `pressDelay` 3 → **2** s: park above its corridor and it starts
+  climbing after two seconds, not three.
+- **Its one defensive move costs it less gun time.** `dodgeHold` 2.5 → **1.6** s shortens the
+  depth dodge from 5.5 s to 4.6 s. The move is kept — it is the scout's signature — but the
+  stretch where it is neither hittable nor shooting is 16 % shorter, and `dodgeCooldown` still
+  holds it to one per ~19 s.
+
+`health` 125 → **137.5** (+10 %) pays for the extra exposure: a scout that spends 89 % of its cycle
+nose-on is a scout in your own gunsight far more often, and the old number would have made the more
+aggressive plane the shorter-lived one. Per-level `enemyHealthScale` is a multiplier on this base,
+so every campaign level inherits the +10 %.
 
 Its aim point is clamped into its corridor at the floor but allowed `AimReach` (150 m) *above* the
 roof, so a player flying higher still draws the nose up into a climbing shot. Containment holds
@@ -156,9 +191,12 @@ So before committing to a turn of more than 30°, the scout works out whether it
 asymmetric turn rate at each simulated heading, so the wide slow right turn is modelled as wide and
 slow — and probes the terrain under every sample. The arc is flown at the speed the plane is
 *actually* making (`FlightSpeed` — cruise, the engagement boost, or the `Return` catch-up,
-whichever is highest), not at the configured `flySpeed`: a scout chasing a boosting Camel is doing
-256 m/s, not 160, and at that speed the real arc is nearly twice as wide and sinks nearly twice as
-deep as the cruise figure. The simulated turn rate also ramps in on the same
+whichever is highest), not at the configured `flySpeed`, and at the matching boosted turn rate
+(`TurnBoost`, below), so the arc it probes is the one the plane will really fly. A scout chasing a
+boosting Camel is doing 256 m/s, not 160; before the turn rate was boosted with it, that arc was
+nearly twice as wide and sank nearly twice as deep as the cruise figure — which is precisely how a
+scout that had just clawed its way back into frame flew itself into the ground.
+The simulated turn rate also ramps in on the same
 `turnResponsiveness / mass` curve the real steering uses, so the ~0.3 s of near-straight flight at
 the start of a turn — where the plane is deepest — is part of the model. Then:
 
@@ -225,6 +263,17 @@ toward* that is penalised, not a fixed rotational sign — and the penalty scale
 term, biting hardest through the vertical and vanishing in level flight, where no turn is either
 left or right yet.
 
+**Pulling up out of a dive is exempt.** That term is symmetric about the horizon, so it applied
+just as hard to a nose-down scout hauling its nose back to level as to one pushing it further
+down — and since the penalty scales with pitch, it bit hardest exactly where the plane was
+steepest and had least room. The result was a ratchet: the scout could enter a dive at the full
+88 °/s and could only come out of it at 61, which is how it flew itself into the ground out of the
+evade repertoire. `TurnLimitAt` now returns the full rate whenever the nose is below the horizon
+and the turn is raising it (`sin(heading) < 0 && cos(heading) × sign(turnRate) >= 0`), the `>= 0`
+so that the exemption still holds at exactly vertical, where the raising term is instantaneously
+zero. Nothing else moves: level flight was never penalised, the slow sweep over the top is
+untouched, and pushing the nose *down* from a climb still pays the full bias.
+
 Since a wave attacks from the right flying left, the turn a scout most needs is the one back to
 the right to chase a player who has run past it. That is the slow one. It is the scout's
 exploitable weak spot, and the engagement boost below is what stops it from being a free escape —
@@ -271,12 +320,12 @@ and while the depth is changing the bank is fixed. `EnemyDepthDodge.Step` is a s
 | 1 | roll onto the wing | held in lane | 0 → 75 | `dodgeRoll` 0.35 |
 | 2 | slide out | lane → +120 | 75 | `dodgeOut` 0.8 |
 | 3 | roll level | held at +120 | 75 → 0 | `dodgeRoll` 0.35 |
-| 4 | fly straight | +120 | 0 | `dodgeHold` 2.5 |
+| 4 | fly straight | +120 | 0 | `dodgeHold` 1.6 |
 | 5 | roll onto the other wing | held at +120 | 0 → −75 | `dodgeRoll` 0.35 |
 | 6 | slide back | +120 → lane | −75 | `dodgeBack` 0.8 |
 | 7 | roll level | held in lane | −75 → 0 | `dodgeRoll` 0.35 |
 
-5.5 s in all, then `dodgeCooldown` (14 s) counted from the moment it returns. Every phase is eased
+4.6 s in all, then `dodgeCooldown` (14 s) counted from the moment it returns. Every phase is eased
 with the same `SmoothStep`, so each movement starts and ends at rest and the joins between them are
 seamless — the plane never snaps from one to the next. `ApplyRotation` adds `Bank` to
 `PlaneRoll.Angle`, the same local-X roll the companion banks on; negate `dodgeBank` in the asset to
@@ -313,15 +362,15 @@ untouchable, about 0.65 s in — does not also kick off a break turn. The ordina
 `threatRange` trigger, same `evadeDuration` and `evadeCooldown` — what it *flies* now comes from
 the repertoire below.
 
-The cost is symmetrical, which is what keeps it fair: the 5.5 s manoeuvre is 5.5 s in which the
-scout cannot be hit *and* cannot shoot, on a ~20 s cycle. You lose the kill you had lined up; it
+The cost is symmetrical, which is what keeps it fair: the 4.6 s manoeuvre is 4.6 s in which the
+scout cannot be hit *and* cannot shoot, on a ~19 s cycle. You lose the kill you had lined up; it
 loses a quarter of its gun time.
 
 ### Climbing when ignored
 
 A scout that cannot reach the player — out of `maxFireRange`, or the player more than 80 m above
-its corridor roof — counts the seconds. After `pressDelay` (5 s) its roof is raised to the top of
-the **mid** band (379 m) for `pressDuration` (8 s); its floor stays on the contour, so it climbs
+its corridor roof — counts the seconds. After `pressDelay` (2 s) its roof is raised to the top of
+the **mid** band (379 m) for `pressDuration` (10 s); its floor stays on the contour, so it climbs
 to meet the player rather than teleporting up a band. It drops back early once it closes to 60% of
 its firing range. So parking high buys you a lull, not immunity.
 
@@ -583,8 +632,10 @@ whole point of it. `TickTail` gives up on four things, and the first is the one 
   lets go — no shooting required. Checked only while locked; during the join phase the nose is
   on the slot, not on you, so the test would be meaningless.
 - **`UnderThreat()`** — your velocity within `threatCone` (18°) of the enemy inside
-  `threatRange` (420 m), with its own nose swung away from you. It matters mostly in the join
-  phase; a locked enemy is already pointed at you, so the test rarely fires.
+  `threatRange` (fighter 420 m, scout 340), with its own nose swung more than `threatTailAngle`
+  (fighter 95°, scout 115) away from you. It matters mostly in the join phase; a locked enemy is
+  already pointed at you, so the test rarely fires — and on the scout it is narrow enough that a
+  run-down survives most of what you can put on it.
 - **Range** opening past `maxFireRange × 1.4` (700 m), which `TailSpeed`'s 1.3× closing speed
   is there to prevent.
 - **`TailOffAngle()` past 105°** for the same 1.1 s — you turned hard enough that it is no
@@ -713,10 +764,22 @@ refuses.
 A circle break never draws `Break`: flying away at an angle is a fine answer to a gun on your
 tail and a poor answer to a stalemate, which is the whole distinction between the two triggers.
 
+**Which side each move takes is picked on that move's own geometry.** `EnterEvade` measures
+`roomUp` and `roomDown` inside the band and picks the roomier side, but it used to run that test
+only on `Break`'s pair (`awayHeading ± evadeBreakAngle`) and then hand the winning sign to
+`Scissors`, which offsets from `towardHeading` — the *opposite* heading. Adding the same signed
+offset to two headings 180° apart reverses which one points up, so the room test was choosing the
+scissors leg with **less** vertical room, every time: a scout low in its corridor would find that
+"up has more room" and cross downward at up to 50° off a line that already pointed at a player
+below it. `PickSide` is now called once per geometry — on `awayHeading ± evadeBreakAngle` for the
+break heading, and again on `towardHeading ± ScissorsAngle` when the move drawn is a scissors.
+`Chandelle`, `SplitDive` and `Extend` do not use the side at all.
+
 ## Engagement boost (both roles)
 
 Without this, a player who simply flies away is uncatchable: both roles cruise at 160 and the
-player cruises at 180, or 234 on a boost. So when the player is beyond `engageRange` (450 m) **and** moving away
+player cruises at 180, or 234 on a boost. So when the player is beyond `engageRange` (fighter
+450 m, scout 380) **and** moving away
 (`dot(playerVelocity, enemy → player) > 0`), the enemy's speed target becomes the player's own
 speed × `engageFactor` (1.15), ignoring its configured `flySpeed` entirely. It eases in and out at
 `engageResponse` (2 /s) and decays back to normal the moment the player stops running or the range
@@ -762,9 +825,9 @@ smoothed rate the window itself is moving at, measured in `SetBounds` (`ScrollRe
 which is what `Return` has always been waiting for: 1.35 × cruise, aimed back through
 `ClampToBand`. The recovery was already written; it just could not be reached.
 
-**2. Station keeping** (`StationTarget`). The engagement boost above arms on *range* — 450 m,
-which at a ~431 m half-view is barely a screen edge away, and only while the player is actively
-running. Station keeping arms on *screen position* instead: the speed target ramps from cruise at
+**2. Station keeping** (`StationTarget`). The engagement boost above arms on *range* — 450 m on
+the fighter, 380 on the scout, which at a ~431 m half-view is a screen edge away at most, and only
+while the player is actively running. Station keeping arms on *screen position* instead: the speed target ramps from cruise at
 the centre line to `TopSpeed` (256) at the left edge, and is folded into `_engageSpeed` with the
 same `Max` and the same `engageResponse` easing as everything else. At the centre it does nothing,
 so a dogfight still ebbs and flows; at the edge it is +76 m/s against the scroll, which is a plane
@@ -788,8 +851,37 @@ so it re-enters exactly like a newly spawned plane and waits for the first appea
 before it may spend a skill. It reads as another plane joining, not as a teleport: the leash is
 two half-views out of frame, so the move is never visible.
 
-Nothing here changes the reversal loop or the turn rates. The looping was never caused by turning
-too fast — it was caused by losing station and having no way back.
+Nothing here changes the reversal loop. The looping was never caused by turning too fast — it was
+caused by losing station and having no way back.
+
+### Turning at catch-up speed (`TurnBoost`)
+
+Speed alone made the scout a liability. Turn radius is `speed / turn rate`, so station keeping —
+which can add 96 m/s to a scout at the left edge — widened every arc by the same 60 % it added to
+the speed, and it did so exactly where the scout already flies lowest: down on the deck, clawing
+back into frame. It out-ran its own ability to pull out of a turn and made craters.
+
+`TurnBoost` gives the rotation rate the same boost the speed gets. It is keyed off the speed
+surplus rather than off `Behind()` directly — `(FlightSpeed() − flySpeed) / (TopSpeed − flySpeed)`,
+clamped to 0…1, lerped from 1 to `catchUpTurnMultiplier`. Keying it off the speed means it eases in
+and out on `engageResponse` for free, in lockstep with the boost it is compensating for, instead of
+snapping in at the screen position while the speed is still ramping. It also covers the other
+things that raise speed — the engagement boost, the `Return` catch-up, the tail chase — for the
+same reason: they lengthen the radius too.
+
+`catchUpTurnMultiplier` defaults to **1.6** in both role configs, matching `maxSpeedMultiplier`, so
+at full boost the radius is exactly the cruise radius: the scout is faster, not clumsier. Set it
+below `maxSpeedMultiplier` to make speed cost some agility, or to 1 to switch the whole thing off.
+Per-level `enemyRotationScale` scales `rotationSpeed`, which the multiplier rides on top of, so the
+ramp is preserved.
+
+It is applied in both places the turn rate is read: `SteerToHeading`, which flies the turn, and
+`TurnClear`, which decides whether the turn is survivable. Both matter — `TurnClear` already
+simulated the arc at the boosted *speed*, so leaving its rate unboosted would have had the scout
+refuse turns it can now make and climb away from nothing. On the fighter it is taken as a `Max`
+against `DiveTurnFactor` rather than multiplied into it: the dive factor exists for the same
+reason — a fast plane needs a tighter turn to pull out — and compounding the two would have made a
+diving fighter turn like nothing with a propeller on it.
 
 ## Per-level difficulty
 

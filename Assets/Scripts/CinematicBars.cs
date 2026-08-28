@@ -7,6 +7,7 @@ namespace MetalRaptors
     public class CinematicBars : MonoBehaviour
     {
         public const float Height = 150f;
+        public const float BottomHeight = 214f;
         public const float SlideSec = 0.5f;
 
         const int SortingOrder = 150;
@@ -78,9 +79,9 @@ namespace MetalRaptors
 
         void Apply()
         {
-            var size = new Vector2(0f, Height * Mathf.SmoothStep(0f, 1f, _slide));
-            _top.sizeDelta = size;
-            _bottom.sizeDelta = size;
+            float k = Mathf.SmoothStep(0f, 1f, _slide);
+            _top.sizeDelta = new Vector2(0f, Height * k);
+            _bottom.sizeDelta = new Vector2(0f, BottomHeight * k);
         }
 
         static RectTransform Bar(Transform parent, string name, float edge)

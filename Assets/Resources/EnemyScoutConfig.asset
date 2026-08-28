@@ -13,37 +13,38 @@ MonoBehaviour:
   m_Name: EnemyScoutConfig
   m_EditorClassIdentifier:
   role: 0
-  health: 125
+  health: 137.5
   damage: 6
   fireRate: 0.18
   bulletSpeed: 400
   mass: 1.5
   turnResponsiveness: 5
-  fireAngleThreshold: 18
+  fireAngleThreshold: 22
   leadFactor: 1
   maxFireRange: 560
   flySpeed: 160
   rotationSpeed: 88
   minAltitudeMargin: 150
   safeAltitudeMargin: 220
-  attackDuration: 4.5
-  flyDuration: 1
+  attackDuration: 5.5
+  flyDuration: 0.7
   flyPerchHeight: 90
   weaveAmplitude: 45
   weaveHz: 0.4
-  evadeDuration: 1
-  evadeCooldown: 4.5
+  evadeDuration: 0.85
+  evadeCooldown: 6.5
   evadeBreakAngle: 65
   jitterAmplitude: 45
   jitterHz: 9
-  threatRange: 420
+  threatRange: 340
   threatCone: 18
-  threatTailAngle: 95
-  engageRange: 450
+  threatTailAngle: 115
+  engageRange: 380
   engageFactor: 1.15
   engageResponse: 2
+  catchUpTurnMultiplier: 1.6
   deckCeilingMargin: 380
-  pressDelay: 3
+  pressDelay: 2
   pressDuration: 10
   turnBias: 0.65
   reversalAngle: 120
@@ -53,7 +54,7 @@ MonoBehaviour:
   dodgeDepth: 120
   dodgeRoll: 0.35
   dodgeOut: 0.8
-  dodgeHold: 2.5
+  dodgeHold: 1.6
   dodgeBack: 0.8
   dodgeBank: 75
   dodgeCooldown: 14

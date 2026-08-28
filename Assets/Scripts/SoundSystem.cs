@@ -268,6 +268,7 @@ namespace MetalRaptors
         bool _paused;
         bool _windStopped;
         Ramp _pauseGain;
+        Ramp _fadeGain;
 
         public static SoundSystem Begin(CubeController player, IReadOnlyList<EnemyController> enemies,
             bool silent = false)
@@ -278,6 +279,7 @@ namespace MetalRaptors
             system._playerTr = player != null ? player.transform : null;
             system._enemies = enemies;
             system._pauseGain.Jump(1f);
+            system._fadeGain.Jump(1f);
 
             if (!silent) system.Arm();
             return system;
@@ -325,6 +327,14 @@ namespace MetalRaptors
             _stutter.Play();
         }
 
+        public void FadeOut(float seconds)
+        {
+            _gameOver = true;
+            _fadeGain.Set(0f, Mathf.Max(0.01f, seconds));
+        }
+
+        float Gain => _pauseGain.Value * _fadeGain.Value;
+
         public void EnterGameOver()
         {
             if (_gameOver) return;
@@ -344,13 +354,14 @@ namespace MetalRaptors
             if (!_armed) return;
 
             float dt = Time.unscaledDeltaTime;
+            _fadeGain.Tick(dt);
 
             if (_gameOver && GameMenu.IsOpen) StopWind();
 
             UpdatePause(dt);
             if (_paused) return;
 
-            _playerVoice?.Tick(dt, _pauseGain.Value);
+            _playerVoice?.Tick(dt, Gain);
 
             if (!_gameOver)
             {
@@ -392,8 +403,8 @@ namespace MetalRaptors
         void StepPauseRamp(float dt)
         {
             _pauseGain.Tick(dt);
-            _playerVoice?.Tick(0f, _pauseGain.Value);
-            foreach (var voice in _enemyVoices.Values) voice.Tick(0f, _pauseGain.Value);
+            _playerVoice?.Tick(0f, Gain);
+            foreach (var voice in _enemyVoices.Values) voice.Tick(0f, Gain);
             ApplyAmbient();
         }
 
@@ -409,7 +420,7 @@ namespace MetalRaptors
         void ApplyAmbient()
         {
             if (_wind != null && !_windStopped)
-                _wind.volume = WindVolume * _pauseGain.Value * AudioOptions.Sfx;
+                _wind.volume = WindVolume * Gain * AudioOptions.Sfx;
         }
 
         void StopWind()

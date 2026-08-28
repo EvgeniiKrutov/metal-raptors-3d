@@ -23,7 +23,7 @@ namespace MetalRaptors
 
     public class EnemyEvade
     {
-        const float ScissorsAngle = 50f;
+        public const float ScissorsAngle = 50f;
         const float ScissorsPhase = 0.7f;
         const int ScissorsCrosses = 3;
 

@@ -117,6 +117,13 @@ namespace MetalRaptors
 
         public void SetTargetHeading(float headingRad) => _targetHeading = headingRad;
 
+        public void FlyLevel()
+        {
+            _headingSteering = true;
+            _targetHeading = 0f;
+            _controlled = true;
+        }
+
         public void Stop()
         {
             _active = false;

@@ -1,9 +1,16 @@
 {
   "steps": [
-    { "op": "say", "speaker": "hq", "line": "l1_line1" },
+    { "op": "say", "speaker": "roussel", "line": "l1_line1" },
     { "op": "say", "speaker": "you", "line": "l1_line2" },
-    { "op": "say", "speaker": "hq", "line": "l1_line3" },
+    { "op": "say", "speaker": "roussel", "line": "l1_line3" },
     { "op": "say", "speaker": "you", "line": "l1_line4" },
+    { "op": "say", "speaker": "roussel", "line": "l1_line5" },
+    { "op": "say", "speaker": "lasalle", "line": "l1_line6" },
+    { "op": "say", "speaker": "roussel", "line": "l1_line7" },
+    { "op": "say", "speaker": "you", "line": "l1_line8" },
+    { "op": "say", "speaker": "roussel", "line": "l1_line9" },
+    { "op": "say", "speaker": "you", "line": "l1_line10" },
+    { "op": "say", "speaker": "roussel", "line": "l1_line11" },
 
     { "op": "task", "line": "l1_task1" },
     { "op": "wait", "seconds": 2.5 },
@@ -17,8 +24,16 @@
 
     { "op": "wait", "seconds": 1.5 },
 
-    { "op": "say", "speaker": "hq", "line": "l1_line5" },
-    { "op": "say", "speaker": "you", "line": "l1_line6", "seconds": 3.5 },
+    { "op": "say", "speaker": "you", "line": "l1_line12" },
+    { "op": "say", "speaker": "roussel", "line": "l1_line13" },
+    { "op": "say", "speaker": "you", "line": "l1_line14" },
+    { "op": "say", "speaker": "roussel", "line": "l1_line15" },
+    { "op": "say", "speaker": "you", "line": "l1_line16" },
+    { "op": "say", "speaker": "roussel", "line": "l1_line17" },
+    { "op": "say", "speaker": "you", "line": "l1_line18" },
+    { "op": "say", "speaker": "roussel", "line": "l1_line19" },
+    { "op": "say", "speaker": "lasalle", "line": "l1_line20" },
+    { "op": "say", "speaker": "roussel", "line": "l1_line21" },
 
     { "op": "task", "line": "l1_task3" },
     { "op": "wave", "enemies": [ { "plane": "fokker", "count": 1 } ] },
@@ -30,8 +45,16 @@
 
     { "op": "wait", "seconds": 1.5 },
 
-    { "op": "say", "speaker": "hq", "line": "l1_line7" },
-    { "op": "say", "speaker": "you", "line": "l1_line8", "seconds": 4 },
+    { "op": "say", "speaker": "you", "line": "l1_line22" },
+    { "op": "say", "speaker": "roussel", "line": "l1_line23" },
+    { "op": "say", "speaker": "you", "line": "l1_line24" },
+    { "op": "say", "speaker": "roussel", "line": "l1_line25" },
+    { "op": "say", "speaker": "you", "line": "l1_line26" },
+    { "op": "say", "speaker": "roussel", "line": "l1_line27" },
+    { "op": "say", "speaker": "lasalle", "line": "l1_line28" },
+    { "op": "say", "speaker": "roussel", "line": "l1_line29" },
+    { "op": "say", "speaker": "you", "line": "l1_line30" },
+    { "op": "say", "speaker": "roussel", "line": "l1_line31" },
 
     { "op": "finish" }
   ]
