@@ -1,27 +1,22 @@
 {
   "steps": [
     { "op": "say", "speaker": "hq", "line": "l7_line1" },
-    { "op": "say", "speaker": "you", "line": "l7_line2" },
-    { "op": "say", "speaker": "hq", "line": "l7_line3" },
+    { "op": "say", "speaker": "wing", "line": "l7_line2" },
+    { "op": "say", "speaker": "you", "line": "l7_line3" },
 
-    { "op": "task", "line": "l7_task1" },
-    { "op": "wave", "enemies": [ { "plane": "fokker", "count": 2 } ] },
-    { "op": "wait", "seconds": 3 },
     { "op": "wave", "enemies": [ { "plane": "albatros", "count": 3 } ] },
-    { "op": "taskdone" },
-
-    { "op": "wait", "seconds": 2 },
-    { "op": "say", "speaker": "hq", "line": "l7_line4" },
-    { "op": "say", "speaker": "ace", "line": "l7_line5" },
-    { "op": "say", "speaker": "you", "line": "l7_line6", "seconds": 3.5 },
-
-    { "op": "task", "line": "l7_task2" },
-    { "op": "wave", "enemies": [ { "plane": "fokker", "count": 1 } ] },
-    { "op": "taskdone" },
 
     { "op": "wait", "seconds": 1.5 },
-    { "op": "say", "speaker": "hq", "line": "l7_line7" },
-    { "op": "say", "speaker": "you", "line": "l7_line8", "seconds": 4 },
+    { "op": "say", "speaker": "wing", "line": "l7_line4" },
+    { "op": "say", "speaker": "hq", "line": "l7_line5" },
+
+    { "op": "wave", "enemies": [ { "plane": "fokker", "count": 3 } ] },
+    { "op": "wait", "seconds": 3 },
+    { "op": "wave", "enemies": [ { "plane": "albatros", "count": 2 }, { "plane": "fokker", "count": 1 } ] },
+
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "say", "speaker": "wing", "line": "l7_line6" },
+    { "op": "say", "speaker": "you", "line": "l7_line7", "seconds": 4 },
 
     { "op": "finish" }
   ]

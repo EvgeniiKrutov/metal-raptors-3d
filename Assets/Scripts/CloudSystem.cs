@@ -7,13 +7,16 @@ namespace MetalRaptors
     public class CloudSystem : MonoBehaviour
     {
         const float MinAltitude = 350f, MaxAltitude = 850f;
-        const float DepthSpread = 60f;
+        const float DepthJitter = 0.08f;
         const float WindowMargin = 300f;
         const float BaseAlpha = 0.5f;
         const int BlobCountMin = 5, BlobCountMax = 9;
 
+        static readonly float[] LayerDepth = { -0.15f, 0.5f, 1.25f };
+        static readonly float[] LayerFade = { 1f, 0.85f, 0.7f };
+
         static readonly float[] DriftSpeed = { 6f, 12f, 24f };
-        static readonly float[] Spacing = { 520f, 300f, 160f };
+        static readonly float[] Spacing = { 440f, 250f, 135f };
         static readonly float[] CloudWidth = { 45f, 80f, 130f };
 
         static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
@@ -28,12 +31,25 @@ namespace MetalRaptors
             public Vector2 amplitude, frequency, phase;
         }
 
+        class Layer
+        {
+            public float depth;
+            public float ratio;
+            public float grade;
+            public float fade;
+            public float jitter;
+            public float left;
+            public float nextSpawnU;
+            public bool primed;
+        }
+
         class Cloud
         {
             public Transform root;
             public Material mat;
             public Blob[] blobs;
             public float speedMul;
+            public Layer layer;
         }
 
         Camera _cam;
@@ -41,9 +57,8 @@ namespace MetalRaptors
         float _speed, _spacing, _width;
         Color _tint, _glow;
         readonly List<Cloud> _clouds = new List<Cloud>();
+        readonly List<Layer> _layers = new List<Layer>();
         float _time;
-        float _nextSpawnU;
-        bool _primed;
 
         public static CloudSystem Begin(Camera cam, Daytime daytime, Weather weather,
             CloudsPart part, float playPlaneZ)
@@ -93,23 +108,10 @@ namespace MetalRaptors
             if (_cam == null) return;
             _time += Time.deltaTime;
 
-            float depth = _playPlaneZ + DepthSpread - _cam.transform.position.z;
-            float halfW = depth * Mathf.Tan(_cam.fieldOfView * 0.5f * Mathf.Deg2Rad) * _cam.aspect;
-            float camX = _cam.transform.position.x;
-            float left = camX - halfW - WindowMargin;
-            float right = camX + halfW + WindowMargin;
+            EnsureLayers();
 
-            if (!_primed)
-            {
-                _nextSpawnU = left + _speed * _time;
-                _primed = true;
-            }
-
-            while (_nextSpawnU - _speed * _time < right)
-            {
-                SpawnCloud(_nextSpawnU - _speed * _time);
-                _nextSpawnU += _spacing * Random.Range(0.55f, 1.45f);
-            }
+            Vector3 eye = _cam.transform.position;
+            for (int i = 0; i < _layers.Count; i++) Feed(_layers[i], eye);
 
             for (int i = _clouds.Count - 1; i >= 0; i--)
             {
@@ -117,7 +119,7 @@ namespace MetalRaptors
                 if (cloud.root == null) { _clouds.RemoveAt(i); continue; }
 
                 cloud.root.position += Vector3.left * (_speed * cloud.speedMul * Time.deltaTime);
-                if (cloud.root.position.x < left)
+                if (cloud.root.position.x < cloud.layer.left)
                 {
                     DestroyCloud(cloud);
                     _clouds.RemoveAt(i);
@@ -136,16 +138,59 @@ namespace MetalRaptors
             }
         }
 
-        void SpawnCloud(float x)
+        void EnsureLayers()
         {
-            float width = _width * Random.Range(0.7f, 1.4f);
+            if (_layers.Count > 0) return;
+
+            float playDist = Mathf.Max(1f, _playPlaneZ - _cam.transform.position.z);
+            for (int i = 0; i < LayerDepth.Length; i++)
+            {
+                float depth = playDist * LayerDepth[i];
+                float ratio = (playDist + depth) / playDist;
+
+                _layers.Add(new Layer
+                {
+                    depth = depth,
+                    ratio = ratio,
+                    grade = Mathf.Sqrt(ratio),
+                    fade = LayerFade[i],
+                    jitter = playDist * DepthJitter,
+                });
+            }
+        }
+
+        void Feed(Layer layer, Vector3 eye)
+        {
+            float dist = _playPlaneZ + layer.depth + layer.jitter - eye.z;
+            float halfW = dist * Mathf.Tan(_cam.fieldOfView * 0.5f * Mathf.Deg2Rad) * _cam.aspect;
+            float margin = WindowMargin * layer.ratio;
+
+            layer.left = eye.x - halfW - margin;
+            float right = eye.x + halfW + margin;
+
+            if (!layer.primed)
+            {
+                layer.nextSpawnU = layer.left + _speed * _time;
+                layer.primed = true;
+            }
+
+            while (layer.nextSpawnU - _speed * _time < right)
+            {
+                SpawnCloud(layer, layer.nextSpawnU - _speed * _time, eye.y);
+                layer.nextSpawnU += _spacing * layer.ratio * Random.Range(0.55f, 1.45f);
+            }
+        }
+
+        void SpawnCloud(Layer layer, float x, float eyeY)
+        {
+            float width = _width * layer.grade * Random.Range(0.7f, 1.4f);
             var root = new GameObject("Cloud");
             root.transform.SetParent(transform, false);
             root.transform.position = new Vector3(x,
-                Random.Range(MinAltitude, MaxAltitude),
-                _playPlaneZ + Random.Range(-DepthSpread, DepthSpread));
+                eyeY + (Random.Range(MinAltitude, MaxAltitude) - eyeY) * layer.grade,
+                _playPlaneZ + layer.depth + Random.Range(-layer.jitter, layer.jitter));
 
-            var mat = BuildMaterial();
+            var mat = BuildMaterial(layer.fade);
             int count = Random.Range(BlobCountMin, BlobCountMax + 1);
             var blobs = new Blob[count];
             for (int i = 0; i < count; i++)
@@ -187,17 +232,18 @@ namespace MetalRaptors
                 mat = mat,
                 blobs = blobs,
                 speedMul = Random.Range(0.85f, 1.15f),
+                layer = layer,
             });
         }
 
-        Material BuildMaterial()
+        Material BuildMaterial(float fade)
         {
             var shader = Shader.Find("Universal Render Pipeline/Lit");
             if (shader == null) return null;
 
             var mat = new Material(shader) { name = "Cloud (runtime)" };
             Color c = _tint;
-            c.a = BaseAlpha * Random.Range(0.88f, 1.12f);
+            c.a = BaseAlpha * fade * Random.Range(0.88f, 1.12f);
             mat.SetColor(BaseColorId, c);
             mat.EnableKeyword("_EMISSION");
             mat.SetColor(EmissionColorId, _glow);

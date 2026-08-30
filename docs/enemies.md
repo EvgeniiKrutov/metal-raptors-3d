@@ -903,5 +903,5 @@ Fokker that turns at 70 °/s, not against a diving fighter. Levels 3, 5, 7 and 8
 Fokkers into their waves, so those levels now mix the two fights without a line of script changing.
 
 The scout's base 88 °/s is picked so the **top** of that ramp still clears the garage: 88 × 1.18 =
-103.8, under the Albatros's 104. The player can out-turn a scout on level 8 as surely as on level
+103.8, under the Albatros's 104. The player can out-turn a scout on level 9 as surely as on level
 1. Speed is not scaled at all, so the 256 cap holds everywhere by construction.

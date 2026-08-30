@@ -131,6 +131,20 @@ player is flying, and the menu duel is quieter again — it is background decora
 behind a menu, not a fight the player is in, so it is deliberately left out of any
 retune of the two gameplay values.
 
+## Cutscenes
+
+While the cinematic bars are anywhere but fully down (`CinematicBars.AnyShowing`, docs/cutscenes.md)
+every engine voice — the player's idle, revs and boost, and each enemy's throttle — ducks to
+**30%** over 0.5 s, and comes back over the same half second when the bars leave. The ramp is its
+own gain multiplied into the engine bed, so the pause, spawn and retire fades still compose on it,
+and it starts with the bars sliding in rather than with the freeze, which puts the drop under the
+picture going still instead of after it.
+
+The **wind is deliberately not ducked**. The engines are what a conversation has to be heard over;
+the wind bed is the only thing left saying the plane is in the air, and with the world frozen and
+blurred it is doing most of that work. The duck target is left alone while the pause menu is open,
+so resuming into a cutscene comes back to the ducked level rather than ramping down again.
+
 ## Pause and game over
 
 While `GameMenu.IsOpen` (pause menu, `Time.timeScale = 0`), every source on the

@@ -4,19 +4,15 @@
     { "op": "say", "speaker": "wing", "line": "l3_line2" },
     { "op": "say", "speaker": "you", "line": "l3_line3" },
 
-    { "op": "task", "line": "l3_task1" },
     { "op": "wave", "enemies": [ { "plane": "albatros", "count": 2 } ] },
-    { "op": "taskdone" },
 
     { "op": "wait", "seconds": 1.5 },
     { "op": "say", "speaker": "wing", "line": "l3_line4" },
     { "op": "say", "speaker": "hq", "line": "l3_line5" },
 
-    { "op": "task", "line": "l3_task2" },
     { "op": "wave", "enemies": [ { "plane": "albatros", "count": 2 }, { "plane": "fokker", "count": 1 } ] },
     { "op": "wait", "seconds": 3 },
     { "op": "wave", "enemies": [ { "plane": "fokker", "count": 3 } ] },
-    { "op": "taskdone" },
 
     { "op": "wait", "seconds": 1.5 },
     { "op": "say", "speaker": "wing", "line": "l3_line6" },

@@ -12,8 +12,10 @@ about three seconds and never takes the stick away once the shooting can start.
 | briefing | The pre-level page (docs/level-briefing.md) freezes the game at `Time.timeScale = 0`, so nothing below has started yet. The level is silent — the engine has not been armed (docs/sounds.md). |
 | fly-in | The frame is static and carries no HUD at all. The plane enters from the left at cruise speed, straight and level; nothing responds to the keyboard. |
 | cue | The script starts. Its first `say` block raises the bars over ~0.5 s. |
+| freeze | With the bars in, the fly-in stops where it is and the picture blurs over 0.55 s (docs/cutscenes.md). |
 | lead-in | The bars hold empty for 0.55 s — the beat that makes the line feel spoken rather than pasted. |
-| radio | The line types itself into the bottom bar (docs/campaign-scripts.md). |
+| radio | The line types itself into the bottom bar (docs/campaign-scripts.md), over a still frame. |
+| thaw | The last line closes: the picture sharpens, the plane resumes its entry, the bars leave. |
 | hand-over | The stick, the guns, the bomb and the boost come back. Shortly after, the plane passes the camera's hold point and the map finally starts to scroll. |
 | HUD | The bars lower at the end of the opening conversation and the HUD appears for the first time. |
 
@@ -58,7 +60,8 @@ at the hand-over.
 Two solid black bars, **150 px** tall each at the 1920×1080 reference resolution, pinned to the top
 and bottom edges. They leave a 780 px window — about 2.46∶1, the letterbox of a widescreen film.
 They slide in and out together by animating their height from 0 over **0.5 s** on a `SmoothStep`
-curve, on *scaled* time, so the pause menu freezes them mid-slide like everything else.
+curve, on `CutscenePause.Delta` (docs/cutscenes.md) — unscaled, so they keep sliding while they are
+themselves stopping the game, but still frozen mid-slide by the pause menu like everything else.
 
 They live on a nested canvas inside the HUD canvas with `overrideSorting` at order **150** — above
 the HUD, below the pause/fail/completed overlay (200) and the briefing (300). Nesting them in the
@@ -76,23 +79,26 @@ of it is `CinematicBars.AnyShowing`, a static sweep over the live bar components
 from the first frame of the slide-in to the last frame of the slide-out, so the two half-second
 slides count as well as the held pose. Three things change while it is true.
 
+A dialogue block additionally **stops and blurs the game** between the bars arriving and the bars
+leaving (docs/cutscenes.md); everything below applies to the slides at either end, where the game
+is still moving, and is simply moot in between.
+
 ### The HUD is not on screen (`HudCurtain`)
 
 `HudCurtain` is a component on the HUD canvas with one idempotent method, `Set(bool)`. Closing it
 deactivates every child of the canvas **except the cinematic bars** — those are nested in the HUD
 canvas (see above) and hiding them would take the dialogue with them — and remembers exactly what
 it turned off; opening it turns exactly those back on. Nothing else is restored, so an absent
-searchlight indicator or a completed task does not reappear.
+searchlight indicator does not reappear.
 
 The curtain starts **closed**, in `BuildHud`, before the fly-in begins. So the player never sees
 the HUD flash up behind the entering plane: the frame is empty until the intro has handed over
 *and* the opening conversation has finished, at which point `Set(!Cinematic)` opens it for the
 first time. It closes again for every later radio line.
 
-A `LevelTask` created while the curtain is closed would otherwise be born visible, so `ShowTask`
-hands the new row to `HudCurtain.Adopt`, which hides it and adds it to the restore list. In
-practice `CampaignScriptRunner` lowers the bars before any op that is not `say`, so this only
-matters for a script whose very first op is a `task`.
+A widget created while the curtain is closed would otherwise be born visible, so a spawner such as
+`WarnIncoming` hands the new object to `HudCurtain.Adopt`, which hides it and adds it to the
+restore list.
 
 The pause and fail overlays still deactivate the whole HUD object, which composes with the curtain
 without either knowing about the other: the root going inactive hides everything, and the curtain
@@ -149,7 +155,7 @@ through hills.
 ### Bomb and boost are refused
 
 `PlaneBomber` ignores H and `PlaneBoost` ignores R while the bars show, and both report not-ready
-to a HUD that is not being drawn anyway. Their cooldowns still tick (the game is running, unlike a
-pause or the briefing), so a cutscene never eats into them, and a boost already running is left
-alone to finish. The gun is *not* gated — only the two things that can hurt the player who used
+to a HUD that is not being drawn anyway. Their cooldowns freeze with the rest of the game while a
+line is up and tick only through the slides, so a cutscene costs the player nothing, and a boost
+already running is left alone to finish. The gun is *not* gated — only the two things that can hurt the player who used
 them.

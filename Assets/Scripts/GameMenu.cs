@@ -223,7 +223,7 @@ namespace MetalRaptors
         {
             if (Current == this) Current = null;
             _pending = false;
-            Time.timeScale = 1f;
+            CutscenePause.Restore();
         }
 
         void OnDestroy() => Release();

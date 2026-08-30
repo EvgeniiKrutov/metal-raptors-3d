@@ -11,8 +11,6 @@ namespace MetalRaptors
         bool CompanionReady { get; }
         void SpawnWave(EnemyGroup[] groups);
         float WarnIncoming(int planes);
-        void ShowTask(string text);
-        float CompleteTask();
         void CompleteLevel();
     }
 
@@ -26,6 +24,7 @@ namespace MetalRaptors
         ICampaignScriptHost _host;
         DialogueBar _bar;
         bool _stopped;
+        bool _frozen;
         int _skipFrame = -1;
         bool _warnedFirst;
         bool _warnedPair;
@@ -46,8 +45,18 @@ namespace MetalRaptors
         public void Stop()
         {
             _stopped = true;
+            _frozen = false;
             StopAllCoroutines();
             if (_bar != null) _bar.Hide();
+            Wake();
+        }
+
+        void OnDestroy() => Wake();
+
+        static void Wake()
+        {
+            CutsceneBlur.Clear();
+            CutscenePause.Release();
         }
 
         bool Running => !_stopped && _host != null && !_host.IsOver;
@@ -68,14 +77,6 @@ namespace MetalRaptors
 
                     case CampaignOp.Say:
                         yield return Say(step);
-                        break;
-
-                    case CampaignOp.Task:
-                        _host.ShowTask(step.text);
-                        break;
-
-                    case CampaignOp.TaskDone:
-                        yield return Wait(_host.CompleteTask());
                         break;
 
                     case CampaignOp.Spawn:
@@ -106,8 +107,57 @@ namespace MetalRaptors
         {
             if (_bar == null || !_bar.IsOpen) yield break;
 
+            yield return Unblur();
+            yield return Unfreeze();
+
             _bar.Hide();
             yield return Wait(CinematicBars.SlideSec);
+        }
+
+        IEnumerator Freeze()
+        {
+            if (_frozen) yield break;
+            _frozen = true;
+
+            float t = 0f;
+            while (t < 1f)
+            {
+                t = Mathf.Min(t + CutscenePause.Delta / CutscenePause.FreezeSec, 1f);
+
+                float k = Mathf.SmoothStep(0f, 1f, t);
+                CutscenePause.Hold(1f - k);
+                CutsceneBlur.Set(k);
+                yield return null;
+            }
+        }
+
+        IEnumerator Unblur()
+        {
+            if (!_frozen) yield break;
+
+            float t = 1f;
+            while (t > 0f)
+            {
+                t = Mathf.Max(t - CutscenePause.Delta / CutsceneBlur.FadeSec, 0f);
+                CutsceneBlur.Set(Mathf.SmoothStep(0f, 1f, t));
+                yield return null;
+            }
+        }
+
+        IEnumerator Unfreeze()
+        {
+            if (!_frozen) yield break;
+            _frozen = false;
+
+            float t = 0f;
+            while (t < 1f)
+            {
+                t = Mathf.Min(t + CutscenePause.Delta / CutscenePause.ThawSec, 1f);
+                CutscenePause.Hold(Mathf.SmoothStep(0f, 1f, t));
+                yield return null;
+            }
+
+            CutscenePause.Release();
         }
 
         IEnumerator Say(CampaignStep step)
@@ -123,6 +173,9 @@ namespace MetalRaptors
                 _bar.Open();
                 while (Running && !_bar.IsReady) yield return null;
                 while (Running && !_host.CompanionReady) yield return null;
+                if (!Running) yield break;
+
+                yield return Freeze();
                 yield return Wait(DialogueBar.LeadInSec);
                 if (!Running) yield break;
             }
@@ -151,8 +204,8 @@ namespace MetalRaptors
             {
                 if (Skipped()) { skipped = true; break; }
 
-                _bar.Reveal(Time.deltaTime);
-                typing += Time.deltaTime;
+                _bar.Reveal(CutscenePause.Delta);
+                typing += CutscenePause.Delta;
                 yield return null;
             }
 
@@ -161,7 +214,7 @@ namespace MetalRaptors
             {
                 if (Skipped()) { skipped = true; break; }
 
-                hold -= Time.deltaTime;
+                hold -= CutscenePause.Delta;
                 yield return null;
             }
 
@@ -199,7 +252,7 @@ namespace MetalRaptors
             float left = seconds;
             while (left > 0f && Running)
             {
-                left -= Time.deltaTime;
+                left -= CutscenePause.Delta;
                 yield return null;
             }
         }

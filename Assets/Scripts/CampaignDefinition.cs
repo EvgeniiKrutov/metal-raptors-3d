@@ -40,7 +40,7 @@ namespace MetalRaptors
 
     public static class CampaignLevels
     {
-        public const int Count = 8;
+        public const int Count = 9;
 
         const string Lore1 =
             "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor "
@@ -200,18 +200,18 @@ namespace MetalRaptors
 
         public static CampaignDefinition Level5 => new CampaignDefinition
         {
-            seed = 1909,
+            seed = 1707,
             terrain = TerrainKind.Flanders,
-            daytime = Daytime.Night,
+            daytime = Daytime.Midday,
             weather = Weather.Calm,
-            clouds = new CloudsPart { frequency = CloudLevel.Low },
+            clouds = new CloudsPart(),
             script = "level5",
-            flak = 1.35f,
-            enemyHealthScale = 0.70f,
-            enemyRotationScale = 0.91f,
+            flak = 1.25f,
+            enemyHealthScale = 0.78f,
+            enemyRotationScale = 1.02f,
             supplyDrops = 1,
-            title = "NOTHING BURNS AT NIGHT",
-            dateline = "19 September 1917 — Wulpendamme, behind the Flanders coast — night",
+            title = "FACING BACKWARDS",
+            dateline = "21 June 1917 — the Flanders coast — midday",
             lore = Lore1,
             outro = OutroLorem(5),
             journal = JournalLorem,
@@ -219,12 +219,31 @@ namespace MetalRaptors
 
         public static CampaignDefinition Level6 => new CampaignDefinition
         {
+            seed = 1909,
+            terrain = TerrainKind.Flanders,
+            daytime = Daytime.Night,
+            weather = Weather.Calm,
+            clouds = new CloudsPart { frequency = CloudLevel.Low },
+            script = "level6",
+            flak = 1.35f,
+            enemyHealthScale = 0.70f,
+            enemyRotationScale = 0.91f,
+            supplyDrops = 1,
+            title = "NOTHING BURNS AT NIGHT",
+            dateline = "19 September 1917 — Wulpendamme, behind the Flanders coast — night",
+            lore = Lore1,
+            outro = OutroLorem(6),
+            journal = JournalLorem,
+        };
+
+        public static CampaignDefinition Level7 => new CampaignDefinition
+        {
             seed = 1310,
             terrain = TerrainKind.Dolomites,
             daytime = Daytime.Morning,
             weather = Weather.Calm,
             clouds = new CloudsPart { size = CloudLevel.High },
-            script = "level6",
+            script = "level7",
             companion = true,
             flak = 1.5f,
             enemyHealthScale = 0.80f,
@@ -233,18 +252,18 @@ namespace MetalRaptors
             title = "HOHRUPT",
             dateline = "3 October 1917 — Hohrupt, upper Fecht valley — low grey morning",
             lore = Lore2,
-            outro = OutroLorem(6),
+            outro = OutroLorem(7),
             journal = JournalLorem,
         };
 
-        public static CampaignDefinition Level7 => new CampaignDefinition
+        public static CampaignDefinition Level8 => new CampaignDefinition
         {
             seed = 1803,
             terrain = TerrainKind.Dolomites,
             daytime = Daytime.Midday,
             weather = Weather.Calm,
             clouds = new CloudsPart(),
-            script = "level7",
+            script = "level8",
             flak = 1.2f,
             enemyHealthScale = 0.90f,
             enemyRotationScale = 1.10f,
@@ -252,18 +271,18 @@ namespace MetalRaptors
             title = "TWO FIRES",
             dateline = "24 March 1918 — Rimbach valley — morning into midday",
             lore = Lore1,
-            outro = OutroLorem(7),
+            outro = OutroLorem(8),
             journal = JournalLorem,
         };
 
-        public static CampaignDefinition Level8 => new CampaignDefinition
+        public static CampaignDefinition Level9 => new CampaignDefinition
         {
             seed = 1505,
             terrain = TerrainKind.Dolomites,
             daytime = Daytime.Evening,
             weather = Weather.Calm,
             clouds = new CloudsPart { size = CloudLevel.High },
-            script = "level8",
+            script = "level9",
             companion = true,
             flak = 1.4f,
             enemyHealthScale = 1.00f,
@@ -273,7 +292,7 @@ namespace MetalRaptors
             title = "IRON BIRDS OF PREY",
             dateline = "15 May 1918 — over the passes, towards the Belfort gap — last light",
             lore = Lore2,
-            outro = OutroLorem(8),
+            outro = OutroLorem(9),
             journal = JournalLorem,
         };
 
@@ -298,6 +317,7 @@ namespace MetalRaptors
                 case 6: return Level6;
                 case 7: return Level7;
                 case 8: return Level8;
+                case 9: return Level9;
                 default:
                     Debug.LogError($"CampaignLevels: no definition for level {number}; flying Level 1's.");
                     return Level1;

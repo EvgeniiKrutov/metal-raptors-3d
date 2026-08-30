@@ -10,7 +10,7 @@ shows. It is built from the same pieces as the main menu (`MenuTheme`, `MenuLayo
 │                         │                           │  ← 15% of the height
 │  LEVEL FAILED           │   the frozen game,        │
 │  ───                    │   darkened (black 60%)    │  ← 72×4 accent rule
-│  level 1 | verdun       │                           │  (muted, no click)
+│  warming engines        │                           │  (muted, no click)
 │  restart                │                           │
 │  options                │                           │
 │                         │                           │
@@ -55,7 +55,9 @@ extra gap under it, so it reads as the first row of the list rather than a heade
 
 * an authored level — `level 1 | verdun`, the level number and its terrain generator
   (`TerrainNames.For(TerrainPart.kind)`);
-* a career campaign level — `level 1 | verdun`, the endless scene's own generator;
+* a career campaign level — its **own name**, lowercased: `warming engines`. No number and no
+  terrain — the career campaign names its levels (docs/campaign.md) and the pause screen is not
+  where a player needs to be told which generator is under them;
 * a **custom battle** — `verdun | morning`, map then sky (`DaytimeNames`), the same pair the
   menu's preview card carries. `CustomBattle.Requested` is what picks this form.
 

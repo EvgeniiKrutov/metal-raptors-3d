@@ -40,8 +40,8 @@ namespace MetalRaptors
         public static readonly Color Stick = new Color(0.88f, 0.89f, 0.91f, 0.5f);
 
         public static readonly float ArrowOrbit = 110f;
-        public static readonly float ArrowArm = 26f;
-        public static readonly float ArrowStroke = 5f;
+        public static readonly float ArrowArm = 16f;
+        public static readonly float ArrowStroke = 1f;
 
         public static readonly int HintSize = Touch ? 34 : 28;
         public static readonly float HintRowHeight = Touch ? 56f : 50f;

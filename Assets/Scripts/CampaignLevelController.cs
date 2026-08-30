@@ -53,10 +53,8 @@ namespace MetalRaptors
         Transform _playerModel;
         CampaignScriptRunner _runner;
         DialogueBar _dialogue;
-        LevelTask _task;
         LevelIntro _intro;
 
-        Vector2 _taskCorner;
         float _halfViewHeight;
         float _halfViewWidth;
         Vector3 _camBasePos;
@@ -260,6 +258,7 @@ namespace MetalRaptors
             _cam.farClipPlane = 2600f;
 
             LevelCamera.Frame(_cam, CameraDistance, out _halfViewWidth, out _halfViewHeight);
+            CutsceneBlur.Focus(CameraDistance);
 
             PositionCamera(instant: true);
 
@@ -299,11 +298,9 @@ namespace MetalRaptors
             if (_cube != null) _cube.Bump();
         }
 
-        string MapName => TerrainNames.For(_level.terrain);
-
         string Subtitle => CustomBattle.Requested
             ? $"{CustomBattle.Map.Name} | {DaytimeNames.For(_level.daytime)}"
-            : $"level {_levelNumber} | {MapName}";
+            : _level.title.ToLowerInvariant();
 
         const string HudObjective = "no turning back  •  don't hit the ground";
 
@@ -312,7 +309,7 @@ namespace MetalRaptors
             if (_cubeTr == null) return;
 
             if (_camShake > 0f)
-                _camShake = Mathf.Max(0f, _camShake - Time.deltaTime / CamShakeDuration);
+                _camShake = Mathf.Max(0f, _camShake - Time.unscaledDeltaTime / CamShakeDuration);
             if (_cam != null && !_camHold) PositionCamera(instant: false);
 
             if (_cube != null && !IntroActive)
@@ -394,21 +391,6 @@ namespace MetalRaptors
             EnemyWarning warning = EnemyWarning.Show(_hud.transform, planes);
             if (_curtain != null) _curtain.Adopt(warning.gameObject);
             return EnemyWarning.Seconds;
-        }
-
-        public void ShowTask(string text)
-        {
-            if (_gameOver || _hud == null) return;
-
-            if (_task != null) Destroy(_task.gameObject);
-            _task = LevelTask.Create(_hud.transform, _taskCorner, text);
-            if (_curtain != null) _curtain.Adopt(_task.gameObject);
-        }
-
-        public float CompleteTask()
-        {
-            if (_task == null || _task.IsCompleting) return 0f;
-            return _task.Complete();
         }
 
         public void CompleteLevel()
@@ -572,7 +554,6 @@ namespace MetalRaptors
 
             _hudView = new LevelHud(canvas.transform, HudObjective, _cube, _shooter, _bomber,
                 _boost, _searchlight, TryPause);
-            _taskCorner = _hudView.TaskCorner;
 
             _curtain = HudCurtain.Attach(_hud);
             _curtain.Set(false);

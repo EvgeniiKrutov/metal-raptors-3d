@@ -35,7 +35,6 @@ namespace MetalRaptors
     public readonly struct CampaignLevelEntry
     {
         public readonly int Number;
-        public readonly string Label;
         public readonly string Title;
         public readonly string Date;
         public readonly string Brief;
@@ -45,7 +44,6 @@ namespace MetalRaptors
         public CampaignLevelEntry(int number, CampaignDefinition level)
         {
             Number = number;
-            Label = $"level {number}";
             Title = level.title;
             Date = DatePart(level.dateline);
             Brief = FirstParagraph(level.lore);

@@ -16,6 +16,8 @@ namespace MetalRaptors
         const float ThrottleGraceSeconds = 0.3f;
         const float SpawnFadeSeconds = 0.6f;
         const float PauseFadeSeconds = 0.12f;
+        const float CutsceneDuck = 0.3f;
+        const float DuckFadeSeconds = 0.5f;
 
         const float TurnRateThreshold = 0.4f;
         const float ClimbAngleDeg = 30f;
@@ -269,6 +271,7 @@ namespace MetalRaptors
         bool _windStopped;
         Ramp _pauseGain;
         Ramp _fadeGain;
+        Ramp _duck;
 
         public static SoundSystem Begin(CubeController player, IReadOnlyList<EnemyController> enemies,
             bool silent = false)
@@ -280,6 +283,7 @@ namespace MetalRaptors
             system._enemies = enemies;
             system._pauseGain.Jump(1f);
             system._fadeGain.Jump(1f);
+            system._duck.Jump(1f);
 
             if (!silent) system.Arm();
             return system;
@@ -335,6 +339,8 @@ namespace MetalRaptors
 
         float Gain => _pauseGain.Value * _fadeGain.Value;
 
+        float EngineGain => Gain * _duck.Value;
+
         public void EnterGameOver()
         {
             if (_gameOver) return;
@@ -355,13 +361,14 @@ namespace MetalRaptors
 
             float dt = Time.unscaledDeltaTime;
             _fadeGain.Tick(dt);
+            UpdateDuck(dt);
 
             if (_gameOver && GameMenu.IsOpen) StopWind();
 
             UpdatePause(dt);
             if (_paused) return;
 
-            _playerVoice?.Tick(dt, Gain);
+            _playerVoice?.Tick(dt, EngineGain);
 
             if (!_gameOver)
             {
@@ -371,6 +378,14 @@ namespace MetalRaptors
 
             UpdateRetiring(dt);
             ApplyAmbient();
+        }
+
+        void UpdateDuck(float dt)
+        {
+            if (!GameMenu.IsOpen)
+                _duck.Set(CinematicBars.AnyShowing ? CutsceneDuck : 1f, DuckFadeSeconds);
+
+            _duck.Tick(dt);
         }
 
         void UpdatePause(float dt)
@@ -403,8 +418,8 @@ namespace MetalRaptors
         void StepPauseRamp(float dt)
         {
             _pauseGain.Tick(dt);
-            _playerVoice?.Tick(0f, Gain);
-            foreach (var voice in _enemyVoices.Values) voice.Tick(0f, Gain);
+            _playerVoice?.Tick(0f, EngineGain);
+            foreach (var voice in _enemyVoices.Values) voice.Tick(0f, EngineGain);
             ApplyAmbient();
         }
 
@@ -480,7 +495,7 @@ namespace MetalRaptors
                 var entry = _rankScratch[i];
                 entry.Voice.TargetAttenuation =
                     i < MaxAudibleEnemies ? AttenuationFor(entry.Distance) : 0f;
-                entry.Voice.Tick(dt, _pauseGain.Value);
+                entry.Voice.Tick(dt, _pauseGain.Value * _duck.Value);
             }
         }
 
@@ -509,7 +524,7 @@ namespace MetalRaptors
             for (int i = _retiring.Count - 1; i >= 0; i--)
             {
                 var voice = _retiring[i];
-                voice.Tick(dt, _pauseGain.Value);
+                voice.Tick(dt, _pauseGain.Value * _duck.Value);
                 if (!voice.Finished) continue;
                 voice.Dispose();
                 _retiring.RemoveAt(i);

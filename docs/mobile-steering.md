@@ -36,7 +36,7 @@ at rest it sits at the base's centre.
 | `StickDeadzone` | 0.20 | Fraction of the clamp radius below which the angle is not read. |
 | `StickReturn` | 0.12 s | Time constant of the thumb easing back to centre on release. |
 | `ArrowOrbit` | 110 | Radius the arrow orbits the plane at, in canvas units. |
-| `ArrowArm` / `ArrowStroke` | 26 / 5 | The chevron's arm length and line width. |
+| `ArrowArm` / `ArrowStroke` | 16 / 1 | The chevron's arm length and line width. |
 
 **Grab area is wider than the clamp.** A finger landing anywhere in the 720 × 620 rect grabs the
 stick and the thumb jumps under it; only the *travel* is limited to 210. Aiming at a 150px
@@ -60,11 +60,13 @@ rather than after uGUI's 10px drag threshold.
 
 ## `HeadingArrow`
 
-A `>` drawn as two rectangles rather than a text glyph: arms of `ArrowArm` (26) by `ArrowStroke`
-(5), pivoted at their right end, rotated ±45° so they meet at a tip, on a parent that carries the
+A `>` drawn as two rectangles rather than a text glyph: arms of `ArrowArm` (16) by `ArrowStroke`
+(1), pivoted at their right end, rotated ±45° so they meet at a tip, on a parent that carries the
 heading rotation. A `Text` `>` was the first cut and it read far too heavy — a font has no stroke
 width to set, and the bold face put a wedge next to the plane instead of a mark. Two rects give
-the thickness as a number, so the arrow can sit a hair above the stick ring's 4 and stay there.
+the thickness as a number, which is what lets the mark be a hairline: a single unit of stroke on a
+16 unit arm, well under the stick ring's 4, so it reads as a pointer and never as a piece of UI
+competing with the plane.
 
 It lives on the same screen-space overlay canvas as everything else. Each frame it takes the
 plane's world position through `Camera.WorldToScreenPoint`, converts that to canvas space, and

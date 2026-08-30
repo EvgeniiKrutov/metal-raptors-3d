@@ -23,8 +23,6 @@ namespace MetalRaptors
         readonly HeadingArrow _arrow;
         Camera _cam;
 
-        public Vector2 TaskCorner { get; }
-
         public LevelHud(Transform parent, string objective, CubeController plane,
             PlaneShooter shooter, PlaneBomber bomber, PlaneBoost boost, PlaneSearchlight searchlight,
             System.Action onPause)
@@ -47,8 +45,6 @@ namespace MetalRaptors
                 _fireSquare = Square(parent, x, ref y, "FIRE", null, holdable: true);
             if (_searchlight != null)
                 _lightSquare = Square(parent, x, ref y, HudTheme.Label("T", "LIGHT"), ToggleLight);
-
-            TaskCorner = new Vector2(x, -y);
 
             if (HudTheme.IsTouch && _plane != null)
             {

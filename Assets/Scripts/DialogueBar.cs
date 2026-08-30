@@ -23,7 +23,9 @@ namespace MetalRaptors
         const string HiddenOpen = "<color=#00000000>";
         const string HiddenClose = "</color>";
 
-        const float AvatarSize = 176f;
+        const float AvatarSize = 200f;
+        const float Box = CinematicBars.BottomHeight - PadTop - PadBottom;
+        const float MaxRoom = Box - NameRow - NameGap;
 
         static readonly char[] Space = { ' ' };
         static readonly char[] SentenceEnd = { '.', '!', '?', '…' };
@@ -61,8 +63,7 @@ namespace MetalRaptors
             _name = BuildText(NameSize, UIFactory.BoldFont, TextAnchor.LowerLeft,
                 NameRow, -PadTop, false);
             _text = BuildText(TextSize, UIFactory.MediumFont, TextAnchor.UpperLeft,
-                CinematicBars.BottomHeight - PadTop - PadBottom - NameRow - NameGap,
-                -(PadTop + NameRow + NameGap), true);
+                MaxRoom, -(PadTop + NameRow + NameGap), true);
 
             Indent(0f);
             _row.SetActive(false);
@@ -94,6 +95,7 @@ namespace MetalRaptors
             if (speaker == null) return;
 
             Dress(speaker);
+            Stack(message);
 
             _line = message ?? string.Empty;
             _shown = 0f;
@@ -124,6 +126,8 @@ namespace MetalRaptors
         {
             ClearLine();
             _open = false;
+            CutsceneBlur.Clear();
+            CutscenePause.Release();
             _bars.Lower();
         }
 
@@ -139,6 +143,21 @@ namespace MetalRaptors
             _avatar.enabled = face != null;
 
             Indent(face != null ? AvatarSize + AvatarGap : 0f);
+        }
+
+        void Stack(string message)
+        {
+            float used = Mathf.Min(Height(message ?? string.Empty), MaxRoom);
+            float top = -(PadTop + (Box - NameRow - NameGap - used) * 0.5f);
+
+            Lift(_name, top);
+            Lift(_text, top - NameRow - NameGap);
+        }
+
+        static void Lift(Text text, float top)
+        {
+            var rt = text.rectTransform;
+            rt.anchoredPosition = new Vector2(rt.anchoredPosition.x, top);
         }
 
         void Indent(float gutter)
@@ -221,13 +240,15 @@ namespace MetalRaptors
             if (tail.Length > 0) yield return tail;
         }
 
-        bool Fits(string content, float room)
+        bool Fits(string content, float room) => Height(content) <= room;
+
+        float Height(string content)
         {
             TextGenerationSettings settings =
                 _text.GetGenerationSettings(new Vector2(_text.GetPixelAdjustedRect().size.x, 0f));
 
             return _text.cachedTextGeneratorForLayout.GetPreferredHeight(content, settings)
-                   / _text.pixelsPerUnit <= room;
+                   / _text.pixelsPerUnit;
         }
 
         void Paint(int count)

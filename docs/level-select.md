@@ -1,7 +1,7 @@
 # Level select
 
 The career campaign picked from cards. It is the second screen after the era cards to leave
-the column and take the whole canvas (docs/main-menu.md), because eight levels need the
+the column and take the whole canvas (docs/main-menu.md), because nine levels need the
 width — and it is the only screen in the menu whose content **scrolls**.
 
 Reached from `career` → `CHAPTER 1` → `level select`. `Escape` (or gamepad east) goes back
@@ -172,7 +172,7 @@ era row uses — `new CardMetrics(LevelVisibleCards, titleLines: 2, top)`, whose
   creeping.
 
 The highlight does not start at card one: opening the page focuses `CampaignProgress.NextLevel`
-— your first uncleared level — and the window follows it, so a player eight levels in lands on
+— your first uncleared level — and the window follows it, so a player nine levels in lands on
 the card they were about to fly.
 
 ## Progress on the page

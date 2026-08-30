@@ -12,15 +12,11 @@
     { "op": "say", "speaker": "you", "line": "l1_line10" },
     { "op": "say", "speaker": "roussel", "line": "l1_line11" },
 
-    { "op": "task", "line": "l1_task1" },
     { "op": "wait", "seconds": 2.5 },
-    { "op": "taskdone" },
 
-    { "op": "task", "line": "l1_task2" },
     { "op": "wave", "enemies": [ { "plane": "fokker", "count": 1 } ] },
     { "op": "wait", "seconds": 4 },
     { "op": "wave", "enemies": [ { "plane": "fokker", "count": 1 } ] },
-    { "op": "taskdone" },
 
     { "op": "wait", "seconds": 1.5 },
 
@@ -35,13 +31,11 @@
     { "op": "say", "speaker": "lasalle", "line": "l1_line20" },
     { "op": "say", "speaker": "roussel", "line": "l1_line21" },
 
-    { "op": "task", "line": "l1_task3" },
     { "op": "wave", "enemies": [ { "plane": "fokker", "count": 1 } ] },
     { "op": "wait", "seconds": 4 },
     { "op": "wave", "enemies": [ { "plane": "fokker", "count": 1 } ] },
     { "op": "wait", "seconds": 4 },
     { "op": "wave", "enemies": [ { "plane": "fokker", "count": 2 } ] },
-    { "op": "taskdone" },
 
     { "op": "wait", "seconds": 1.5 },
 

@@ -7,7 +7,7 @@ namespace MetalRaptors
     public class CinematicBars : MonoBehaviour
     {
         public const float Height = 150f;
-        public const float BottomHeight = 214f;
+        public const float BottomHeight = 238f;
         public const float SlideSec = 0.5f;
 
         const int SortingOrder = 150;
@@ -73,7 +73,7 @@ namespace MetalRaptors
         {
             if (_slide == _target) return;
 
-            _slide = Mathf.MoveTowards(_slide, _target, Time.deltaTime / SlideSec);
+            _slide = Mathf.MoveTowards(_slide, _target, CutscenePause.Delta / SlideSec);
             Apply();
         }
 

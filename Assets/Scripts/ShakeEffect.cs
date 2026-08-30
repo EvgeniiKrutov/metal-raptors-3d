@@ -30,7 +30,7 @@ namespace MetalRaptors
         {
             if (!_shaking) return;
 
-            _timeLeft -= Time.deltaTime;
+            _timeLeft -= Time.unscaledDeltaTime;
             if (_timeLeft <= 0f)
             {
                 transform.localPosition = _restPos;

@@ -38,8 +38,8 @@ without being out on its own — riding a slow sine up/down (and a slower one fo
 
 Every cutscene repeats the cycle with a **fresh** foe, so a level never runs out of background
 fight. The peel fires on the bars going down rather than on the first wave spawning: in level 1
-that is the `task` op right after the opening conversation, so the split reads as "we're
-separating" rather than as a reaction to enemies that are not there yet.
+that is the `wait` right after the opening conversation, so the split reads as "we're separating"
+rather than as a reaction to enemies that are not there yet.
 
 ## Coming back
 

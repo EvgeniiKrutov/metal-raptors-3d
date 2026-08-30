@@ -8,7 +8,7 @@ here and docs/level-select.md for the card page the levels are picked from.
 
 ## Levels and maps
 
-`CampaignLevels` carries the **eight** levels of the World War 1 campaign. Their titles, dates,
+`CampaignLevels` carries the **nine** levels of the World War 1 campaign. Their titles, dates,
 terrains and skies come from the campaign's story source, `Assets/Resources/docs/campaign-ww1-scenario.md`
 (untracked, work in progress — it is the authority when the two disagree):
 
@@ -18,36 +18,44 @@ terrains and skies come from the campaign's story source, `Assets/Resources/docs
 | 2 | THE NUMBERS | 22 Jun 1916 | `Verdun` | Midday |
 | 3 | FIXED GROUND | 12 Feb 1917 | `Verdun` | Evening |
 | 4 | THE RAVEN | 6 Apr 1917 | `Flanders` | Morning |
-| 5 | NOTHING BURNS AT NIGHT | 19 Sep 1917 | `Flanders` | Night |
-| 6 | HOHRUPT | 3 Oct 1917 | `Dolomites` | Morning |
-| 7 | TWO FIRES | 24 Mar 1918 | `Dolomites` | Midday |
-| 8 | IRON BIRDS OF PREY | 15 May 1918 | `Dolomites` | Evening |
+| 5 | FACING BACKWARDS | 21 Jun 1917 | `Flanders` | Midday |
+| 6 | NOTHING BURNS AT NIGHT | 19 Sep 1917 | `Flanders` | Night |
+| 7 | HOHRUPT | 3 Oct 1917 | `Dolomites` | Morning |
+| 8 | TWO FIRES | 24 Mar 1918 | `Dolomites` | Midday |
+| 9 | IRON BIRDS OF PREY | 15 May 1918 | `Dolomites` | Evening |
+
+The campaign runs **three levels per terrain**, in order — Verdun, then Flanders, then the
+Dolomites — and each block walks the light forward, so a terrain is seen under three different
+skies before the campaign leaves it. `FACING BACKWARDS` is the scenario's **rear gun** level —
+two pilots with no machines of their own fly one DH.4 two-seater, and the player fights from the
+observer's seat while the photographs it brings back find Wulpendamme, where level 6 goes at
+night.
 
 The scenario's `Mountain` sector is `TerrainKind.Dolomites`, the alpine streamer we already have
 (docs/dolomites.md) — so all three terrain kinds are now flown in career and none is
 custom-battle-only.
 
-**Level 1 is written; levels 2–8 are still placeholder.** Level 1 speaks the scenario's three
+**Level 1 is written; levels 2–9 are still placeholder.** Level 1 speaks the scenario's three
 cutscenes, carries its written objectives, opens on the journal's *Before* page and ends on the
 ground scene and the journal's closing page (docs/level-outro.md). Its briefing shows
 `WARMING ENGINES` over the bare date — no sector, no light — above three paragraphs of Vasseur
 being turned down twice by the recruiting board.
 
-Levels 2–8 each have a script (`level2` … `level8`) so that they can be *finished*, which is what
+Levels 2–9 each have a script (`level2` … `level9`) so that they can be *finished*, which is what
 career progression is built on — but every one is the same scroller shape (opening exchange →
-objective → waves → closing exchange → `finish`), its radio lines and ground scene are lorem ipsum,
-and its briefing `lore` is lorem ipsum. The scenario designs levels 3, 5, 6 and 7 as fixed-width,
-stealth, strike and time-attack levels and 4 and 8 as boss fights; none of those modes exist yet,
-so those levels currently fly as ordinary scrollers.
+waves → closing exchange → `finish`), its radio lines and ground scene are lorem ipsum, and its
+briefing `lore` is lorem ipsum. The scenario designs rear-gun, stealth, strike and time-attack
+levels and two boss fights; none of those modes exist yet, so those levels currently fly as
+ordinary scrollers.
 
 Level 1 also flies **only Fokker monoplanes**, on both sides of the frame: the waves are Fokkers
 and so is `companionFoe`, the machine the wingman duels in the background layer. The Albatros
 arrives in level 2, which is the whole of what level 2 has to say to level 1.
 
-Difficulty is a straight ramp across the eight: `enemyHealthScale` 0.50 → 1.00,
+Difficulty is a straight ramp across the nine: `enemyHealthScale` 0.50 → 1.00,
 `enemyRotationScale` 0.80 → 1.18 (multipliers on each enemy role's own base, docs/enemies.md), and
 `flak` climbing to 1.5 at Hohrupt, where the scenario puts guns on both valley walls. The counts
-ramp with them, six machines in level 1 to eleven in level 8.
+ramp with them, six machines in level 1 to eleven in level 9.
 
 ## Progress
 
@@ -62,7 +70,7 @@ fixed challenge levels (`Level1`/`Level2`) and is untouched by career.
 
 Level 1 is always unlocked; every later card is locked until the one before it is cleared.
 `continue` on the era page flies `CampaignProgress.NextLevel`, which is the first uncleared
-level — and level 8 once the whole campaign is done, so `continue` replays the finale rather
+level — and level 9 once the whole campaign is done, so `continue` replays the finale rather
 than dead-ending.
 
 **One scene serves every level.** `CampaignLevel1` is the only endless scene; the menu writes
@@ -105,9 +113,9 @@ is painted, what it decorates with, and what extra meshes ride along with it).
   edge with the controls dead, and the script's first radio call plays between two black film
   bars. Control comes back during the fly-in (docs/level-intro.md).
 - The daytime is authored on the definition: level 1 flies at dawn (`Daytime.Morning`), and
-  the eight spread over all four daytimes. Sky, fog and ambient reuse the same sky classes as
+  the nine spread over all four daytimes. Sky, fog and ambient reuse the same sky classes as
   the fixed terrain levels — `CoastSky` and `DolomitesSky` carry a palette per daytime, which
-  is what lets levels 5 and 8 fly at night on the coast's and the alpine ground.
+  is what lets level 6 fly at night on the coast and level 9 at last light in the mountains.
 - A **custom battle** is the one exception. When `CustomBattle.Requested` is set (the menu's
   custom battle screen did it), the controller builds
   `CampaignLevels.Custom(map, daytime)` — the picked map's seed under the picked sky — in

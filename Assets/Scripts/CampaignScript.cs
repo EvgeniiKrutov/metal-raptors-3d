@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace MetalRaptors
 {
-    public enum CampaignOp { Wait, Say, Task, TaskDone, Wave, Spawn, WaitClear, Finish }
+    public enum CampaignOp { Wait, Say, Wave, Spawn, WaitClear, Finish }
 
     public class CampaignStep
     {
@@ -82,8 +82,6 @@ namespace MetalRaptors
                 case "wait":
                     return new CampaignStep { op = CampaignOp.Wait, seconds = Seconds(step) };
                 case "say": return ParseSay(step, origin, index);
-                case "task": return ParseTask(step, origin, index);
-                case "taskdone": return new CampaignStep { op = CampaignOp.TaskDone };
                 case "wave": return ParseWave(CampaignOp.Wave, step, origin, index);
                 case "spawn": return ParseWave(CampaignOp.Spawn, step, origin, index);
                 case "waitclear": return new CampaignStep { op = CampaignOp.WaitClear };
@@ -115,18 +113,6 @@ namespace MetalRaptors
                 text = line,
                 seconds = seconds > 0f ? seconds : ReadingTime(line),
             };
-        }
-
-        static CampaignStep ParseTask(Dictionary<string, object> step, string origin, int index)
-        {
-            string key = Text(step, "line");
-            if (key.Length == 0)
-            {
-                Debug.LogError($"CampaignScript {origin}[{index}]: 'task' needs a 'line' key.");
-                return null;
-            }
-
-            return new CampaignStep { op = CampaignOp.Task, text = DialogueLines.For(key) };
         }
 
         static CampaignStep ParseWave(CampaignOp op, Dictionary<string, object> step, string origin,

@@ -17,7 +17,6 @@ from their own `LateUpdate`. Everything it makes is a direct child of the HUD ca
 | Heading arrow | Orbiting the plane, touch only — a `>` at the heading the stick last set. |
 | Objective hint | Bottom edge, centred, stretched to the canvas width less the side inset. |
 | `Piloting: …` | Top-centre, on the authored levels only. |
-| Task list | Docks under the last square, at `LevelHud.TaskCorner` (campaign only, docs/campaign-scripts.md). |
 
 The level title and the campaign's distance-in-metres readout were removed. The title said
 nothing the pre-level briefing had not (docs/level-briefing.md), and the metre count was the only
@@ -113,8 +112,7 @@ between white and grey — hollow either way. The searchlight lost its own widge
 
 Nothing is placed at a hand-tuned centre-relative coordinate any more. Every widget anchors to the
 canvas corner it belongs to — the bar and the squares to `(0, 1)` with a `(0, 1)` pivot, the hint
-to the bottom edge — and offsets from there. `LevelTask` was re-anchored the same way so the task
-row follows the column instead of floating at a fixed y.
+to the bottom edge — and offsets from there.
 
 That alone fixes the overflow: an iPhone canvas is about 2118 × 978 reference units, so the old
 title at y 480 and the hint at y −500 were both outside the 978-unit height, and the bar's top
@@ -152,7 +150,7 @@ and the 10-unit hit pad takes the tappable area to ~60 pt. The pad is the same t
 whose pointer events bubble up to the handler on the parent.
 
 Even at four squares — the night case, plus the pause button off in the other corner — the column
-runs to roughly 710 of the canvas's 978 units, which still leaves the task row and the bottom hint
+runs to roughly 710 of the canvas's 978 units, which still leaves the column and the bottom hint
 clear of each other.
 
 `HudTheme.Label` also swaps the caption. A phone has no `H` key, so the squares read `BOMB`,
