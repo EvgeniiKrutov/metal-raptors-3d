@@ -46,12 +46,12 @@ runs no `Update`), so an intro or a pause never eats into it. A radio line is th
 cooldown keeps ticking through one, since the game itself is still running — only the release is
 refused.
 
-The bomb is spawned `BellyClearance` (8 units) below the plane along the plane's **own** down
+The bomb is spawned `BellyClearance` (4 units) below the plane along the plane's **own** down
 axis, not world down — it separates from the belly, so releasing in a bank throws it out
 sideways and releasing inverted throws it upward, which is what a real rack does. The clearance
-is only slightly more than the bomb's own half-height (3), so it reads as leaving the fuselage
-rather than appearing under it; nothing needs more room, because the bomb ignores its own plane's
-collider from the moment it is launched.
+is roughly twice the bomb's own half-height (about 2), so it appears tucked under the fuselage
+rather than dropped into open air below it; nothing needs more room, because the bomb ignores its
+own plane's collider from the moment it is launched.
 
 It leaves with the plane's **full current velocity**, so the drop is a genuine ballistic
 problem: at cruise from a few hundred units up it lands two to three hundred units ahead of the
@@ -63,8 +63,24 @@ and one material.
 
 ## Flight (`Bomb`)
 
-A plain grey box, 16 × 6 × 6 — about a quarter of the plane's length — dressed metallic and dull
-so it reads as iron rather than as another glowing round.
+The `ww1_puw_bomb` model from `Resources/objects/bombs`, normalised to **16 units long** — about
+a quarter of the plane's length — which puts its body at roughly 2.8 across and its fin cross at
+4.2. It keeps the material that ships with the FBX (a dark olive iron), so nothing is recoloured
+in code.
+
+`Bomb.BuildTemplate` builds the template the same way the other imported models are handled
+(`PlaneFactory`, `SupplyCrate`): an empty root carries the `Bomb`, the `Rigidbody` and a
+`BoxCollider`, and the model hangs under it as a child. Like the plane models the bomb is
+authored Z-up with its **nose along −Y**, so the child is turned by `ModelEuler` (0, 0, 90) to
+put the nose on **+X**, the direction the weathervane angle measures from. It is then scaled so
+its measured length is `Length`, and shifted so the centre of that box sits on the root's origin
+— the root is what physics moves and rotates, so an off-centre pivot would swing the bomb around
+a point inside its tail.
+
+The collider and `Belly()` both read the measured box (`_size`) rather than fixed numbers, so the
+model's real silhouette drives the ground contact. If the model is ever missing, the template
+falls back to the old metallic grey cube of `Length × Girth × Girth` and everything else works
+unchanged.
 
 It is spawned **level**, whatever the plane was doing, and then weathervanes: every physics step
 its Z angle eases toward `atan2(vy, vx)` with an exponential approach (`AlignResponse`, 4/s). In

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace MetalRaptors
 {
@@ -9,6 +10,8 @@ namespace MetalRaptors
     {
         public const int Layer = 10;
         public const float ShakeRadii = 3f;
+
+        const string ModelResource = "objects/bombs/ww1_puw_bomb";
 
         const float Length = 16f, Girth = 6f;
         const float Mass = 8f;
@@ -22,7 +25,10 @@ namespace MetalRaptors
         const int GroundMask = 1 << ProceduralTerrain.GroundLayer;
 
         static readonly Color BodyColor = new Color(0.19f, 0.20f, 0.22f);
+        static readonly Vector3 ModelEuler = new Vector3(0f, 0f, 90f);
         static readonly List<IDamageable> Struck = new List<IDamageable>();
+
+        static Vector3 _size = new Vector3(Length, Girth, Girth);
 
         float _damage;
         float _radius;
@@ -36,10 +42,46 @@ namespace MetalRaptors
 
         public static GameObject BuildTemplate()
         {
-            var template = UIFactory.CreatePrimitive3D(PrimitiveType.Cube, Vector3.zero,
-                new Vector3(Length, Girth, Girth), BodyColor);
+            var prefab = Resources.Load<GameObject>(ModelResource);
+            if (prefab == null)
+            {
+                Debug.LogError($"Bomb: {ModelResource} not found in Resources.");
+                return Seal(BuildFallbackTemplate());
+            }
 
-            var rend = template.GetComponent<Renderer>();
+            var template = new GameObject("BombTemplate");
+
+            var model = Instantiate(prefab, template.transform, false);
+            model.name = "ww1_puw_bomb";
+            model.transform.localRotation = Quaternion.Euler(ModelEuler);
+            _size = Fit(model.transform, Length).size;
+
+            foreach (Renderer renderer in model.GetComponentsInChildren<Renderer>())
+                renderer.shadowCastingMode = ShadowCastingMode.On;
+
+            foreach (Collider col in model.GetComponentsInChildren<Collider>())
+                Destroy(col);
+
+            template.AddComponent<BoxCollider>().size = _size;
+            return Seal(template);
+        }
+
+        static GameObject Seal(GameObject template)
+        {
+            template.layer = Layer;
+            template.AddComponent<Bomb>();
+            template.SetActive(false);
+            template.name = "BombTemplate";
+            return template;
+        }
+
+        static GameObject BuildFallbackTemplate()
+        {
+            _size = new Vector3(Length, Girth, Girth);
+
+            var cube = UIFactory.CreatePrimitive3D(PrimitiveType.Cube, Vector3.zero, _size, BodyColor);
+
+            var rend = cube.GetComponent<Renderer>();
             if (rend != null && rend.sharedMaterial != null)
             {
                 var mat = rend.sharedMaterial;
@@ -47,11 +89,48 @@ namespace MetalRaptors
                 mat.SetFloat("_Smoothness", 0.35f);
             }
 
-            template.layer = Layer;
-            template.AddComponent<Bomb>();
-            template.SetActive(false);
-            template.name = "BombTemplate";
-            return template;
+            return cube;
+        }
+
+        static Bounds Fit(Transform model, float length)
+        {
+            Bounds bounds = Measure(model);
+            if (bounds.size.x > 0.0001f) model.localScale *= length / bounds.size.x;
+
+            bounds = Measure(model);
+            model.localPosition -= bounds.center;
+            bounds.center = Vector3.zero;
+            return bounds;
+        }
+
+        static Bounds Measure(Transform model)
+        {
+            Transform space = model.parent != null ? model.parent : model;
+            Matrix4x4 toSpace = space.worldToLocalMatrix;
+
+            var bounds = new Bounds();
+            bool any = false;
+
+            foreach (var filter in model.GetComponentsInChildren<MeshFilter>())
+            {
+                Mesh mesh = filter.sharedMesh;
+                if (mesh == null) continue;
+
+                Bounds local = mesh.bounds;
+                Matrix4x4 toModel = toSpace * filter.transform.localToWorldMatrix;
+                for (int corner = 0; corner < 8; corner++)
+                {
+                    Vector3 point = toModel.MultiplyPoint3x4(new Vector3(
+                        (corner & 1) == 0 ? local.min.x : local.max.x,
+                        (corner & 2) == 0 ? local.min.y : local.max.y,
+                        (corner & 4) == 0 ? local.min.z : local.max.z));
+
+                    if (any) bounds.Encapsulate(point);
+                    else { bounds = new Bounds(point, Vector3.zero); any = true; }
+                }
+            }
+
+            return bounds;
         }
 
         public void Launch(Vector3 velocity, float damage, float radius, Collider ignore,
@@ -179,8 +258,8 @@ namespace MetalRaptors
         float Belly()
         {
             float radians = _angle * Mathf.Deg2Rad;
-            return Mathf.Abs(Mathf.Sin(radians)) * Length * 0.5f
-                 + Mathf.Abs(Mathf.Cos(radians)) * Girth * 0.5f;
+            return Mathf.Abs(Mathf.Sin(radians)) * _size.x * 0.5f
+                 + Mathf.Abs(Mathf.Cos(radians)) * _size.y * 0.5f;
         }
 
         static bool GroundHeight(Vector3 at, out float y)

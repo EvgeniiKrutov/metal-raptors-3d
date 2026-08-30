@@ -6,7 +6,7 @@ namespace MetalRaptors
 {
     public class PlaneBomber : MonoBehaviour
     {
-        const float BellyClearance = 8f;
+        const float BellyClearance = 4f;
 
         public event Action<Vector3, float> OnDetonated;
 
