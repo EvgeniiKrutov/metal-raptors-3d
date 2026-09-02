@@ -28,6 +28,7 @@ namespace MetalRaptors
         public CampaignOutroLine[] outro;
         public string journal;
         public bool companion;
+        public bool zeppelins;
         public float flak = 1f;
         public float enemyHealthScale = 1f;
         public float enemyRotationScale = 1f;
@@ -126,6 +127,7 @@ namespace MetalRaptors
             clouds = new CloudsPart(),
             script = "level1",
             companion = true,
+            zeppelins = true,
             flak = 1.0f,
             enemyHealthScale = 0.50f,
             enemyRotationScale = 0.80f,
@@ -147,6 +149,7 @@ namespace MetalRaptors
             clouds = new CloudsPart(),
             script = "level2",
             companion = true,
+            zeppelins = true,
             flak = 1.1f,
             enemyHealthScale = 0.60f,
             enemyRotationScale = 0.84f,
@@ -167,6 +170,7 @@ namespace MetalRaptors
             clouds = new CloudsPart(),
             script = "level3",
             companion = true,
+            zeppelins = true,
             flak = 0.9f,
             enemyHealthScale = 0.65f,
             enemyRotationScale = 0.88f,
@@ -303,6 +307,7 @@ namespace MetalRaptors
             daytime = daytime,
             weather = Weather.Calm,
             clouds = new CloudsPart(),
+            zeppelins = map.Terrain == TerrainKind.Verdun,
         };
 
         public static CampaignDefinition ForNumber(int number)

@@ -196,6 +196,13 @@ default on every level, `0` to fly a clean sky. The same field exists on the are
 plane drops to `supplyHealthFraction` of its health. Level 1 sends one, worth 50 health; every
 other level and the custom battle send none. See docs/supply-drops.md.
 
+## Background zeppelins
+
+`CampaignDefinition.zeppelins` drifts a lone airship across the sky far behind the fight —
+on for levels 1, 2 and 3 and for a custom battle over Verdun, off on the other maps. One is
+in the sky from the moment the level opens. Scenery only: no collider, no shadow, never more
+than one alive. See docs/zeppelins.md.
+
 ## The companion
 
 A level can fly with a wingman: `CampaignDefinition.companion` turns it on and names the two

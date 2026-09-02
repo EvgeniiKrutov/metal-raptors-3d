@@ -17,6 +17,7 @@ who loads it:
 | `Assets/Resources/*.asset` | The `ScriptableObject` tunables — `PlayerConfig`, `EnemyScoutConfig`, `EnemyFighterConfig`. | yes |
 | `Assets/Resources/objects/planes/<era>/` | Aircraft FBX, one folder per career era (`world_war_1` today, matching `CareerEras`). | no |
 | `Assets/Resources/objects/trees`, `objects/burned_houses` | Scenery prop FBX (docs/battlefield.md). | no |
+| `Assets/Resources/objects/machines/` | Non-flyable machines — the background `zeppelin` (docs/zeppelins.md). | no |
 | `Assets/Resources/Sounds/` | Every sound effect (docs/sounds.md). | no |
 
 `.gitignore` excludes `/Assets/Resources/objects` and `/Assets/Resources/Sounds` — the

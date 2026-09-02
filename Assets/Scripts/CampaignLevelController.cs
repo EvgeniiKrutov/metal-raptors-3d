@@ -108,6 +108,8 @@ namespace MetalRaptors
             }
 
             SkyFlak.Begin(_cam, _cubeTr, _halfViewWidth, _halfViewHeight, PlayPlaneZ, _level.flak);
+            SkyZeppelin.Begin(_cam, _halfViewWidth, _halfViewHeight, PlayPlaneZ,
+                CameraDistance, _level.zeppelins);
 
             PlaneScrapes.DisablePlanePlaneCollisions();
             PlaneScrapes.SetGroundCollisions(true);
