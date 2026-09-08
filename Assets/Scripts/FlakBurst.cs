@@ -85,7 +85,8 @@ namespace MetalRaptors
         {
             float scale = size * CoreSize;
             var go = UIFactory.CreatePrimitive3D(PrimitiveType.Sphere, transform.position,
-                Vector3.one * scale, CoreColor, emissive: true, keepCollider: false);
+                Vector3.one * scale, Firelight.Warm(CoreColor),
+                emissive: true, keepCollider: false);
             go.name = "Core";
 
             var renderer = go.GetComponent<Renderer>();
@@ -196,7 +197,8 @@ namespace MetalRaptors
 
                 if (p.glows)
                 {
-                    p.mat.SetColor(EmissionColorId, CoreColor * (CoreGlow * (1f - t)));
+                    p.mat.SetColor(EmissionColorId,
+                        Firelight.Warm(CoreColor) * (CoreGlow * (1f - t)));
                     continue;
                 }
 

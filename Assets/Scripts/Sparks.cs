@@ -27,7 +27,7 @@ namespace MetalRaptors
                 float mote = size * SizeFactor * Random.Range(0.6f, 1.2f);
                 var go = UIFactory.CreatePrimitive3D(PrimitiveType.Cube,
                     position, Vector3.one * mote,
-                    HotColor, emissive: true, keepCollider: false);
+                    Firelight.Warm(HotColor), emissive: true, keepCollider: false);
                 go.name = "Spark";
 
                 var spark = go.AddComponent<Sparks>();
@@ -57,7 +57,7 @@ namespace MetalRaptors
 
             if (_mat != null)
             {
-                var c = Color.Lerp(HotColor, CoolColor, t);
+                var c = Color.Lerp(Firelight.Warm(HotColor), Firelight.Warm(CoolColor), t);
                 _mat.SetColor("_BaseColor", c);
                 _mat.SetColor("_EmissionColor", c * 2f);
             }

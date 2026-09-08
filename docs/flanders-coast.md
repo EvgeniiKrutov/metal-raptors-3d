@@ -396,7 +396,7 @@ horizon band, a directional key light shining into `+Z`, and restrained URP post
 | Morning | `(0.88, 0.90, 0.89)` | `(0.34, 0.44, 0.43)` | pale grey-green mist, low sun off to the side |
 | Midday | `(0.89, 0.92, 0.91)` | `(0.37, 0.48, 0.47)` | bright overcast North Sea daylight, the greyest of the four |
 | Evening | `(0.92, 0.82, 0.72)` | `(0.30, 0.37, 0.40)` | warm amber low sun over cold water |
-| Night | `(0.20, 0.25, 0.32)` | `(0.14, 0.19, 0.23)` | moon disc and stars over a blue-grey sea |
+| Night | `(0.13, 0.16, 0.21)` | `(0.09, 0.12, 0.15)` | moon disc and stars over a blue-grey sea |
 
 Every palette is pulled toward grey-green and desaturated relative to its Verdun counterpart
 (negative `saturation`, cool white balance) — the same daytime, a colder coast.
@@ -408,14 +408,19 @@ overcast. The lift is spread across four knobs rather than pushed into one, so n
 
 | Knob | Change |
 | --- | --- |
-| `postExposure` | +0.3 stop on the three day palettes (0.28→0.62, 0.30→0.62, 0.32→0.66), 1.9→2.1 at night |
+| `postExposure` | +0.3 stop on the three day palettes (0.28→0.62, 0.30→0.62, 0.32→0.66); night sat at 2.1 before the darkening below took it back to 2.0 |
 | Ambient trilight | sky/equator/ground all raised; the ground term roughly doubles, which is what stops downward-facing surfaces going black |
 | `lightIntensity` | +0.25 to +0.30 across the table |
 | `vignette` / `contrast` | both eased back, so the lift reaches the frame edges and the shadows stay open |
 
-Night gets the same treatment but keeps its identity: the haze, sea and ambient terms are
-lifted about 1.7×, while the exposure is nudged only 0.2 of a stop and the palette stays
-blue — a moonlit coast you can read, not a daylit one.
+The day palettes still carry that lift. **Night no longer does** — it was reading as dusk
+next to `NightSky`, so it was brought back down to Verdun's level while keeping the coast's
+blue: haze, zenith, cloud, sea and all three ambient terms cut by roughly a third, the key
+light down to 1.00, the colour filter darkened `(0.68, 0.74, 0.92)` → `(0.55, 0.60, 0.75)`,
+and the grade shape matched to Verdun's (temperature −22, exposure 2.0, saturation −12,
+contrast +4, vignette 0.16 → 0.27). What is left is a moonlit coast you can still read,
+lit mainly by the moon and by whatever is burning. The night palette also sets
+`firelightBoost = 1.3`, so fire stays warm through the filter (docs/atmospheres.md).
 
 `CoastSky` also owns the **sea colour**, so the water is tinted from the same table as the sky
 it sits under.

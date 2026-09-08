@@ -44,6 +44,10 @@ Shader "Custom/GradientSkybox"
         [Header(Stars)]
         _StarIntensity ("Star Intensity", Range(0, 2)) = 0
         _StarScale     ("Star Density", Range(10, 200)) = 80
+        // Heights above the horizon plane (see MRSkyHeight) where the star field starts and
+        // where it reaches full density. Defaults hug the horizon, i.e. the old flat field.
+        _StarHorizon   ("Star Rise Height", Range(0, 1)) = 0.05
+        _StarZenith    ("Star Full Height", Range(0, 2)) = 0.10
     }
 
     SubShader
@@ -73,6 +77,7 @@ Shader "Custom/GradientSkybox"
             float  _HaloFalloff, _HaloIntensity;
             float  _DiscRadius, _DiscEdge, _MariaIntensity;
             float  _StarIntensity, _StarScale;
+            float  _StarHorizon, _StarZenith;
 
             v2f vert (appdata v)
             {
@@ -115,23 +120,28 @@ Shader "Custom/GradientSkybox"
                 s.discRadius     = _DiscRadius;
                 s.discEdge       = _DiscEdge;
                 s.mariaIntensity = _MariaIntensity;
+                s.discFill       = 1.0;
 
                 float above, discMask, halo;
                 float3 col = MRSkyColor(d, s, above, discMask, halo);
 
-                // Stars: one faint-to-bright point per hash cell, kept off the horizon band
-                // (above), the disc, and the moonglow patch, with a slow subtle twinkle.
+                // Stars: one faint-to-bright point per hash cell, thinning out and dimming
+                // toward the horizon plane, hidden behind the disc and inside the moonglow
+                // patch, with a slow subtle twinkle.
                 if (_StarIntensity > 0.0)
                 {
+                    float  rise = saturate((MRSkyHeight(d, _HorizonSlope) - _StarHorizon)
+                                           / max(1e-4, _StarZenith - _StarHorizon));
                     float3 sp   = d * _StarScale;
                     float3 cell = floor(sp);
                     float3 rnd  = hash33(cell);
                     float  dist  = length(sp - (cell + 0.2 + 0.6 * rnd));
                     float  spark = 1.0 - smoothstep(0.0, 0.18, dist);
-                    float  star  = spark * spark * step(0.72, hash13(cell + 3.3));
+                    float  star  = spark * spark
+                                 * step(lerp(0.995, 0.72, rise), hash13(cell + 3.3));
                     float  b    = 0.35 + 0.65 * pow(hash13(cell + 7.7), 4.0);
                     float  tw   = 0.85 + 0.15 * sin(_Time.y * (1.5 + 2.5 * rnd.x) + rnd.y * 6.2832);
-                    float  mask = saturate(above * 2.5) * (1.0 - discMask) * saturate(1.0 - halo * 4.0);
+                    float  mask = rise * rise * (1.0 - discMask) * saturate(1.0 - halo * 4.0);
                     float3 starCol = lerp(float3(0.75, 0.82, 1.0), float3(1.0, 0.95, 0.85), rnd.z);
                     col += starCol * (star * b * tw * _StarIntensity * mask);
                 }

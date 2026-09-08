@@ -20,6 +20,7 @@ struct MRSky
     float  discRadius;
     float  discEdge;
     float  mariaIntensity;
+    float  discFill;        // 1 = paint the disc body, 0 = report its mask only
 };
 
 float MRHash21(float2 p)
@@ -68,7 +69,7 @@ float3 MRSkyColor(float3 d, MRSky s, out float above, out float discMask, out fl
         float ang = acos(clamp(dot(d, s.sunDir), -1.0, 1.0));
         discMask = 1.0 - smoothstep(R - edge, R + edge, ang);
 
-        if (discMask > 0.0)
+        if (discMask > 0.0 && s.discFill > 0.0)
         {
             float3 mR = normalize(cross(float3(0, 1, 0), s.sunDir));
             float3 mU = cross(s.sunDir, mR);
@@ -77,7 +78,8 @@ float3 MRSkyColor(float3 d, MRSky s, out float above, out float discMask, out fl
             float n = 0.6 * MRValueNoise(uv * 2.6 + 17.0)
                     + 0.4 * MRValueNoise(uv * 5.2 + 31.0);
             float maria = 1.0 - s.mariaIntensity * smoothstep(0.35, 0.8, n);
-            col = lerp(col, s.sunColor * s.sunIntensity * limb * maria, discMask);
+            col = lerp(col, s.sunColor * s.sunIntensity * limb * maria,
+                       discMask * s.discFill);
         }
     }
     else

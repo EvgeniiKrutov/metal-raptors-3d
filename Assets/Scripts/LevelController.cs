@@ -71,6 +71,9 @@ namespace MetalRaptors
             var config = Resources.Load<PlayerConfig>("PlayerConfig");
             if (config == null) config = ScriptableObject.CreateInstance<PlayerConfig>();
 
+            // The night sky turns this back on; everything else stays neutral. Reset before
+            // the world is built, so nothing spawned there inherits the last level's grade.
+            Firelight.Clear();
             ConfigureShadows();
             BuildWorld();
             SpawnPlayer(config);

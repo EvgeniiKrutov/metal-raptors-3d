@@ -19,6 +19,11 @@ namespace MetalRaptors
         const float MoonViewportX = 0.74f;
         const float MoonHorizonLift = 0.30f;
 
+        const float StarRiseHeight = 0.12f;
+        const float StarFullHeight = 0.62f;
+
+        const float FirelightBoost = 1.3f;
+
         static readonly Color RayColor = new Color(0.72f, 0.80f, 1.00f);
         const float RayIntensity = 0.30f;
         const float RayDensity = 0.75f;
@@ -32,6 +37,7 @@ namespace MetalRaptors
             BuildSkybox(cam);
             TuneMoonLight();
             BuildPostFx(cam);
+            Firelight.Grade(ColorFilter, FirelightBoost);
 
             RenderSettings.ambientMode = AmbientMode.Trilight;
             RenderSettings.ambientSkyColor = AmbientSkyColor;
@@ -62,8 +68,10 @@ namespace MetalRaptors
             sky.SetFloat("_MariaIntensity", 0.25f);
             sky.SetFloat("_HaloFalloff", 8f);
             sky.SetFloat("_HaloIntensity", 0.22f);
-            sky.SetFloat("_StarIntensity", 1.4f);
+            sky.SetFloat("_StarIntensity", 1.6f);
             sky.SetFloat("_StarScale", 80f);
+            sky.SetFloat("_StarHorizon", StarRiseHeight);
+            sky.SetFloat("_StarZenith", StarFullHeight);
             sky.SetFloat("_Exposure", 1f);
 
             RenderSettings.skybox = sky;

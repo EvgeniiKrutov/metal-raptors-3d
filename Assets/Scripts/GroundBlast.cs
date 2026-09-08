@@ -77,7 +77,8 @@ namespace MetalRaptors
         {
             float scale = size * FlashSize;
             var go = UIFactory.CreatePrimitive3D(PrimitiveType.Sphere, transform.position,
-                Vector3.one * scale, FlashColor, emissive: true, keepCollider: false);
+                Vector3.one * scale, Firelight.Warm(FlashColor),
+                emissive: true, keepCollider: false);
             go.name = "Flash";
 
             var renderer = go.GetComponent<Renderer>();
@@ -207,7 +208,8 @@ namespace MetalRaptors
                 }
                 else if (p.glows)
                 {
-                    p.mat.SetColor(EmissionColorId, FlashColor * (FlashGlow * (1f - t)));
+                    p.mat.SetColor(EmissionColorId,
+                        Firelight.Warm(FlashColor) * (FlashGlow * (1f - t)));
                 }
             }
 

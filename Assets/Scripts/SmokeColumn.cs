@@ -68,7 +68,7 @@ namespace MetalRaptors
             float ember = EmberSize * _scale;
             var go = UIFactory.CreatePrimitive3D(PrimitiveType.Cube, transform.position,
                 new Vector3(ember * 1.6f, ember * 0.5f, ember * 1.6f),
-                EmberColor, emissive: true, keepCollider: false);
+                Firelight.Warm(EmberColor), emissive: true, keepCollider: false);
             go.name = "Ember";
 
             var renderer = go.GetComponent<Renderer>();
@@ -172,7 +172,11 @@ namespace MetalRaptors
         {
             if (_emberMat == null) return;
             float pulse = 1f + Mathf.Sin(Time.time * EmberPulseRate + _emberPhase) * EmberPulseDepth;
-            _emberMat.SetColor(EmissionColorId, EmberColor * (EmberGlow * pulse));
+            // Terrain columns are built before the sky, so the base colour is refreshed here
+            // rather than only at spawn.
+            Color ember = Firelight.Warm(EmberColor);
+            _emberMat.SetColor(BaseColorId, ember);
+            _emberMat.SetColor(EmissionColorId, ember * (EmberGlow * pulse));
         }
 
         void OnDestroy()

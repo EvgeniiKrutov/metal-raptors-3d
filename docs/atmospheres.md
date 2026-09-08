@@ -27,8 +27,9 @@ built entirely at runtime (no material/profile assets): `MorningSky`, `MiddaySky
    skies: a moon-disc mode (`_DiscRadius > 0` swaps the additive soft core for an opaque
    hard-edged disc with limb shading and noise-dark maria patches — a solid body, not a
    glow) and procedural stars (`_StarIntensity > 0`; hash-cell points with varied
-   brightness and a slow twinkle, masked off the horizon band, the disc, and the
-   moonglow patch so they live only in the dark upper sky).
+   brightness and a slow twinkle, thinned and dimmed toward the horizon by a height ramp
+   (`_StarHorizon` → `_StarZenith`) and hidden behind the disc and inside the moonglow
+   patch, so they live only in the dark upper sky).
 2. Linear fog whose colour is exactly the skybox's horizon band (`HazeColor`, the one
    public value per sky — `ProceduralTerrain` reads it), so the land dissolves seamlessly
    into the sky. Retune fog colour and horizon band together or the seam shows. The
@@ -109,8 +110,13 @@ the colour of the light scattered through it, which near a low sun means the sun
 Mechanics:
 
 - The sky is evaluated by `Assets/Shaders/GradientSky.hlsl`, shared verbatim with
-  `GradientSkybox.shader`, so the two cannot drift apart. Stars are the one term left out —
-  they are masked off the horizon band anyway, and fogged land is always below it.
+  `GradientSkybox.shader`, so the two cannot drift apart. Two terms are left out. Stars,
+  because they are masked off the horizon band anyway and fogged land is always below it.
+  And the moon disc: `MRSky.discFill` is 1 in the skybox but 0 here, so the haze fogs
+  geometry into the gradient and the moonglow halo — scattered light, which genuinely sits
+  in front of things — but never into the disc body. With it on, anything past the fog start
+  that crossed the moon (the zeppelin above all, at 25–60% fog weight) had the moon painted
+  straight through it.
 - Sky pixels are skipped (they already *are* the sky; adding the difference again would
   double the halo), as are pixels in front of the fog start.
 - The addition is clamped to a brightening. Geometry only projects above the horizon band
@@ -265,24 +271,50 @@ power — under dark-violet air.
   `_MariaIntensity 0.25` stamps the dark noise patches that make it *the moon*. Disc
   brightness 1.2 — just past HDR white, so bloom rings it gently; the `_HaloFalloff 8` /
   intensity 0.22 halo is the moonlight scattered around the body.
-- **Stars**: `_StarIntensity 1.4`, `_StarScale 80` — about a quarter of the hash cells
-  carry a star, so a couple of thousand points land on screen. Each is a ~4 px point
-  with a squared-smoothstep profile (crisp bright centre, soft edge — sized to survive
-  the colour filter and vignette; single-pixel stars vanished). Most are moderate, a few
-  bright (brightness is a 4th-power hash, floor 0.35), tinted from blue-white to
-  warm-white per star, with a slow ±15% twinkle. They fade only right at the horizon
-  band (`saturate(tUp * 2.5)`), vanish behind the moon disc, and dim inside the
-  moonglow patch — so the field reads as depth, not noise.
+- **Stars**: `_StarIntensity 1.6`, `_StarScale 80` — at full density about a quarter of
+  the hash cells carry a star. Each is a ~4 px point with a squared-smoothstep profile
+  (crisp bright centre, soft edge — sized to survive the colour filter and vignette;
+  single-pixel stars vanished). Most are moderate, a few bright (brightness is a
+  4th-power hash, floor 0.35), tinted from blue-white to warm-white per star, with a slow
+  ±15% twinkle. They vanish behind the moon disc and dim inside the moonglow patch.
+- **Star height ramp**: `_StarHorizon 0.12` → `_StarZenith 0.62`, heights above the
+  horizon *plane* (`MRSkyHeight`, so ~the sine of the elevation angle). The ramp does two
+  things at once: it lerps the per-cell threshold 0.995 → 0.72, so the field genuinely
+  thins out as it comes down, and it squares into a brightness mask, so what survives low
+  down is faint. The camera sits between y 100 and 400 and never rotates, which puts the
+  top of the frame at height ~0.6–0.8 and the horizon line at viewport y 0.2–0.4: stars
+  gather in the upper third and fade to nothing well before the land. The old mask,
+  `saturate(above * 2.5)`, was already saturated 0.1 above the horizon plane — that is
+  below screen centre, so the field started at the horizon at full strength.
 - **Key light**: `Euler(50, -14, 0)` — steep, matching the high moon, falling into +Z
   from the moon's side; intensity 0.9, still well under any sun (morning 1.25,
   midday 1.35, evening 1.05) — moonlight, not daylight, but enough to model the land.
-- **Post FX**: the defining move is a violet colour filter `(0.78, 0.72, 0.95)` on the
+- **Post FX**: the defining move is a violet colour filter `(0.65, 0.56, 0.85)` on the
   colour grade — it tints the whole frame and cools it at once. Around it: cold white
   balance (-22, the only sky below zero), desaturation (-12, colours drain at night),
-  mild contrast (+4 — more crushed the shadows into black), a light vignette (0.18) and
-  the biggest exposure lift of the four (+1.7). The filter used to be darker
-  `(0.65, 0.56, 0.85)` and the contrast/vignette heavier, which together made the level
-  unreadable rather than nocturnal.
+  mild contrast (+4), a vignette of 0.27 and the biggest exposure lift of the four (+2).
+- **Firelight** (`Firelight.cs`): the grade is a flat multiply over the whole frame, which
+  turns every fire in the level lilac — wrong, because fire is a light source, not
+  something the night is tinting. `NightSky.Apply` hands the filter to `Firelight.Grade`,
+  which stores the channel gain that undoes it — the filter normalised to its own peak and
+  inverted, `(1.31, 1.52, 1.00)`, times a `FirelightBoost` of 1.3 so the flames also read
+  brighter than the graded scene. Effects run their hot colours through `Firelight.Warm`
+  before they reach a material, so what the filter multiplies back down comes out at the
+  authored orange-yellow rather than violet:
+
+  | Warmed | Left in the grade |
+  |---|---|
+  | `Explosion` fireball (orange → yellow), `GroundBlast` flash, `FlakBurst` core, `MuzzleFlash` core and spikes, `Sparks`, `SmokeColumn` embers, `PlaneFire` and `WreckFire` flames | the explosion's grey smoke tail, `SmokeColumn` puffs, `FlakBurst` soot and earth, `GroundBlast` clods and dust |
+
+  `PlaneSearchlight` uses `Firelight.Beam` instead: same gain, then renormalised to its
+  original peak, so the lamp and its shaft turn amber without also over-driving the
+  carefully tuned `BrightnessAtRange`. It tints in `SetOn` rather than at build time,
+  because the plane is built before the sky.
+- **Scope**: the three night skies grade firelight — `NightSky` from its own
+  `FirelightBoost`, `CoastSky` and `DolomitesSky` from a `firelightBoost` on the night
+  palette (0 on every day palette, which leaves the gain neutral). Both level controllers
+  call `Firelight.Clear()` before the world is built, so a day level never inherits the
+  previous night level's grade.
 - **Horizon band**: `_HorizonFalloff 2.2` — a restrained band of violet glow low over
   the land, night's version of scattered horizon light.
 - **Player searchlight**: night is the only daytime that mounts one on the player's plane

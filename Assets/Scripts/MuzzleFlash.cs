@@ -57,6 +57,7 @@ namespace MetalRaptors
         static Piece BuildPiece(Transform parent, PrimitiveType type, Vector3 localPos,
             Quaternion localRot, Vector3 scale, Color color)
         {
+            color = Firelight.Warm(color);
             var go = UIFactory.CreatePrimitive3D(type, Vector3.zero, scale, color,
                 emissive: true, keepCollider: false);
             go.name = "Flash";

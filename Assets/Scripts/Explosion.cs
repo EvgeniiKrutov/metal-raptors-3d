@@ -120,11 +120,13 @@ namespace MetalRaptors
             return Mathf.Lerp(1f, EndScale, h * h);
         }
 
+        // Only the fire is a light source; the smoke it fades into keeps the scene's grade.
         static Color ColorAt(float t)
         {
-            if (t < YellowAt) return Color.Lerp(Orange, Yellow, t / YellowAt);
+            if (t < YellowAt)
+                return Color.Lerp(Firelight.Warm(Orange), Firelight.Warm(Yellow), t / YellowAt);
             float k = Mathf.Clamp01((t - YellowAt) / (GreyAt - YellowAt));
-            return Color.Lerp(Yellow, Grey, k * k * (3f - 2f * k));
+            return Color.Lerp(Firelight.Warm(Yellow), Grey, k * k * (3f - 2f * k));
         }
 
         static float EmissionAt(float t)

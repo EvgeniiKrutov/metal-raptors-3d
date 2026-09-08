@@ -133,7 +133,8 @@ namespace MetalRaptors
                 flame.tr.localScale = Vector3.one * (flame.scale * pulse);
 
                 if (flame.mat == null) continue;
-                Color c = Color.Lerp(Deep, Hot, 0.5f + 0.5f * Mathf.Sin(t * 0.7f));
+                Color c = Color.Lerp(Firelight.Warm(Deep), Firelight.Warm(Hot),
+                    0.5f + 0.5f * Mathf.Sin(t * 0.7f));
                 flame.mat.SetColor(BaseColorId, c);
                 flame.mat.SetColor(EmissionColorId, c * EmissionStrength);
             }

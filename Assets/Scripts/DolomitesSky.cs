@@ -33,6 +33,8 @@ namespace MetalRaptors
             public float bloomThreshold, bloomIntensity;
             public float temperature, postExposure, saturation, contrast;
             public float splitBalance, vignette, cloudGlow;
+            // 0 leaves the warm-light gain neutral; see docs/atmospheres.md.
+            public float firelightBoost;
         }
 
         static readonly Palette[] Palettes =
@@ -126,19 +128,19 @@ namespace MetalRaptors
             },
             new Palette
             {
-                haze = new Color(0.22f, 0.26f, 0.36f),
-                zenith = new Color(0.04f, 0.07f, 0.14f),
-                cloud = new Color(0.48f, 0.54f, 0.66f),
+                haze = new Color(0.14f, 0.17f, 0.24f),
+                zenith = new Color(0.03f, 0.04f, 0.09f),
+                cloud = new Color(0.39f, 0.44f, 0.56f),
                 disc = new Color(0.92f, 0.95f, 1.00f),
-                keyLight = new Color(0.68f, 0.78f, 0.98f),
-                ambientSky = new Color(0.30f, 0.36f, 0.52f),
-                ambientEquator = new Color(0.32f, 0.36f, 0.48f),
-                ambientGround = new Color(0.20f, 0.22f, 0.26f),
-                slope = new Color(0.17f, 0.24f, 0.18f),
-                rock = new Color(0.24f, 0.27f, 0.34f),
-                peak = new Color(0.62f, 0.68f, 0.80f),
+                keyLight = new Color(0.61f, 0.71f, 0.93f),
+                ambientSky = new Color(0.21f, 0.25f, 0.38f),
+                ambientEquator = new Color(0.23f, 0.26f, 0.36f),
+                ambientGround = new Color(0.13f, 0.14f, 0.18f),
+                slope = new Color(0.12f, 0.17f, 0.13f),
+                rock = new Color(0.17f, 0.19f, 0.24f),
+                peak = new Color(0.46f, 0.51f, 0.62f),
                 rayColor = new Color(0.74f, 0.84f, 1.00f),
-                colorFilter = new Color(0.70f, 0.76f, 0.94f),
+                colorFilter = new Color(0.56f, 0.61f, 0.76f),
                 shadowTone = new Color(0.26f, 0.32f, 0.56f),
                 highlightTone = new Color(0.64f, 0.76f, 1.00f),
                 horizonFalloff = 0.70f,
@@ -147,12 +149,13 @@ namespace MetalRaptors
                 discRadius = 1.8f, mariaIntensity = 0.25f, starIntensity = 1.6f,
                 discViewportX = 0.74f, discViewportY = 0.92f,
                 lightRotation = Quaternion.Euler(52f, -12f, 0f),
-                lightIntensity = 1.20f,
+                lightIntensity = 1.02f,
                 fogStartOffset = 220f, fogEnd = NightFogEnd,
                 rayIntensity = 0.18f, rayDensity = 0.75f, rayFalloff = 1.5f,
                 bloomThreshold = 0.85f, bloomIntensity = 1.1f,
-                temperature = -18f, postExposure = 2.0f, saturation = -8f, contrast = 3f,
-                splitBalance = 8f, vignette = 0.16f, cloudGlow = 0.55f,
+                temperature = -22f, postExposure = 2.0f, saturation = -12f, contrast = 4f,
+                splitBalance = 8f, vignette = 0.27f, cloudGlow = 0.55f,
+                firelightBoost = 1.3f,
             },
         };
 
@@ -192,6 +195,7 @@ namespace MetalRaptors
             BuildSkybox(cam, p);
             TuneKeyLight(p);
             BuildPostFx(cam, p, daytime);
+            if (p.firelightBoost > 0f) Firelight.Grade(p.colorFilter, p.firelightBoost);
 
             RenderSettings.ambientMode = AmbientMode.Trilight;
             RenderSettings.ambientSkyColor = p.ambientSky;

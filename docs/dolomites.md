@@ -119,7 +119,7 @@ through `InverseLerp(20, 900)` — the ridges' **whole** height range, not just 
 | Band | World Y | Colour |
 | --- | --- | --- |
 | Foot | 20 – 75 | slope green, matching the pasture |
-| Body | 145 – 520 | **dark stone**, one flat colour: `(0.45, 0.46, 0.49)` at midday, down to `(0.24, 0.27, 0.34)` at night |
+| Body | 145 – 520 | **dark stone**, one flat colour: `(0.45, 0.46, 0.49)` at midday, down to `(0.17, 0.19, 0.24)` at night |
 | Summits | 520 – 820 | pale rock: `(0.92, 0.93, 0.94)` at midday, warm `(0.94, 0.82, 0.74)` at evening |
 
 The body is deliberately dark. These ridges are lit by one directional light with no texture and
@@ -168,7 +168,7 @@ URP post FX (docs/atmospheres.md).
 | Morning | `(0.93, 0.88, 0.80)` | `(0.34, 0.52, 0.80)` | warm gold light on the peaks, valley still cool |
 | Midday | `(0.82, 0.88, 0.94)` | `(0.17, 0.42, 0.82)` | the brightest sky in the game — hard sun, deep alpine blue |
 | Evening | `(0.96, 0.78, 0.64)` | `(0.30, 0.36, 0.62)` | warm low light, the valley going to shade |
-| Night | `(0.22, 0.26, 0.36)` | `(0.04, 0.07, 0.14)` | moon and a dense star field over pale rock |
+| Night | `(0.14, 0.17, 0.24)` | `(0.03, 0.04, 0.09)` | moon and a dense star field over dim rock |
 
 ### The sun has to clear the skyline
 
@@ -245,6 +245,17 @@ the haze band belongs at the true vanishing line with the peaks standing above i
 Night keeps the coast's `horizonFalloff` trick (0.70, an exponent above 1) so the haze leaves the
 horizon flat and the low sky, the far ridge and the band are one continuous value
 (docs/flanders-coast.md, *Carrying the mist across the horizon line*).
+
+### Night darkness
+
+The night palette was pulled down to `NightSky`'s level, because next to Verdun the valley
+read as late dusk rather than night. Haze, zenith, cloud and all three mountain bands are cut
+by roughly a third, ambient with them; the key light drops 1.20 → 1.02, the colour filter
+`(0.70, 0.76, 0.94)` → `(0.56, 0.61, 0.76)`, and the grade shape matches Verdun's
+(temperature −22, exposure 2.0, saturation −12, contrast +4, vignette 0.16 → 0.27). The pale
+summits take the change hardest — `(0.62, 0.68, 0.80)` → `(0.46, 0.51, 0.62)` — which is the
+point: moonlit rock, not rock in daylight under a blue filter. `firelightBoost = 1.3` keeps
+fire warm through the filter (docs/atmospheres.md).
 
 ## Battlefield life
 

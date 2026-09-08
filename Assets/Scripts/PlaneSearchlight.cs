@@ -165,11 +165,26 @@ namespace MetalRaptors
         void SetOn(bool on)
         {
             _on = on;
+            if (on) Tint();
             if (_lights != null)
                 foreach (var light in _lights)
                     if (light != null) light.enabled = on;
             if (_shaft != null) _shaft.gameObject.SetActive(on);
             if (on) UpdateShaft();
+        }
+
+        // The sky is built after the plane, so the warm-light gain is not known at Build
+        // time; re-reading it here also survives a level change on a persistent rig.
+        void Tint()
+        {
+            Color beam = Firelight.Beam(BeamColor);
+
+            if (_lights != null)
+                foreach (var light in _lights)
+                    if (light != null) light.color = beam;
+
+            if (_shaftMat != null)
+                _shaftMat.SetColor(ColorId, new Color(beam.r, beam.g, beam.b, ShaftAlpha));
         }
 
         void UpdateShaft()
