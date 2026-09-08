@@ -58,7 +58,7 @@ to the next one, so the choice never depends on streaming timing.
 
 ## Valley mode
 
-`Battlefield.BeginValley(cam, halfViewWidth, seed, inCrater, peopleZMax)` is the Dolomites
+`Battlefield.BeginValley(cam, halfViewWidth, seed, inCrater, peopleZMax, peopleDensity)` is the Dolomites
 entry point (docs/dolomites.md). It is the ordinary inland battlefield with two switches:
 
 - **`_placeProps = false`** — no trees and no houses; that map places nothing solid. People,
@@ -475,8 +475,19 @@ naturally over the crater rims it walks across.
 
 ### Bounded maps vs scrollers
 
-Squad count comes from a fixed spacing (one squad per 235 units, capped at 18),
-so roughly three squads are visible at any time on either kind of map.
+Squad count comes from a spacing (one squad per 235 units, capped at 18), so
+roughly three squads are visible at any time on either kind of map.
+
+Both numbers are scaled by **`Battlefield.PeopleDensity`**, the crowd multiplier
+the level definition carries: spacing is divided by it and the cap multiplied by
+it. It defaults to **1.5** on every level and every custom-battle map — a squad
+every ~157 units and up to 27 of them — because a front with the baseline 1 reads
+as emptied rather than held. A level only writes the field to go deliberately
+thinner or thicker than the rest of the game.
+
+It is a level-authoring knob, not a quality setting — `GraphicsOptions.PeopleScale`
+still multiplies the same cap on top of it, so a low-detail machine thins out a
+dense level rather than being forced to draw it.
 
 **Bounded maps** (`LevelController`, width 2000) are populated across their whole
 extent plus a half-view-width of padding on each side — the arena tiles its
@@ -514,11 +525,48 @@ before `TickFigure` moved it onto the terrain, which reads as figures appearing
 out of thin air. Each figure now samples its own ground at birth and falls back to
 the squad centre's height where that sample misses.
 
+### Firefights (`SquadTracers.cs`)
+
+Squads shoot at each other. Every 1.2–2.4 s a squad looks for the **nearest live
+squad of the other faction within 340 units** and keeps it as its `foe`; there is
+no line-of-sight test, and props do not block a shot. The reference is cleared
+when the target squad is removed, so nobody keeps firing at a squad that is gone.
+
+Each figure carries its own 0.9–2.8 s fire timer and **fires only while halted** —
+a figure whose timer comes up mid-walk retries in 0.2 s instead of burning the
+interval, so it opens up shortly after it stops rather than skipping the exchange.
+That is what makes the walk/halt cycle read as fire-and-movement without any new
+state. A squad more than a view-width plus 120 units from the camera does not fire
+at all: the shot would be invisible and only cost objects.
+
+A shot is aimed at a **random figure** in the enemy squad, from muzzle height
+(0.66 × figure height) to chest height (0.55 ×), with ±7 units of horizontal
+spread and a little vertical scatter applied at the far end. The spread is what
+makes a firefight look like one — parallel misses converging on a squad, not a
+laser onto one man.
+
+**Shots are not lethal.** They pass through everything; only ground blasts kill
+(below). Two squads in contact would otherwise wipe each other out in a few
+seconds and leave the map cycling through respawns, and a figure blinking out at
+this distance reads as a glitch rather than a casualty. The spread makes the misses
+the explanation.
+
+`SquadTracers` draws them. It is one pooled system per battlefield, parented under
+the people object: a stack of inactive tracers is drawn from on each shot and
+returned on expiry, so a sustained firefight allocates nothing after the first few
+seconds. A tracer is a single emissive cube — 11 long, 0.9 thick, the same box
+vocabulary as the figures — scaled along Z and turned with `LookRotation`, flying
+at 300 u/s and expiring when it reaches the aim point (`distance / speed`, capped
+at 2 s). All of them share one material, shadow casting and receiving are off, and
+**64 may be alive at once**; a shot fired when the pool is full is simply dropped.
+
+There is no sound and no muzzle flash — the tracer is the whole read.
+
 ### Casualties
 
 After spawning a blast, `Battlefield` calls `KillWithin(position, size × 1.0)`.
 Any figure inside that XZ radius (45–90 units, comparable to a squad's own
 spread, so a direct hit takes most of a squad) is destroyed outright — no
 ragdoll, no corpse; the blast's own dirt and dust cover the moment. A squad that
-loses its last figure is removed and replaced by the rules above. Bullets pass
-through figures entirely.
+loses its last figure is removed and replaced by the rules above. Bullets — the
+player's, the enemy's and the squads' own tracers — pass through figures entirely.

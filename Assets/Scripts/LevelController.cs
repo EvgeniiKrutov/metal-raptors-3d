@@ -77,7 +77,8 @@ namespace MetalRaptors
             SetupCamera();
             SpawnEnemies();
             if (VerdunLand)
-                Battlefield.Begin(_cam, _halfViewWidth, _level.terrain.seed, MinX, MaxX, _inCrater);
+                Battlefield.Begin(_cam, _halfViewWidth, _level.terrain.seed, MinX, MaxX, _inCrater,
+                    _level.people);
             SkyFlak.Begin(_cam, _cubeTr, _halfViewWidth, _halfViewHeight, PlayPlaneZ, _level.flak);
             PlaneScrapes.DisablePlanePlaneCollisions();
             PlaneScrapes.SetGroundCollisions(true);

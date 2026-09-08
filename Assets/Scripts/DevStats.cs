@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using Unity.Profiling;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.Profiling;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace MetalRaptors
@@ -67,6 +69,9 @@ namespace MetalRaptors
         ProfilerRecorder _gpuFrame;
         ProfilerRecorder _systemMemory;
         ProfilerRecorder _gcMemory;
+        ProfilerRecorder _triangles;
+
+        readonly Dictionary<Mesh, long> _meshFaces = new Dictionary<Mesh, long>();
 
         readonly FrameTiming[] _timings = new FrameTiming[1];
         bool _hasTiming;
@@ -75,6 +80,7 @@ namespace MetalRaptors
         RectTransform _panelRt;
         Row _cpu;
         Row _gpu;
+        Row _tris;
         Row _ram;
         Row _fps;
 
@@ -88,7 +94,9 @@ namespace MetalRaptors
         double _frameSum;
         double _cpuSum;
         double _gpuSum;
+        double _trisSum;
         int _gpuSamples;
+        int _trisSamples;
         int _samples;
         float _elapsed;
         bool _visible;
@@ -112,6 +120,8 @@ namespace MetalRaptors
             _instance = this;
             DontDestroyOnLoad(gameObject);
 
+            SceneManager.sceneLoaded += OnSceneLoaded;
+
             StartRecorders();
             Build();
             SetVisible(false);
@@ -123,16 +133,22 @@ namespace MetalRaptors
             _gpuFrame = ProfilerRecorder.StartNew(ProfilerCategory.Render, "GPU Frame Time");
             _systemMemory = ProfilerRecorder.StartNew(ProfilerCategory.Memory, "System Used Memory");
             _gcMemory = ProfilerRecorder.StartNew(ProfilerCategory.Memory, "GC Used Memory");
+            _triangles = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Triangles Count");
         }
+
+        void OnSceneLoaded(Scene scene, LoadSceneMode mode) => _meshFaces.Clear();
 
         void OnDestroy()
         {
             if (_instance == this) _instance = null;
 
+            SceneManager.sceneLoaded -= OnSceneLoaded;
+
             if (_mainThread.Valid) _mainThread.Dispose();
             if (_gpuFrame.Valid) _gpuFrame.Dispose();
             if (_systemMemory.Valid) _systemMemory.Dispose();
             if (_gcMemory.Valid) _gcMemory.Dispose();
+            if (_triangles.Valid) _triangles.Dispose();
         }
 
         void Build()
@@ -166,6 +182,7 @@ namespace MetalRaptors
             float y = -(TitleRowHeight + TitleToRows);
             _cpu = CreateRow(content, "CPU", ref y, true);
             _gpu = CreateRow(content, "GPU", ref y, true);
+            _tris = CreateRow(content, "TRIS", ref y, false);
             _ram = CreateRow(content, "RAM", ref y, false);
             _fps = CreateRow(content, "FPS", ref y, false);
 
@@ -321,8 +338,10 @@ namespace MetalRaptors
             _frameSum = 0d;
             _cpuSum = 0d;
             _gpuSum = 0d;
+            _trisSum = 0d;
             _samples = 0;
             _gpuSamples = 0;
+            _trisSamples = 0;
             _elapsed = 0f;
         }
 
@@ -401,6 +420,12 @@ namespace MetalRaptors
                 _gpuSum += gpuMs;
                 _gpuSamples++;
             }
+
+            if (_triangles.Valid && _triangles.LastValue > 0)
+            {
+                _trisSum += _triangles.LastValue;
+                _trisSamples++;
+            }
         }
 
         void CaptureTiming()
@@ -437,6 +462,10 @@ namespace MetalRaptors
             else
                 SetMetric(_gpu, "n/a", 0f);
 
+            _tris.Value.text = _trisSamples > 0
+                ? Count(_trisSum / _trisSamples)
+                : $"~{Count(VisibleFaces())} faces";
+
             _ram.Value.text = $"{Megabytes(TotalMemory())} MB   gc {Megabytes(ManagedMemory())} MB";
 
             double fps = frameMs > 0d ? 1000d / frameMs : 0d;
@@ -445,8 +474,10 @@ namespace MetalRaptors
             _frameSum = 0d;
             _cpuSum = 0d;
             _gpuSum = 0d;
+            _trisSum = 0d;
             _samples = 0;
             _gpuSamples = 0;
+            _trisSamples = 0;
             _elapsed = 0f;
         }
 
@@ -464,6 +495,60 @@ namespace MetalRaptors
             budget > 0d ? $"{value / budget * 100d:0}%" : "--";
 
         static string Megabytes(long bytes) => (bytes / (1024d * 1024d)).ToString("0");
+
+        static string Count(double value)
+        {
+            if (value >= 1e6d) return $"{value / 1e6d:0.00}M";
+            if (value >= 1e3d) return $"{value / 1e3d:0.0}k";
+            return value.ToString("0");
+        }
+
+        long VisibleFaces()
+        {
+            long total = 0L;
+            Renderer[] renderers =
+                FindObjectsByType<Renderer>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                Renderer renderer = renderers[i];
+                if (!renderer.enabled || !renderer.isVisible) continue;
+
+                Mesh mesh = MeshOf(renderer);
+                if (mesh != null) total += FaceCount(mesh);
+            }
+
+            return total;
+        }
+
+        static Mesh MeshOf(Renderer renderer)
+        {
+            if (renderer is SkinnedMeshRenderer skinned) return skinned.sharedMesh;
+
+            var filter = renderer.GetComponent<MeshFilter>();
+            return filter != null ? filter.sharedMesh : null;
+        }
+
+        long FaceCount(Mesh mesh)
+        {
+            if (_meshFaces.TryGetValue(mesh, out long cached)) return cached;
+
+            long faces = 0L;
+            for (int sub = 0; sub < mesh.subMeshCount; sub++)
+                faces += (long)mesh.GetIndexCount(sub) / IndicesPerFace(mesh.GetTopology(sub));
+
+            _meshFaces[mesh] = faces;
+            return faces;
+        }
+
+        static int IndicesPerFace(MeshTopology topology) => topology switch
+        {
+            MeshTopology.Quads => 4,
+            MeshTopology.Lines => 2,
+            MeshTopology.LineStrip => 2,
+            MeshTopology.Points => 1,
+            _ => 3,
+        };
 
         static double BudgetMs()
         {

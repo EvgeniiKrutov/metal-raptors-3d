@@ -26,6 +26,7 @@ unreadable per-frame jitter you get from raw values.
 | --- | --- | --- |
 | CPU | main thread ms + % of frame budget | `ProfilerRecorder(Internal, "Main Thread")` |
 | GPU | gpu frame ms + % of frame budget | `ProfilerRecorder(Render, "GPU Frame Time")` |
+| TRIS | triangles submitted per frame | `ProfilerRecorder(Render, "Triangles Count")` |
 | RAM | total used MB + managed heap MB | `ProfilerRecorder(Memory, "System Used Memory")` / `"GC Used Memory"` |
 | FPS | frames per second + frame ms | `Time.unscaledDeltaTime` |
 
@@ -40,6 +41,7 @@ therefore degrades instead of showing nothing:
   `n/a` and an empty meter rather than a fabricated number).
 - **RAM**: profiler counters → `Profiler.GetTotalAllocatedMemoryLong()` /
   `GetMonoUsedSizeLong()` → `GC.GetTotalMemory(false)`.
+- **TRIS**: profiler counter → a scene face count (see below).
 
 `FrameTimingManager` needs **Frame Timing Stats** enabled in Player Settings
 (`enableFrameTimingStats: 1` in `ProjectSettings.asset`), which is why that flag was
@@ -58,7 +60,33 @@ number that matters when hunting for the bottleneck.
 Meter colours follow that fraction: green under 70%, amber under 100%, red at or
 above 100%.
 
-RAM has no meter — there is no meaningful ceiling to draw the bar against.
+RAM and TRIS have no meter — there is no meaningful ceiling to draw the bar against.
+
+## Triangle count
+
+The counter is what the renderer actually submitted last frame, so it already accounts
+for culling, shadow passes and every extra camera; it is averaged over the same 0.25 s
+window as the rest and printed as `184.2k` / `1.24M`.
+
+When the counter is unavailable — a release player, where `ProfilerRecorder.Valid` is
+false — the row falls back to a face count of what is on screen, prefixed with `~` and
+suffixed `faces` so the two are never confused. That pass walks every active `Renderer`
+that `isVisible`, takes the `MeshFilter` (or `SkinnedMeshRenderer`) shared mesh and sums
+`GetIndexCount / indices-per-face` over its submeshes: 3 for triangles, 4 for quads, 2
+for lines, 1 for points. Meshes that are drawn several times are counted once per
+renderer, as the GPU sees them.
+
+The fallback differs from the counter in three ways worth knowing: it counts source
+mesh faces rather than post-tessellation triangles, it ignores geometry with no mesh
+asset behind it (particle systems, line and trail renderers, the UI), and it counts a
+mesh once even when shadow passes redraw it. It is a scale readout, not a profiler
+number — hence the `~`.
+
+Cost is kept off the hot path: it only runs on the 4 Hz refresh, only while the panel is
+open, and only when the counter is missing. Per-mesh face counts are cached by mesh, and
+the cache is cleared on `sceneLoaded` so it neither grows across levels nor keeps
+wrappers for destroyed meshes alive. The
+`FindObjectsByType` sweep it needs still allocates an array each refresh.
 
 ## Spawn buttons (custom battle)
 

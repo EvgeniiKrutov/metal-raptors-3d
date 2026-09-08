@@ -30,6 +30,7 @@ namespace MetalRaptors
         public bool companion;
         public bool zeppelins;
         public float flak = 1f;
+        public float people = 1.5f;
         public float enemyHealthScale = 1f;
         public float enemyRotationScale = 1f;
         public int supplyDrops;

@@ -77,6 +77,7 @@ namespace MetalRaptors
         public CloudsPart clouds;
         public EnemyGroup[] enemies;
         public float flak = 1f;
+        public float people = 1.5f;
     }
 
     public static class Levels

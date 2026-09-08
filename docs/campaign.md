@@ -190,6 +190,16 @@ docs/campaign-ww1-portraits.md holds the avatar generation prompts for those spe
 default on every level, `0` to fly a clean sky. The same field exists on the arena's
 `LevelDefinition`. See docs/sky-flak.md.
 
+## Ground crowds
+
+`CampaignDefinition.people` scales how many infantry squads the battlefield carries. It is
+**`1.5` by default**, so every campaign level and every custom battle gets the same manned
+front rather than an emptied one; a level sets the field only to go against that. The
+controller hands it to `Battlefield.Begin`/`BeginValley`, which divides the squad spacing by
+it and multiplies the squad cap. The same field with the same default exists on the arena's
+`LevelDefinition`. Coast levels ignore it — they place no people at all.
+See docs/battlefield.md.
+
 ## Supply drops
 
 `CampaignDefinition.supplyDrops` lets a level parachute a health crate past the player when the

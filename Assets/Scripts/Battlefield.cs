@@ -36,6 +36,7 @@ namespace MetalRaptors
         float _waterFromZ = float.PositiveInfinity;
         float _smokeZMin = SmokeZMin, _smokeZMax = SmokeZMax;
         float _peopleZMax = PeopleZMaxDefault;
+        float _peopleDensity = 1f;
         bool _placeProps = true;
         bool _placePeople = true;
 
@@ -55,13 +56,15 @@ namespace MetalRaptors
         public bool Bounded => !float.IsInfinity(_minX) && !float.IsInfinity(_maxX);
         public BattlefieldProps Props => _props;
         public float PeopleZMax => _peopleZMax;
+        public float PeopleDensity => _peopleDensity;
 
         public static Battlefield Begin(Camera cam, float halfViewWidth, int seed,
-            System.Func<float, float, bool> inCrater)
-            => Begin(cam, halfViewWidth, seed, float.NegativeInfinity, float.PositiveInfinity, inCrater);
+            System.Func<float, float, bool> inCrater, float peopleDensity = 1f)
+            => Begin(cam, halfViewWidth, seed, float.NegativeInfinity, float.PositiveInfinity,
+                inCrater, peopleDensity);
 
         public static Battlefield BeginValley(Camera cam, float halfViewWidth, int seed,
-            System.Func<float, float, bool> inCrater, float peopleZMax)
+            System.Func<float, float, bool> inCrater, float peopleZMax, float peopleDensity = 1f)
         {
             var field = Create(cam, halfViewWidth, seed,
                 float.NegativeInfinity, float.PositiveInfinity, inCrater);
@@ -69,6 +72,7 @@ namespace MetalRaptors
 
             field._placeProps = false;
             field._peopleZMax = peopleZMax;
+            field._peopleDensity = peopleDensity;
             field.Populate();
             return field;
         }
@@ -92,11 +96,13 @@ namespace MetalRaptors
         }
 
         public static Battlefield Begin(Camera cam, float halfViewWidth, int seed,
-            float minX, float maxX, System.Func<float, float, bool> inCrater)
+            float minX, float maxX, System.Func<float, float, bool> inCrater,
+            float peopleDensity = 1f)
         {
             var field = Create(cam, halfViewWidth, seed, minX, maxX, inCrater);
             if (field == null) return null;
 
+            field._peopleDensity = peopleDensity;
             field.Populate();
             return field;
         }

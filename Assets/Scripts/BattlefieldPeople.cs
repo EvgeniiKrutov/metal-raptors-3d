@@ -44,6 +44,15 @@ namespace MetalRaptors
         const float GroupPropClearance = 34f;
         const float PropTurnRate = 300f;
 
+        const float FireRange = 340f;
+        const float FireIntervalMin = 0.9f, FireIntervalMax = 2.8f;
+        const float FireHoldRetry = 0.2f;
+        const float FoeSearchMin = 1.2f, FoeSearchMax = 2.4f;
+        const float MuzzleHeight = Height * 0.66f;
+        const float AimHeight = Height * 0.55f;
+        const float AimSpread = 7f;
+        const float FireCullMargin = 120f;
+
         static readonly Color[] UniformColors =
         {
             new Color(0.40f, 0.47f, 0.56f),
@@ -70,6 +79,7 @@ namespace MetalRaptors
             public float noisePhase;
             public float speed;
             public float stepPhase;
+            public float fireTimer;
         }
 
         class Group
@@ -81,11 +91,14 @@ namespace MetalRaptors
             public bool moving;
             public float stateTimer;
             public float noisePhase;
+            public Group foe;
+            public float foeTimer;
             public readonly List<Figure> figures = new List<Figure>();
         }
 
         readonly List<Group> _groups = new List<Group>();
         Battlefield _field;
+        SquadTracers _tracers;
         int _targetGroups;
 
         public static BattlefieldPeople Begin(Battlefield field)
@@ -95,6 +108,7 @@ namespace MetalRaptors
 
             var people = go.AddComponent<BattlefieldPeople>();
             people._field = field;
+            people._tracers = SquadTracers.Begin(go.transform);
             people._targetGroups = people.TargetGroupCount();
 
             for (int i = 0; i < people._targetGroups; i++)
@@ -106,6 +120,8 @@ namespace MetalRaptors
         float BandMinX => _field.MinX - _field.HalfViewWidth;
         float BandMaxX => _field.MaxX + _field.HalfViewWidth;
         float ZMax => _field.PeopleZMax;
+        float Density => Mathf.Max(0.1f, _field.PeopleDensity);
+        float Spacing => GroupSpacing / Density;
 
         float ScrollerBehind => _field.HalfViewWidth + CullMargin;
         float ScrollerAhead => _field.HalfViewWidth + ScrollerLeadMax;
@@ -115,8 +131,8 @@ namespace MetalRaptors
             float width = _field.Bounded
                 ? BandMaxX - BandMinX
                 : ScrollerBehind + ScrollerAhead;
-            int cap = Mathf.RoundToInt(MaxGroups * GraphicsOptions.PeopleScale);
-            return Mathf.Clamp(Mathf.RoundToInt(width / GroupSpacing), 2, Mathf.Max(2, cap));
+            int cap = Mathf.RoundToInt(MaxGroups * GraphicsOptions.PeopleScale * Density);
+            return Mathf.Clamp(Mathf.RoundToInt(width / Spacing), 2, Mathf.Max(2, cap));
         }
 
         float InitialX(int index)
@@ -125,7 +141,7 @@ namespace MetalRaptors
                 return _field.CameraX + Random.Range(-ScrollerBehind, ScrollerAhead);
 
             return Mathf.Lerp(BandMinX, BandMaxX, (index + 0.5f) / _targetGroups)
-                   + Random.Range(-GroupSpacing, GroupSpacing) * 0.35f;
+                   + Random.Range(-Spacing, Spacing) * 0.35f;
         }
 
         public void Tick(float camX, float dt)
@@ -138,6 +154,7 @@ namespace MetalRaptors
 
                 Destroy(group.root);
                 _groups.RemoveAt(i);
+                ForgetFoe(group);
             }
 
             while (_groups.Count < _targetGroups)
@@ -207,6 +224,7 @@ namespace MetalRaptors
                 moving = true,
                 stateTimer = Random.Range(GroupMoveTimeMin, GroupMoveTimeMax),
                 noisePhase = Random.Range(0f, 100f),
+                foeTimer = Random.Range(0f, FoeSearchMax),
             };
 
             int count = Mathf.Min(Random.Range(GroupSizeMin, GroupSizeMax + 1),
@@ -231,6 +249,7 @@ namespace MetalRaptors
                     noisePhase = Random.Range(0f, 100f),
                     speed = Random.Range(WalkSpeedMin, WalkSpeedMax),
                     stepPhase = Random.Range(0f, 2f),
+                    fireTimer = Random.Range(0f, FireIntervalMax),
                 });
             }
 
@@ -248,6 +267,13 @@ namespace MetalRaptors
 
         void TickGroup(Group group, float dt)
         {
+            group.foeTimer -= dt;
+            if (group.foeTimer <= 0f)
+            {
+                group.foe = NearestFoe(group);
+                group.foeTimer = Random.Range(FoeSearchMin, FoeSearchMax);
+            }
+
             group.stateTimer -= dt;
             if (group.stateTimer <= 0f)
             {
@@ -309,6 +335,8 @@ namespace MetalRaptors
                 Confine(ref figure.x, ref figure.z, ref figure.headingDeg);
             }
 
+            TickFire(group, figure, dt);
+
             if (!_field.SampleGround(figure.x, figure.z, out float y)) return;
 
             float hop = figure.moving
@@ -316,6 +344,69 @@ namespace MetalRaptors
                   * HopHeight
                 : 0f;
             figure.tr.position = new Vector3(figure.x, y + hop, figure.z);
+        }
+
+        void ForgetFoe(Group gone)
+        {
+            foreach (var group in _groups)
+                if (group.foe == gone) group.foe = null;
+        }
+
+        Group NearestFoe(Group group)
+        {
+            Group best = null;
+            float bestSq = FireRange * FireRange;
+
+            foreach (var other in _groups)
+            {
+                if (other.faction == group.faction || other.figures.Count == 0) continue;
+
+                float dx = other.x - group.x;
+                float dz = other.z - group.z;
+                float distSq = dx * dx + dz * dz;
+                if (distSq >= bestSq) continue;
+
+                bestSq = distSq;
+                best = other;
+            }
+
+            return best;
+        }
+
+        void TickFire(Group group, Figure figure, float dt)
+        {
+            figure.fireTimer -= dt;
+            if (figure.fireTimer > 0f) return;
+
+            if (group.foe == null || group.foe.figures.Count == 0)
+            {
+                figure.fireTimer = Random.Range(FireIntervalMin, FireIntervalMax);
+                return;
+            }
+
+            if (figure.moving)
+            {
+                figure.fireTimer = FireHoldRetry;
+                return;
+            }
+
+            figure.fireTimer = Random.Range(FireIntervalMin, FireIntervalMax);
+            if (Mathf.Abs(group.x - _field.CameraX) > _field.HalfViewWidth + FireCullMargin) return;
+
+            Figure target = group.foe.figures[Random.Range(0, group.foe.figures.Count)];
+            if (target.tr == null) return;
+
+            Vector3 muzzle = figure.tr.position + Vector3.up * MuzzleHeight;
+            Vector3 aim = target.tr.position + Vector3.up * AimHeight;
+
+            Vector3 flat = new Vector3(aim.x - muzzle.x, 0f, aim.z - muzzle.z);
+            if (flat.sqrMagnitude < 1f) return;
+
+            Vector3 side = Vector3.Cross(flat.normalized, Vector3.up);
+            aim += side * Random.Range(-AimSpread, AimSpread)
+                   + Vector3.up * Random.Range(-AimSpread * 0.3f, AimSpread * 0.6f);
+
+            _tracers.Fire(muzzle, aim);
         }
 
         void Deflect(float x, float z, ref float headingDeg, float clearance, float dt)

@@ -100,11 +100,12 @@ namespace MetalRaptors
             {
                 MountainRange.Begin(_cam, _level.seed, _level.daytime);
                 Battlefield.BeginValley(_cam, _halfViewWidth, _level.seed, _terrain.InCrater,
-                    DolomitesTerrain.ValleyZMax);
+                    DolomitesTerrain.ValleyZMax, _level.people);
             }
             else
             {
-                Battlefield.Begin(_cam, _halfViewWidth, _level.seed, _terrain.InCrater);
+                Battlefield.Begin(_cam, _halfViewWidth, _level.seed, _terrain.InCrater,
+                    _level.people);
             }
 
             SkyFlak.Begin(_cam, _cubeTr, _halfViewWidth, _halfViewHeight, PlayPlaneZ, _level.flak);
