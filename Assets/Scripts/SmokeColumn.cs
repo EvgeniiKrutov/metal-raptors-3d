@@ -21,6 +21,7 @@ namespace MetalRaptors
         const float EmberGlow = 1.6f;
         const float EmberPulseRate = 1.7f;
         const float EmberPulseDepth = 0.35f;
+        const float MinScale = 0.05f;
 
         static readonly Color SmokeColor = new Color(0.13f, 0.12f, 0.12f, Opacity);
         static readonly Color EmberColor = new Color(0.85f, 0.30f, 0.07f);
@@ -44,8 +45,10 @@ namespace MetalRaptors
         Material _emberMat;
         float _emitTimer;
         float _emberPhase;
+        float _scale = 1f;
 
-        public static SmokeColumn Begin(Transform parent, Vector3 position, int seed)
+        public static SmokeColumn Begin(Transform parent, Vector3 position, int seed,
+            float scale = 1f)
         {
             var go = new GameObject("Smoke Column");
             go.transform.SetParent(parent, false);
@@ -53,6 +56,7 @@ namespace MetalRaptors
 
             var column = go.AddComponent<SmokeColumn>();
             column._rng = new System.Random(seed);
+            column._scale = Mathf.Max(MinScale, scale);
             column._emberPhase = (float)column._rng.NextDouble() * Mathf.PI * 2f;
             column.BuildEmber();
             column.Prewarm();
@@ -61,8 +65,9 @@ namespace MetalRaptors
 
         void BuildEmber()
         {
+            float ember = EmberSize * _scale;
             var go = UIFactory.CreatePrimitive3D(PrimitiveType.Cube, transform.position,
-                new Vector3(EmberSize * 1.6f, EmberSize * 0.5f, EmberSize * 1.6f),
+                new Vector3(ember * 1.6f, ember * 0.5f, ember * 1.6f),
                 EmberColor, emissive: true, keepCollider: false);
             go.name = "Ember";
 
@@ -96,7 +101,7 @@ namespace MetalRaptors
 
         void EmitPuff(float initialAge)
         {
-            float scale = Range(StartSizeMin, StartSizeMax);
+            float scale = Range(StartSizeMin, StartSizeMax) * _scale;
 
             var go = UIFactory.CreatePrimitive3D(PrimitiveType.Cube, transform.position,
                 Vector3.one * scale, SmokeColor, emissive: false, keepCollider: false);
@@ -108,7 +113,8 @@ namespace MetalRaptors
 
             go.transform.SetParent(transform, false);
             go.transform.localPosition = new Vector3(
-                Range(-StartSpread, StartSpread), 0f, Range(-StartSpread, StartSpread));
+                Range(-StartSpread, StartSpread) * _scale, 0f,
+                Range(-StartSpread, StartSpread) * _scale);
             go.transform.localRotation = Quaternion.Euler(
                 Range(0f, 360f), Range(0f, 360f), Range(0f, 360f));
 
@@ -116,8 +122,9 @@ namespace MetalRaptors
             {
                 tr = go.transform,
                 mat = renderer.sharedMaterial,
-                velocity = new Vector3(WindX + Range(-WindJitter, WindJitter),
-                    Range(RiseMin, RiseMax), Range(-WindJitter, WindJitter) * 0.5f),
+                velocity = new Vector3(WindX + Range(-WindJitter, WindJitter) * _scale,
+                    Range(RiseMin, RiseMax) * _scale,
+                    Range(-WindJitter, WindJitter) * 0.5f * _scale),
                 spinAxis = new Vector3(Range(-1f, 1f), Range(-1f, 1f), Range(-1f, 1f)).normalized,
                 spinRate = Range(SpinMin, SpinMax) * (_rng.NextDouble() < 0.5 ? -1f : 1f),
                 startScale = scale,

@@ -10,14 +10,22 @@ namespace MetalRaptors
 
         const float TreeCellSize = 58f;
         const float HouseCellSize = 620f;
+        const float TankCellSize = 400f;
         const float StreamMargin = 500f;
+        const float TankBurnMargin = 120f;
 
         const float ZMin = 20f, ZMax = 700f;
+        const float TankZMin = 175f, TankZMax = 650f;
 
         const float MetreScale = 7.2f;
         const float TreeOversize = 1.5f;
         const float HouseOversize = 1.5f;
+        const float TankOversize = 1.15f;
         const float SizeJitter = 0.25f;
+        const float TankSizeJitter = 0.06f;
+        const float TankTiltMax = 7f;
+        const float TankSink = 2.2f;
+        const float TankClearance = 30f;
         const float TreeDepthNear = 200f;
         const float TreeDepthBoost = 0.5f;
         const float MaxPropRadius = 75f;
@@ -28,8 +36,13 @@ namespace MetalRaptors
         const float ProbeY = -5000f;
 
         const string ModelFolder = "objects/";
+        const string TankTexture = "machines/tank_ww1";
 
         static readonly Quaternion StandUp = Quaternion.Euler(-90f, 0f, 0f);
+
+        static readonly int BaseMapId = Shader.PropertyToID("_BaseMap");
+        static readonly int MainTexId = Shader.PropertyToID("_MainTex");
+        static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
 
         static readonly string[] TreeModels =
         {
@@ -45,6 +58,10 @@ namespace MetalRaptors
             "burned_houses/house_3", "burned_houses/house_4", "burned_houses/house_5",
         };
 
+        static readonly string[] TankModels = { "machines/tank_ww1" };
+
+        enum Kind { House, Tank, Tree }
+
         class Prototype
         {
             public GameObject prefab;
@@ -55,17 +72,22 @@ namespace MetalRaptors
         class Prop
         {
             public GameObject go;
-            public float x, z, radius;
+            public GameObject burn;
+            public float x, y, z, radius;
+            public int seed;
         }
 
         readonly Dictionary<string, Prototype> _prototypes = new Dictionary<string, Prototype>();
         readonly Dictionary<int, Prop> _trees = new Dictionary<int, Prop>();
         readonly Dictionary<int, Prop> _houses = new Dictionary<int, Prop>();
+        readonly Dictionary<int, Prop> _tanks = new Dictionary<int, Prop>();
         readonly List<int> _scratch = new List<int>();
 
         Battlefield _field;
         int _seed;
         float _treeCell = TreeCellSize;
+        MaterialPropertyBlock _tankBlock;
+        bool _tankSkinMissing;
 
         public static BattlefieldProps Begin(Battlefield field, int seed)
         {
@@ -85,21 +107,26 @@ namespace MetalRaptors
 
         public void Tick(float camX)
         {
-            UpdateGrid(_houses, HouseModels, HouseCellSize, 11, camX, tree: false);
-            UpdateGrid(_trees, TreeModels, _treeCell, 12, camX, tree: true);
+            UpdateGrid(_tanks, TankModels, TankCellSize, 13, camX, Kind.Tank);
+            UpdateGrid(_houses, HouseModels, HouseCellSize, 11, camX, Kind.House);
+            UpdateGrid(_trees, TreeModels, _treeCell, 12, camX, Kind.Tree);
+            TickBurning(camX);
         }
 
         public bool Blocks(float x, float z, float margin, out Vector2 centre)
         {
             if (Nearest(_houses, HouseCellSize, x, z, margin, out centre)) return true;
+            if (Nearest(_tanks, TankCellSize, x, z, margin, out centre)) return true;
             return Nearest(_trees, _treeCell, x, z, margin, out centre);
         }
 
         void UpdateGrid(Dictionary<int, Prop> grid, string[] models, float cellSize, int salt,
-            float camX, bool tree)
+            float camX, Kind kind)
         {
-            int first = Mathf.FloorToInt((camX - _field.HalfViewWidth - StreamMargin) / cellSize);
-            int last = Mathf.FloorToInt((camX + _field.HalfViewWidth + StreamMargin) / cellSize);
+            int first = Mathf.FloorToInt(
+                (camX - _field.HalfViewWidth - StreamMargin) / cellSize);
+            int last = Mathf.FloorToInt(
+                (camX + _field.HalfViewWidth + StreamMargin) / cellSize);
 
             _scratch.Clear();
             foreach (var kv in grid)
@@ -107,8 +134,7 @@ namespace MetalRaptors
 
             foreach (int cell in _scratch)
             {
-                var stale = grid[cell];
-                if (stale != null && stale.go != null) Destroy(stale.go);
+                Release(grid[cell]);
                 grid.Remove(cell);
             }
 
@@ -116,52 +142,139 @@ namespace MetalRaptors
             {
                 if (grid.ContainsKey(cell)) continue;
 
-                var rng = new System.Random(Hash(_seed, cell, salt));
+                int hash = Hash(_seed, cell, salt);
+                var rng = new System.Random(hash);
                 float x = (cell + (float)rng.NextDouble()) * cellSize;
-                float z = Mathf.Lerp(ZMin, ZMax, (float)rng.NextDouble());
+                float z = kind == Kind.Tank
+                    ? Mathf.Lerp(TankZMin, TankZMax, (float)rng.NextDouble())
+                    : Mathf.Lerp(ZMin, ZMax, (float)rng.NextDouble());
                 string model = models[rng.Next(models.Length)];
                 float yaw = (float)rng.NextDouble() * 360f;
-                float size = 1f + ((float)rng.NextDouble() * 2f - 1f) * SizeJitter;
-                if (tree) size *= 1f + DepthBoost(z) * (float)rng.NextDouble();
+                float jitter = kind == Kind.Tank ? TankSizeJitter : SizeJitter;
+                float size = 1f + ((float)rng.NextDouble() * 2f - 1f) * jitter;
+                if (kind == Kind.Tree) size *= 1f + DepthBoost(z) * (float)rng.NextDouble();
+
+                float tilt = kind == Kind.Tank ? TankTiltMax : 0f;
+                var rotation = Quaternion.Euler(
+                    ((float)rng.NextDouble() * 2f - 1f) * tilt, yaw,
+                    ((float)rng.NextDouble() * 2f - 1f) * tilt);
 
                 if (!_field.SampleGround(x, z, out float y)) continue;
 
                 if (_field.InCrater(x, z)
                     || SlopeDeg(x, z, y) > MaxSlopeDeg
-                    || (tree && Nearest(_houses, HouseCellSize, x, z, 0f, out _)))
+                    || Occupied(kind, x, z))
                 {
                     grid[cell] = null;
                     continue;
                 }
 
-                grid[cell] = Build(model, x, y, z, yaw, size, tree);
+                grid[cell] = Build(model, x, y, z, rotation, size, kind, hash);
             }
         }
 
-        Prop Build(string model, float x, float y, float z, float yaw, float size, bool tree)
+        bool Occupied(Kind kind, float x, float z)
+        {
+            if (kind == Kind.Tank) return false;
+            if (Nearest(_tanks, TankCellSize, x, z, TankClearance, out _)) return true;
+
+            return kind == Kind.Tree && Nearest(_houses, HouseCellSize, x, z, 0f, out _);
+        }
+
+        void TickBurning(float camX)
+        {
+            float reach = _field.HalfViewWidth + TankBurnMargin;
+
+            foreach (var kv in _tanks)
+            {
+                var tank = kv.Value;
+                if (tank == null || tank.go == null) continue;
+
+                bool near = Mathf.Abs(tank.x - camX) <= reach;
+                if (near == (tank.burn != null)) continue;
+
+                if (near)
+                    tank.burn = WreckFire.Begin(transform,
+                        new Vector3(tank.x, tank.y, tank.z), tank.radius, tank.seed).gameObject;
+                else
+                {
+                    Destroy(tank.burn);
+                    tank.burn = null;
+                }
+            }
+        }
+
+        static void Release(Prop prop)
+        {
+            if (prop == null) return;
+            if (prop.go != null) Destroy(prop.go);
+            if (prop.burn != null) Destroy(prop.burn);
+        }
+
+        Prop Build(string model, float x, float y, float z, Quaternion rotation, float size,
+            Kind kind, int hash)
         {
             var proto = Load(model);
             if (proto == null) return null;
 
-            float scale = MetreScale * (tree ? TreeOversize : HouseOversize) * size;
+            float scale = MetreScale * Oversize(kind) * size;
             float radius = Mathf.Max(proto.bounds.extents.x, proto.bounds.extents.z) * scale;
+            float seat = LowestGround(x, z, radius, y)
+                         - (kind == Kind.Tank ? TankSink : 0f);
 
             var root = new GameObject(model);
             root.layer = Layer;
             root.transform.SetParent(transform, false);
-            root.transform.position = new Vector3(x, LowestGround(x, z, radius, y), z);
-            root.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
+            root.transform.position = new Vector3(x, seat, z);
+            root.transform.rotation = rotation;
             root.transform.localScale = Vector3.one * scale;
 
             var view = Instantiate(proto.prefab, root.transform);
             view.transform.localPosition = proto.offset;
             view.transform.localRotation = StandUp;
 
+            var skin = kind == Kind.Tank ? TankBlock() : null;
             foreach (var r in view.GetComponentsInChildren<Renderer>())
+            {
                 r.shadowCastingMode = ShadowCastingMode.On;
+                if (skin != null) r.SetPropertyBlock(skin);
+            }
 
-            AddCollider(root, proto.bounds, tree);
-            return new Prop { go = root, x = x, z = z, radius = radius };
+            AddCollider(root, proto.bounds, kind == Kind.Tree);
+
+            return new Prop
+            {
+                go = root, x = x, y = seat, z = z, radius = radius, seed = hash,
+            };
+        }
+
+        MaterialPropertyBlock TankBlock()
+        {
+            if (_tankBlock != null || _tankSkinMissing) return _tankBlock;
+
+            var texture = Resources.Load<Texture2D>(TankTexture);
+            if (texture == null)
+            {
+                Debug.LogError($"BattlefieldProps: {TankTexture} not found in Resources.");
+                _tankSkinMissing = true;
+                return null;
+            }
+
+            _tankBlock = new MaterialPropertyBlock();
+            _tankBlock.SetTexture(BaseMapId, texture);
+            _tankBlock.SetTexture(MainTexId, texture);
+            _tankBlock.SetColor(BaseColorId, Color.white);
+            return _tankBlock;
+        }
+
+        static float Oversize(Kind kind)
+        {
+            switch (kind)
+            {
+                case Kind.Tree: return TreeOversize;
+                case Kind.Tank: return TankOversize;
+                default: return HouseOversize;
+            }
         }
 
         static void AddCollider(GameObject root, Bounds bounds, bool tree)

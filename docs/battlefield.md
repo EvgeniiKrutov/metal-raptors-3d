@@ -1,8 +1,8 @@
 # Battlefield life
 
 Ambient life on the Verdun ground: random shell/mine blasts, burning smoke
-columns, small squads of infantry crossing the mud, and the dead trees and burned
-houses standing in it. Everything is built in code at runtime. Only the scenery
+columns, small squads of infantry crossing the mud, and the dead trees, burned
+houses and knocked-out tanks standing in it. Everything is built in code at runtime. Only the scenery
 props carry colliders — blasts, smoke and infantry have none and can never damage
 the player or soak a bullet. The gameplay-shaped interactions are that a ground
 blast wipes out any figures standing in it, and that a plane which clips a tree
@@ -122,6 +122,7 @@ deliberately occupy different slices of it:
 | Smoke columns | 140 – 380 | Just behind the play plane, close enough to read as part of the scene rather than horizon decoration. |
 | People | 40 – 700 | The whole map, so squads are seen both in front of and behind the aircraft. The back edge is per-map (`Battlefield.PeopleZMax`); Dolomites pulls it in to 520. |
 | Scenery props | 20 – 700 | The whole map. Reaching in front of the play plane is deliberate: near trees sweep past the camera for parallax, and the handful that land in the flight lane are the ones a plane can hit. |
+| Tank wrecks | 175 – 650 | Behind the play plane only, so a burning wreck and its smoke never sit on the player's own Z and never obscure the duel. 175 keeps even the near end a tank-length clear of the lane. |
 
 ## Ground blasts (`GroundBlast.cs`)
 
@@ -205,6 +206,13 @@ twice as large, so the source sizes are smaller than they would need to be
 further back. A pulsing emissive slab sits at the base as the fire itself, which
 is most of what you see of a column at night.
 
+`Begin` takes an optional **`scale`** (default 1) for callers that want the same column
+smaller: it multiplies puff start size, spread and rise, the wind jitter and the ember,
+and leaves life, growth, opacity, spin and the downwind drift alone. Burning tank wrecks
+are the one caller that passes it, at 0.55. Because it scales what each `Range` call
+returns rather than how many are drawn, the RNG sequence is untouched and a column at the
+default 1 is puff-for-puff what it was before the parameter existed.
+
 Columns are **pre-warmed** on creation: `Prewarm` emits the full set of puffs at
 staggered ages and advances each one to that age, so a column enters the view
 already at full height. Without it you would watch every column grow from the
@@ -254,13 +262,17 @@ grid holds entries would invalidate every `Nearest` lookup; fixing it at the sta
 
 ## Scenery props (`BattlefieldProps.cs`)
 
-Dead trees and burned-out houses, the only solid things on the battlefield. The
-models are the 12 FBX files in `Resources/objects/trees` and the 6 in
-`Resources/objects/burned_houses`, each with a single flat Phong material — like
-the plane models they live under `Assets/Resources/objects`, which the repository
-does not track (docs/conventions.md). The `objects/` prefix is not in the model
-table: `BattlefieldProps.Load` adds it, because the bare names are also the
-prototype cache's keys.
+Dead trees, burned-out houses and knocked-out tanks, the only solid things on the
+battlefield. The models are the 12 FBX files in `Resources/objects/trees`, the 6
+in `Resources/objects/burned_houses` and `machines/tank_ww1` — like the plane
+models they live under `Assets/Resources/objects`, which the repository does not
+track (docs/conventions.md). The `objects/` prefix is not in the model table:
+`BattlefieldProps.Load` adds it, because the bare names are also the prototype
+cache's keys.
+
+The three kinds share one streaming grid implementation and are told apart by a
+`Kind` enum, which selects the Z band, the oversize factor, the size jitter, the
+collider shape and what a candidate has to keep clear of.
 
 ### Placement
 
@@ -274,9 +286,20 @@ the same spot, and a level replays identically.
 | --- | --- | --- |
 | Trees | 58 | ~12 on screen |
 | Houses | 620 | ~1 on screen |
+| Tanks | 400 | 1–2 on screen |
 
-**Houses are updated first**, because a tree candidate that falls inside a house
-footprint is dropped — the one overlap the two grids can produce on their own.
+**The grids are updated tanks first, then houses, then trees**, and each one only
+has to avoid the kinds already placed: a house candidate is dropped inside a tank's
+footprint plus 30 units, a tree candidate inside a tank's or a house's. Ordering is
+what makes that cheap and deterministic — the tank grid tests nothing, so a tank
+never depends on what streamed in before it, and every grid uses the same
+`halfViewWidth + 500` window, so the kinds it must avoid are always fully populated
+by the time it runs. Reversing the order would make the answer depend on which way
+the camera had travelled.
+
+Tanks win the ties because there are one or two of them against a dozen trees: a
+tree missing from behind a wreck reads as the wreck having cleared it, whereas a
+tank shoved out of the way by a tree is one less set piece.
 
 A candidate is refused, and its cell remembered as empty, when it is inside a
 crater (bowl + rim, via `Battlefield.InCrater`) or standing on ground steeper
@@ -303,16 +326,23 @@ standing model about the world Y axis.
 
 ### Model colours
 
-Nothing in the code touches a prop's material — each FBX carries a single flat Phong
-material and is rendered with whatever the importer builds from it (`materialImportMode: 2`,
-embedded, identical on all 18 models). The authored diffuse values are the only thing that
-gives a prop its colour:
+Trees and houses take their colour entirely from the asset — each FBX carries one flat
+Phong material and is rendered with whatever the importer builds from it
+(`materialImportMode: 2`, embedded). The tank is the exception: it carries five
+materials and a **texture**, and the code binds that texture (see *Skinning the tank*
+below), so its authored diffuse values only show if the texture fails to load. They are
+listed here as that fallback:
 
 | Models | Material | Diffuse |
 | --- | --- | --- |
 | `bent_tree_*`, `gnarled_tree_*` | `TreeDeadWood.*` | 0.34, 0.21, 0.10 |
 | `dead_tree_*` | `TreeDeadWood.*` | 0.28, 0.16, 0.07 |
 | `house_0`–`house_5` | `BurnedWood.001`–`.006` | 0.052, 0.034, 0.022 |
+| `tank_ww1` sponsons, guns, grilles | `black_steel` | 0.023, 0.026, 0.030 |
+| `tank_ww1` gun mounts, grille frames | `steel` | 0.068, 0.076, 0.084 |
+| `tank_ww1` rear hatch | `hull` | 0.533, 0.323, 0.070 |
+| `tank_ww1` tracks | `tracks` | 0.045, 0.044, 0.038 |
+| `tank_ww1` unditching rail | `tank_material` | 0.120, 0.100, 0.085 |
 
 **A white prop means a bad export, not a shader problem.** `house_0` shipped with its
 diffuse *and* specular at pure white — the exporter's default — which rendered it as a
@@ -323,16 +353,61 @@ rendering fault rather than one broken asset. The values above were written back
 `Assets/Resources/objects` is not tracked (docs/conventions.md), a re-export from the
 source scene will bring the white back unless the material is fixed there too.
 
+`tank_ww1` shipped the **same bug on one material**. Its `tank_material` — the unditching
+rail along the roof — was at 0.8 grey, and it was patched the same way, in place, to the
+scorched value in the table. That only matters on the fallback path now, but it is the
+value the wreck falls back *to*, so it is worth having right.
+
+### Skinning the tank
+
+The tank's 2048² camo atlas is bound in code, from
+`Assets/Textures/Resources/machines/tank_ww1.png`, and it is the one place anything here
+touches a prop's appearance. The importer cannot do it: the FBX names its map `123.png`,
+a file that is not in the project and never was, and it wires that name to
+`tank_material` alone — one small roof rail out of five materials. Renaming the texture to
+match would therefore skin the rail and nothing else.
+
+Every mesh in the model is unwrapped into that single atlas — all sixteen have UVs inside
+`[0, 1]` covering different islands of it — so the fix is to put the map on **all** of the
+model's renderers. `TankBlock` loads it once per level and fills one shared
+`MaterialPropertyBlock` with `_BaseMap`, `_MainTex` and a **white `_BaseColor`**; `Build`
+sets that block on every renderer in the instantiated view, in the loop that was already
+walking them to turn shadow casting on.
+
+The white base colour is the part that is easy to miss. URP Lit multiplies `_BaseColor`
+by the map, and four of the five authored materials sit between 0.02 and 0.07 — binding
+the atlas without overriding the tint would crush the camo to near-black on everything but
+the rear hatch. One block is shared by every wreck: it holds no per-renderer state, so
+there is nothing to read back with `GetPropertyBlock` first, and streaming tanks in and out
+allocates nothing.
+
+If the texture is missing, `TankBlock` logs once, latches `_tankSkinMissing`, and every
+tank renders in the flat authored colours above rather than spamming the console per
+wreck.
+
 ### Scale, seating and colliders
 
 The models are authored in metres (a tree is about 5 m, a house 7.5 m wide) and
 the game runs at roughly **7.2 units per metre** — a 13-unit soldier is 1.8 m.
 A prop's root is scaled by `MetreScale`
-7.2, then by an oversize factor of **1.5** (`TreeOversize` / `HouseOversize`,
-tunable per kind), then by ±25 % per-instance jitter — which keeps the models'
-relative sizes. Trees land around 45–65 units tall, around the length of a plane
-(44–57 units, docs/plane-scale.md); houses around 70–90 wide. Deliberately larger than life, so they read at
-the camera's 420-unit standoff.
+7.2, then by a per-kind oversize factor, then by per-instance jitter — which keeps
+the models' relative sizes. Trees land around 45–65 units tall, around the length
+of a plane (44–57 units, docs/plane-scale.md); houses around 70–90 wide.
+Deliberately larger than life, so they read at the camera's 420-unit standoff.
+
+| Kind | Oversize | Jitter | Result |
+| --- | --- | --- | --- |
+| Trees, houses | 1.5 | ±25 % | 45–65 tall / 70–90 wide |
+| Tanks | 1.15 | ±6 % | ~67 long, ~34 wide, ~27 tall |
+
+The tank is the one prop **soldiers walk right up to**, and that is what sets its
+two numbers apart. At the scenery's 1.5 the 8-metre Mark IV would stand over twice
+a 13-unit soldier and the mismatch would be read directly off the figures beside
+it; 1.15 keeps it imposing — hull roughly 1.6 soldiers tall, which is about right
+for the real machine — without breaking that comparison. And the ±25 % jitter that
+makes a stand of trees look natural makes two of the same factory-built tank look
+wrong, so tanks take ±6 %: enough to stop them stamping, not enough to read as
+different models.
 
 Trees get one extra factor on top: a **depth boost** of
 `1 + InverseLerp(200, 700, z) × 0.5 × rand`. It is zero in front of `z = 200` and
@@ -353,8 +428,55 @@ it is why the same bounds can be handed straight to the collider.
 
 Colliders are deliberately generous, one per object on the scaled root: a
 Y-capsule enclosing trunk *and* branches for a tree, a box around the walls for a
-house. Clipping a branch or a doorway counts as a hit; nothing can slip through a
-collapsed wall.
+house or the hull for a tank. Clipping a branch or a doorway counts as a hit;
+nothing can slip through a collapsed wall. A tank's collider never actually fires —
+its Z band keeps it well behind the flight lane — but it is the same box a house
+gets, so the wreck is solid to anything that ever does reach it.
+
+### Tank wrecks (`WreckFire.cs`)
+
+One `machines/tank_ww1` — a Mark IV — on a 400-unit grid, so **one or two are on
+screen at a time** once craters and steep ground have taken their cut of the
+candidates. Everything about one is drawn from the cell's own hashed
+`System.Random`, so a wreck streamed out and back in returns identical: its X
+inside the cell, its Z across 175–650, a full 360° yaw, ±6 % size, and — unique to
+tanks — a **±7° pitch and roll**. A knocked-out tank sitting perfectly level reads
+as parked; the tilt is what makes it read as abandoned where it stopped. It is then
+sunk `TankSink` 2.2 units below the lowest ground under its footprint, which beds it
+into the mud and hides the gap a tilted hull would otherwise open at one corner.
+
+Every tank is **burning**. `WreckFire.Begin` builds the whole effect under one
+object parented to the props root — not to the tank, because the tank's root
+carries the model scale and the wreck's tilt, and smoke has to rise vertically at
+world scale whatever the hull is doing:
+
+- **Seven flames**, the same blob-mesh-and-flicker vocabulary as `PlaneFire`: an
+  emissive URP material per flame pulsing between a deep orange and a hot yellow at
+  3.5–8 Hz, sized 0.10–0.26 × the hull radius and scattered ±0.42 × it in X and Z,
+  0.28–0.85 × it in Y — mid-hull to just above the roof.
+- **A smoke column**, the ordinary `SmokeColumn` at `scale` 0.55. That parameter
+  multiplies puff start size, spread, rise and wind jitter, and the ember at the
+  base; it leaves puff life, growth, opacity and spin alone, and — because it scales
+  the *result* of each `Range` call rather than the draw — a column at the default 1
+  is unchanged down to the last puff. Wind is deliberately **not** scaled: the same
+  7 units of drift across a slower rise leans a wreck's plume harder than a shell
+  crater's, which is what a low fire in wind actually does.
+
+The flames and smoke are attached only while the tank is within
+`halfViewWidth + 120` of the camera, added and removed by `TickBurning`. The model
+itself streams on the ordinary `halfViewWidth + 500` window like every other prop —
+that wider window is what keeps placement deterministic — but a burning tank costs
+a smoke column's worth of puffs and seven flickering materials, and there is no
+reason to pay it for the two or three wrecks sitting off-screen. Nothing pops:
+`SmokeColumn` prewarms its whole 13 seconds of puffs on the frame it is created, so
+a fire that ignites 120 units outside the view is already fully formed by the time
+it scrolls in.
+
+Squads treat a wreck exactly as they treat a house — it is in the same
+`BattlefieldProps.Blocks` lookup, so both the per-figure 18-unit and the per-group
+34-unit clearance steer infantry around it, and the tank's ~33-unit radius makes
+that a wide berth. Shells still land on it and the blast still kills the figures
+standing around it; the wreck itself is not destructible and takes no damage.
 
 ### Scraping a prop
 
@@ -449,7 +571,7 @@ reflects the heading (`-θ` off a Z wall, `180° - θ` off an X wall).
 
 ### Going around the scenery
 
-Figures never walk through a tree or a house. `Deflect` asks
+Figures never walk through a tree, a house or a tank wreck. `Deflect` asks
 `BattlefieldProps.Blocks` for the nearest prop whose radius plus a clearance
 contains the walker, and turns the heading away from that prop's centre at
 300°/s. It is pure steering — no position clamp — so a squad flows around an
@@ -463,7 +585,7 @@ not streamed in yet.
 
 The lookup is cheap because the props are already in X-keyed grids: `Blocks`
 only visits the cells within `MaxPropRadius + clearance` of the walker, which is
-one or two cells per grid.
+one or two cells per each of the three grids.
 
 The step is sold entirely by a vertical hop: `|sin(π · (t · rate + phase))| × 0.9`
 units while moving, zero while halted, with a per-figure phase offset so nobody
