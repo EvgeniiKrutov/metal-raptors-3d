@@ -14,9 +14,9 @@
 
     { "op": "wait", "seconds": 2.5 },
 
-    { "op": "wave", "enemies": [ { "plane": "fokker", "count": 1 } ] },
+    { "op": "wave", "enemies": [ { "plane": "eindecker", "count": 1 } ] },
     { "op": "wait", "seconds": 4 },
-    { "op": "wave", "enemies": [ { "plane": "fokker", "count": 1 } ] },
+    { "op": "wave", "enemies": [ { "plane": "eindecker", "count": 1 } ] },
 
     { "op": "wait", "seconds": 1.5 },
 
@@ -31,11 +31,11 @@
     { "op": "say", "speaker": "lasalle", "line": "l1_line20" },
     { "op": "say", "speaker": "roussel", "line": "l1_line21" },
 
-    { "op": "wave", "enemies": [ { "plane": "fokker", "count": 1 } ] },
+    { "op": "wave", "enemies": [ { "plane": "eindecker", "count": 1 } ] },
     { "op": "wait", "seconds": 4 },
-    { "op": "wave", "enemies": [ { "plane": "fokker", "count": 1 } ] },
+    { "op": "wave", "enemies": [ { "plane": "eindecker", "count": 1 } ] },
     { "op": "wait", "seconds": 4 },
-    { "op": "wave", "enemies": [ { "plane": "fokker", "count": 2 } ] },
+    { "op": "wave", "enemies": [ { "plane": "eindecker", "count": 2 } ] },
 
     { "op": "wait", "seconds": 1.5 },
 

@@ -249,6 +249,7 @@ and where the model's nose really points:
 | Sopwith Camel | +7.3° | −10° | — | −2.7° |
 | Fokker Dr.I | +5.9° | −10° | — | −4.1° |
 | Albatros D.III | −2.1° | −10° | +9.4° | −2.7° |
+| Fokker E.III | 0° | −10° | +10° | **0°** |
 
 Three or four degrees of cone is not visible on a spinning blade, so the body's axis is the
 right one to use: it needs no per-plane data, it cannot drift out of step with a re-export,
@@ -267,6 +268,26 @@ and it is already the axis everything else about the plane is measured against.
   `pitchTrimDeg` fixed the propeller, and the axis went back to the body's `+X`.
 
 If a prop cones, check the plane's attitude and its propeller nodes before the axis.
+
+The E.III proved the rule a second time. It was added with no `pitchTrimDeg`, sat at −10°, and
+showed both halves of the symptom at once — an airframe that would not fly level and a blade
+sweeping the cowling at a slant. Nothing was wrong with `propeller` / `prop_blade_1`, and
+nothing was wrong with the axis; the attitude was, and one trim value fixed both.
+
+**The E.III is the one plane whose cone is exactly zero, and it is worth knowing why.** Its
+blade is a 36-vertex two-blade prop that is symmetric and *untwisted*: chord and radius axes
+both centred on 0, identical geometry at both tips, and the only off-centre component (0.038
+in model units) lying **along** the spin axis, where it cannot wobble. With no twist the disc
+is exactly perpendicular to the model's nose axis, which collapses the last column to a single
+identity —
+
+    cone angle = |ModelPitchDeg + pitchTrimDeg|
+
+— so `+10°` is not a fitted number, it is the only value that zeroes it. The first attempt at
+this trim used `+7.3°`, chosen to land the plane on the Camel's −2.7° for consistency; that is
+**copying the other planes' leftover error rather than removing it**, and at 2.7° the cone was
+still visible on this model's tight cowling. Where a model's disc is square to its own axes,
+trim to zero rather than to the family's residual.
 
 ## Scrape shake (`ShakeEffect.cs`)
 

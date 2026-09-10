@@ -39,6 +39,12 @@ namespace MetalRaptors
             color = Parse("#6E7A4A"),
         };
 
+        public static readonly PlaneType Scout = new PlaneType
+        {
+            label = "scout",
+            color = Parse("#4A7C50"),
+        };
+
         static Color Parse(string hex) =>
             ColorUtility.TryParseHtmlString(hex, out Color c) ? c : Color.magenta;
     }

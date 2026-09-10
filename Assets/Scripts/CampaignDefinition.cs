@@ -133,7 +133,7 @@ namespace MetalRaptors
             enemyHealthScale = 0.50f,
             enemyRotationScale = 0.80f,
             supplyDrops = 1,
-            companionFoe = PlaneModels.Fokker,
+            companionFoe = PlaneModels.Eindecker,
             title = "WARMING ENGINES",
             dateline = "14 April 1916",
             lore = Before1,

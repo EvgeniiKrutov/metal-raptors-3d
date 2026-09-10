@@ -319,7 +319,7 @@ and raycasts the streamed ground under itself so its corridor can follow the con
 means, so nothing can wedge the script permanently.
 
 The plane named in a wave entry decides its **role**, through `PlaneModelConfig.enemyRole`:
-`albatros` flies as a fighter, `fokker` as a scout. Each role has its own asset —
+`albatros` flies as a fighter, `fokker` and `eindecker` as scouts. Each role has its own asset —
 `EnemyScoutConfig` and `EnemyFighterConfig` — and the whole of docs/enemies.md is about what
 that changes. Per-level difficulty is a pair of multipliers on `CampaignDefinition`, applied to
 both role assets; `0` on either keeps the asset's own figure:

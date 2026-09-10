@@ -110,7 +110,7 @@ when it reaches zero. The two buttons count independently. Timing runs on
 still fires if Tab closes the console mid-countdown; a pending spawn is cancelled if the
 level stops being spawnable first.
 
-The plane launched is `PlaneModels.EnemyFor(role)` — the Dr.I for scout, the D.III for
+The plane launched is `PlaneModels.EnemyFor(role)` — the E.III for scout, the D.III for
 fighter, the same mapping campaign scripts get through `PlaneModelConfig.enemyRole`
 (docs/enemies.md). It goes through `CampaignEnemies.Spawn` as a one-plane wave, so it
 enters off the right edge of the view and behaves exactly like a scripted wave's plane.

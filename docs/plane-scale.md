@@ -13,6 +13,7 @@ each other as the machines were.
 | Sopwith Camel | 5.72 m | 8.5 m | 2.59 m | 44.4 | 1.000 | 66.0 |
 | Fokker Dr.I | 5.77 m | 7.19 m | 2.95 m | 44.8 | 1.009 | 55.8 |
 | Albatros D.III | 7.35 m | 9.0 m | 2.8 m | 57.1 | 1.285 | 69.9 |
+| Fokker E.III | 7.2 m | 9.52 m | 2.4 m | 55.9 | 1.259 | 73.9 |
 
 `PlaneModelConfig.UnitsPerMeter` is `66 / 8.5` ≈ 7.76. The **Camel is the reference at
 1.0**: the 8.5 in the denominator is its wingspan, which used to be fitted to a flat 60

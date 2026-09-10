@@ -39,6 +39,7 @@ stats and its model:
 | Sopwith Camel | `green`, `blue` |
 | Fokker Dr.I | none (`skins` left null) |
 | Albatros D.III | `plywood` |
+| Fokker E.III | none (`skins` left null) |
 
 **The first entry is the default.** `PlaneSkins.Default` returns `skins[0]`, so the Sopwith
 is green until the player says otherwise, and a plane with no skins resolves to `null` —

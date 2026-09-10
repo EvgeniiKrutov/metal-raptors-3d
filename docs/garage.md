@@ -336,14 +336,14 @@ not rebuild the body out from under the animation.
 definition. `PlaneStatBars.All` is the display list — one entry per bar, carrying its
 label, the field to read and the **ceiling** the bar is drawn against:
 
-| bar | ceiling | Sopwith Camel | Fokker Dr.I | Albatros D.III |
-| --- | --- | --- | --- | --- |
-| max speed | 360 | 288 | 264 | 300 |
-| rotation speed | 200 | 120 | 140 | 104 |
-| mass | 4 | 2.5 | 2.1 | 3 |
-| fire rate | 8 | 5 | 5.5 | 5.5 |
-| damage | 15 | 10 | 10 | 10 |
-| health | 200 | 150 | 128 | 165 |
+| bar | ceiling | Sopwith Camel | Fokker Dr.I | Albatros D.III | Fokker E.III |
+| --- | --- | --- | --- | --- | --- |
+| max speed | 360 | 288 | 264 | 300 | 210 |
+| rotation speed | 200 | 120 | 140 | 104 | 95 |
+| mass | 4 | 2.5 | 2.1 | 3 | 1.8 |
+| fire rate | 8 | 5 | 5.5 | 5.5 | 4.5 |
+| damage | 15 | 10 | 10 | 10 | 9 |
+| health | 200 | 150 | 128 | 165 | 105 |
 
 The ceilings are display headroom, not caps — they exist so today's values sit around two
 thirds full instead of pegged at 100%, leaving somewhere for a faster or tougher plane to go.
@@ -361,10 +361,16 @@ Above the bars sits **one** row that is not a bar, carrying two things and no ca
 
 * the **type badge** — a filled rectangle in the type's own colour with its name in the page
   background colour, built by `MenuBadge`. `PlaneType` pairs the label with the colour and
-  `PlaneTypes` holds the table (`Fighter` `#9E4A3C`, plus `Bomber` and `Recon` ready for when
-  a plane needs them); a plane points at one through `PlaneModelConfig.type`. The badge sizes
-  itself to its text plus `BadgePadX` either side, so a longer type name just makes a wider
-  badge. All three planes are `Fighter` today.
+  `PlaneTypes` holds the table (`Fighter` `#9E4A3C` and `Scout` `#4A7C50`, plus `Bomber` and
+  `Recon` ready for when a plane needs them); a plane points at one through
+  `PlaneModelConfig.type`. The badge sizes itself to its text plus `BadgePadX` either side, so
+  a longer type name just makes a wider badge. The three D-class machines are `Fighter`; the
+  E.III is the one `Scout`.
+
+  `Scout`'s green is a mid-dark one on purpose: `MenuBadge.Set` paints the label in the page
+  **background** colour on the type's own fill, so a light green would leave `SCOUT` unreadable.
+  `#4A7C50` sits at about the same lightness as `Fighter`'s red and is a cooler, more saturated
+  green than `Recon`'s olive `#6E7A4A`, so the two stay apart if a recon plane ever lands.
 * the **country**, `BadgeValueGap` (16px) to the right of it — a bare `Fg` value, no caption.
   It reads fine unlabelled beside the type, and a caption would only be in the way of the flag
   that is going there.
@@ -408,14 +414,21 @@ failure mode a display-only table invites.
 
 The Dr.I is drawn from the aircraft: lighter and quicker on the controls, slower in level
 flight, more fragile, and a shade faster on the guns (its twin Spandaus outpaced the Camel's
-Vickers). Damage is the one bar all three share — every one of them carried a pair of
-synchronised rifle-calibre machine guns.
+Vickers). Damage is the one bar the three D-class machines share — every one of them carried a
+pair of synchronised rifle-calibre machine guns.
 
 The Albatros D.III is the other extreme: a 160 hp inline Mercedes instead of a rotary, so it
 is the **fastest** and the **toughest** of the three and by far the **worst turner** (104°/s,
 against the Camel's 120 and the Dr.I's 140). It is the heaviest as well, at 3 of a 4 ceiling.
 It shares the Dr.I's 5.5 fire rate — the same twin Spandaus — which leaves turn rate as the
 price the player pays for its speed and its health.
+
+The Fokker E.III is deliberately the weakest thing in the garage, and it is the only entry
+that is **under** all three D-class machines on every bar. A 100 hp Oberursel and wing-warping
+against the Camel's 130 hp rotary and ailerons: 210 max speed, 95°/s, 105 health, and 4.5 on
+the guns for its single Spandau — the only plane here that does not carry a pair. It is the
+lightest at 1.8 and the only one under 10 damage, at 9. It is a 1915 machine parked beside
+1917 ones, and the bars are meant to say so rather than flatter it.
 
 **Enemies are unaffected.** An enemy flying an Albatros is initialised from
 `EnemyFighterConfig.asset` (a Dr.I from `EnemyScoutConfig.asset` — docs/enemies.md), which has
@@ -468,7 +481,7 @@ Three things are particular to it:
   on click, and light `Accent` while hovered (`MenuArrowView` gained an `Exited` event for
   this; the selector rows do not subscribe, so their arrows keep the menu's no-clear-on-exit
   rule).
-* The list **wraps**: with three planes both triangles are always live, so neither ever greys
+* The list **wraps**: with four planes both triangles are always live, so neither ever greys
   out the way a selector row's do at the end of its values.
 * `↑` / `↓` move the focus inside the column — `colour` (when shown) and `select plane`.
 * **Holding the left button (or a finger) over the plane** and moving left/right turns it (see
@@ -525,6 +538,7 @@ differently-exported model is a registry entry rather than a code change:
 | Sopwith Camel | `propPivot` | `propBlades` | the blade mesh |
 | Fokker Dr.I | `propPivot` | `propBlades` | the blade mesh |
 | Albatros D.III | `propAssembly` | `prop` | `cyl.013` spinner, and `blade` + `cyl.014` under `prop` |
+| Fokker E.III | `propeller` | `prop_blade_1` | the blade mesh |
 
 The Albatros carries a spinner as well as blades, which is why its pivot is a level above its
 blade node: `PropellerSpin` goes on `propPivotNode`, so the spinner turns with the blades

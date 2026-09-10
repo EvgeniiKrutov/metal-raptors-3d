@@ -29,11 +29,28 @@ climb, and is the fighter's preferred meal.
 | Model | Role |
 | --- | --- |
 | `albatros` — Albatros D.III | Fighter |
+| `eindecker` — Fokker E.III | Scout |
 | `fokker` — Fokker Dr.I | Scout |
 | `sopwith` — Sopwith Camel | Fighter (the default; never spawned as an enemy today) |
 
-The Dr.I is a stand-in. The scout is written for a Fokker Eindecker; when that model lands it
-takes the role and the Dr.I goes back to being a fighter.
+The E.III is the scout the role was written for, and `PlaneModels.EnemyFor(Scout)` returns it —
+so every role-driven spawn (the Tab console's SPAWN SCOUT, `CampaignLevelController`'s
+role-based waves) flies an Eindecker. The Dr.I keeps `enemyRole = Scout` so the scripted
+`fokker` waves still get the scout config and the scout's altitude band; they simply fly a Dr.I
+airframe rather than an E.III.
+
+**Level 1 flies Eindeckers, later levels keep the Dr.I.** All five of `level1.json`'s waves are
+`eindecker`, and `CampaignLevels.Level1.companionFoe` is the E.III as well, so the background
+duel matches the waves. That is the era reading as much as the roster: level 1 is dated
+14 April 1916, when the E.III was the German scout, and the Dr.I did not reach the front until
+late 1917. `level3.json` and `level9.json` keep their `fokker` waves. Level 2 has no scout
+waves at all — its three waves are `albatros`, which is a **fighter**, so nothing in it answers
+to "the scouts".
+
+`ById` resolves a plane by its `resourceName`, by the part before the first `_`, or by its
+explicit `scriptId`. `fokker` still resolves to the Dr.I — it is the earlier entry in
+`PlaneModels.All` and owns that prefix — so the Eindecker carries `scriptId = "eindecker"`
+and is the one id a script must spell out.
 
 ## Altitude bands
 
@@ -58,7 +75,7 @@ A role leaves its band only during a declared manoeuvre. The fighter's practical
 
 **The scout's band is terrain-relative, not a fraction.** The fractions above are fixed slices of
 the world, and the deck slice is only 80 m tall — less than the scout's own turn *radius*
-(160 m/s ÷ 88 °/s ≈ 104 m), so a scout held inside it could not complete a turn without flying
+(180 m/s ÷ 88 °/s ≈ 117 m), so a scout held inside it could not complete a turn without flying
 into the ground. Instead the scout's corridor rides the contour under it: floor at
 `contour + safeAltitudeMargin` (220 m), roof at `contour + deckCeilingMargin` (380 m) but never
 above the mid/high boundary, so it stays out of the fighter's airspace. On Verdun that is 240 – 379
@@ -93,9 +110,9 @@ only ever felt like a cheat.
 
 ## Scout
 
-160 m/s cruising and 256 flat out, 88 °/s to the left and 57 °/s to the right, 137.5 health,
-6 damage a round. **Both of those numbers sit under the whole garage**: 256 is below the Dr.I's
-264, the slowest plane the player can buy, and 88 is below the Albatros's 104 °/s, the widest
+180 m/s cruising and 256 flat out, 88 °/s to the left and 57 °/s to the right, 137.5 health,
+6 damage a round. **Flat out and turn rate both sit under the D-class garage**: 256 is below the
+Dr.I's 264, the slowest of the three, and 88 is below the Albatros's 104 °/s, the widest
 turner of the three. Whatever the player flies, they can out-run a scout and out-turn a scout —
 the fight is winnable by flying, not only by shooting, and every escape and every break the AI
 below offers is one the airframe can actually take. It is the pressure role, so its gun discipline is
@@ -114,6 +131,35 @@ always shooting at you:
 
 Longer runs, shorter break-aways, shorter and rarer evades: the scout spends most of an engagement
 pointed at you, and its 6 damage a round is what keeps that survivable.
+
+### Cruise matches the player, flat out does not
+
+The cruise was 160 and the scout **could not hold a firing position**. Nothing was wrong with the
+guns: `EngageTarget` only fires *beyond* `engageRange` (380 m) and only while the player is moving
+away, and `TailSpeed` only matches the player's speed in the `Tail` state. In `Attack` and `Fly` —
+the states it actually shoots from — the scout ran at a flat `flySpeed`, so at 160 against a player
+cruising at 180 it slid backwards out of its own firing cone every pass.
+
+Cruise is therefore **180, the player's own**, and `maxSpeedMultiplier` drops 1.6 → 1.422 so that
+`flySpeed × maxSpeedMultiplier` stays at exactly **256**. The two halves are deliberately split:
+
+* **Cruise** decides whether the scout can *fight* you. At 180 it holds station through a pass
+  instead of falling out of it.
+* **Flat out** decides whether the scout can *catch* you, and 256 is the number that says no. Had
+  the multiplier been left at 1.6 the cap would have gone to 288 — exactly a Camel's top speed —
+  and a player running flat out could never shake a scout again. Raising the ceiling would have
+  answered a question nobody asked; the complaint was about the floor.
+
+The turn radius grows with the cruise — 117 m one way and 181 m the other, up from 104 / 160 — but
+nothing downstream needed resizing: `TurnClear` already simulates each arc at the speed the plane is
+*actually* making rather than at `flySpeed`, and it was built to handle the 256 m/s case, which is
+further from 180 than 180 is from 160.
+
+One rule above is now stale, and knowingly so. "256 is under the slowest plane the garage sells"
+was written when that was the Dr.I's 264. The garage now also sells the **Fokker E.III at 210**, so
+a player who picks it cannot out-run a scout at all. That is the E.III's bargain rather than a bug —
+it is the deliberately weakest airframe on every bar (docs/garage.md) — but if a plane that slow
+should still be able to disengage, the cap is the thing to lower, not the cruise.
 
 ### How the pressure was raised
 
@@ -182,9 +228,9 @@ eased steering as every other plane; what the turn choice changes is not *how fa
 
 ### Choosing which way to turn (`ChooseTurn`)
 
-A turn in a side-scroller costs altitude: half of it is spent pointing downward, and at 160 m/s the
-scout's turn radius is 104 m one way and 160 m the other, so a reversal taken the wrong way round
-drops it 208 – 320 m — straight through the corridor floor and into the ground.
+A turn in a side-scroller costs altitude: half of it is spent pointing downward, and at 180 m/s the
+scout's turn radius is 117 m one way and 181 m the other, so a reversal taken the wrong way round
+drops it 234 – 362 m — straight through the corridor floor and into the ground.
 
 So before committing to a turn of more than 30°, the scout works out whether it can survive it.
 `TurnClear` runs a short forward simulation of the arc — 2 s at 0.15 s steps, using the *actual*
@@ -193,7 +239,7 @@ slow — and probes the terrain under every sample. The arc is flown at the spee
 *actually* making (`FlightSpeed` — cruise, the engagement boost, or the `Return` catch-up,
 whichever is highest), not at the configured `flySpeed`, and at the matching boosted turn rate
 (`TurnBoost`, below), so the arc it probes is the one the plane will really fly. A scout chasing a
-boosting Camel is doing 256 m/s, not 160; before the turn rate was boosted with it, that arc was
+boosting Camel is doing 256 m/s, not 180; before the turn rate was boosted with it, that arc was
 nearly twice as wide and sank nearly twice as deep as the cruise figure — which is precisely how a
 scout that had just clawed its way back into frame flew itself into the ground.
 The simulated turn rate also ramps in on the same
@@ -281,8 +327,8 @@ as far as its 256 cap allows, which against a player at full throttle is not far
 
 This asymmetry *is* the scout's reversal cost — there is no separate manoeuvre for it. A scout
 turning around simply takes longer one way than the other, through ordinary steering. It also
-feeds the terrain check below: the slow side's turn radius is half again as wide (160 m against
-104 m), so it is the side more likely to be refused when the ground is close.
+feeds the terrain check below: the slow side's turn radius is half again as wide (181 m against
+117 m), so it is the side more likely to be refused when the ground is close.
 
 ### Depth dodge
 
@@ -378,7 +424,7 @@ its firing range. So parking high buys you a lull, not immunity.
 
 160 m/s, 75 °/s, 130 health, a shot every 0.20 s, 6 damage. It used to cruise at the player's
 own 180 and turn at 105 °/s; it is now the widest-turning thing in the air, with a **122 m turn
-radius** (`v / ω` — 160 ÷ 1.31 rad/s) against the scout's 104 m one way and 160 m the other, and
+radius** (`v / ω` — 160 ÷ 1.31 rad/s) against the scout's 117 m one way and 181 m the other, and
 the player's 86 m at cruise. It cannot follow you round a corner and it is not supposed to try:
 a level runaway is answered by the engagement boost below, and a turning fight by the loop
 reversal or a dive, never by matching your arc. Dropping the cruise under the player's 180 also
@@ -777,8 +823,8 @@ break heading, and again on `towardHeading ± ScissorsAngle` when the move drawn
 
 ## Engagement boost (both roles)
 
-Without this, a player who simply flies away is uncatchable: both roles cruise at 160 and the
-player cruises at 180, or 234 on a boost. So when the player is beyond `engageRange` (fighter
+Without this, a player who simply flies away is uncatchable: the fighter cruises at 160, the scout
+at 180, and the player cruises at 180, or 234 on a boost. So when the player is beyond `engageRange` (fighter
 450 m, scout 380) **and** moving away
 (`dot(playerVelocity, enemy → player) > 0`), the enemy's speed target becomes the player's own
 speed × `engageFactor` (1.15), ignoring its configured `flySpeed` entirely. It eases in and out at
@@ -793,7 +839,7 @@ moment wins.
 respected a ceiling: a scout chasing a fleeing Camel took 288 × 1.15 = 331 and simply outran it —
 and the Albatros's 300 the same way — for as long as the player kept running — most visibly right after
 shaking off a run-down, which is exactly the moment the range is open and the boost is at full.
-`FlightSpeed` now clamps a scout to `flySpeed × maxSpeedMultiplier` (160 × 1.6 = **256**) after
+`FlightSpeed` now clamps a scout to `flySpeed × maxSpeedMultiplier` (180 × 1.422 = **256**) after
 every one of those terms, which is under the Dr.I's 264 — the slowest thing the garage sells. A
 scout can still close on a player who is not running flat out, and can never overhaul one who is.
 The fighter keeps the uncapped boost: it is the role that is *supposed* to catch you, and its
@@ -804,7 +850,7 @@ own `_speed` is already clamped to the same 256 by `UpdateSpeed`.
 The campaign camera ratchets: `CampaignLevelController.PositionCamera` takes
 `Max(camX, lerp → playerX)`, so the frame scrolls right at roughly the player's 180 m/s cruise and
 never comes back. Everything in the air is therefore flying against a moving frame, and an enemy
-that cruises at 160 loses ground simply by flying straight. A single loop reversal costs it
+that cruises under the player's 180 loses ground simply by flying straight. A single loop reversal costs it
 another 270 m of frame — a third of the screen — and a break-away costs more.
 
 The old answer was a hard left wall: `CampaignEnemies` pushed

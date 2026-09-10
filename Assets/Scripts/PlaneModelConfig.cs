@@ -11,6 +11,8 @@ namespace MetalRaptors
 
         public string resourceName;
 
+        public string scriptId;
+
         public string folder = WorldWar1;
 
         public string ResourcePath => string.IsNullOrEmpty(folder)
@@ -73,6 +75,13 @@ namespace MetalRaptors
             "the pilot a clear view downward and a nasty habit of shedding itself in a hard dive. " +
             "Richthofen flew one through Bloody April, when the Jastas took four British machines " +
             "for every one they lost.";
+
+        const string EindeckerStory =
+            "The machine behind the Fokker Scourge, unremarkable in every way but one: a gun that " +
+            "fired through its own propeller arc. Wing-warping made it slow to answer the stick and " +
+            "the 100 hp Oberursel gave it nothing in a climb, but for one winter over the Western " +
+            "Front an aeroplane that could aim itself was enough. Immelmann and Boelcke learned " +
+            "the trade in it.";
 
         public static readonly PlaneModelConfig Sopwith = new PlaneModelConfig
         {
@@ -157,10 +166,39 @@ namespace MetalRaptors
             },
         };
 
-        public static readonly PlaneModelConfig[] All = { Sopwith, Fokker, Albatros };
+        public static readonly PlaneModelConfig Eindecker = new PlaneModelConfig
+        {
+            resourceName   = "fokker_eindecker",
+            scriptId       = "eindecker",
+            folder         = PlaneModelConfig.WorldWar1,
+            displayName    = "Fokker E.III",
+            country        = "Germany",
+            type           = PlaneTypes.Scout,
+            enemyRole      = EnemyRole.Scout,
+            description    = EindeckerStory,
+            standUpEuler   = new Vector3(90f, -90f, 0f),
+            rollWheelsDown = true,
+            pitchTrimDeg   = 10f,
+            lengthMeters   = 7.2f,
+            wingspanMeters = 9.52f,
+            heightMeters   = 2.4f,
+            propPivotNode  = "propeller",
+            propBladesNode = "prop_blade_1",
+            stats = new PlaneStats
+            {
+                maxSpeed      = 210f,
+                rotationSpeed = 95f,
+                mass          = 1.8f,
+                fireRate      = 4.5f,
+                damage        = 9f,
+                health        = 105f,
+            },
+        };
+
+        public static readonly PlaneModelConfig[] All = { Sopwith, Fokker, Albatros, Eindecker };
 
         public static PlaneModelConfig EnemyFor(EnemyRole role) =>
-            role == EnemyRole.Scout ? Fokker : Albatros;
+            role == EnemyRole.Scout ? Eindecker : Albatros;
 
         public static PlaneModelConfig ById(string id)
         {
@@ -168,7 +206,8 @@ namespace MetalRaptors
 
             foreach (PlaneModelConfig plane in All)
             {
-                if (string.Equals(plane.resourceName, id, StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(plane.resourceName, id, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(plane.scriptId, id, StringComparison.OrdinalIgnoreCase))
                     return plane;
 
                 int cut = plane.resourceName.IndexOf('_');

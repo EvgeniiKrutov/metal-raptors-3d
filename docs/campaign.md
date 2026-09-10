@@ -271,11 +271,24 @@ tail-centroid to nose-centroid:
 | Sopwith Camel | +7.3° nose-up | −10° | −2.7° |
 | Fokker Dr.I | +5.9° nose-up | −10° | −4.1° |
 | Albatros D.III | −2.1° nose-**down** | −10° | −12.1° |
+| Fokker E.III | 0° (level) | −10° | −10° |
 
 The Albatros was exported in a level flying attitude instead, so there was nothing for the
 −10° to cancel and it flew visibly nose-down. `PlaneModelConfig.pitchTrimDeg` absorbs the
 difference — it is added to `ModelPitchDeg` before the mirror flip, so it corrects the enemy
 build too — and the Albatros carries `+9.4°`, which lands it on the Camel's −2.7°.
+
+The E.III arrived the same way and needed the same treatment: its fuselage centreline and its
+propeller disc are both square to the model's own axes, so the −10° had nothing to cancel and
+it flew ~10° nose-down with the blades coning through the cowling. It carries `+10°` — a full
+cancellation rather than the Albatros' partial one, so it is the one plane that flies at a true
+0° and whose propeller does not cone at all (docs/effects.md explains why zero is reachable
+here and not on the others).
+
+**A level export is now the common case, not the exception.** Two of the four planes have
+arrived that way, so when a new model flies nose-down, measure its built-in attitude before
+looking anywhere else — the fuselage's tail-to-nose centreline slope in the FBX is the whole
+diagnosis, and `10° − that slope − 2.7°` is the trim.
 
 The **garage is unaffected** by any of this: `GaragePlaneView.SolveRestingPitch` measures the
 built model's contact points and pitches the *body* to stand them on the ground, so a change
