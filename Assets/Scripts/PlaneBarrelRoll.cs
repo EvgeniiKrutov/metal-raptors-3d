@@ -3,23 +3,23 @@ using UnityEngine.InputSystem;
 
 namespace MetalRaptors
 {
-    public class PlaneBoost : MonoBehaviour
+    public class PlaneBarrelRoll : MonoBehaviour
     {
         public float Charge => _config == null
             ? 1f
-            : _running > 0f
+            : IsRunning
                 ? 1f
-                : 1f - Mathf.Clamp01(_cooldown / Mathf.Max(0.01f, _config.boostCooldown));
+                : 1f - Mathf.Clamp01(_cooldown / Mathf.Max(0.01f, _config.rollCooldown));
 
         public bool IsReady => enabled && _cooldown <= 0f && !CinematicBars.AnyShowing;
 
-        public bool IsRunning => _running > 0f;
+        public bool IsRunning => _plane != null && _plane.BarrelRolling;
 
         PlayerConfig _config;
         CubeController _plane;
         WingStreaks _trails;
-        float _running;
         float _cooldown;
+        bool _wasRolling;
 
         public void Initialize(PlayerConfig config, CubeController plane, Transform model)
         {
@@ -31,46 +31,47 @@ namespace MetalRaptors
         public void Stop()
         {
             enabled = false;
-            if (_running > 0f) End();
+            if (_wasRolling) End();
         }
 
         public void Resume() => enabled = true;
 
         public void Request()
         {
-            if (!IsReady || _running > 0f || GameMenu.IsOpen || LevelBriefing.IsOpen) return;
-            Begin();
+            if (!IsReady || IsRunning || GameMenu.IsOpen || LevelBriefing.IsOpen) return;
+            if (_plane == null || !_plane.BeginBarrelRoll(RollRate, _config.rollGrace)) return;
+
+            _wasRolling = true;
+            if (_trails != null) _trails.SetEmitting(this, true);
         }
+
+        float RollRate => _config == null
+            ? 0f
+            : _config.rotationSpeed * Mathf.Max(1f, _config.rollRateMultiplier);
 
         void Update()
         {
             if (_config == null || GameMenu.IsOpen || LevelBriefing.IsOpen) return;
 
-            if (_running > 0f)
+            if (_wasRolling)
             {
-                _running -= Time.deltaTime;
-                if (_running <= 0f) End();
+                if (!IsRunning) End();
                 return;
             }
 
             _cooldown = Mathf.Max(0f, _cooldown - Time.deltaTime);
 
             var kb = Keyboard.current;
-            if (kb != null && kb.rKey.wasPressedThisFrame) Request();
-        }
+            if (kb != null && kb.bKey.wasPressedThisFrame) { Request(); return; }
 
-        void Begin()
-        {
-            _running = Mathf.Max(0.01f, _config.boostDuration);
-            if (_plane != null) _plane.SetBoost(true);
-            if (_trails != null) _trails.SetEmitting(this, true);
+            var pad = Gamepad.current;
+            if (pad != null && pad.buttonEast.wasPressedThisFrame) Request();
         }
 
         void End()
         {
-            _running = 0f;
-            _cooldown = _config != null ? Mathf.Max(0.01f, _config.boostCooldown) : 0f;
-            if (_plane != null) _plane.SetBoost(false);
+            _wasRolling = false;
+            _cooldown = _config != null ? Mathf.Max(0.01f, _config.rollCooldown) : 0f;
             if (_trails != null) _trails.SetEmitting(this, false);
         }
 

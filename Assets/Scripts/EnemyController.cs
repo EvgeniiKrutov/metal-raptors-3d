@@ -8,6 +8,9 @@ namespace MetalRaptors
     {
         const float ShotVolume = 0.18f;
         const float RecoverClimbAngleDeg = 70f;
+        const float RecoverLookaheadSec = 1f;
+        const int RecoverProbeSteps = 6;
+        const float RecoverSideBias = 15f;
         const float CeilingMargin = 130f;
         const float ReturnSpeedFactor = 1.35f;
         const float BreakRoomCap = 300f;
@@ -145,6 +148,7 @@ namespace MetalRaptors
         float _turnCheck;
         bool _turnClimb;
         float _diveSide;
+        float _recoverSide = 1f;
         bool _onCamera = true;
         bool _appeared;
         WingStreaks _streaks;
@@ -273,7 +277,11 @@ namespace MetalRaptors
 
         public bool OffPlane => _dodge.Clear;
 
+        public Rigidbody Body => _rb;
+
         float GroundRef => Scouting ? _deck : _groundY;
+
+        float GroundAt(float x) => Scouting ? TerrainAt(x) : _groundY;
 
         void FixedUpdate()
         {
@@ -331,7 +339,8 @@ namespace MetalRaptors
 
             ApplyVelocity(dt);
 
-            if (!_standDown && _state != AiState.Return) UpdateFiring();
+            if (!_standDown && _state != AiState.Return && _state != AiState.Recover)
+                UpdateFiring();
         }
 
         void TickFall(float dt)
@@ -418,10 +427,63 @@ namespace MetalRaptors
         bool CheckGroundAvoidance()
         {
             if (RunningDown) return false;
-            if (transform.position.y - GroundRef >= _config.minAltitudeMargin) return false;
-            EndDive();
-            _state = AiState.Recover;
+            if (!GroundThreat()) return false;
+            if (_state != AiState.Recover) EnterRecover();
             return true;
+        }
+
+        bool GroundThreat()
+        {
+            Vector2 p = _rb.position;
+            if (p.y - GroundRef < _config.minAltitudeMargin) return true;
+
+            float travel = FlightSpeed() * (RecoverLookaheadSec / RecoverProbeSteps);
+            var step = new Vector2(Mathf.Cos(_heading), Mathf.Sin(_heading)) * travel;
+
+            for (int i = 0; i < RecoverProbeSteps; i++)
+            {
+                p += step;
+                if (p.y - GroundAt(p.x) < _config.minAltitudeMargin) return true;
+            }
+            return false;
+        }
+
+        void EnterRecover()
+        {
+            EndDive();
+            CancelReversal();
+            _evade.Cancel();
+            _dodge.Release();
+
+            _state = AiState.Recover;
+            _stateTimer = 0f;
+            _recoverSide = ClearerSide();
+
+            _tailLocked = false;
+            _tailLost = 0f;
+            if (_runDown == this) _runDown = null;
+
+            _pressTimer = 0f;
+            _pressHold = 0f;
+            _circleTimer = 0f;
+            _turnDir = 0f;
+            _turnClimb = false;
+
+            _evadeCooldown = _config.evadeCooldown;
+            _diveCooldown = _config.diveCooldown;
+        }
+
+        float ClearerSide()
+        {
+            float facing = Mathf.Cos(_heading) >= 0f ? 1f : -1f;
+
+            float reach = Mathf.Max(1f, FlightSpeed() * RecoverLookaheadSec);
+            float x = _rb.position.x;
+            float right = GroundAt(x + reach);
+            float left = GroundAt(x - reach);
+
+            if (Mathf.Abs(right - left) < RecoverSideBias) return facing;
+            return right <= left ? 1f : -1f;
         }
 
         void TickState(float dt)
@@ -1042,7 +1104,7 @@ namespace MetalRaptors
                 case AiState.Recover:
                 {
                     float climb = RecoverClimbAngleDeg * Mathf.Deg2Rad;
-                    return Mathf.Cos(_heading) >= 0f ? climb : Mathf.PI - climb;
+                    return _recoverSide >= 0f ? climb : Mathf.PI - climb;
                 }
 
                 case AiState.DiveClimb:
@@ -1315,6 +1377,9 @@ namespace MetalRaptors
             if (_state == AiState.Return)
                 speed = Mathf.Max(speed, _config.flySpeed * ReturnSpeedFactor);
             if (_state == AiState.Tail) speed = TailSpeed(speed);
+            if (_state == AiState.Recover)
+                speed = Mathf.Max(speed,
+                    _config.flySpeed * Mathf.Max(1f, _config.recoverBoost));
             if (Scouting) speed = Mathf.Min(speed, TopSpeed);
             return Mathf.Max(1f, speed);
         }

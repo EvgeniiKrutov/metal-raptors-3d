@@ -35,13 +35,19 @@ The scenario's `Mountain` sector is `TerrainKind.Dolomites`, the alpine streamer
 (docs/dolomites.md) — so all three terrain kinds are now flown in career and none is
 custom-battle-only.
 
-**Level 1 is written; levels 2–9 are still placeholder.** Level 1 speaks the scenario's three
+**Level 1 is written and level 2 is built; levels 3–9 are still placeholder.** Level 1 speaks the scenario's three
 cutscenes, carries its written objectives, opens on the journal's *Before* page and ends on the
 ground scene and the journal's closing page (docs/level-outro.md). Its briefing shows
 `WARMING ENGINES` over the bare date — no sector, no light — above three paragraphs of Vasseur
 being turned down twice by the recruiting board.
 
-Levels 2–9 each have a script (`level2` … `level9`) so that they can be *finished*, which is what
+**Level 2, THE NUMBERS, is now authored to its final shape** — four cutscenes, seventeen machines
+in nine waves, two placed supply crates and a background duel that changes machine partway through
+— speaking through the campaign's own cast rather than the generic placeholders. Only its prose is
+still lorem ipsum: every radio line, its ground scene and its briefing `lore`. See
+docs/campaign-scripts.md for the walkthrough.
+
+Levels 3–9 each have a script (`level3` … `level9`) so that they can be *finished*, which is what
 career progression is built on — but every one is the same scroller shape (opening exchange →
 waves → closing exchange → `finish`), its radio lines and ground scene are lorem ipsum, and its
 briefing `lore` is lorem ipsum. The scenario designs rear-gun, stealth, strike and time-attack
@@ -50,12 +56,19 @@ ordinary scrollers.
 
 Level 1 also flies **only Fokker monoplanes**, on both sides of the frame: the waves are Fokkers
 and so is `companionFoe`, the machine the wingman duels in the background layer. The Albatros
-arrives in level 2, which is the whole of what level 2 has to say to level 1.
+arrives in level 2, and it arrives *partway through it*: level 2 opens on eight more Eindeckers,
+turns over to the Albatros at its third cutscene, and swaps its own background foe from one to the
+other a phase later. That turn is the whole of what level 2 has to say to level 1.
 
 Difficulty is a straight ramp across the nine: `enemyHealthScale` 0.50 → 1.00,
 `enemyRotationScale` 0.80 → 1.18 (multipliers on each enemy role's own base, docs/enemies.md), and
-`flak` climbing to 1.5 at Hohrupt, where the scenario puts guns on both valley walls. The counts
-ramp with them, six machines in level 1 to eleven in level 9.
+`flak` climbing to 1.5 at Hohrupt, where the scenario puts guns on both valley walls.
+
+The **counts** do not ramp with them, and are not meant to. Level 1 flies six machines and the
+placeholder levels 3–9 fly seven to eleven, but level 2 — the first level authored to a real shape
+rather than to a shape that could be finished — flies seventeen. Length and per-plane toughness are
+separate dials: a long level of weak machines is a long level, not a hard one, and the placeholder
+counts are what a written level replaces, not a budget it has to stay inside.
 
 ## Progress
 
@@ -177,8 +190,8 @@ the bottom of the screen, timed pauses, enemy waves with their incoming warning,
 condition. `CampaignDefinition.enemyHealthScale` and `enemyRotationScale` scale what those waves
 fly with, and the plane named in the wave decides whether it flies as a scout or a fighter
 (docs/enemies.md). Level 1 runs
-`level1` — six scouts in five waves, three cutscenes; level 2 and custom battles have none
-and stay endless. See
+`level1` — six scouts in five waves, three cutscenes; level 2 runs `level2` — seventeen machines in
+nine waves, four cutscenes; custom battles have no script and stay endless. See
 docs/campaign-scripts.md for the file format, the dialogue bar, and how the enemy AI was
 adapted to a forward-scrolling world, and docs/campaign-ww1-scenario.md for the WW1 era's
 plot, cast, loading-screen text and every radio line (story only — none of it is wired up).
@@ -203,8 +216,10 @@ See docs/battlefield.md.
 ## Supply drops
 
 `CampaignDefinition.supplyDrops` lets a level parachute a health crate past the player when the
-plane drops to `supplyHealthFraction` of its health. Level 1 sends one, worth 50 health; every
-other level and the custom battle send none. See docs/supply-drops.md.
+plane drops to `supplyHealthFraction` of its health. Every career level sends at least one, worth
+50 health; the custom battle sends none. Level 2 is the first to say *where*: its script opens two
+crate windows with the `supply` op, and outside them no crate falls however badly the plane is hurt.
+See docs/supply-drops.md.
 
 ## Background zeppelins
 
@@ -218,7 +233,15 @@ than one alive. See docs/zeppelins.md.
 A level can fly with a wingman: `CampaignDefinition.companion` turns it on and names the two
 plane models involved. It holds formation while the film bars are up and peels 250 m back into
 a background dogfight while the level is being played, swapping every time the cutscene state
-does. See docs/companion.md.
+does.
+
+**Level 2 flies three of them instead.** `backCompanions = 2` puts two companions permanently in
+the background layer, each with its own opponent and never rejoining, and `supportCompanion = true`
+turns the escort into a wingman that stays at the player's own depth and **fights** — it picks the
+nearest live enemy and fires real rounds at about half the player's output. Every companion is
+still immortal, passes rounds in both directions, cannot reach the ground and costs the player
+nothing to bump into. The two background machines wear the Sopwith's dark blue skin and the
+fighting wingman wears white — `companionSkins = { "white" }`. See docs/companion.md.
 
 ## Pre-level briefing
 

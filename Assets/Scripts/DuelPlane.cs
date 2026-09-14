@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace MetalRaptors
 {
-    public enum DuelRole { Escort, Peel, Hunt, Break, Cross, Level, Form, Idle }
+    public enum DuelRole { Escort, Peel, Hunt, Break, Cross, Level, Form, Support, Idle }
 
     public class DuelPlane : MonoBehaviour
     {
@@ -64,6 +64,16 @@ namespace MetalRaptors
         const float MuzzleClearance = 6f;
         const float TracerSpeed = 430f;
         const float ShotVolume = 0.045f;
+
+        const float SupportLeash = 900f;
+        const float SupportFireRange = 420f;
+        const float SupportFireAngleDeg = 8f;
+        const float SupportDamageShare = 0.5f;
+        const int SupportBurstMin = 3;
+        const int SupportBurstMax = 5;
+        const float SupportRestMin = 1.6f;
+        const float SupportRestMax = 2.8f;
+        const float SupportShotVolume = 0.18f;
 
         const float SideMargin = 200f;
         const float FloorMargin = 100f;
@@ -128,6 +138,11 @@ namespace MetalRaptors
         float _shotTimer, _restTimer;
         int _burstLeft;
 
+        Rigidbody _mark;
+        GameObject _round;
+        float _gunDamage;
+        float _gunSpeed;
+
         bool _falling;
         float _fallSpeed;
         float _fallHeadingDeg;
@@ -160,7 +175,7 @@ namespace MetalRaptors
             new Vector2(Mathf.Cos(_heading), Mathf.Sin(_heading)) * _speed;
 
         public static DuelPlane Spawn(string name, PlaneModelConfig plane, PlayerConfig flight,
-            Vector3 position, float heading, bool mirrored)
+            Vector3 position, float heading, bool mirrored, PlaneSkin skin)
         {
             if (plane == null)
             {
@@ -172,8 +187,7 @@ namespace MetalRaptors
 
             var go = new GameObject(name);
             go.transform.position = position;
-            PlaneFactory.BuildPlaneModel(go.transform, plane, mirrored,
-                mirrored ? PlaneSkins.Default(plane) : null);
+            PlaneFactory.BuildPlaneModel(go.transform, plane, mirrored, skin);
 
             foreach (Collider col in go.GetComponentsInChildren<Collider>()) Destroy(col);
 
@@ -200,6 +214,20 @@ namespace MetalRaptors
 
             duel.ApplyRotation();
             return duel;
+        }
+
+        public void ArmGuns(PlayerConfig flight)
+        {
+            if (_round != null || flight == null) return;
+
+            _gunDamage = Mathf.Max(0f, flight.damage) * SupportDamageShare;
+            _gunSpeed = Mathf.Max(1f, flight.bulletSpeed);
+            _round = Bullet.BuildTemplate(Bullet.RoundColor);
+        }
+
+        public void SetMark(Rigidbody mark)
+        {
+            _mark = mark;
         }
 
         public void SetEscort(Transform target, Vector3 offset)
@@ -334,6 +362,7 @@ namespace MetalRaptors
 
             if (_falling) { TickWreck(pos); return; }
             if (_role == DuelRole.Hunt) UpdateGun(dt);
+            else if (_role == DuelRole.Support) UpdateSupportGun(dt);
         }
 
         void TickWreck(Vector3 pos)
@@ -373,7 +402,8 @@ namespace MetalRaptors
             Remove();
         }
 
-        bool Escorting => _role == DuelRole.Escort || _role == DuelRole.Form;
+        bool Escorting => _role == DuelRole.Escort || _role == DuelRole.Form
+                       || _role == DuelRole.Support;
 
         float BandFloor => Escorting ? _escortFloorY : _floorY;
 
@@ -442,7 +472,7 @@ namespace MetalRaptors
 
             float cruise = _pace;
             float floor = cruise;
-            if (_role == DuelRole.Form)
+            if (_role == DuelRole.Form || _role == DuelRole.Support)
             {
                 cruise = FormCruise(pos);
                 floor = FormMinSpeed;
@@ -547,14 +577,10 @@ namespace MetalRaptors
                     return 0f;
 
                 case DuelRole.Form:
-                {
-                    if (_escort == null) return 0f;
+                    return FormHeading(pos);
 
-                    Vector3 station = _escort.position + _stationOffset;
-                    float ahead = Mathf.Max(FormLookahead, station.x - pos.x);
-                    float rise = Mathf.Clamp(station.y - pos.y, -ahead, ahead);
-                    return Mathf.Atan2(rise, ahead);
-                }
+                case DuelRole.Support:
+                    return Marked() ? HeadingTo(pos, LeadMark(pos)) : FormHeading(pos);
 
                 case DuelRole.Hunt:
                 {
@@ -589,6 +615,16 @@ namespace MetalRaptors
                 default:
                     return 0f;
             }
+        }
+
+        float FormHeading(Vector3 pos)
+        {
+            if (_escort == null) return 0f;
+
+            Vector3 station = _escort.position + _stationOffset;
+            float ahead = Mathf.Max(FormLookahead, station.x - pos.x);
+            float rise = Mathf.Clamp(station.y - pos.y, -ahead, ahead);
+            return Mathf.Atan2(rise, ahead);
         }
 
         void AimCross(float side)
@@ -695,6 +731,73 @@ namespace MetalRaptors
             _shotTimer = 0f;
         }
 
+        void UpdateSupportGun(float dt)
+        {
+            if (_round == null) return;
+
+            if (_burstLeft > 0)
+            {
+                _shotTimer -= dt;
+                if (_shotTimer > 0f) return;
+
+                _shotTimer = ShotSpacing;
+                _burstLeft--;
+                ShootRound();
+                if (_burstLeft == 0)
+                    _restTimer = Random.Range(SupportRestMin, SupportRestMax);
+                return;
+            }
+
+            _restTimer -= dt;
+            if (_restTimer > 0f || !AimedAtMark()) return;
+
+            _burstLeft = Random.Range(SupportBurstMin, SupportBurstMax + 1);
+            _shotTimer = 0f;
+        }
+
+        bool Marked()
+        {
+            if (_mark == null) return false;
+            if (_escort == null) return true;
+
+            Vector2 stray = (Vector2)_mark.position - (Vector2)_escort.position;
+            return stray.sqrMagnitude <= SupportLeash * SupportLeash;
+        }
+
+        Vector2 LeadMark(Vector3 pos)
+        {
+            Vector2 target = _mark.position;
+            float time = Vector2.Distance(pos, target) / _gunSpeed;
+            return target + (Vector2)_mark.linearVelocity * time;
+        }
+
+        bool AimedAtMark()
+        {
+            Vector3 pos = transform.position;
+            if (!Marked()) return false;
+            if (Vector2.Distance(pos, _mark.position) > SupportFireRange) return false;
+
+            float aim = HeadingTo(pos, LeadMark(pos)) * Mathf.Rad2Deg;
+            return Mathf.Abs(Mathf.DeltaAngle(_heading * Mathf.Rad2Deg, aim))
+                   <= SupportFireAngleDeg;
+        }
+
+        void ShootRound()
+        {
+            Vector3 dir = new Vector3(Mathf.Cos(_heading), Mathf.Sin(_heading), 0f);
+            Vector3 muzzle = transform.position + dir * (_size * 0.5f + MuzzleClearance);
+
+            GameObject go = Instantiate(_round, muzzle,
+                Quaternion.Euler(0f, 0f, _heading * Mathf.Rad2Deg - 90f));
+            go.name = "CompanionBullet";
+            go.SetActive(true);
+            go.GetComponent<Bullet>().Launch(dir, _gunSpeed, _gunDamage, null, fromEnemy: false);
+
+            MuzzleFlash.Spawn(muzzle, dir, _size);
+            if (_shotClip != null && _audio != null)
+                _audio.PlayOneShot(_shotClip, SupportShotVolume * AudioOptions.Sfx);
+        }
+
         bool Aimed()
         {
             Vector3 pos = transform.position;
@@ -712,6 +815,11 @@ namespace MetalRaptors
             Tracer.Spawn(muzzle, dir, TracerSpeed);
             MuzzleFlash.Spawn(muzzle, dir, _size);
             if (_shotClip != null && _audio != null) _audio.PlayOneShot(_shotClip, ShotVolume * AudioOptions.Sfx);
+        }
+
+        void OnDestroy()
+        {
+            if (_round != null) Destroy(_round);
         }
 
         void Remove()

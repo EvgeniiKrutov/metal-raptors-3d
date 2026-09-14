@@ -21,7 +21,11 @@ namespace MetalRaptors
         public static readonly PlaneSkin[] SopwithCamel =
         {
             new PlaneSkin { id = "green", label = "green", texture = "skins/sopwith_camel/green" },
-            new PlaneSkin { id = "blue",  label = "blue",  texture = "skins/sopwith_camel/blue" },
+            new PlaneSkin
+            {
+                id = "dark_blue", label = "dark blue", texture = "skins/sopwith_camel/dark_blue",
+            },
+            new PlaneSkin { id = "white", label = "white", texture = "skins/sopwith_camel/white" },
         };
 
         public static readonly PlaneSkin[] AlbatrosD3 =
@@ -33,6 +37,11 @@ namespace MetalRaptors
             plane != null && plane.skins != null ? plane.skins : Empty;
 
         public static bool Selectable(PlaneModelConfig plane) => Of(plane).Length > 1;
+
+        public const string CompanionId = "dark_blue";
+
+        public static PlaneSkin Companion(PlaneModelConfig plane, string id = null) =>
+            ById(plane, id) ?? ById(plane, CompanionId) ?? Default(plane);
 
         public static PlaneSkin Default(PlaneModelConfig plane)
         {

@@ -33,10 +33,11 @@ condition.
 
 **Level 1 is written; levels 2–9 are structure.** Level 1 speaks the three cutscenes of the
 campaign's story source verbatim — eleven lines climbing out, ten after the first two Fokkers, ten
-flying home — and its ground scene is written with them. The other eight are still the same
-scroller shape each time (opening exchange → waves → closing exchange → `finish`) with placeholder
-Latin in every line, wave counts and enemy mix climbing from seven Albatros scouts in level 2 to
-eleven mixed machines in level 9. Level 4 is the one variation, using `spawn` + `waitclear` for a
+flying home — and its ground scene is written with them. Level 2 is authored to its final *shape*
+— four cutscenes, seventeen machines in nine waves, two placed supply windows and a mid-level
+change of background foe — but every one of its lines is still placeholder Latin. Levels 3 and 5–9
+are the same scroller shape each time (opening exchange → waves → closing exchange → `finish`)
+with Latin in every line, and level 4 is the one variation, using `spawn` + `waitclear` for a
 running fight instead of blocking waves. The real levels are
 designed in `Assets/Resources/docs/campaign-ww1-scenario.md` — including four modes and two boss
 fights this grammar cannot express yet.
@@ -57,11 +58,49 @@ step rather than the whole level.
 | `{ "op": "wave", "enemies": [ { "plane": "albatros", "count": 2 }, { "plane": "sopwith", "count": 1 } ] }` | A wave of mixed types. |
 | `{ "op": "spawn", "enemies": [ … ] }` | Same spawn, but the script continues immediately. |
 | `{ "op": "waitclear" }` | Block until no scripted enemy is alive (pairs with `spawn`). |
+| `{ "op": "supply" }` | Open a supply-crate window for the phase that follows (docs/supply-drops.md). |
+| `{ "op": "foe", "plane": "albatros" }` | Re-cast the wingman's background opponent from the next peel onward (docs/companion.md). |
 | `{ "op": "finish" }` | End the level, and stop reading the script. It does not open LEVEL COMPLETED directly any more — it starts the outro, which flies the patrol out and shows the ground scene and the journal first (docs/level-outro.md). |
 
 `count` defaults to 1. Plane ids are matched against `PlaneModelConfig.resourceName` either in full
 (`albatros_d3`) or by its first segment (`albatros`), so `PlaneModels` stays the one place a plane is
 defined.
+
+### Placing the supply crates (`supply`)
+
+By default a level's crates are governed only by health: `supplyDrops` is a budget and a crate is
+sent the moment the plane falls to `supplyHealthFraction`, wherever in the level that happens
+(docs/supply-drops.md). A script that contains **any** `supply` step takes that decision away from
+the health check and keeps only the health *condition*: the crates then fall solely inside the
+windows the script opens.
+
+- `CampaignScript.HasSupply` is computed once when the script is parsed, and
+  `CampaignLevelController.BeginScript` calls `SupplyDrop.TakeScriptControl()` on it. The drop
+  system still begins in `Start` as it always did — it simply starts **closed**.
+- `{ "op": "supply" }` opens a window. One crate may fall in it, and only if the player is at or
+  under the trigger fraction while it is open.
+- A window closes on its own at the **start of the next cutscene** — the runner calls
+  `ArmSupply(false)` on the first `say` of a block — and when a crate is spent. So a window is
+  exactly the phase of flying that follows the step, and an unused crate expires with it.
+
+Nothing changes for the eight levels that do not use the op: with `HasSupply` false, `Arm` is a
+no-op and the drop system is the health-triggered budget it has always been.
+
+### Re-casting the background duel (`foe`)
+
+The wingman's background opponent normally comes from `CampaignDefinition.companionFoe` and never
+changes (docs/companion.md). `{ "op": "foe", "plane": "<id>" }` changes which model the **next**
+foe is built from; the one currently in the air is left alone, since it is about to be killed by
+the next cutscene anyway.
+
+That is why the step is written *before* the cutscene it should take effect after — the new machine
+enters on the peel that follows the block, not on the step itself. Level 2 puts
+`{ "op": "foe", "plane": "albatros" }` immediately ahead of cutscene 4, so the background duel is
+an Eindecker for three quarters of the level and an Albatros for the last quarter.
+
+On a level whose background companions are permanent (`backCompanions`, docs/companion.md) there is
+no peel to wait for, so the op kills the live background foes on the spot and flies their
+replacements in — which is what happens on level 2.
 
 ### The incoming warning (`EnemyWarning`)
 
@@ -119,7 +158,7 @@ the freeze a `say` block puts on the game itself.
 
 Keys are `l<level>_line<n>` for radio calls and `l<level>_after<n>` for the lines of the ground
 scene played after the level (docs/level-outro.md) — prefixing by level keeps one file usable for
-the whole campaign while staying greppable. It holds 137 keys, one block per level, each used by
+the whole campaign while staying greppable. It holds 166 keys, one block per level, each used by
 exactly one script step or one entry in the level's `outro`. Level 1's block is written; levels
 2–9 are lorem ipsum. The ground scene shares the table with radio dialogue on purpose: it is the
 *displayed text* file, not the *speech* file, and a translation pass wants all of it.
@@ -154,8 +193,10 @@ screen and to whether the line is the player's:
 | `ace` | RED BARON | no | the placeholder levels |
 
 The first six are the campaign's cast, named as the story source labels them on the wireless. The
-last three are the generic placeholders levels 2–9 still speak through; they go when those levels
-are written. `crane` and `ravensberg` are in the table ahead of the levels that need them, so a
+last three are the generic placeholders levels 3–9 still speak through; they go when those levels
+are written. **Level 2 is already off them**: it flies Roussel's flight, so its four cutscenes are
+Vasseur, Roussel and Lasalle and its ground scene is Roussel and Marchand, exactly as level 1's
+are. Only the words are still Latin. `crane` and `ravensberg` are in the table ahead of the levels that need them, so a
 script can be written without touching C#.
 
 A new character is one entry in that array. An unknown id logs an error and falls back to the
@@ -377,3 +418,57 @@ Because one scene serves every campaign level (docs/campaign.md), **next level**
 `CampaignRun.LastLevel`. Campaign completion deliberately does not touch
 `GameManager.UnlockLevel` — that counter gates the fixed `Level1`/`Level2` scenes, and the career
 level list is not gated by it.
+
+## Level 2 — The Numbers
+
+```
+say  l2_line1  … l2_line10   cutscene 1, over the intro fly-in
+wait 2.5
+wave eindecker ×1 → wait 4 → ×2 → wait 4 → ×2
+wait 1.5
+say  l2_line11 … l2_line19   cutscene 2
+supply                        crate window 1
+wave eindecker ×2 → wait 4 → ×1
+wait 1.5
+say  l2_line20 … l2_line27   cutscene 3
+wave albatros ×2
+wait 1.5
+foe  albatros                 the background duel changes machine
+say  l2_line28 … l2_line36   cutscene 4
+supply                        crate window 2
+wave albatros ×2 → wait 4 → ×2 → wait 4 → ×2 + eindecker ×1
+finish                        → the outro (docs/level-outro.md)
+```
+
+**Seventeen machines in nine waves across four cutscenes** — against level 1's six in five across
+three. The shape is `cutscene → waves → cutscene → …`, and unlike every other level so far it
+**ends on flying, not on talking**: the last wave is followed straight by `finish`, and the closing
+beat is the ground scene the outro plays rather than a fourth radio block. The pacing constants are
+level 1's exactly — `wait 4` between waves inside a phase, `wait 1.5` between the last kill of a
+phase and the radio opening, `wait 2.5` after the opening block.
+
+**The level turns over at cutscene 3.** Everything before it is the Eindecker the player learned on
+in level 1 — five of them, then three — and everything after it is the Albatros, which is a
+*fighter* and dives from the high band rather than fighting on the deck (docs/enemies.md). The
+final wave puts one Eindecker back in among two Albatros, so the last fight is the only mixed one
+in the campaign so far. `companionFoe` is the Eindecker rather than the definition's Albatros
+default, and the `foe` step swaps it after cutscene 4, so the background duel makes the same turn
+the waves do — one phase later, so it reads as the sky changing rather than as a matching pair.
+
+**Level 2 flies three companions, not one** (docs/companion.md). Two live permanently in the
+background layer with their own opponents and never come forward; the third stays at the player's
+own depth and fights, firing real rounds at about half the player's output. Every one of them is
+immortal and untouchable, so the seventeen machines are still the player's problem — the wingman
+softens them rather than clearing them. The two in the background wear the Sopwith's dark blue
+skin and the fighting wingman wears white, so none of the three is mistaken for the player's own
+Camel and the one that matters is the one that stands out.
+
+**The two crates are placed, not earned anywhere.** Window 1 is the phase between cutscenes 2 and
+3, window 2 is everything after cutscene 4 — the level's longest fight, seven machines with no
+cutscene left to break it up. Neither is a gift: the health condition still has to be met inside
+the window, and a window that closes unused takes its crate with it. Level 2 is the first level to
+use the `supply` op at all.
+
+Difficulty is unchanged by the length: `enemyHealthScale` 0.60 and `enemyRotationScale` 0.84, one
+step up from level 1's 0.50/0.80. Seventeen weak machines is a long level, not a hard one, which is
+what a second level should be.

@@ -13,6 +13,8 @@ namespace MetalRaptors
         float _fraction;
         float _heal;
         int _left;
+        bool _scripted;
+        bool _open = true;
 
         public static SupplyDrop Begin(GameObject owner, CampaignDefinition level,
             CubeController plane, Transform model, float z, float floorY)
@@ -30,6 +32,18 @@ namespace MetalRaptors
             return drop;
         }
 
+        public void TakeScriptControl()
+        {
+            _scripted = true;
+            _open = false;
+        }
+
+        public void Arm(bool open)
+        {
+            if (!_scripted) return;
+            _open = open;
+        }
+
         public void StandDown()
         {
             _left = 0;
@@ -45,11 +59,12 @@ namespace MetalRaptors
                 return;
             }
 
-            if (_left <= 0 || cinematic || _plane == null) return;
+            if (_left <= 0 || !_open || cinematic || _plane == null) return;
             if (_plane.CurrentHealth <= 0f) return;
             if (_plane.CurrentHealth > _plane.MaxHealth * _fraction) return;
 
             _left--;
+            _open = !_scripted;
             _crate = SupplyCrate.Spawn(camPos, halfWidth, halfHeight, _z, _floorY,
                 _plane.transform, Collect);
         }

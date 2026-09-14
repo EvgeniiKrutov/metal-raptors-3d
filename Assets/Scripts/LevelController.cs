@@ -44,6 +44,7 @@ namespace MetalRaptors
         PlaneShooter _shooter;
         PlaneBomber _bomber;
         PlaneBoost _boost;
+        PlaneBarrelRoll _roll;
         PlaneSearchlight _searchlight;
         Transform _cubeTr;
         Camera _cam;
@@ -164,6 +165,9 @@ namespace MetalRaptors
 
             _boost = body.AddComponent<PlaneBoost>();
             _boost.Initialize(flight, _cube, model);
+
+            _roll = body.AddComponent<PlaneBarrelRoll>();
+            _roll.Initialize(flight, _cube, model);
         }
 
         void SpawnEnemies()
@@ -362,6 +366,7 @@ namespace MetalRaptors
             if (_shooter != null) _shooter.Stop();
             if (_bomber != null) _bomber.Stop();
             if (_boost != null) _boost.Stop();
+            if (_roll != null) _roll.Stop();
         }
 
         void WinLevel()
@@ -416,7 +421,7 @@ namespace MetalRaptors
 
             _hudView = new LevelHud(canvas.transform,
                 "destroy the enemy  •  don't hit the ground",
-                _cube, _shooter, _bomber, _boost, _searchlight, TryPause);
+                _cube, _shooter, _bomber, _boost, _roll, _searchlight, TryPause);
         }
 
         void UpdateHealthHud()

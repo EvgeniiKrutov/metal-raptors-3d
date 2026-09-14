@@ -149,7 +149,7 @@ namespace MetalRaptors
 
             protected override void Advance(float dt)
             {
-                bool boosting = _plane != null && _plane.Boosting;
+                bool boosting = _plane != null && _plane.HighRevs;
                 if (boosting != _boosting)
                 {
                     _boosting = boosting;

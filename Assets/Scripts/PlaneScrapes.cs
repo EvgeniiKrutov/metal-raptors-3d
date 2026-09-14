@@ -24,7 +24,7 @@ namespace MetalRaptors
             IReadOnlyList<EnemyController> enemies)
         {
             if (enemies == null || player == null || playerTr == null
-                || player.CurrentHealth <= 0f) return;
+                || player.CurrentHealth <= 0f || player.Evading) return;
 
             float reach = HitboxRadius * 2f;
             float reachSq = reach * reach;

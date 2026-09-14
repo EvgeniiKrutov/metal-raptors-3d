@@ -62,7 +62,7 @@ considered to be working the engine when either
 Once maneuvering stops, a 0.3 s grace period runs before dropping back to idle,
 so rapid stick work does not chatter between the two loops.
 
-### High revs (boost)
+### High revs (boost and barrel roll)
 
 The third voice is the **same `engine_throttle_1` clip at 1.35× pitch**, not a
 separate recording — pitching the loop we already load is what a hard-running

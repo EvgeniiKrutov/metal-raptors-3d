@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace MetalRaptors
 {
-    public enum CampaignOp { Wait, Say, Wave, Spawn, WaitClear, Finish }
+    public enum CampaignOp { Wait, Say, Wave, Spawn, WaitClear, Supply, Foe, Finish }
 
     public class CampaignStep
     {
@@ -13,6 +13,7 @@ namespace MetalRaptors
         public CampaignSpeaker speaker;
         public string text;
         public EnemyGroup[] groups;
+        public PlaneModelConfig plane;
     }
 
     public class CampaignScript
@@ -27,8 +28,14 @@ namespace MetalRaptors
         static readonly char[] Space = { ' ', '\t' };
 
         public readonly CampaignStep[] Steps;
+        public readonly bool HasSupply;
 
-        CampaignScript(CampaignStep[] steps) => Steps = steps;
+        CampaignScript(CampaignStep[] steps)
+        {
+            Steps = steps;
+            foreach (CampaignStep step in steps)
+                if (step.op == CampaignOp.Supply) { HasSupply = true; break; }
+        }
 
         public static CampaignScript Load(string name)
         {
@@ -85,6 +92,8 @@ namespace MetalRaptors
                 case "wave": return ParseWave(CampaignOp.Wave, step, origin, index);
                 case "spawn": return ParseWave(CampaignOp.Spawn, step, origin, index);
                 case "waitclear": return new CampaignStep { op = CampaignOp.WaitClear };
+                case "supply": return new CampaignStep { op = CampaignOp.Supply };
+                case "foe": return ParseFoe(step, origin, index);
                 case "finish": return new CampaignStep { op = CampaignOp.Finish };
                 default:
                     Debug.LogError($"CampaignScript {origin}[{index}]: unknown op '{op}'.");
@@ -113,6 +122,20 @@ namespace MetalRaptors
                 text = line,
                 seconds = seconds > 0f ? seconds : ReadingTime(line),
             };
+        }
+
+        static CampaignStep ParseFoe(Dictionary<string, object> step, string origin, int index)
+        {
+            string id = Text(step, "plane");
+            PlaneModelConfig plane = PlaneModels.ById(id);
+
+            if (plane == null)
+            {
+                Debug.LogError($"CampaignScript {origin}[{index}]: unknown plane '{id}'.");
+                return null;
+            }
+
+            return new CampaignStep { op = CampaignOp.Foe, plane = plane };
         }
 
         static CampaignStep ParseWave(CampaignOp op, Dictionary<string, object> step, string origin,

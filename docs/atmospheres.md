@@ -80,9 +80,44 @@ same for all — the last ~250 m of land sit in solid haze so the map edge never
 | Daytime | Fog start past camera | Air |
 |---|---|---|
 | Morning | +80 m | thick gold mist from just past the play line |
-| Midday  | +300 m | clear; haze only toward the horizon |
-| Evening | +260 m | warm haze held back to the far half — the golden air was drowning the land |
+| Midday  | +200 m | light haze from the middle distance back |
+| Evening | +120 m | warm haze held back to the far half — the golden air was drowning the land |
 | Night   | +250 m | clear calm air; the distance is lost to darkness, not mist |
+
+### Why midday's start is +200 and not +300
+
+The offset is measured from the camera, and the two depths that matter sit at fixed distances
+from it: the **play plane** at `CameraDistance` (420) and the **companion background layer** at
+`CameraDistance + CompanionFlight.Depth` (670). The far anchor is
+`FogEndDistance` = 870 for every Verdun daytime.
+
+At the old +300 the fog began at 720 — **fifty metres behind the background layer** — so the
+duelling companions and their opponents were drawn at exactly the same values as the plane on the
+play line, with nothing separating the two depths but perspective. Nothing was wrong with the
+land; the layering simply had no air in it.
+
++200 starts the fog at 620 and puts the background layer at **20 %** haze:
+
+| start | at the play plane (420) | at the duel layer (670) |
+|---|---|---|
+| morning +80 → 500 | 0 % | 46 % |
+| evening +120 → 540 | 0 % | 39 % |
+| **midday +200 → 620** | **0 %** | **20 %** |
+| night +250 → 670 | 0 % | 0 % |
+| midday, was +300 → 720 | 0 % | 0 % |
+
+So the companions are dimmed by well under half what the morning does to them, and the player's
+own plane, the enemy waves and the clouds (Z 40–160, i.e. 260–380 m out) are all still in front of
+the fog start and completely untouched. Only things genuinely behind the fight pick anything up.
+
+`FogEndDistance` is deliberately **not** changed with it: the streamer derives its chunk keep-window
+from that figure (docs/campaign.md), so moving the far anchor would move how much land is built as
+well as how it looks.
+
+This is keyed on the daytime, not the level, so it applies to **every** Verdun midday flight —
+career level 2, a Verdun midday custom battle, and the fixed `Level1` when its daytime is midday.
+The fixed levels fly no companions, so there the change is only the far ground reading as slightly
+airier.
 
 ## Aerial perspective (`AerialHaze`)
 

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -16,16 +17,25 @@ namespace MetalRaptors
 
         TrailRenderer[] _trails;
         Material _material;
+        Color _tint;
+
+        readonly HashSet<object> _sources = new HashSet<object>();
 
         public static WingStreaks Mount(GameObject body, Transform model, Color? tint = null)
         {
+            Color colour = tint ?? Color.white;
+
+            var existing = body.GetComponentInChildren<WingStreaks>(true);
+            if (existing != null && existing._tint == colour) return existing;
+
             PlaneFactory.WingTipsLocal(body, model, out Vector3 near, out Vector3 far);
 
             var go = new GameObject("Wing Streaks");
             go.transform.SetParent(body.transform, false);
 
             var trails = go.AddComponent<WingStreaks>();
-            trails._material = BuildMaterial(tint ?? Color.white);
+            trails._tint = colour;
+            trails._material = BuildMaterial(colour);
             trails._trails = new[]
             {
                 trails.Streak(near, "Wingtip Near"),
@@ -34,12 +44,18 @@ namespace MetalRaptors
             return trails;
         }
 
-        public void SetEmitting(bool on)
+        public void SetEmitting(bool on) => SetEmitting(this, on);
+
+        public void SetEmitting(object source, bool on)
         {
+            if (on) _sources.Add(source);
+            else _sources.Remove(source);
+
             if (_trails == null) return;
 
+            bool emit = _sources.Count > 0;
             foreach (var trail in _trails)
-                if (trail != null) trail.emitting = on;
+                if (trail != null) trail.emitting = emit;
         }
 
         TrailRenderer Streak(Vector3 tipLocal, string name)

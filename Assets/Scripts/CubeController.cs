@@ -30,6 +30,12 @@ namespace MetalRaptors
 
         public bool Boosting => _boostTarget > 1f;
 
+        public bool BarrelRolling => _barrelLeft > 0f;
+
+        public bool Evading => (BarrelRolling || _evadeGrace > 0f) && !_falling;
+
+        public bool HighRevs => Boosting || BarrelRolling;
+
         const float ExplosionSize = 60f;
 
         const float CollisionDamage = 10f;
@@ -39,6 +45,9 @@ namespace MetalRaptors
 
         const float BoostResponse = 3.5f;
         const float BoostSnap = 0.001f;
+
+        const float BarrelTurn = 360f;
+        const float BarrelMinRate = 40f;
 
         const float GroundProbe = 500f;
         const float GroundSkim = 14f;
@@ -64,6 +73,12 @@ namespace MetalRaptors
         float _boost = 1f;
         float _boostTarget = 1f;
         bool _cinematic;
+
+        float _barrelAngle;
+        float _barrelLeft;
+        float _barrelRate;
+        float _evadeGrace;
+        float _barrelGrace;
 
         bool _hardLeftWall;
         float _wallX = float.NegativeInfinity;
@@ -101,6 +116,36 @@ namespace MetalRaptors
 
             ApplyRotation();
             _active = true;
+        }
+
+        public bool BeginBarrelRoll(float rateDeg, float grace)
+        {
+            if (!_active || _falling || BarrelRolling) return false;
+
+            _barrelRate = Mathf.Max(BarrelMinRate, rateDeg);
+            _barrelLeft = BarrelTurn / _barrelRate;
+            _barrelAngle = 0f;
+            _barrelGrace = Mathf.Max(0f, grace);
+            return true;
+        }
+
+        void AdvanceBarrelRoll(float dt)
+        {
+            if (!BarrelRolling)
+            {
+                _evadeGrace = Mathf.Max(0f, _evadeGrace - dt);
+                return;
+            }
+
+            _barrelLeft -= dt;
+            if (_barrelLeft <= 0f)
+            {
+                _barrelLeft = 0f;
+                _barrelAngle = 0f;
+                _evadeGrace = _barrelGrace;
+                return;
+            }
+            _barrelAngle += _barrelRate * dt;
         }
 
         public void SetControlled(bool value) => _controlled = value;
@@ -197,7 +242,8 @@ namespace MetalRaptors
             float approach = 1f - Mathf.Exp(-(_config.turnResponsiveness / _rb.mass) * dt);
             _angularVelocity += (desiredRate - _angularVelocity) * approach;
             _heading += _angularVelocity * dt;
-            _roll.Tick(dt, _heading, steady, _config.rotationSpeed);
+            AdvanceBarrelRoll(dt);
+            if (!BarrelRolling) _roll.Tick(dt, _heading, steady, _config.rotationSpeed);
             ApplyRotation();
 
             _speed = CruiseSpeed;
@@ -258,7 +304,7 @@ namespace MetalRaptors
 
         void ApplyRotation()
         {
-            float roll = _roll.Angle + (_fall != null ? _fall.Roll : 0f);
+            float roll = _roll.Angle + _barrelAngle + (_fall != null ? _fall.Roll : 0f);
             transform.rotation = Quaternion.Euler(0f, 0f, _heading * Mathf.Rad2Deg)
                                * Quaternion.Euler(roll, 0f, 0f);
         }
@@ -290,7 +336,7 @@ namespace MetalRaptors
 
         public bool Scrape()
         {
-            if (!_active || _falling) return false;
+            if (!_active || _falling || Evading) return false;
             if (Time.time - _lastCollisionTime < CollisionCooldown) return false;
             _lastCollisionTime = Time.time;
 
@@ -307,6 +353,9 @@ namespace MetalRaptors
         void BeginFall()
         {
             _falling = true;
+            _barrelLeft = 0f;
+            _barrelAngle = 0f;
+            _evadeGrace = 0f;
             OnShotDown?.Invoke();
 
             if (_smoke != null) _smoke.Ignite(ExplosionSize);

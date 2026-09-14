@@ -11,6 +11,8 @@ namespace MetalRaptors
         bool CompanionReady { get; }
         void SpawnWave(EnemyGroup[] groups);
         float WarnIncoming(int planes);
+        void ArmSupply(bool open);
+        void SetCompanionFoe(PlaneModelConfig plane);
         void CompleteLevel();
     }
 
@@ -94,6 +96,14 @@ namespace MetalRaptors
                         yield return WaitForClear();
                         break;
 
+                    case CampaignOp.Supply:
+                        _host.ArmSupply(true);
+                        break;
+
+                    case CampaignOp.Foe:
+                        _host.SetCompanionFoe(step.plane);
+                        break;
+
                     case CampaignOp.Finish:
                         if (Running) _host.CompleteLevel();
                         yield break;
@@ -170,6 +180,7 @@ namespace MetalRaptors
 
             if (!_bar.IsOpen)
             {
+                _host.ArmSupply(false);
                 _bar.Open();
                 while (Running && !_bar.IsReady) yield return null;
                 while (Running && !_host.CompanionReady) yield return null;

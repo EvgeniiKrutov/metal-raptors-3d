@@ -66,5 +66,15 @@ namespace MetalRaptors
 
         [Tooltip("Seconds before R can be used again, counted from the moment the boost ends.")]
         public float boostCooldown = 8f;
+
+        [Tooltip("Multiple of rotationSpeed the B barrel roll spins at; the roll's duration is " +
+                 "360 degrees at that rate (see docs/barrel-roll.md).")]
+        public float rollRateMultiplier = 2f;
+
+        [Tooltip("Seconds before B can be used again, counted from the moment the roll ends.")]
+        public float rollCooldown = 6f;
+
+        [Tooltip("Seconds the barrel roll's evasion lasts after the spin itself has finished.")]
+        public float rollGrace = 0.5f;
     }
 }

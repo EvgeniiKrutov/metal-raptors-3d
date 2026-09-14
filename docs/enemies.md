@@ -43,9 +43,15 @@ airframe rather than an E.III.
 `eindecker`, and `CampaignLevels.Level1.companionFoe` is the E.III as well, so the background
 duel matches the waves. That is the era reading as much as the roster: level 1 is dated
 14 April 1916, when the E.III was the German scout, and the Dr.I did not reach the front until
-late 1917. `level3.json` and `level9.json` keep their `fokker` waves. Level 2 has no scout
-waves at all — its three waves are `albatros`, which is a **fighter**, so nothing in it answers
-to "the scouts".
+late 1917. `level3.json` and `level9.json` keep their `fokker` waves. **Level 2 flies both roles, in that
+order**: its first five waves are `eindecker` scouts, its last four are `albatros` fighters, and
+the final wave puts one scout back in among two fighters — the only mixed wave in the campaign so
+far. That is the level's whole argument, since a fighter dives from the high band rather than
+fighting on the deck.
+
+**Enemies never target a companion.** `EnemyController._target` is one `Rigidbody` — the
+player's — and nothing re-points it, so the supporting wingman level 2 flies at the play depth
+(docs/companion.md) draws no fire and is never manoeuvred against. It shoots them; they ignore it.
 
 `ById` resolves a plane by its `resourceName`, by the part before the first `_`, or by its
 explicit `scriptId`. `fokker` still resolves to the Dr.I — it is the earlier entry in
@@ -213,7 +219,7 @@ rather than against the flat conservative floor:
 
 The scout is a low-flying enemy, not a suicidal one. Four things keep it off the terrain: the
 soft push of `Contain` as it nears the corridor floor, the turn-direction choice below, the hard
-`Recover` climb below `minAltitudeMargin`, and `KeepNoseUp` as a last-ditch net. Its aim point is
+`Recover` climb (below), and `KeepNoseUp` as a last-ditch net. Its aim point is
 clamped at the corridor floor by `ClampToBand` on top of that, so it never *steers* at a player
 flying below it.
 
@@ -608,7 +614,7 @@ problem the lock exists to fix.
 | --- | --- | --- |
 | Tail slot | `ClampToBand(TailSlot())` | pure pursuit onto your centre |
 | `Contain` | floor and ceiling push the nose back into the band | X containment only |
-| `CheckGroundAvoidance` | below `minAltitudeMargin`, abort and climb | never fires |
+| `CheckGroundAvoidance` | the projected flight path breaching `minAltitudeMargin` aborts everything and climbs | never fires |
 | `KeepNoseUp` *(scout)* | below `contour + safeAltitudeMargin` any descent is **flattened to level** | off |
 | `ChooseTurn` *(scout)* | picks the turn by probing arcs against the corridor floor, climbs out at 55° when both are blocked | off — turns the short way, like a fighter |
 | Depth dodge *(scout)* | slides out of your plane of fire | off, and an active one is flown home (`Release`) when the lock is taken |
@@ -703,6 +709,90 @@ The heading still goes through `Contain`, but during a run-down `Contain` is doi
 job: the level's **X** edges still turn the enemy back, and the vertical margins are zero. It
 will not follow you out through the side of the level. It will absolutely follow you into the
 ground.
+
+## Ground avoidance (`Recover`, both roles)
+
+**This outranks everything.** In `FixedUpdate` the ground check sits above the off-camera test and
+above `TickState`, so an enemy that is about to hit the terrain stops doing whatever it was doing
+— diving, evading, tailing, weaving, reversing — and does nothing but climb away until it is
+clear. It is the one state that cannot be preempted.
+
+### The trigger looks ahead, it does not wait
+
+`GroundThreat` is the entry condition, and it is a **swept test, not a point test**: the plane's
+current heading and speed are projected forward **one second** in six steps, and the threat fires
+the moment any point on that path is closer than `minAltitudeMargin` to the ground beneath *it*.
+
+The old test only asked where the plane was *now*. At the fighter's diving speed that is not a
+warning, it is a report: 160 m of margin is well under a second of travel nose-down, so the
+recovery began at the point where there was no longer room to fly it. Sweeping the path forward
+moves the decision to where it can still be acted on — the pull-out starts with the margin
+**intact** rather than already spent.
+
+The ground the probe measures against is `GroundAt(x)`, which is `GroundRef` generalised to an
+arbitrary x: the **real terrain contour** under each projected point for a scout (the raycast it
+already runs for `TickDeck`), and the flat conservative `groundY` for a fighter, which is the
+terrain maximum and so is never optimistic. Only the scout pays for raycasts, and only six of
+them a step — the same order as the arcs `ChooseTurn` already probes.
+
+The one-second horizon is a deliberate choice of *late*: it is enough for the fighter's steep dive
+and short enough that an enemy does not flinch at a ridge it will comfortably clear. Enemies still
+press low and still look committed; they simply stop arriving at the decision too late to take it.
+
+### Entering it resets the aeroplane
+
+`EnterRecover` is a full teardown, not a state assignment. It ends any dive (and its streaks),
+cancels a reversal in progress, cancels the evade, and flies an active depth dodge home
+(`Release`, so it slides back rather than snapping). It drops the tail lock and gives up the
+`_runDown` claim, so another enemy can take the six it was working on. It zeroes the press, circle
+and turn-choice timers. And it **arms the dive and evade cooldowns**, which is the part that stops
+the obvious failure: without it an enemy that just escaped the ground is immediately eligible to
+dive back at it.
+
+**The guns go cold.** `UpdateFiring` is skipped for the whole of `Recover`, alongside `Return`.
+An enemy hauling its nose off the deck is not shooting at anybody.
+
+### The climb, and which way it turns
+
+The escape heading is a 70° climb, and `ClearerSide` decides which way it faces. It samples the
+ground one second of flight to either side and climbs away over the **lower** one, so a scout
+nose-down at a rising hillside turns out of the valley rather than climbing into it. When the two
+sides are within 15 m of each other it keeps the heading it had — on flat ground, and for the
+fighter (whose `GroundAt` is a constant), that is always the case, so the fighter's recovery is
+unchanged: straight up, still facing the way it was.
+
+A reversal is never used to make that turn: `WantsReversal` refuses while `Recover` is the state,
+and `ChooseTurn` hands the heading straight through, so the plane simply steers the short way round
+through the vertical.
+
+### The evade boost
+
+`recoverBoost` (**1.35×** `flySpeed`, on both role assets) is applied in `FlightSpeed` for the
+duration, next to the `Return` and `Tail` clauses.
+
+It is deliberately **below** `catchUpTurnMultiplier` (1.6). Turn rate scales with speed through
+`TurnBoost`, so a boost that is smaller than the turn multiplier raises the turn rate faster than
+it raises the speed — and the pull-out radius `speed / turnRate` therefore **tightens** rather
+than merely holding. Firewalling it to the fighter's own 1.6× top speed would match the two
+exactly and buy a faster climb at an unchanged radius, which is the wrong trade when the problem
+is the radius. It also sits under both roles' `maxSpeedMultiplier` (scout 1.42, fighter 1.6), so
+nothing is clamped away.
+
+### Leaving it
+
+The hysteresis is unchanged and is the reason the state is stable: the threat test releases at
+`minAltitudeMargin`, but `Recover` itself only exits — through `TickState` → `EnterAttack`, which
+is where the player is re-acquired — once the plane has `safeAltitudeMargin` of clearance. So a
+plane cannot bounce along the trigger line; it climbs past it and keeps climbing to the wider
+margin before it is allowed to think about the fight again.
+
+### The one exemption
+
+A scout `RunningDown` — locked on the player's six, one enemy at a time — is still exempt, as it
+has always been ("Only then is the ground ignored", above). It is the single case in which an
+enemy can still fly into the terrain, and it is deliberate: the lock is the scout's committed
+chase, and making it break off near the deck would turn hugging the ground into a reliable way to
+shake one.
 
 ## When an enemy is allowed to shoot (`HasFiringSolution`)
 
@@ -832,8 +922,8 @@ speed × `engageFactor` (1.15), ignoring its configured `flySpeed` entirely. It 
 closes.
 
 It is folded in with a `Max` against everything else that can raise speed — the `Return` catch-up
-for an off-camera enemy, the fighter's dive, `TailSpeed`'s 1.3× — so whichever is fastest at that
-moment wins.
+for an off-camera enemy, the fighter's dive, `TailSpeed`'s 1.3×, and the ground recovery's
+`recoverBoost` (1.35×, "Ground avoidance") — so whichever is fastest at that moment wins.
 
 **The scout is capped; the fighter is not.** Everything above is a *target*, and none of it
 respected a ceiling: a scout chasing a fleeing Camel took 288 × 1.15 = 331 and simply outran it —

@@ -35,6 +35,7 @@ namespace MetalRaptors
         PlaneShooter _shooter;
         PlaneBomber _bomber;
         PlaneBoost _boost;
+        PlaneBarrelRoll _roll;
         PlaneSearchlight _searchlight;
         Transform _cubeTr;
         Camera _cam;
@@ -135,7 +136,7 @@ namespace MetalRaptors
 
         void BeginIntro()
         {
-            _intro = LevelIntro.Begin(gameObject, _cube, _shooter, _bomber, _boost, StartX,
+            _intro = LevelIntro.Begin(gameObject, _cube, _shooter, _bomber, _boost, _roll, StartX,
                 _halfViewWidth, BeginScript);
         }
 
@@ -172,6 +173,8 @@ namespace MetalRaptors
 
             CampaignScript script = CampaignScript.Load(_level.script);
             if (script == null) return;
+
+            if (script.HasSupply && _supply != null) _supply.TakeScriptControl();
 
             EnsureEnemies();
             _dialogue = new DialogueBar(_hud.transform);
@@ -230,6 +233,9 @@ namespace MetalRaptors
 
             _boost = go.AddComponent<PlaneBoost>();
             _boost.Initialize(flight, _cube, model);
+
+            _roll = go.AddComponent<PlaneBarrelRoll>();
+            _roll.Initialize(flight, _cube, model);
 
             _searchlight = PlaneSearchlight.Mount(go,
                 PlaneFactory.NoseLocal(go, model, planeModel), _level.daytime);
@@ -338,6 +344,7 @@ namespace MetalRaptors
 
             if (_wing == null) return;
             _wing.SetWindow(_camBasePos, _halfViewWidth, _halfViewHeight);
+            _wing.SetTargets(_enemies != null ? _enemies.Live : null);
             _wing.SetCinematic(Cinematic);
             _wing.Tick(Time.deltaTime);
         }
@@ -388,6 +395,16 @@ namespace MetalRaptors
             EnsureEnemies();
             _enemies.Spawn(new[] { new EnemyGroup(PlaneModels.EnemyFor(role), 1) },
                 _camBasePos.x, _halfViewWidth);
+        }
+
+        public void ArmSupply(bool open)
+        {
+            if (_supply != null) _supply.Arm(open);
+        }
+
+        public void SetCompanionFoe(PlaneModelConfig plane)
+        {
+            if (_wing != null) _wing.SetFoe(plane);
         }
 
         public float WarnIncoming(int planes)
@@ -532,6 +549,7 @@ namespace MetalRaptors
             if (_shooter != null) _shooter.Stop();
             if (_bomber != null) _bomber.Stop();
             if (_boost != null) _boost.Stop();
+            if (_roll != null) _roll.Stop();
         }
 
         void OnCrashed()
@@ -559,7 +577,7 @@ namespace MetalRaptors
             _hud = canvas.gameObject;
 
             _hudView = new LevelHud(canvas.transform, HudObjective, _cube, _shooter, _bomber,
-                _boost, _searchlight, TryPause);
+                _boost, _roll, _searchlight, TryPause);
 
             _curtain = HudCurtain.Attach(_hud);
             _curtain.Set(false);

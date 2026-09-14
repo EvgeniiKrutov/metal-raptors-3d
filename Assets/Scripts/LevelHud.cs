@@ -5,17 +5,20 @@ namespace MetalRaptors
 {
     public class LevelHud
     {
-        const string KeyHint = "A / D to steer  •  F to fire  •  H to bomb  •  R to boost  •  ";
+        const string KeyHint = "A / D to steer  •  F to fire  •  H to bomb  •  R to boost  •  "
+                               + "B to roll  •  ";
 
         readonly CubeController _plane;
         readonly PlaneShooter _shooter;
         readonly PlaneBomber _bomber;
         readonly PlaneBoost _boost;
+        readonly PlaneBarrelRoll _roll;
         readonly PlaneSearchlight _searchlight;
 
         readonly HealthBar _health;
         readonly CooldownSquare _bombSquare;
         readonly CooldownSquare _boostSquare;
+        readonly CooldownSquare _rollSquare;
         readonly CooldownSquare _fireSquare;
         readonly CooldownSquare _lightSquare;
 
@@ -24,13 +27,14 @@ namespace MetalRaptors
         Camera _cam;
 
         public LevelHud(Transform parent, string objective, CubeController plane,
-            PlaneShooter shooter, PlaneBomber bomber, PlaneBoost boost, PlaneSearchlight searchlight,
-            System.Action onPause)
+            PlaneShooter shooter, PlaneBomber bomber, PlaneBoost boost, PlaneBarrelRoll roll,
+            PlaneSearchlight searchlight, System.Action onPause)
         {
             _plane = plane;
             _shooter = shooter;
             _bomber = bomber;
             _boost = boost;
+            _roll = roll;
             _searchlight = searchlight;
 
             float x = HudTheme.ColumnLeft;
@@ -41,6 +45,7 @@ namespace MetalRaptors
 
             _bombSquare = Square(parent, x, ref y, HudTheme.Label("H", "BOMB"), RequestBomb);
             _boostSquare = Square(parent, x, ref y, HudTheme.Label("R", "BOOST"), RequestBoost);
+            _rollSquare = Square(parent, x, ref y, HudTheme.Label("B", "ROLL"), RequestRoll);
             if (HudTheme.IsTouch)
                 _fireSquare = Square(parent, x, ref y, "FIRE", null, holdable: true);
             if (_searchlight != null)
@@ -84,6 +89,8 @@ namespace MetalRaptors
                 _bombSquare.Set(_bomber.Charge, _bomber.IsReady);
             if (_boostSquare != null && _boost != null)
                 _boostSquare.Set(_boost.Charge, _boost.IsReady || _boost.IsRunning);
+            if (_rollSquare != null && _roll != null)
+                _rollSquare.Set(_roll.Charge, _roll.IsReady || _roll.IsRunning);
             if (_fireSquare != null && _shooter != null)
             {
                 _fireSquare.Set(0f, _shooter.IsReady);
@@ -119,6 +126,11 @@ namespace MetalRaptors
         void RequestBoost()
         {
             if (_boost != null) _boost.Request();
+        }
+
+        void RequestRoll()
+        {
+            if (_roll != null) _roll.Request();
         }
 
         void ToggleLight()

@@ -2,7 +2,7 @@
 
 Both level types build the same HUD out of `LevelHud` (`Assets/Scripts/LevelHud.cs`), which owns
 the health bar, the action column and the bottom hint line. `LevelController` and
-`CampaignLevelController` only create it, hand it the four player components, and call `Tick()`
+`CampaignLevelController` only create it, hand it the five player components, and call `Tick()`
 from their own `LateUpdate`. Everything it makes is a direct child of the HUD canvas, so
 `HudCurtain` still hides the lot during a cutscene and `GameMenu` still hides the lot when paused.
 
@@ -11,7 +11,7 @@ from their own `LateUpdate`. Everything it makes is a direct child of the HUD ca
 | Element | Where |
 | --- | --- |
 | Health bar | Top-left, hung from the top-left corner of the canvas. |
-| Action column | Directly under the bar: **bomb**, **boost**, **fire** (touch only), and **light** on night levels — one square per row. |
+| Action column | Directly under the bar: **bomb**, **boost**, **roll**, **fire** (touch only), and **light** on night levels — one square per row. |
 | Pause | Top-**right** corner, touch only — a `P` square wired to the controller's `TryPause`. |
 | Steering stick | Bottom-right corner, touch only — a ring on an invisible base (docs/mobile-steering.md). |
 | Heading arrow | Orbiting the plane, touch only — a `>` at the heading the stick last set. |
@@ -149,12 +149,14 @@ and the 10-unit hit pad takes the tappable area to ~60 pt. The pad is the same t
 `MenuArrowView.AddTouchPad` uses: a transparent `raycastTarget` image stretched past the square,
 whose pointer events bubble up to the handler on the parent.
 
-Even at four squares — the night case, plus the pause button off in the other corner — the column
-runs to roughly 710 of the canvas's 978 units, which still leaves the column and the bottom hint
-clear of each other.
+Even at five squares — the night case (bomb, boost, roll, fire, light), plus the pause button off
+in the other corner — the column runs to roughly 860 of the canvas's 978 units, which still leaves
+the column and the bottom hint clear of each other. The barrel roll (docs/barrel-roll.md) took the
+fourth slot from the fire square and is what makes this the binding constraint: a sixth square
+would not fit on a night touch level.
 
 `HudTheme.Label` also swaps the caption. A phone has no `H` key, so the squares read `BOMB`,
-`BOOST`, `LIGHT` on touch and keep the single key letter on desktop. The bottom hint drops its
+`BOOST`, `ROLL`, `LIGHT` on touch and keep the single key letter on desktop. The bottom hint drops its
 `A / D to steer • F to fire • …` prefix on touch for the same reason and shows only the objective;
 the controller passes just that half and `LevelHud` prepends the key legend on desktop.
 
@@ -192,6 +194,7 @@ that its own `Update` now calls too, so key and tap run identical code:
 | --- | --- | --- |
 | `PlaneBomber` | `Request()` | Checks `IsReady`, starts the cooldown, releases. `Update` calls it on `H`. |
 | `PlaneBoost` | `Request()` | Checks `IsReady` and that no boost is running. `Update` calls it on `R`. |
+| `PlaneBarrelRoll` | `Request()` | Checks `IsReady` and that no roll is running, then asks `CubeController.BeginBarrelRoll`. `Update` calls it on `B` and on the pad's east button (docs/barrel-roll.md). |
 | `PlaneShooter` | `SetHeld(bool)` | ORed with `fKey.isPressed`; the existing `fireRate` cooldown still paces the shots. |
 | `PlaneSearchlight` | `Toggle()` | Same guard as the `T` path. |
 

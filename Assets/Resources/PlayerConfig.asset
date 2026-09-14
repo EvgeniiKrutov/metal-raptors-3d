@@ -29,3 +29,6 @@ MonoBehaviour:
   boostMultiplier: 1.3
   boostDuration: 3
   boostCooldown: 8
+  rollRateMultiplier: 2
+  rollCooldown: 6
+  rollGrace: 0.5

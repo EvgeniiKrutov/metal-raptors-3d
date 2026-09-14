@@ -8,8 +8,8 @@ than a maneuvering trade.
 | Script | Role |
 | --- | --- |
 | `PlaneBoost.cs` | The R key, the duration, the cooldown. Lives on the player's body next to `PlaneShooter` and `PlaneBomber`. |
-| `WingStreaks.cs` | The two wingtip streaks. Shared — the fighter's diving pass mounts the same component in red (docs/enemies.md). |
-| `CooldownSquare.cs` | The HUD square, shared with the bomb. |
+| `WingStreaks.cs` | The two wingtip streaks. Shared three ways — the barrel roll puts up the same white pair (docs/barrel-roll.md) and the fighter's diving pass mounts the same component in red (docs/enemies.md). |
+| `CooldownSquare.cs` | The HUD square, shared with the bomb and the barrel roll. |
 
 ## Configuration
 
@@ -70,10 +70,10 @@ plane body, they follow its heading for free.
 
 Each trail is 2.1 units wide at the plane and lives 0.55 s, on a
 `Universal Render Pipeline/Unlit` material at 0.8 alpha made transparent through
-`UIFactory.MakeTransparent`. The colour is a caller's choice (`Mount`'s optional `tint`) but
-both users take the default white: the player's boost and the enemy fighter's diving pass
-(docs/enemies.md) put up the same streak, so on screen it reads as *a plane running its engine
-hard*, whoever is flying it. `alignment = View` keeps the ribbon facing the camera, so it reads
+`UIFactory.MakeTransparent`. The colour is a caller's choice (`Mount`'s optional `tint`) and
+only the enemy fighter's diving pass (docs/enemies.md) takes anything but the default white: the
+player's boost, the player's barrel roll (docs/barrel-roll.md) and that pass all put up the same
+streak, so on screen it reads as *a plane being flown hard*, whoever is flying it. `alignment = View` keeps the ribbon facing the camera, so it reads
 the same from any bank angle.
 
 The width is a *curve*, not a straight `startWidth`/`endWidth` taper: full width at the plane,
@@ -87,14 +87,23 @@ it.
 Ending the boost only clears `emitting`; the existing tail lives out its 0.55 s and disappears
 on its own.
 
+**The player has two callers, so the streaks are shared rather than doubled.** `Mount` returns an
+existing set on the same body when the tint matches — two pairs of trail renderers at the same
+wingtips would read as one thicker ribbon — and `SetEmitting(source, on)` counts its callers, so
+the trails run while *either* the boost or the barrel roll wants them and a boost expiring mid-roll
+cannot take the roll's streaks with it. The enemy fighter is a single-source caller on its own
+body and still uses the plain `SetEmitting(bool)`.
+
 ## Sound
 
 The engine gets a third looping voice in `PlayerEngineVoice` (docs/sounds.md): the same
 `engine_throttle_1` clip played at **1.35× pitch**, faded in over 0.18 s while boosting and out
-again afterwards. The idle and throttle beds duck to 0.35 underneath it, so the high revs
-dominate without the engine dropping out. The voice follows `CubeController.Boosting`, which
-tracks the *target* factor, so the sound arrives on the keypress rather than trailing the eased
-speed.
+again afterwards. The barrel roll raises the same bed (docs/barrel-roll.md), which is why the
+voice follows `CubeController.HighRevs` — `Boosting || BarrelRolling` — rather than `Boosting`
+alone. The idle and throttle beds duck to 0.35 underneath it, so the high revs
+dominate without the engine dropping out. The boost half of `HighRevs` reads the boost's *target*
+factor rather than the eased one, so the sound arrives on the keypress rather than trailing the
+eased speed.
 
 ## HUD
 

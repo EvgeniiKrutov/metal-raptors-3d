@@ -118,6 +118,11 @@ namespace MetalRaptors
                  + "maxSpeedMultiplier to hold the turn radius constant while boosting.")]
         public float catchUpTurnMultiplier = 1.6f;
 
+        [Tooltip("Speed during a ground recovery as a multiple of flySpeed. Keep it below "
+                 + "catchUpTurnMultiplier so the turn rate rises faster than the speed and the "
+                 + "pull-out tightens (see docs/enemies.md).")]
+        public float recoverBoost = 1.35f;
+
         [Header("Scout: deck flying")]
         [Tooltip("Metres above the terrain contour the scout's corridor is capped at.")]
         public float deckCeilingMargin = 260f;

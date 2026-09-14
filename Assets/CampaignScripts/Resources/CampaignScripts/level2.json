@@ -1,22 +1,75 @@
 {
   "steps": [
-    { "op": "say", "speaker": "hq", "line": "l2_line1" },
+    { "op": "say", "speaker": "roussel", "line": "l2_line1" },
     { "op": "say", "speaker": "you", "line": "l2_line2" },
-    { "op": "say", "speaker": "hq", "line": "l2_line3" },
+    { "op": "say", "speaker": "roussel", "line": "l2_line3" },
+    { "op": "say", "speaker": "you", "line": "l2_line4" },
+    { "op": "say", "speaker": "lasalle", "line": "l2_line5" },
+    { "op": "say", "speaker": "roussel", "line": "l2_line6" },
+    { "op": "say", "speaker": "you", "line": "l2_line7" },
+    { "op": "say", "speaker": "roussel", "line": "l2_line8" },
+    { "op": "say", "speaker": "you", "line": "l2_line9" },
+    { "op": "say", "speaker": "roussel", "line": "l2_line10" },
+
+    { "op": "wait", "seconds": 2.5 },
+
+    { "op": "wave", "enemies": [ { "plane": "eindecker", "count": 1 } ] },
+    { "op": "wait", "seconds": 4 },
+    { "op": "wave", "enemies": [ { "plane": "eindecker", "count": 2 } ] },
+    { "op": "wait", "seconds": 4 },
+    { "op": "wave", "enemies": [ { "plane": "eindecker", "count": 2 } ] },
+
+    { "op": "wait", "seconds": 1.5 },
+
+    { "op": "say", "speaker": "roussel", "line": "l2_line11" },
+    { "op": "say", "speaker": "you", "line": "l2_line12" },
+    { "op": "say", "speaker": "roussel", "line": "l2_line13" },
+    { "op": "say", "speaker": "lasalle", "line": "l2_line14" },
+    { "op": "say", "speaker": "roussel", "line": "l2_line15" },
+    { "op": "say", "speaker": "you", "line": "l2_line16" },
+    { "op": "say", "speaker": "roussel", "line": "l2_line17" },
+    { "op": "say", "speaker": "you", "line": "l2_line18" },
+    { "op": "say", "speaker": "roussel", "line": "l2_line19" },
+
+    { "op": "supply" },
+
+    { "op": "wave", "enemies": [ { "plane": "eindecker", "count": 2 } ] },
+    { "op": "wait", "seconds": 4 },
+    { "op": "wave", "enemies": [ { "plane": "eindecker", "count": 1 } ] },
+
+    { "op": "wait", "seconds": 1.5 },
+
+    { "op": "say", "speaker": "lasalle", "line": "l2_line20" },
+    { "op": "say", "speaker": "roussel", "line": "l2_line21" },
+    { "op": "say", "speaker": "you", "line": "l2_line22" },
+    { "op": "say", "speaker": "roussel", "line": "l2_line23" },
+    { "op": "say", "speaker": "you", "line": "l2_line24" },
+    { "op": "say", "speaker": "roussel", "line": "l2_line25" },
+    { "op": "say", "speaker": "you", "line": "l2_line26" },
+    { "op": "say", "speaker": "roussel", "line": "l2_line27" },
 
     { "op": "wave", "enemies": [ { "plane": "albatros", "count": 2 } ] },
 
     { "op": "wait", "seconds": 1.5 },
-    { "op": "say", "speaker": "hq", "line": "l2_line4" },
-    { "op": "say", "speaker": "you", "line": "l2_line5", "seconds": 3.5 },
+    { "op": "foe", "plane": "albatros" },
+
+    { "op": "say", "speaker": "roussel", "line": "l2_line28" },
+    { "op": "say", "speaker": "you", "line": "l2_line29" },
+    { "op": "say", "speaker": "roussel", "line": "l2_line30" },
+    { "op": "say", "speaker": "you", "line": "l2_line31" },
+    { "op": "say", "speaker": "lasalle", "line": "l2_line32" },
+    { "op": "say", "speaker": "roussel", "line": "l2_line33" },
+    { "op": "say", "speaker": "you", "line": "l2_line34" },
+    { "op": "say", "speaker": "roussel", "line": "l2_line35" },
+    { "op": "say", "speaker": "you", "line": "l2_line36" },
+
+    { "op": "supply" },
 
     { "op": "wave", "enemies": [ { "plane": "albatros", "count": 2 } ] },
-    { "op": "wait", "seconds": 3 },
-    { "op": "wave", "enemies": [ { "plane": "albatros", "count": 3 } ] },
-
-    { "op": "wait", "seconds": 1.5 },
-    { "op": "say", "speaker": "hq", "line": "l2_line6" },
-    { "op": "say", "speaker": "you", "line": "l2_line7", "seconds": 4 },
+    { "op": "wait", "seconds": 4 },
+    { "op": "wave", "enemies": [ { "plane": "albatros", "count": 2 } ] },
+    { "op": "wait", "seconds": 4 },
+    { "op": "wave", "enemies": [ { "plane": "albatros", "count": 2 }, { "plane": "eindecker", "count": 1 } ] },
 
     { "op": "finish" }
   ]

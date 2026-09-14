@@ -14,7 +14,8 @@ Files: `SupplyDrop.cs` (the director), `SupplyCrate.cs` (the falling crate),
 | `supplyHealthFraction` | `0.3` | Fraction of `MaxHealth` at or below which a crate is sent. |
 | `supplyHeal` | `50` | Health restored on catch, clamped to `MaxHealth`. |
 
-Every career level opts in — one crate on levels 1–6, two on 7 and 8. `CampaignLevels.Custom` — the Custom Battle skirmish — leaves it at `0`, so
+Every career level opts in — one crate on levels 1 and 3–6, **two on level 2**, two on 7 and 8.
+`CampaignLevels.Custom` — the Custom Battle skirmish — leaves it at `0`, so
 no crate ever falls there: the drop is a campaign beat, not a general pickup. Changing it for a
 level is one line in that level's definition.
 
@@ -28,12 +29,29 @@ is at or under 30 health, worth 50 back.
 It returns `null` from `Begin` when the level has no drops, and everything downstream is guarded
 on that null — a level without supply drops pays nothing.
 
-A crate is sent when all of these hold: drops are left, none is in the air, the level is not in a
+A crate is sent when all of these hold: drops are left, **the window is open** (below), none is in
+the air, the level is not in a
 cinematic (`IntroActive` or cinematic bars — the player is not fully flying the plane then and
 would lose the crate through no fault of their own), the plane is alive, and current health is at
 or below the trigger fraction. `StandDown` — called from `StopScript` and `CompleteLevel` —
 zeroes the budget and removes a crate still in the air, so nothing keeps falling over the fail or
 completion screen.
+
+### Windows: letting the script place the crates
+
+By default the window is simply always open, and the budget is the only thing limiting the crates
+— that is every level but one. A level whose script contains a `supply` step
+(docs/campaign-scripts.md) instead hands the *when* to the script:
+
+- `CampaignLevelController.BeginScript` calls `TakeScriptControl()` once, on the parsed script's
+  `HasSupply`. That sets `_scripted` and closes the window.
+- `{ "op": "supply" }` in the script calls `Arm(true)`; the first `say` of the next cutscene calls
+  `Arm(false)`; spending a crate closes the window too, so a window is worth **one** crate.
+- `Arm` returns immediately unless `_scripted`, so nothing about the other eight levels changes.
+
+The health condition is untouched by any of this — a window is permission for a crate to fall, not
+a crate. Level 2 is the only level using it: two windows, one in the phase between cutscenes 2 and
+3 and one after cutscene 4, and a window that closes unused takes its crate with it.
 
 There is **no HUD announcement**. An earlier version put a green plate up next to the enemy
 warning and it was noise: the crate enters at the top of the screen where the player is already

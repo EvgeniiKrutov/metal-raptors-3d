@@ -1,9 +1,25 @@
 # The companion (`CompanionFlight`, `DuelPlane`, `Tracer`)
 
-The player does not fly a career level alone. One friendly fighter flies the level with them:
-in formation while the film bars are up, and out in a **background dogfight** — a whole depth
-layer behind the play plane — while the level is being played. It is theatre, not gameplay:
-nothing in the background can hurt the player and the player cannot reach it.
+The player does not fly a career level alone. Friendly fighters fly the level with them, and a
+level picks one of two shapes.
+
+**The classic shape** (levels 1, 3, 7, 9) is one wingman: in formation while the film bars are up,
+and out in a **background dogfight** — a whole depth layer behind the play plane — while the level
+is being played. It is theatre, not gameplay: nothing in the background can hurt the player and
+the player cannot reach it.
+
+**The squadron shape** (level 2) is three: two that live permanently in the background layer, each
+duelling its own opponent and never rejoining, plus one **supporting wingman that stays at the
+play depth and actually fights** — it picks a live enemy, flies to a shot and fires real rounds
+that damage it. See "The supporting wingman" below.
+
+Every companion in either shape is immortal by construction and cannot be touched: `DuelPlane`
+destroys the colliders `PlaneFactory` builds and adds no rigidbody, so it never contacts the
+terrain, `Bullet`'s sphere-cast only sees the plane layer's colliders, and `Bullet.Hostile` only
+ever matches an `EnemyController` (for a friendly round) or the player's `CubeController` (for an
+enemy one). A companion is neither, so **rounds pass through it in both directions and it cannot
+be shot down, bombed or crashed**. Flying into one costs the player nothing either — see
+"Bumping into it".
 
 ## What it is configured with
 
@@ -11,16 +27,34 @@ Per level, on `CampaignDefinition` (`CampaignDefinition.cs`):
 
 | Field | Default | Means |
 | --- | --- | --- |
-| `companion` | `false` | Whether this level flies with a wingman at all. Level 1 sets it `true`; level 2 does not. |
-| `companionPlane` | `PlaneModels.Sopwith` | The wingman's model. Any `PlaneModelConfig` — the same registry the player and the enemy waves pick from. |
-| `companionFoe` | `PlaneModels.Albatros` | The model of the plane it duels in the background. |
+| `companion` | `false` | Whether this level flies with a wingman at all. Levels 1, 2, 3, 7 and 9 set it `true`. |
+| `companionPlane` | `PlaneModels.Sopwith` | The companions' model. Any `PlaneModelConfig` — the same registry the player and the enemy waves pick from. |
+| `companionFoe` | `PlaneModels.Albatros` | The model of the plane they duel in the background — the **opening** one; see "Changing machine mid-level". |
+| `backCompanions` | `0` | Extra companions that live **permanently** in the background layer, each with its own foe. They never formate and never rejoin. |
+| `supportCompanion` | `false` | Whether the escort wingman stays at the play depth and fights instead of peeling into the background. |
+| `companionSkins` | `null` | Per-companion skin ids, **lead first**: entry 0 is the escort or supporting wingman, entries 1..n the background companions in spawn order. Anything unnamed or unrecognised falls back to the squadron paint. |
+
+The two new fields are what separate the shapes. `backCompanions = 0, supportCompanion = false` is
+the classic single wingman and is what levels 1, 3, 7 and 9 fly — unchanged in every respect.
+Level 2 sets `backCompanions = 2, supportCompanion = true`, which is three companions: two in the
+back and the escort turned into a fighter at the player's own depth.
+
+**Companions wear the Sopwith's `dark_blue` skin** by default, through `PlaneSkins.Companion` —
+so friendly machines are one colour whatever the player picked in the garage
+(docs/plane-skins.md). A level overrides individual machines through `companionSkins`, resolved
+at spawn by `CompanionFlight.SkinFor(index)`: **level 2 flies its supporting wingman in `white`**
+against the two dark blue machines in the background layer, which is what tells the one that
+actually fights apart from the theatre behind it. The background foes still wear their own
+plane's default.
 
 Custom battles never get one: `CampaignLevels.Custom` leaves the flag off, and
 `CampaignLevelController.BeginCompanion` refuses on `CustomBattle.Requested` as well.
 
-Nothing about the companion is in the level *script* (docs/campaign-scripts.md). The whole
+Almost nothing about the companion is in the level *script* (docs/campaign-scripts.md). The whole
 sequence hangs off the cutscene state instead, so a level of any shape — three conversations
-or seven — gets the same rhythm for free and no script has to mention it.
+or seven — gets the same rhythm for free and no script has to mention it. The single exception is
+the `foe` op ("Changing machine mid-level", below), which changes *which* machine the background
+fight is against and nothing at all about when or how it happens.
 
 ## The rhythm
 
@@ -40,6 +74,112 @@ Every cutscene repeats the cycle with a **fresh** foe, so a level never runs out
 fight. The peel fires on the bars going down rather than on the first wave spawning: in level 1
 that is the `wait` right after the opening conversation, so the split reads as "we're separating"
 rather than as a reaction to enemies that are not there yet.
+
+### Changing machine mid-level
+
+`CompanionFlight` reads `companionFoe` once, into `_foePlane`, and `SpawnFoe` builds from that
+field rather than from the definition. `SetFoe(plane)` replaces it, and because a foe is spawned
+fresh at every peel, the change lands on the **next** background fight — the one in the air is
+left alone, since the next cutscene is about to kill it anyway.
+
+The script reaches it through the `foe` op and `ICampaignScriptHost.SetCompanionFoe`
+(docs/campaign-scripts.md). This is the one thing about the companion a script can touch, and it
+exists for level 2: the level turns over from Eindeckers to Albatros partway through, and the
+background duel turns over with it a phase later.
+
+**A permanent background foe has to be replaced rather than waited out.** The classic wingman's
+foe is killed at every cutscene, so a new model simply arrives with the next peel. A `backCompanions`
+foe is never killed by anything, so `SetFoe` kills the live ones itself — they burn down in the
+background layer — and spawns their replacements in from beyond the right edge. On level 2 that is
+the two Eindeckers going down and two Albatros arriving as the fourth cutscene opens, which is the
+same turn the waves make.
+
+## The two in the back (`backCompanions`)
+
+Each extra background companion is a `BackPair` in `CompanionFlight`: a friendly `DuelPlane`, its
+own foe, and its own hunt/cross timers. They are spawned in `Begin`, staggered 190 m apart in X and
+130 m in Y so the two duels do not sit on top of each other, and from then on they are **outside
+the cutscene machine entirely** — `TickBack` runs their role swaps every frame and nothing about
+the film bars touches them. They never align, never form up, never come forward.
+
+That is the whole point of them: "constantly in the back" means the background layer is never
+empty and never resets, so the level reads as a squadron fight the player is one part of rather
+than as a wingman who appears when the radio does. They do freeze with everything else while a
+cutscene holds the game (docs/cutscenes.md) — `DuelPlane.Update` returns on a zero `dt` — but they
+resume mid-pass rather than starting a new duel.
+
+They share the duel band, the camera-relative view and the pace trim with everything else in the
+layer; `CentreX`, the point the pace trim holds on station, is **the average of every background
+plane** once there are back pairs, so the whole layer is kept in frame rather than one pair of it.
+
+## The supporting wingman (`supportCompanion`)
+
+With `supportCompanion` set, the escort plane never peels. `SetCinematic` swaps it between two
+roles instead of running the phase machine:
+
+| Cutscene state | Role | What it does |
+| --- | --- | --- |
+| film bars up | `Escort` | Holds station on the player exactly as the classic wingman does, guns cold and no target. |
+| gameplay | `Support` | Flies itself, picks up the mark `CompanionFlight` gives it, and fires. |
+
+Because the phase never leaves `Escort`, `Formed` is always true and **the radio never waits** —
+there is no rejoin to wait for (docs/campaign-scripts.md).
+
+### How `Support` flies
+
+`Support` is `Form` with a gun. It is not `HoldStation`: the plane is flown through `Fly`, so the
+heading is the flight path and the nose is never crabbed. The heading is either:
+
+- **no mark, or a mark outside the 900 m leash from the player** — `FormHeading`, the bearing to
+  its station with the 130 m lookahead floor, which is the same solver the classic rejoin's step 3
+  uses. It flies back to the player's wing.
+- **a mark inside the leash** — the lead-intercept bearing on that enemy, the same `Lead` maths the
+  duel's `Hunt` uses, but against a real `Rigidbody` rather than another `DuelPlane`.
+
+Speed is `FormCruise` in both cases — the player's cruise plus a per-metre trim on the gap to the
+station — so it can chase a target without ever outrunning or falling behind the player. `Support`
+counts as `Escorting`, so it is held in the **escort** Y band (ground + 60 … top − 40) rather than
+the duel band: it can follow the player down low, and it still cannot reach the ground.
+
+The effect is the "loose station" it was asked for: it sits on the player's wing, leaves it to take
+a shot at anything within about a screen's reach, and comes straight back when there is nothing to
+shoot.
+
+### Picking the mark
+
+`CampaignLevelController` hands the flight the live enemy list every `LateUpdate`
+(`CompanionFlight.SetTargets`), and `AimSupport` picks the **nearest living enemy to the player**
+and gives its `Rigidbody` to the plane. It is re-picked every frame, so a wingman chasing a machine
+the player has just killed switches at once. The mark is cleared whenever a cutscene starts.
+
+`EnemyController` grew a `Body` accessor for this — the alternative was a `GetComponent` per enemy
+per frame.
+
+### Its guns
+
+`ArmGuns` builds the wingman a `Bullet` template of its own, exactly the one `PlaneShooter` builds
+for the player, and `ShootRound` launches real rounds with `fromEnemy: false`. So they damage
+enemies, and they pass straight through the player — `Bullet.Hostile` is
+`_fromEnemy != (target is EnemyController)`, which is false for a `CubeController` hit by a
+friendly round, and the bullet layer already ignores plane-layer collisions outright.
+
+It is deliberately **about half the player's output**:
+
+| | player | supporting wingman |
+| --- | --- | --- |
+| damage | `PlayerConfig.damage` (10) | × `SupportDamageShare` (0.5) → 5 |
+| cadence | 5 rounds/s, held | bursts of 3–5 at 0.085 s, then 1.6–2.8 s rest |
+| firing cone | the player's aim | 8°, tighter than the duel's 12° |
+| range | — | 420 m |
+
+That works out at roughly 8 damage a second while it is actually engaged, so a level 2 Eindecker
+(105 health × 0.60 = 63) takes it the better part of ten seconds. It visibly helps and occasionally
+takes a kill; the player still does most of the work. Its shot volume is 0.18 — between the
+player's 0.36 and the background duel's 0.045, which is where a plane on your wing belongs.
+
+The damage comes from the shared `PlayerConfig` **asset**, not from the loadout the player picked
+in the garage, for the same reason the flight model does (below): the wingman is another pilot in
+another aeroplane.
 
 ## Coming back
 
@@ -110,6 +250,11 @@ camera 420 m in front of the play plane, that is 670 m away, so the pair render 
 of the player's size with no scaling anywhere — pure perspective. It also puts them behind the
 cloud layer (Z 40–160, docs/clouds.md), so a cloud drifts in front of the duel now and then,
 which is most of the depth cue.
+
+**Distance haze is the other half of it**, where a map has any that reaches this far. The duel
+layer sits 670 m from the camera, and a fog start closer than that dims the whole background fight
+relative to the play line — on Verdun at midday it is 20 % hazed, which is what separates the two
+depths when no cloud happens to be passing (docs/atmospheres.md).
 
 ### Staying on screen
 
@@ -334,8 +479,11 @@ moment rather than the moment the bounds are released.
 
 ## Bumping into it
 
-While the wingman is at the play depth (within 40 m of Z 100 — the escort, and the first moments
-of a peel) the player can fly into it. `CompanionFlight.CheckBump` is a distance test on the same
+While a wingman is at the play depth the player can fly into it. For the classic wingman that is
+within 40 m of Z 100 — the escort, and the first moments of a peel; for a **supporting** wingman it
+is the whole level, so the bump goes from a rarity to routine feedback for flying too close. That
+is deliberate: it is a plane sharing the player's airspace, and two aircraft overlapping with no
+response at all reads as a bug. `CompanionFlight.CheckBump` is a distance test on the same
 30 m reach `PlaneScrapes` uses for plane-to-plane contact, on a 0.5 s cooldown, called from
 `CampaignLevelController.FixedUpdate` next to the scrape check.
 

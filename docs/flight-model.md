@@ -166,6 +166,11 @@ docs/level-intro.md.
 
 ## Auto-righting half roll (`PlaneRoll`)
 
+Note that this is not the only thing that rolls the plane about its nose axis. `ApplyRotation`
+sums three sources — this flip, the player's **barrel roll** (docs/barrel-roll.md) and the death
+spin — and the barrel roll **suppresses this tick for its duration**, because a 360° roll passes
+through inverted twice and would otherwise trigger a righting flip into the middle of itself.
+
 A plane that flies "backwards" along the play plane is upside down, because the
 only rotation the flight model applies is Z = heading: at heading π the body is
 turned 180°, which points the nose the right way but puts the wheels up. Left

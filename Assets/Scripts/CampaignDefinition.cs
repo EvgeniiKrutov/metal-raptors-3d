@@ -28,6 +28,8 @@ namespace MetalRaptors
         public CampaignOutroLine[] outro;
         public string journal;
         public bool companion;
+        public int backCompanions;
+        public bool supportCompanion;
         public bool zeppelins;
         public float flak = 1f;
         public float people = 1.5f;
@@ -38,6 +40,12 @@ namespace MetalRaptors
         public float supplyHeal = 50f;
         public PlaneModelConfig companionPlane = PlaneModels.Sopwith;
         public PlaneModelConfig companionFoe = PlaneModels.Albatros;
+        public string[] companionSkins;
+
+        public string CompanionSkin(int index) =>
+            companionSkins != null && index >= 0 && index < companionSkins.Length
+                ? companionSkins[index]
+                : null;
     }
 
     public static class CampaignLevels
@@ -110,6 +118,15 @@ namespace MetalRaptors
             new CampaignOutroLine("roussel", "l1_after7"),
         };
 
+        static CampaignOutroLine[] Outro2 => new[]
+        {
+            new CampaignOutroLine("roussel", "l2_after1"),
+            new CampaignOutroLine("you", "l2_after2"),
+            new CampaignOutroLine("marchand", "l2_after3"),
+            new CampaignOutroLine("roussel", "l2_after4"),
+            new CampaignOutroLine("you", "l2_after5"),
+        };
+
         static CampaignOutroLine[] OutroLorem(int level) => new[]
         {
             new CampaignOutroLine("hq", $"l{level}_after1"),
@@ -150,15 +167,19 @@ namespace MetalRaptors
             clouds = new CloudsPart(),
             script = "level2",
             companion = true,
+            backCompanions = 2,
+            supportCompanion = true,
             zeppelins = true,
             flak = 1.1f,
             enemyHealthScale = 0.60f,
             enemyRotationScale = 0.84f,
-            supplyDrops = 1,
+            supplyDrops = 2,
+            companionFoe = PlaneModels.Eindecker,
+            companionSkins = new[] { "white" },
             title = "THE NUMBERS",
             dateline = "22 June 1916 — Verdun sector — high midday",
             lore = Lore2,
-            outro = OutroLorem(2),
+            outro = Outro2,
             journal = JournalLorem,
         };
 
