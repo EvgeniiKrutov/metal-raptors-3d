@@ -26,6 +26,7 @@ namespace MetalRaptors
                 id = "dark_blue", label = "dark blue", texture = "skins/sopwith_camel/dark_blue",
             },
             new PlaneSkin { id = "white", label = "white", texture = "skins/sopwith_camel/white" },
+            new PlaneSkin { id = "red", label = "red", texture = "skins/sopwith_camel/red" },
         };
 
         public static readonly PlaneSkin[] AlbatrosD3 =

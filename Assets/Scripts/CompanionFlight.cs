@@ -140,7 +140,8 @@ namespace MetalRaptors
         }
 
         PlaneSkin SkinFor(int index) =>
-            PlaneSkins.Companion(_level.companionPlane, _level.CompanionSkin(index));
+            PlaneSkins.Companion(_level.companionPlane,
+                CampaignSpeakers.SkinOf(_level.CompanionPilot(index)));
 
         void AddBackPair(int index, PlayerConfig playerFlight)
         {

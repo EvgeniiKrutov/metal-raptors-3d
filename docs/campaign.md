@@ -240,8 +240,10 @@ the background layer, each with its own opponent and never rejoining, and `suppo
 turns the escort into a wingman that stays at the player's own depth and **fights** — it picks the
 nearest live enemy and fires real rounds at about half the player's output. Every companion is
 still immortal, passes rounds in both directions, cannot reach the ground and costs the player
-nothing to bump into. The two background machines wear the Sopwith's dark blue skin and the
-fighting wingman wears white — `companionSkins = { "white" }`. See docs/companion.md.
+nothing to bump into. `companionPilots = { "crane", "roussel", "marchand" }` names who flies
+which, lead first, and each machine takes its pilot's colour: Crane's red one fights at the play
+depth, Roussel's white and Marchand's dark blue duel in the background. Level 1 names
+`{ "roussel" }` the same way. See docs/companion.md and docs/plane-skins.md.
 
 ## Pre-level briefing
 

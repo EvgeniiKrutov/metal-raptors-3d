@@ -1,7 +1,7 @@
 # Plane skins
 
-A **skin** is an alternate base texture for a plane model. The Sopwith Camel has three —
-`green`, `dark_blue` and `white` — and the player picks one in the garage (`docs/garage.md`);
+A **skin** is an alternate base texture for a plane model. The Sopwith Camel has four —
+`green`, `dark_blue`, `white` and `red` — and the player picks one in the garage (`docs/garage.md`);
 the Albatros D.III has one, `plywood`, which it simply always wears. The pick is per plane, persists
 across launches, and is worn by the **player's** plane everywhere: the garage preview, the
 main menu's flying plane, challenge levels and campaign levels.
@@ -15,22 +15,37 @@ the Albatros gets `plywood`, which it otherwise flew unpainted.
 It is the **default**, never the player's pick: enemies read `PlaneSkins`, not `GameManager`,
 so repainting your own plane cannot repaint the other side.
 
-**Companions wear `dark_blue` unless the level says otherwise.** `DuelPlane.Spawn` takes the skin
-as an explicit argument now rather than deriving it from `mirrored`, and `CompanionFlight` passes
-`PlaneSkins.Companion(plane, id)` for every friendly machine and `PlaneSkins.Default(plane)` for
-every background foe. `Companion` tries the level's requested id first, then the squadron id
-`dark_blue`, then the plane's default — so a companion flying something other than a Camel, or one
-asking for a skin that plane has not got, is still painted rather than left bare.
+**Companions wear their pilot's colour, or `dark_blue` if the level names nobody.**
+`DuelPlane.Spawn` takes the skin as an explicit argument now rather than deriving it from
+`mirrored`, and `CompanionFlight` passes `PlaneSkins.Companion(plane, id)` for every friendly
+machine and `PlaneSkins.Default(plane)` for every background foe. `Companion` tries the requested
+id first, then the squadron id `dark_blue`, then the plane's default — so a companion flying
+something other than a Camel, or one asking for a skin that plane has not got, is still painted
+rather than left bare.
 
-The per-companion id comes from `CampaignDefinition.companionSkins`, indexed **lead first**: entry
-0 is the escort or supporting wingman, entries 1..n the background companions in spawn order. A
-short, null or unrecognised entry falls through to `dark_blue`, so a level only has to name the
-companions that differ. Level 2 sets `{ "white" }` — its supporting wingman is white and the two
-background machines stay dark blue (docs/companion.md).
+**A character's colour hangs off the character, not off the level.** `CampaignSpeaker` carries a
+`Skin` alongside the name it shows in dialogue, so the same list that says what a pilot is *called*
+says what they *fly in*, and a character keeps their machine from level to level without any level
+repeating it:
 
-One squadron colour for the rest is what keeps a three-ship legible: on level 2 a supporting
-wingman flies at the player's own depth, and several Camels in the same frame have to be told
-apart at a glance — which is exactly why *that* one is the white machine. The **player is the
+| pilot | skin |
+| --- | --- |
+| Roussel | `white` |
+| Marchand | `dark_blue` |
+| Crane | `red` |
+
+A level names **who** is flying, through `CampaignDefinition.companionPilots`, indexed **lead
+first**: entry 0 is the escort or supporting wingman, entries 1..n the background companions in
+spawn order. `CompanionFlight.SkinFor(index)` turns that id into a colour through
+`CampaignSpeakers.SkinOf`, and a short, null or unrecognised entry falls through to `dark_blue` —
+so a level only has to name the pilots it actually has. Level 1 flies `{ "roussel" }`; level 2
+flies `{ "crane", "roussel", "marchand" }`, which is Crane's red machine fighting at the play
+depth and the white and dark blue pair duelling in the background layer (docs/companion.md).
+Later levels with a wingman name nobody yet and fly the squadron colour.
+
+Naming the pilot rather than the paint is what keeps a three-ship legible *and* consistent: level
+2 has several Camels in one frame, the one that actually fights is the red one, and it is red
+because Crane is flying it rather than because that level picked a colour. The **player is the
 exception** and keeps their garage pick.
 
 The cost is that the player's Albatros and an enemy Albatros now wear the same paint. They
@@ -51,7 +66,7 @@ stats and its model:
 
 | plane | skins |
 | --- | --- |
-| Sopwith Camel | `green`, `dark_blue`, `white` (`dark_blue` is the default companion paint) |
+| Sopwith Camel | `green`, `dark_blue`, `white`, `red` (`dark_blue` is the default companion paint) |
 | Fokker Dr.I | none (`skins` left null) |
 | Albatros D.III | `plywood` |
 | Fokker E.III | none (`skins` left null) |
@@ -112,7 +127,7 @@ of renderers, which is why it does not matter here.
 ## Storage
 
 `GameManager` writes one `PlayerPrefs` key **per plane**, `mr_plane_skin_<resourceName>` —
-so `mr_plane_skin_sopwith_camel` holds `green`, `dark_blue` or `white`. A second plane with
+so `mr_plane_skin_sopwith_camel` holds `green`, `dark_blue`, `white` or `red`. A second plane with
 skins gets its own key for free and the two never overwrite each other.
 
 The key stores the skin's `id`, not its index, so reordering `PlaneSkins.SopwithCamel` or
@@ -142,5 +157,6 @@ the three player build sites pass.
 | `PlaneFactory.cs` | Paints a model at build time through the optional `skin` argument. |
 | `GaragePlaneView.cs` | `SetSkin` repaints the parked plane in place. |
 | `GarageController.cs` | The `colour` selector row. |
-| `CampaignDefinition.cs` | `companionSkins` — the per-level, lead-first companion paint. |
-| `CompanionFlight.cs` | `SkinFor(index)` resolves each companion's paint at spawn. |
+| `CampaignDefinition.cs` | `companionPilots` — the per-level, lead-first companion roster. |
+| `CampaignSpeakers.cs` | `Skin` on a character, and `SkinOf(id)` to look it up. |
+| `CompanionFlight.cs` | `SkinFor(index)` resolves each companion's pilot, then their paint, at spawn. |

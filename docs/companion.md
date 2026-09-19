@@ -32,7 +32,7 @@ Per level, on `CampaignDefinition` (`CampaignDefinition.cs`):
 | `companionFoe` | `PlaneModels.Albatros` | The model of the plane they duel in the background — the **opening** one; see "Changing machine mid-level". |
 | `backCompanions` | `0` | Extra companions that live **permanently** in the background layer, each with its own foe. They never formate and never rejoin. |
 | `supportCompanion` | `false` | Whether the escort wingman stays at the play depth and fights instead of peeling into the background. |
-| `companionSkins` | `null` | Per-companion skin ids, **lead first**: entry 0 is the escort or supporting wingman, entries 1..n the background companions in spawn order. Anything unnamed or unrecognised falls back to the squadron paint. |
+| `companionPilots` | `null` | Which character flies each machine, **lead first**: entry 0 is the escort or supporting wingman, entries 1..n the background companions in spawn order. The id is a `CampaignSpeakers` id, and the paint follows from the pilot. Anything unnamed or unrecognised falls back to the squadron paint. |
 
 The two new fields are what separate the shapes. `backCompanions = 0, supportCompanion = false` is
 the classic single wingman and is what levels 1, 3, 7 and 9 fly — unchanged in every respect.
@@ -40,12 +40,21 @@ Level 2 sets `backCompanions = 2, supportCompanion = true`, which is three compa
 back and the escort turned into a fighter at the player's own depth.
 
 **Companions wear the Sopwith's `dark_blue` skin** by default, through `PlaneSkins.Companion` —
-so friendly machines are one colour whatever the player picked in the garage
-(docs/plane-skins.md). A level overrides individual machines through `companionSkins`, resolved
-at spawn by `CompanionFlight.SkinFor(index)`: **level 2 flies its supporting wingman in `white`**
-against the two dark blue machines in the background layer, which is what tells the one that
-actually fights apart from the theatre behind it. The background foes still wear their own
-plane's default.
+so an unnamed friendly machine is one colour whatever the player picked in the garage
+(docs/plane-skins.md). A level names its pilots instead through `companionPilots`, and each one
+brings their own paint: `CompanionFlight.SkinFor(index)` reads the character out of the level,
+asks `CampaignSpeakers.SkinOf` what they fly in, and hands that to `PlaneSkins.Companion`.
+
+| level | shape | pilots, lead first |
+| --- | --- | --- |
+| 1 | single wingman | `roussel` — white |
+| 2 | support + two in the back | `crane` — red, at play depth; then `roussel` and `marchand` in the background |
+
+So level 2 still reads at a glance, but for a story reason rather than a formatting one: the
+machine that actually fights beside the player is Crane's **red** one, and the two in the
+theatre behind are Roussel's white and Marchand's dark blue. Levels 3, 7 and 9 name no pilot
+yet and fly the squadron's dark blue. The background foes still wear their own plane's
+default.
 
 Custom battles never get one: `CampaignLevels.Custom` leaves the flag off, and
 `CampaignLevelController.BeginCompanion` refuses on `CustomBattle.Requested` as well.
@@ -168,11 +177,11 @@ It is deliberately **about half the player's output**:
 | | player | supporting wingman |
 | --- | --- | --- |
 | damage | `PlayerConfig.damage` (10) | × `SupportDamageShare` (0.5) → 5 |
-| cadence | 5 rounds/s, held | bursts of 3–5 at 0.085 s, then 1.6–2.8 s rest |
+| cadence | 5 rounds/s, held | bursts of 3–5 **at the player's own 5 rounds/s**, then 1.6–2.8 s rest |
 | firing cone | the player's aim | 8°, tighter than the duel's 12° |
 | range | — | 420 m |
 
-That works out at roughly 8 damage a second while it is actually engaged, so a level 2 Eindecker
+That works out at roughly 7 damage a second while it is actually engaged, so a level 2 Eindecker
 (105 health × 0.60 = 63) takes it the better part of ten seconds. It visibly helps and occasionally
 takes a kill; the player still does most of the work. Its shot volume is 0.18 — between the
 player's 0.36 and the background duel's 0.045, which is where a plane on your wing belongs.
@@ -180,6 +189,15 @@ player's 0.36 and the background duel's 0.045, which is where a plane on your wi
 The damage comes from the shared `PlayerConfig` **asset**, not from the loadout the player picked
 in the garage, for the same reason the flight model does (below): the wingman is another pilot in
 another aeroplane.
+
+**So does the cadence.** `DuelPlane.Spawn` reads `flight.fireRate` into `_shotSpacing` — the same
+field, in the same seconds-between-shots units, that `PlaneShooter` puts on its own cooldown — so a
+companion inside a burst fires at the player's rate (0.2 s, five rounds a second) rather than at a
+spacing of its own. It used to be a `ShotSpacing` constant of 0.085 s, nearly two and a half times
+the player's rate, which read and sounded like a stream rather than like a gun. The burst and rest
+timings are unchanged, so the rhythm is the same shape — the rounds inside a burst are simply
+spaced like the player's now. Every `DuelPlane` is built from that config, so this applies to the
+supporting wingman, the classic escort and the background machines on both sides alike.
 
 ## Coming back
 
@@ -436,7 +454,8 @@ badly-timed merge — worth having, since nothing here has a collider to stop it
 Fire is **cosmetic only**. `Tracer` is an emissive round with no rigidbody, no collider and no
 damage — it flies a straight line for 1.3 s and destroys itself. Nothing in the background
 duel can be hit by anything, and nothing it fires can hit the level. Rounds leave in bursts of
-4–8 at 0.085 s spacing followed by a 0.9–1.9 s pause, and only when the hunter is inside 470 m
+4–8 at the player's own shot spacing followed by a 0.9–1.9 s pause, and only when the hunter is
+inside 470 m
 and aimed within 12°; a burst that has started is committed even if the aim drifts, which is
 what a real burst does. Each shot draws the same `MuzzleFlash` the player and the enemies use,
 and plays the shared shot clip at **0.045** volume against the enemy's 0.15 — audible as a

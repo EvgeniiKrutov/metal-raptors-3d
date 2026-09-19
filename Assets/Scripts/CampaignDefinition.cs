@@ -40,11 +40,11 @@ namespace MetalRaptors
         public float supplyHeal = 50f;
         public PlaneModelConfig companionPlane = PlaneModels.Sopwith;
         public PlaneModelConfig companionFoe = PlaneModels.Albatros;
-        public string[] companionSkins;
+        public string[] companionPilots;
 
-        public string CompanionSkin(int index) =>
-            companionSkins != null && index >= 0 && index < companionSkins.Length
-                ? companionSkins[index]
+        public string CompanionPilot(int index) =>
+            companionPilots != null && index >= 0 && index < companionPilots.Length
+                ? companionPilots[index]
                 : null;
     }
 
@@ -151,6 +151,7 @@ namespace MetalRaptors
             enemyRotationScale = 0.80f,
             supplyDrops = 1,
             companionFoe = PlaneModels.Eindecker,
+            companionPilots = new[] { "roussel" },
             title = "WARMING ENGINES",
             dateline = "14 April 1916",
             lore = Before1,
@@ -175,7 +176,7 @@ namespace MetalRaptors
             enemyRotationScale = 0.84f,
             supplyDrops = 2,
             companionFoe = PlaneModels.Eindecker,
-            companionSkins = new[] { "white" },
+            companionPilots = new[] { "crane", "roussel", "marchand" },
             title = "THE NUMBERS",
             dateline = "22 June 1916 — Verdun sector — high midday",
             lore = Lore2,

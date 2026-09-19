@@ -56,7 +56,6 @@ namespace MetalRaptors
 
         const float FireRange = 470f;
         const float FireAngleDeg = 12f;
-        const float ShotSpacing = 0.085f;
         const int BurstMin = 4;
         const int BurstMax = 8;
         const float RestMin = 0.9f;
@@ -135,7 +134,7 @@ namespace MetalRaptors
         float _groundY;
         bool _hasGround;
 
-        float _shotTimer, _restTimer;
+        float _shotTimer, _restTimer, _shotSpacing;
         int _burstLeft;
 
         Rigidbody _mark;
@@ -204,6 +203,7 @@ namespace MetalRaptors
             duel._z = position.z;
             duel._depthTo = position.z;
             duel._wobblePhase = Random.Range(0f, 10f);
+            duel._shotSpacing = Mathf.Max(0.01f, flight.fireRate);
             duel._restTimer = Random.Range(RestMin, RestMax);
             duel._smoke = go.AddComponent<SmokeTrail>();
 
@@ -717,7 +717,7 @@ namespace MetalRaptors
                 _shotTimer -= dt;
                 if (_shotTimer > 0f) return;
 
-                _shotTimer = ShotSpacing;
+                _shotTimer = _shotSpacing;
                 _burstLeft--;
                 Shoot();
                 if (_burstLeft == 0) _restTimer = Random.Range(RestMin, RestMax);
@@ -740,7 +740,7 @@ namespace MetalRaptors
                 _shotTimer -= dt;
                 if (_shotTimer > 0f) return;
 
-                _shotTimer = ShotSpacing;
+                _shotTimer = _shotSpacing;
                 _burstLeft--;
                 ShootRound();
                 if (_burstLeft == 0)
