@@ -82,6 +82,17 @@ spends alive but invisible, which at this size is several seconds of empty sky a
 The left edge is the only exit test needed: the campaign camera's X never decreases and the
 airship's never increases, so the gap between them only ever closes.
 
+## The left limit
+
+`SetLeftLimit(x)` stops the airship at a world X and keeps it there. It exists for level 3,
+where the left end of the map is the squadron's own aerodrome and nothing hostile is meant to
+be over it (docs/aerodrome.md): the limit is the airfield's right edge. The drift is clamped
+rather than the airship destroyed, so it never blinks out mid-frame — it simply holds station
+at the boundary until the camera moves on and the ordinary off-screen death takes it. A spawn
+that would land left of the limit is refused outright, except the opening one, which is pushed
+to the limit instead so a level still opens with an airship in the sky. Unset, the limit is
+negative infinity and nothing above changes.
+
 ## Propellers
 
 `StartPropellers` puts a `PropellerSpin` on each of the four `outrigger_*_prop` pivot nodes —

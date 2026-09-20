@@ -145,9 +145,12 @@ namespace MetalRaptors
                 int hash = Hash(_seed, cell, salt);
                 var rng = new System.Random(hash);
                 float x = (cell + (float)rng.NextDouble()) * cellSize;
+                if (!_field.InBand(x)) { grid[cell] = null; continue; }
+
+                float back = _field.ZBack;
                 float z = kind == Kind.Tank
-                    ? Mathf.Lerp(TankZMin, TankZMax, (float)rng.NextDouble())
-                    : Mathf.Lerp(ZMin, ZMax, (float)rng.NextDouble());
+                    ? Mathf.Lerp(TankZMin, Mathf.Min(TankZMax, back), (float)rng.NextDouble())
+                    : Mathf.Lerp(ZMin, Mathf.Min(ZMax, back), (float)rng.NextDouble());
                 string model = models[rng.Next(models.Length)];
                 float yaw = (float)rng.NextDouble() * 360f;
                 float jitter = kind == Kind.Tank ? TankSizeJitter : SizeJitter;

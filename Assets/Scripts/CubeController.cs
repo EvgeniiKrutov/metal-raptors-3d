@@ -80,16 +80,17 @@ namespace MetalRaptors
         float _evadeGrace;
         float _barrelGrace;
 
-        bool _hardLeftWall;
-        float _wallX = float.NegativeInfinity;
+        bool _hardWalls;
+        float _wallMinX = float.NegativeInfinity;
+        float _wallMaxX = float.PositiveInfinity;
 
         bool _headingSteering;
         float _targetHeading;
 
         public void Initialize(PlayerConfig config, float startHeadingRad, float minX, float maxX,
-            float ceilingY, float edgeMargin, bool hardLeftWall = false)
+            float ceilingY, float edgeMargin, bool hardWalls = false)
         {
-            _hardLeftWall = hardLeftWall;
+            _hardWalls = hardWalls;
             _config     = config;
             _heading    = startHeadingRad;
             _minX       = minX;
@@ -235,7 +236,7 @@ namespace MetalRaptors
                 steady = !left && !right;
             }
 
-            if (!_hardLeftWall)
+            if (!_hardWalls)
                 desiredRate = FlightSteering.EdgeSteer(_rb.position.x, _heading,
                     _minX, _maxX, _edgeMargin, maxRate, desiredRate);
 
@@ -252,12 +253,14 @@ namespace MetalRaptors
             Vector3 pos = _rb.position;
 
             if (pos.y >= _ceilingY && vel.y > 0f) vel.y = 0f;
-            if (_hardLeftWall && pos.x <= _wallX && vel.x < 0f) vel.x = 0f;
+            if (_hardWalls && pos.x <= _wallMinX && vel.x < 0f) vel.x = 0f;
+            if (_hardWalls && pos.x >= _wallMaxX && vel.x > 0f) vel.x = 0f;
             _rb.linearVelocity = vel;
 
             bool clamped = false;
             if (pos.y > _ceilingY) { pos.y = _ceilingY; clamped = true; }
-            if (_hardLeftWall && pos.x < _wallX) { pos.x = _wallX; clamped = true; }
+            if (_hardWalls && pos.x < _wallMinX) { pos.x = _wallMinX; clamped = true; }
+            if (_hardWalls && pos.x > _wallMaxX) { pos.x = _wallMaxX; clamped = true; }
 
             if (GroundUnder(pos, out float deck) && pos.y < deck)
             {
@@ -286,7 +289,19 @@ namespace MetalRaptors
             return hit;
         }
 
-        public void SetLeftWall(float x) => _wallX = Mathf.Max(_wallX, x);
+        public void SetLeftWall(float x) => _wallMinX = Mathf.Max(_wallMinX, x);
+
+        public void SetWalls(float minX, float maxX)
+        {
+            _wallMinX = minX;
+            _wallMaxX = maxX;
+        }
+
+        public void ClearWalls()
+        {
+            _wallMinX = float.NegativeInfinity;
+            _wallMaxX = float.PositiveInfinity;
+        }
 
         public void SetBoost(bool on) => _boostTarget = on && _config != null
             ? Mathf.Max(1f, _config.boostMultiplier)

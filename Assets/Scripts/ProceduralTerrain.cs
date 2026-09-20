@@ -15,6 +15,8 @@ namespace MetalRaptors
         internal const float MinHeight = 4f;
         public const float MaxHeight = 85f;
         internal const float FrontStrip = 130f;
+        const float FogHideMargin = 120f;
+        const float FogEdgeMargin = 60f;
         const int Res = 1025;
 
         internal const float CratersPerMetre = 0.017f;
@@ -149,9 +151,17 @@ namespace MetalRaptors
         }
 
         internal static float FogEndDistance(float cameraDistance, float playPlaneZ)
-            => cameraDistance - playPlaneZ + Depth - 250f;
+            => cameraDistance - playPlaneZ + Depth - FogHideMargin;
+
+        internal static float FogEndDistance(float cameraDistance, float playPlaneZ, float depth)
+            => Mathf.Min(FogEndDistance(cameraDistance, playPlaneZ),
+                cameraDistance - playPlaneZ + depth - FogEdgeMargin);
 
         internal static void ApplyFog(Daytime daytime, float cameraDistance, float playPlaneZ)
+            => ApplyFog(daytime, cameraDistance, playPlaneZ, Depth);
+
+        internal static void ApplyFog(Daytime daytime, float cameraDistance, float playPlaneZ,
+            float depth)
         {
             Color haze;
             float startOffset;
@@ -166,7 +176,7 @@ namespace MetalRaptors
             RenderSettings.fogMode = FogMode.Linear;
             RenderSettings.fogColor = haze;
             RenderSettings.fogStartDistance = cameraDistance + startOffset;
-            RenderSettings.fogEndDistance = FogEndDistance(cameraDistance, playPlaneZ);
+            RenderSettings.fogEndDistance = FogEndDistance(cameraDistance, playPlaneZ, depth);
         }
 
         static float[,] GenerateHeights(System.Random rng, float width,

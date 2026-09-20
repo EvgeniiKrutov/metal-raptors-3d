@@ -25,6 +25,7 @@ namespace MetalRaptors
         const int SmokeSiteTries = 3;
 
         const float PeopleZMaxDefault = 700f;
+        const float BackMargin = 40f;
 
         Camera _cam;
         float _halfViewWidth;
@@ -37,6 +38,8 @@ namespace MetalRaptors
         float _smokeZMin = SmokeZMin, _smokeZMax = SmokeZMax;
         float _peopleZMax = PeopleZMaxDefault;
         float _peopleDensity = 1f;
+        float _landDepth = ProceduralTerrain.Depth;
+        bool _explicitBand;
         bool _placeProps = true;
         bool _placePeople = true;
 
@@ -54,6 +57,14 @@ namespace MetalRaptors
         public float MinX => _minX;
         public float MaxX => _maxX;
         public bool Bounded => !float.IsInfinity(_minX) && !float.IsInfinity(_maxX);
+
+        public float BandMinX => _explicitBand ? _minX : _minX - _halfViewWidth;
+        public float BandMaxX => _explicitBand ? _maxX : _maxX + _halfViewWidth;
+
+        public bool InBand(float x) => !Bounded || (x >= BandMinX && x <= BandMaxX);
+
+        public float LandDepth => _landDepth;
+        public float ZBack => _landDepth - BackMargin;
         public BattlefieldProps Props => _props;
         public float PeopleZMax => _peopleZMax;
         public float PeopleDensity => _peopleDensity;
@@ -73,6 +84,21 @@ namespace MetalRaptors
             field._placeProps = false;
             field._peopleZMax = peopleZMax;
             field._peopleDensity = peopleDensity;
+            field.Populate();
+            return field;
+        }
+
+        public static Battlefield BeginBounded(Camera cam, float halfViewWidth, int seed,
+            float bandMinX, float bandMaxX, System.Func<float, float, bool> inCrater,
+            float peopleDensity, float landDepth)
+        {
+            var field = Create(cam, halfViewWidth, seed, bandMinX, bandMaxX, inCrater);
+            if (field == null) return null;
+
+            field._explicitBand = true;
+            field._peopleDensity = peopleDensity;
+            field._landDepth = landDepth;
+            field._peopleZMax = Mathf.Min(PeopleZMaxDefault, field.ZBack);
             field.Populate();
             return field;
         }
@@ -204,7 +230,8 @@ namespace MetalRaptors
             _blastTimer = Random.Range(BlastIntervalMin, BlastIntervalMax);
 
             float x = camX + Random.Range(-1f, 1f) * _halfViewWidth * BlastSpread;
-            float z = Random.Range(BlastZMin, BlastZMax);
+            float z = Random.Range(BlastZMin, Mathf.Min(BlastZMax, ZBack));
+            if (!InBand(x)) return;
             if (!SampleGround(x, z, out float y)) return;
 
             float size = Random.Range(BlastSizeMin, BlastSizeMax);
@@ -266,6 +293,7 @@ namespace MetalRaptors
                     float x = (cell + (float)rng.NextDouble()) * SmokeCellSize;
                     float z = Mathf.Lerp(_smokeZMin, _smokeZMax, (float)rng.NextDouble());
 
+                    if (!InBand(x)) continue;
                     if (!SampleGround(x, z, out float y)) { retry = true; break; }
                     if (y < _seaLevel + DryClearance) continue;
 

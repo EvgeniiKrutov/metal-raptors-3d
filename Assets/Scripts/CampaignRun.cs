@@ -14,12 +14,15 @@ namespace MetalRaptors
 
     public static class CampaignProgress
     {
+        public const int AlwaysUnlocked = 3;
+
         public static int HighestCompleted =>
             GameManager.Instance != null ? GameManager.Instance.CampaignLevelsCompleted : 0;
 
         public static bool IsCompleted(int level) => level <= HighestCompleted;
 
-        public static bool IsUnlocked(int level) => level <= HighestCompleted + 1;
+        public static bool IsUnlocked(int level) =>
+            level <= Mathf.Max(AlwaysUnlocked, HighestCompleted + 1);
 
         public static bool AllCompleted => HighestCompleted >= CampaignRun.LastLevel;
 

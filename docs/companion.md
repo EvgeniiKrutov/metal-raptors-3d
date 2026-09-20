@@ -49,11 +49,12 @@ asks `CampaignSpeakers.SkinOf` what they fly in, and hands that to `PlaneSkins.C
 | --- | --- | --- |
 | 1 | single wingman | `roussel` — white |
 | 2 | support + two in the back | `crane` — red, at play depth; then `roussel` and `marchand` in the background |
+| 3 | single wingman | `marchand` — dark blue |
 
 So level 2 still reads at a glance, but for a story reason rather than a formatting one: the
 machine that actually fights beside the player is Crane's **red** one, and the two in the
-theatre behind are Roussel's white and Marchand's dark blue. Levels 3, 7 and 9 name no pilot
-yet and fly the squadron's dark blue. The background foes still wear their own plane's
+theatre behind are Roussel's white and Marchand's dark blue. Levels 7 and 9 name no pilot yet and
+fly the squadron's dark blue — which is also, by coincidence, what level 3's named pilot flies. The background foes still wear their own plane's
 default.
 
 Custom battles never get one: `CampaignLevels.Custom` leaves the flag off, and

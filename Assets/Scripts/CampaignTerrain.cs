@@ -5,17 +5,33 @@ using UnityEngine.Rendering;
 
 namespace MetalRaptors
 {
+    public class CampaignLandOptions
+    {
+        public float depth;
+        public float worldWidth;
+        public float apronUntilX;
+        public float roadZ;
+        public float roadHalfWidth;
+    }
+
     public abstract class CampaignTerrain : MonoBehaviour
     {
         public const float ChunkLength = 512f;
         protected const int Res = 257;
         protected const float XStep = ChunkLength / (Res - 1);
-        protected const float Depth = ProceduralTerrain.Depth;
-        protected const float ZStep = Depth / (Res - 1);
         const double BuildBudgetMs = 3.0;
+        const int BoundsMarginChunks = 1;
+
+        public static float Depth { get; private set; } = ProceduralTerrain.Depth;
+        protected static float ZStep => Depth / (Res - 1);
 
         protected int _seed;
+        protected float _apronUntilX;
+        protected float _roadZ;
+        protected float _roadHalfWidth;
         float _keepBehind, _keepAhead;
+        bool _bounded;
+        int _firstChunk, _lastChunk;
         Material _terrainMat;
 
         class Chunk
@@ -47,7 +63,8 @@ namespace MetalRaptors
         public virtual bool InCrater(float worldX, float z) => false;
 
         public static CampaignTerrain Begin(TerrainKind kind, int seed, Daytime daytime,
-            Weather weather, float cameraDistance, float playPlaneZ, float startCamX)
+            Weather weather, float cameraDistance, float playPlaneZ, float startCamX,
+            CampaignLandOptions options = null)
         {
             CampaignTerrain land;
             switch (kind)
@@ -64,10 +81,11 @@ namespace MetalRaptors
             }
 
             land._seed = seed;
+            land.Configure(options);
             land._terrainMat = new Material(Shader.Find("Universal Render Pipeline/Terrain/Lit"));
             land.Prepare(daytime, weather, cameraDistance, playPlaneZ);
 
-            float keep = ProceduralTerrain.FogEndDistance(cameraDistance, playPlaneZ);
+            float keep = ProceduralTerrain.FogEndDistance(cameraDistance, playPlaneZ, Depth);
             land._keepBehind = keep + ChunkLength * 0.5f;
             land._keepAhead = keep + ChunkLength * 1.5f;
 
@@ -79,8 +97,38 @@ namespace MetalRaptors
             return land;
         }
 
+        void Configure(CampaignLandOptions options)
+        {
+            Depth = ProceduralTerrain.Depth;
+            if (options == null) return;
+
+            if (options.depth > 0f) Depth = options.depth;
+            _apronUntilX = options.apronUntilX;
+            _roadZ = options.roadZ;
+            _roadHalfWidth = options.roadHalfWidth;
+
+            if (options.worldWidth <= 0f) return;
+
+            _bounded = true;
+            _firstChunk = Mathf.FloorToInt(0f / ChunkLength) - BoundsMarginChunks;
+            _lastChunk = Mathf.FloorToInt(options.worldWidth / ChunkLength) + BoundsMarginChunks;
+        }
+
+        public bool SampleHeight(float x, float z, out float y)
+        {
+            y = 0f;
+            if (!_chunks.TryGetValue(Mathf.FloorToInt(x / ChunkLength), out var chunk)) return false;
+            if (chunk.terrain == null) return false;
+
+            y = chunk.terrain.SampleHeight(new Vector3(x, 0f, z))
+                + chunk.terrain.transform.position.y;
+            return true;
+        }
+
         public void UpdateStreaming(float camX)
         {
+            if (_bounded) return;
+
             int first = FirstChunk(camX);
             int last = LastChunk(camX);
 
@@ -98,8 +146,13 @@ namespace MetalRaptors
                 }
         }
 
-        int FirstChunk(float camX) => Mathf.FloorToInt((camX - _keepBehind) / ChunkLength);
-        int LastChunk(float camX) => Mathf.FloorToInt((camX + _keepAhead) / ChunkLength);
+        int FirstChunk(float camX) => _bounded
+            ? _firstChunk
+            : Mathf.FloorToInt((camX - _keepBehind) / ChunkLength);
+
+        int LastChunk(float camX) => _bounded
+            ? _lastChunk
+            : Mathf.FloorToInt((camX + _keepAhead) / ChunkLength);
 
         IEnumerable<int> MissingChunks(float camX)
         {

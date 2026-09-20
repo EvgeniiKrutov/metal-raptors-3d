@@ -27,6 +27,8 @@ namespace MetalRaptors
         public string lore;
         public CampaignOutroLine[] outro;
         public string journal;
+        public float worldWidth;
+        public bool aerodrome;
         public bool companion;
         public int backCompanions;
         public bool supportCompanion;
@@ -192,12 +194,15 @@ namespace MetalRaptors
             weather = Weather.Calm,
             clouds = new CloudsPart(),
             script = "level3",
+            worldWidth = 2000f,
+            aerodrome = true,
             companion = true,
             zeppelins = true,
             flak = 0.9f,
             enemyHealthScale = 0.65f,
             enemyRotationScale = 0.88f,
             supplyDrops = 1,
+            companionPilots = new[] { "marchand" },
             title = "FIXED GROUND",
             dateline = "12 February 1917 — Vaux-le-Bois — failing light",
             lore = Lore1,

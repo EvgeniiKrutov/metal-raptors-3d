@@ -27,6 +27,7 @@ namespace MetalRaptors
         float _halfViewWidth, _halfViewHeight;
         float _playZ;
         float _intensity = 1f;
+        float _leftLimit = float.NegativeInfinity;
         float _timer;
         int _salvoLeft;
         int _soundsLeft;
@@ -46,6 +47,8 @@ namespace MetalRaptors
             flak._timer = Random.Range(StartDelayMin, StartDelayMax) / intensity;
             return flak;
         }
+
+        public void SetLeftLimit(float x) => _leftLimit = x;
 
         void LateUpdate()
         {
@@ -92,6 +95,8 @@ namespace MetalRaptors
                 float scale = Mathf.Max(0.1f, z - camPos.z) / camDistance;
 
                 float x = camPos.x + Random.Range(-1f, 1f) * _halfViewWidth * scale * SpreadX;
+                if (x < _leftLimit) continue;
+
                 float y = PickY(camPos.y, _halfViewHeight * scale);
 
                 var field = Battlefield.Current;

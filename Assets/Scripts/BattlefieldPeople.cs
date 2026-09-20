@@ -117,8 +117,8 @@ namespace MetalRaptors
             return people;
         }
 
-        float BandMinX => _field.MinX - _field.HalfViewWidth;
-        float BandMaxX => _field.MaxX + _field.HalfViewWidth;
+        float BandMinX => _field.BandMinX;
+        float BandMaxX => _field.BandMaxX;
         float ZMax => _field.PeopleZMax;
         float Density => Mathf.Max(0.1f, _field.PeopleDensity);
         float Spacing => GroupSpacing / Density;

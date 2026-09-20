@@ -16,7 +16,7 @@ namespace MetalRaptors
         static readonly Color AmbientGroundColor = new Color(0.42f, 0.27f, 0.20f);
 
         const float SunViewportX = 0.22f;
-        const float SunHorizonLift = 0.04f;
+        const float SunHorizonLift = 0.08f;
 
         static readonly Color RayColor = new Color(1.00f, 0.70f, 0.42f);
         const float RayIntensity = 0.8f;

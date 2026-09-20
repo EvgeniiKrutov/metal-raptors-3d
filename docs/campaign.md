@@ -1,6 +1,7 @@
 # Campaign mode
 
-An endless side-scrolling flight over streamed terrain. Entry points: main menu → career →
+A side-scrolling flight over streamed terrain — endless on every level but the third, which is a
+fixed-width map (below). Entry points: main menu → career →
 World War 1 → continue (or → level select → a card), and main menu → custom battle → start
 (scene `CampaignLevel1`, controller `CampaignLevelController`, definition registry
 `CampaignLevels` in `CampaignDefinition.cs`). See docs/main-menu.md for the pages that lead
@@ -35,11 +36,17 @@ The scenario's `Mountain` sector is `TerrainKind.Dolomites`, the alpine streamer
 (docs/dolomites.md) — so all three terrain kinds are now flown in career and none is
 custom-battle-only.
 
-**Level 1 is written and level 2 is built; levels 3–9 are still placeholder.** Level 1 speaks the scenario's three
+**Level 1 is written, level 2 is built, level 3 has its map; levels 4–9 are still placeholder.** Level 1 speaks the scenario's three
 cutscenes, carries its written objectives, opens on the journal's *Before* page and ends on the
 ground scene and the journal's closing page (docs/level-outro.md). Its briefing shows
 `WARMING ENGINES` over the bare date — no sector, no light — above three paragraphs of Vasseur
 being turned down twice by the recruiting board.
+
+**Level 3, FIXED GROUND, is the campaign's first fixed-width map** — a 2000 m arena the player can
+fly both ways in, with the squadron's aerodrome standing on the left end of it, the shelled
+ground starting where the field ends, and a road leaving the field at the player's own depth.
+See "Fixed-width levels" below and docs/aerodrome.md. Only its shape is authored: the script,
+the radio lines, the ground scene and the briefing `lore` are still the placeholder ones.
 
 **Level 2, THE NUMBERS, is now authored to its final shape** — four cutscenes, seventeen machines
 in nine waves, two placed supply crates and a background duel that changes machine partway through
@@ -48,11 +55,11 @@ still lorem ipsum: every radio line, its ground scene and its briefing `lore`. S
 docs/campaign-scripts.md for the walkthrough.
 
 Levels 3–9 each have a script (`level3` … `level9`) so that they can be *finished*, which is what
-career progression is built on — but every one is the same scroller shape (opening exchange →
+career progression is built on — but every one is the same placeholder shape (opening exchange →
 waves → closing exchange → `finish`), its radio lines and ground scene are lorem ipsum, and its
-briefing `lore` is lorem ipsum. The scenario designs rear-gun, stealth, strike and time-attack
-levels and two boss fights; none of those modes exist yet, so those levels currently fly as
-ordinary scrollers.
+briefing `lore` is lorem ipsum. Level 3 is the one whose *map* is no longer a placeholder; its
+script still is. The scenario designs rear-gun, stealth, strike and time-attack levels and two
+boss fights; none of those modes exist yet, so those levels fly as ordinary fights.
 
 Level 1 also flies **only Fokker monoplanes**, on both sides of the frame: the waves are Fokkers
 and so is `companionFoe`, the machine the wingman duels in the background layer. The Albatros
@@ -74,14 +81,18 @@ counts are what a written level replaces, not a budget it has to stay inside.
 
 `GameManager.CampaignLevelsCompleted` (PlayerPrefs `mr_campaign_progress`) is the highest
 career level cleared, and `CampaignProgress` in `CampaignRun.cs` is the null-safe facade the
-menu reads: `IsCompleted(n)`, `IsUnlocked(n)` (`n <= completed + 1`), `NextLevel`. It is
+menu reads: `IsCompleted(n)`, `IsUnlocked(n)`, `NextLevel`. It is
 written in `CampaignLevelController.CompleteLevel`, and **only outside a custom battle** — a
 skirmish on a career map cannot advance the campaign.
 
 It is deliberately a different key from `mr_highest_unlocked_level`, which belongs to the
 fixed challenge levels (`Level1`/`Level2`) and is untouched by career.
 
-Level 1 is always unlocked; every later card is locked until the one before it is cleared.
+`CampaignProgress.AlwaysUnlocked` is **3**: every level up to it is open whatever the save says,
+and every later card is locked until the one before it is cleared. It is the highest level that
+is authored and being worked on, and it moves up as the campaign is built out — it is not a
+cheat and not a debug switch: below it `IsUnlocked` is the plain `n <= completed + 1`.
+
 `continue` on the era page flies `CampaignProgress.NextLevel`, which is the first uncleared
 level — and level 9 once the whole campaign is done, so `continue` replays the finale rather
 than dead-ending.
@@ -102,7 +113,8 @@ is painted, what it decorates with, and what extra meshes ride along with it).
 
 ## Rules of the level
 
-- The plane flies left to right; a level ends when its script says so (docs/campaign-scripts.md),
+- The plane flies left to right — unless the level is **fixed width**, which level 3 is (below);
+  a level ends when its script says so (docs/campaign-scripts.md),
   and a level with no script flies forever. `finish` does not open LEVEL COMPLETED directly — it
   starts the outro, which flies the patrol out of frame and plays the ground scene and the journal
   page first (docs/level-outro.md). Touching the ground
@@ -135,6 +147,35 @@ is painted, what it decorates with, and what extra meshes ride along with it).
   place of the authored definition. Career's start clears the request first, so the two
   entry points never bleed into each other. It flies no script, so its only enemies are the
   ones the dev console's spawn buttons launch (docs/dev-stats.md).
+
+## Fixed-width levels
+
+`CampaignDefinition.worldWidth` turns a level from an endless scroller into a **bounded arena**.
+`0` — every level but the third — is the scroller described above. Level 3 sets `2000`, and that
+one field changes five things:
+
+- **Hard walls on both sides**, at `0` and `worldWidth`, inset by the plane's half size the same
+  way the ceiling is. `CubeController.SetWalls` replaces the scroller's moving `SetLeftWall`, and
+  the block is the ceiling's: slide along it, no damage, no crash, and never an auto-turn. The
+  soft `FlightSteering.EdgeSteer` boundaries of the fixed challenge levels stay off.
+- **The camera stops ratcheting.** It follows the plane both ways and clamps to
+  `[halfView, worldWidth − halfView]`, so the frame never crosses the map's edges.
+- **The land is finite and built once.** `CampaignTerrain` builds every chunk from one before the
+  left wall to one past the right wall in `Begin` and then streams nothing — there is no chunk to
+  drop and none to add, and the land reaches past both walls, so no edge is ever in frame.
+- **`Battlefield` is bounded**, so infantry spread evenly across the map instead of being fed in
+  ahead of a moving camera (docs/battlefield.md, "Bounded maps vs scrollers"), and props, smoke,
+  ground blasts, flak and the zeppelin are all held inside the same band.
+- **The objective line** reads `hold the sector` rather than `no turning back`.
+
+The walls are armed only after the intro, like the scroller's, since the plane still flies in
+from off the left edge — the intro's hold point becomes the camera's clamped resting X rather
+than `StartX`. `CompleteLevel` drops both walls again so the outro can fly the patrol out past
+the right-hand one.
+
+A fixed-width level may also carry an **aerodrome** (`CampaignDefinition.aerodrome`), which is
+what puts the airfield, its flattened apron and the road into level 3 and cuts the land's Z depth
+down to the field's own. That is a separate document: docs/aerodrome.md.
 
 ## Streamed Verdun terrain (`VerdunTerrain`)
 
@@ -240,7 +281,10 @@ the background layer, each with its own opponent and never rejoining, and `suppo
 turns the escort into a wingman that stays at the player's own depth and **fights** — it picks the
 nearest live enemy and fires real rounds at about half the player's output. Every companion is
 still immortal, passes rounds in both directions, cannot reach the ground and costs the player
-nothing to bump into. `companionPilots = { "crane", "roussel", "marchand" }` names who flies
+nothing to bump into. Level 3 flies the classic single wingman again, and names `marchand` — so the machine at the
+player's wing over their own airfield is the dark blue one.
+
+`companionPilots = { "crane", "roussel", "marchand" }` names who flies
 which, lead first, and each machine takes its pilot's colour: Crane's red one fights at the play
 depth, Roussel's white and Marchand's dark blue duel in the background. Level 1 names
 `{ "roussel" }` the same way. See docs/companion.md and docs/plane-skins.md.

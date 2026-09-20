@@ -10,6 +10,9 @@ namespace MetalRaptors
         const float CellSize = 128f;
         const float MaxCraterReach = 150f;
         const int RowsPerStep = 16;
+        const float ApronRamp = 160f;
+        const float ApronLevel = ProceduralTerrain.BaseLevel;
+        const float RoadGrassMargin = 8f;
 
         float _r1, _r2, _r3, _ox1, _oz1, _ox2, _oz2;
 
@@ -44,8 +47,21 @@ namespace MetalRaptors
             _landLayer = ProceduralTerrain.CreateLandLayer();
             _wallMat = ProceduralTerrain.CutWallMaterial();
 
-            ProceduralTerrain.ApplyFog(daytime, cameraDistance, playPlaneZ);
+            ProceduralTerrain.ApplyFog(daytime, cameraDistance, playPlaneZ, Depth);
         }
+
+        float ApronBlend(float worldX)
+        {
+            if (_apronUntilX <= 0f) return 0f;
+            if (worldX <= _apronUntilX) return 1f;
+
+            return 1f - Mathf.SmoothStep(0f, 1f, (worldX - _apronUntilX) / ApronRamp);
+        }
+
+        bool OnApron(float worldX) => _apronUntilX > 0f && worldX < _apronUntilX;
+
+        bool OnRoad(float z) =>
+            _roadHalfWidth > 0f && Mathf.Abs(z - _roadZ) < _roadHalfWidth + RoadGrassMargin;
 
         public override bool InCrater(float worldX, float z)
         {
@@ -111,6 +127,9 @@ namespace MetalRaptors
                     h += (Mathf.PerlinNoise(x / 170f + _ox1, zEff / 170f + _oz1) - 0.5f) * 2f * 10f * depthRamp;
                     h += (Mathf.PerlinNoise(x / 30f + _ox2, zEff / 30f + _oz2) - 0.5f) * 2f * 1.6f;
 
+                    float apron = ApronBlend(x);
+                    if (apron > 0f) h = Mathf.Lerp(h, ApronLevel, apron);
+
                     heights[iz, ix] = h;
                 }
             }
@@ -164,6 +183,7 @@ namespace MetalRaptors
                     float cz = Mathf.Lerp(10f, Depth - 40f, (float)shellRng.NextDouble());
                     float radius = Mathf.Lerp(12f, 42f, (float)shellRng.NextDouble());
                     float depth = radius * Mathf.Lerp(0.22f, 0.30f, (float)shellRng.NextDouble());
+                    if (ReachesApron(cx, radius * 1.8f)) continue;
                     list.Add(new CraterSpec
                     {
                         x = cx, z = cz, radius = radius, depth = depth,
@@ -183,6 +203,7 @@ namespace MetalRaptors
                     float u = (float)mineRng.NextDouble();
                     float depth = radius * Mathf.Lerp(ProceduralTerrain.MineDepthShallow,
                         ProceduralTerrain.MineDepthDeep, 1f - u * u);
+                    if (ReachesApron(cx, radius * 1.7f)) continue;
                     list.Add(new CraterSpec
                     {
                         x = cx, z = cz, radius = radius, depth = depth,
@@ -193,6 +214,9 @@ namespace MetalRaptors
                 }
             }
         }
+
+        bool ReachesApron(float x, float influence) =>
+            _apronUntilX > 0f && x - influence < _apronUntilX;
 
         IEnumerable<object> PlantGrass(TerrainData data, int index, List<CraterSpec> craters)
         {
@@ -212,6 +236,7 @@ namespace MetalRaptors
                     float lx = Mathf.Min((col + (float)rng.NextDouble()) * cellX, ChunkLength);
                     float lz = Mathf.Min((row + (float)rng.NextDouble()) * cellZ, Depth);
 
+                    if (OnApron(x0 + lx) || OnRoad(lz)) continue;
                     if (InCrater(x0 + lx, lz, craters)) continue;
                     float xNorm = lx / ChunkLength, zNorm = lz / Depth;
                     if (data.GetSteepness(xNorm, zNorm) > ProceduralTerrain.GrassMaxSlopeDeg) continue;

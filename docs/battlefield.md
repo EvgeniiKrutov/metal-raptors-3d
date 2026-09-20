@@ -70,6 +70,24 @@ entry point (docs/dolomites.md). It is the ordinary inland battlefield with two 
   read by `BattlefieldPeople` in place of its old `ZMax` constant; every other map passes
   nothing and keeps 700. Blasts are *not* capped — shells still land on the lower slopes.
 
+## Bounded mode
+
+`Battlefield.BeginBounded(cam, halfViewWidth, seed, bandMinX, bandMaxX, inCrater, peopleDensity,
+landDepth)` is the fixed-width campaign entry point (docs/campaign.md, "Fixed-width levels"). It
+differs from the plain `Begin` in two ways:
+
+- **The band is explicit.** An ordinary bounded map pads `MinX`/`MaxX` by a half view width on
+  each side, because its terrain tiles sideways and the ground past the edges is on screen. A
+  fixed-width campaign map does not want that: its left edge is the aerodrome, and nothing is
+  meant to stand on the airfield. `BandMinX`/`BandMaxX` — now on `Battlefield`, where
+  `BattlefieldPeople` reads them from — return the passed span unpadded, and `InBand(x)` gates
+  scenery props, smoke columns and ground blasts as well as infantry. Level 3 passes the
+  aerodrome's right edge as the band's start, which is what keeps the field clean.
+- **The land depth is passed in.** `Battlefield.LandDepth` and the derived `ZBack`
+  (`LandDepth − 40`) cap every Z range against the actual strip of land rather than the usual
+  800, so a shallow map does not place props, tanks or infantry past its own back edge. At the
+  default depth `ZBack` is 760, above every range below, so nothing changes for the other levels.
+
 ## Crater lookup
 
 `Begin` also takes a `Func<float, float, bool> inCrater` — a world-space
@@ -123,6 +141,9 @@ deliberately occupy different slices of it:
 | People | 40 – 700 | The whole map, so squads are seen both in front of and behind the aircraft. The back edge is per-map (`Battlefield.PeopleZMax`); Dolomites pulls it in to 520. |
 | Scenery props | 20 – 700 | The whole map. Reaching in front of the play plane is deliberate: near trees sweep past the camera for parallax, and the handful that land in the flight lane are the ones a plane can hit. |
 | Tank wrecks | 175 – 650 | Behind the play plane only, so a burning wreck and its smoke never sit on the player's own Z and never obscure the duel. 175 keeps even the near end a tank-length clear of the lane. |
+
+Every back edge in that table is additionally clamped to `Battlefield.ZBack` on a map whose land
+is shallower than 800 — see *Bounded mode*.
 
 ## Ground blasts (`GroundBlast.cs`)
 

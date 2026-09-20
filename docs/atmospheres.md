@@ -75,7 +75,11 @@ the coast is unaffected; only the anchored maps change, and they change by becom
   keeps its fixed screen anchor; only its band tracks the edge.
 
 Fog start distance per daytime (set in `ProceduralTerrain.Build`; the far anchor is the
-same for all — the last ~250 m of land sit in solid haze so the map edge never shows):
+same for all — the last `FogHideMargin` of land sits in solid haze so the map edge never
+shows). That margin was cut from 250 to **120** on 2026-09-20, which moves the far anchor from
+870 out to **1000** and buys 130 units of readable distance on every Verdun map; 120 units of
+land still stand past the point where the haze goes solid, and a map cut deeper than 800 keeps
+its own `edge − 60` clamp on top:
 
 | Daytime | Fog start past camera | Air |
 |---|---|---|
@@ -89,7 +93,10 @@ same for all — the last ~250 m of land sit in solid haze so the map edge never
 The offset is measured from the camera, and the two depths that matter sit at fixed distances
 from it: the **play plane** at `CameraDistance` (420) and the **companion background layer** at
 `CameraDistance + CompanionFlight.Depth` (670). The far anchor is
-`FogEndDistance` = 870 for every Verdun daytime.
+`FogEndDistance` — 870 when this was written, 1000 since the margin was cut. The starts below
+are unchanged, so the ramp is simply longer and every percentage in the table reads lower now:
+the duel layer sits at 34 % morning, 28 % evening, 13 % midday. The ordering the argument rests
+on is untouched.
 
 At the old +300 the fog began at 720 — **fifty metres behind the background layer** — so the
 duelling companions and their opponents were drawn at exactly the same values as the plane on the
@@ -267,9 +274,15 @@ Golden hour: the sun low by the horizon, warm yellow-orange air, dusk closing in
   shadows lean dusk-purple instead of the morning's blue.
 - **Sun placement**: screen column x = 0.22 — left of frame (unlike the morning's right
   side; the setting sun is the centrepiece of this sky, so it sits where the player
-  spawns and looks from), riding `SunHorizonLift = 0.04` above the map-edge horizon via
-  `SkyHorizon` (the morning uses 0.08 — a sun already risen; the evening's lower rim
-  stays in the haze, a sun mid-set). Big soft disc (`_SunFalloff 150`, intensity 6) with
+  spawns and looks from), riding `SunHorizonLift = 0.08` above the map-edge horizon via
+  `SkyHorizon` — **the morning's lift, taken over on 2026-09-20**. It was 0.04, a lower
+  rim held in the haze, and that reads as a sun mid-set on a map whose land ends where
+  `SkyHorizon` expects. It does not on level 3: the anchor is the world point
+  `(camX, BaseLevel, ProceduralTerrain.Depth)` — a *fixed* 800 — while the aerodrome level
+  cuts its strip 1150 deep, and a farther ground edge projects **higher** on the screen, not
+  lower. At a 200-unit camera height that is about 0.031 of the frame, so a 0.04 lift left
+  the disc roughly 0.009 above the land it was supposed to be clear of, and the hangars and
+  the ridge cut into it. At 0.08 the clearance is about 0.049. Big soft disc (`_SunFalloff 150`, intensity 6) with
   a halo (`_HaloFalloff 4.5`, intensity 0.4) — the most visible sun of the four skies,
   but no longer a white hole: the disc keeps its edge instead of blowing out into the sky.
 - **Key light**: `Euler(16, 20, 0)`, intensity 1.05 — the lowest of the sun skies, for

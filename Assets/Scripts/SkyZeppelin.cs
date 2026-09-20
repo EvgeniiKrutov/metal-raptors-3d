@@ -41,6 +41,7 @@ namespace MetalRaptors
         float _speed;
         float _length;
         float _halfWindow;
+        float _leftLimit = float.NegativeInfinity;
         int _spawnedChunk = int.MinValue;
 
         public static SkyZeppelin Begin(Camera cam, float halfViewWidth, float halfViewHeight,
@@ -59,6 +60,15 @@ namespace MetalRaptors
             return sky;
         }
 
+        public void SetLeftLimit(float x)
+        {
+            _leftLimit = x;
+            if (_airship == null) return;
+
+            Vector3 pos = _airship.position;
+            _airship.position = new Vector3(Mathf.Max(pos.x, x), pos.y, pos.z);
+        }
+
         void LateUpdate()
         {
             if (_cam == null) return;
@@ -72,9 +82,11 @@ namespace MetalRaptors
         {
             if (_airship == null) return;
 
-            _airship.position += new Vector3(_speed * Time.deltaTime, 0f, 0f);
+            Vector3 pos = _airship.position;
+            pos.x = Mathf.Max(pos.x + _speed * Time.deltaTime, _leftLimit);
+            _airship.position = pos;
 
-            if (_airship.position.x - eye.x > -_halfWindow - _length * HideMargin) return;
+            if (pos.x - eye.x > -_halfWindow - _length * HideMargin) return;
 
             Destroy(_airship.gameObject);
             _airship = null;
@@ -99,26 +111,33 @@ namespace MetalRaptors
                 return;
             }
 
-            _spawnedChunk = ChunkAt(eye.x);
-
             float z = _playPlaneZ + CompanionFlight.Depth
                       + Random.Range(DepthBehindDuelMin, DepthBehindDuelMax);
             float grade = (z - eye.z) / _cameraDistance;
 
-            _length = ApparentLength * grade
-                      * Random.Range(1f - LengthJitter, 1f + LengthJitter);
-            _halfWindow = _halfViewWidth * grade;
+            float length = ApparentLength * grade
+                           * Random.Range(1f - LengthJitter, 1f + LengthJitter);
+            float halfWindow = _halfViewWidth * grade;
 
+            float x = eye.x + (onScreen
+                ? halfWindow * Random.Range(OnScreenMin, OnScreenMax)
+                : halfWindow + length * HideMargin);
+
+            if (x < _leftLimit)
+            {
+                if (!onScreen) return;
+                x = _leftLimit;
+            }
+
+            _spawnedChunk = ChunkAt(eye.x);
+            _length = length;
+            _halfWindow = halfWindow;
             _speed = -Random.Range(SpeedMin, SpeedMax);
-
-            float x = onScreen
-                ? _halfWindow * Random.Range(OnScreenMin, OnScreenMax)
-                : _halfWindow + _length * HideMargin;
 
             var root = new GameObject("Zeppelin");
             root.transform.SetParent(transform, false);
             root.transform.position = new Vector3(
-                eye.x + x,
+                x,
                 eye.y + _halfViewHeight * grade * Random.Range(RiseMin, RiseMax),
                 z);
 

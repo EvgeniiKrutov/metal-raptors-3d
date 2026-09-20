@@ -82,6 +82,13 @@ terrain, asked through `Battlefield.Current.SampleGround`, so a burst never deto
 buried in a hill. Where there is no `Battlefield` (or no terrain streamed in yet) the
 lift is simply skipped.
 
+### The left limit
+
+`SetLeftLimit(x)` refuses any burst left of a world X, using the same four placement tries as the
+keep-out. Level 3 sets it to the right edge of its aerodrome, so the sky over the squadron's own
+field is never shelled (docs/aerodrome.md); with the player at that end of the map all four
+tries fail and the salvo simply does not fire. Unset, it is negative infinity.
+
 ### The keep-out
 
 A burst inside the play plane's own depth slab (`|z − 100| < 90`) is refused if it

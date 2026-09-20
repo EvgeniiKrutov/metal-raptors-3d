@@ -24,6 +24,13 @@ namespace MetalRaptors
         const float OutroExitMargin = 120f;
         const float OutroFadeSec = 1.2f;
 
+        const float AerodromeX = 0f;
+        const float AerodromeZ = 0f;
+        const float AerodromeLandMargin = 50f;
+        const float AerodromeMaxDepth = 2000f;
+        const float RoadOverlap = 60f;
+        const float RoadOverrun = 500f;
+
         const float DitchSplashSize = 75f;
         const float SinkSpeed = 26f;
         const float SinkDriftKeep = 0.15f;
@@ -75,6 +82,19 @@ namespace MetalRaptors
 
         bool Alpine => _level.terrain == TerrainKind.Dolomites;
 
+        bool Bounded => _level.worldWidth > 0f;
+
+        float WorldRight => _level.worldWidth;
+
+        float CamMinX => Mathf.Min(_halfViewWidth, WorldRight * 0.5f);
+
+        float CamMaxX => Mathf.Max(WorldRight - _halfViewWidth, WorldRight * 0.5f);
+
+        float IntroHoldX => Bounded ? CamMinX : StartX;
+
+        float ApronEndX =>
+            _level.aerodrome && Aerodrome.Ready && AerodromeFits ? AerodromeX + Aerodrome.Width : 0f;
+
         void Start()
         {
             _levelNumber = CampaignRun.Level;
@@ -90,7 +110,8 @@ namespace MetalRaptors
             Firelight.Clear();
             ConfigureShadows();
             _terrain = CampaignTerrain.Begin(_level.terrain, _level.seed, _level.daytime,
-                _level.weather, CameraDistance, PlayPlaneZ, StartX);
+                _level.weather, CameraDistance, PlayPlaneZ, StartX, BuildLand());
+            BuildAerodrome();
             SpawnPlayer(config);
             SetupCamera();
 
@@ -106,15 +127,18 @@ namespace MetalRaptors
                 Battlefield.BeginValley(_cam, _halfViewWidth, _level.seed, _terrain.InCrater,
                     DolomitesTerrain.ValleyZMax, _level.people);
             }
+            else if (Bounded)
+            {
+                Battlefield.BeginBounded(_cam, _halfViewWidth, _level.seed, ApronEndX, WorldRight,
+                    _terrain.InCrater, _level.people, CampaignTerrain.Depth);
+            }
             else
             {
                 Battlefield.Begin(_cam, _halfViewWidth, _level.seed, _terrain.InCrater,
                     _level.people);
             }
 
-            SkyFlak.Begin(_cam, _cubeTr, _halfViewWidth, _halfViewHeight, PlayPlaneZ, _level.flak);
-            SkyZeppelin.Begin(_cam, _halfViewWidth, _halfViewHeight, PlayPlaneZ,
-                CameraDistance, _level.zeppelins);
+            BeginSky();
 
             PlaneScrapes.DisablePlanePlaneCollisions();
             PlaneScrapes.SetGroundCollisions(true);
@@ -132,12 +156,59 @@ namespace MetalRaptors
 
         bool HasBriefing => !CustomBattle.Requested && !string.IsNullOrEmpty(_level.title);
 
+        CampaignLandOptions BuildLand()
+        {
+            if (!Bounded && !_level.aerodrome) return null;
+
+            var land = new CampaignLandOptions { worldWidth = _level.worldWidth };
+            if (!_level.aerodrome || !Aerodrome.Measure()) return land;
+
+            if (!AerodromeFits)
+            {
+                Debug.LogError($"Aerodrome: measured {Aerodrome.Width} by {Aerodrome.LandDepth}, "
+                               + $"which does not fit a {WorldRight} map; the field is skipped.");
+                return land;
+            }
+
+            land.depth = Aerodrome.LandDepth + AerodromeLandMargin;
+            land.apronUntilX = AerodromeX + Aerodrome.Width;
+            land.roadZ = PlayPlaneZ;
+            land.roadHalfWidth = AerodromeRoad.HalfWidth;
+            return land;
+        }
+
+        bool AerodromeFits =>
+            Aerodrome.Width > 0f && Aerodrome.Width < WorldRight
+            && Aerodrome.LandDepth > 0f
+            && Aerodrome.LandDepth + AerodromeLandMargin <= AerodromeMaxDepth;
+
+        void BuildAerodrome()
+        {
+            if (!_level.aerodrome || !Aerodrome.Ready || !AerodromeFits) return;
+
+            Aerodrome.Place(AerodromeX, AerodromeZ, ProceduralTerrain.BaseLevel);
+            AerodromeRoad.Build(_terrain, ApronEndX - RoadOverlap, WorldRight + RoadOverrun,
+                PlayPlaneZ);
+        }
+
+        void BeginSky()
+        {
+            SkyFlak flak = SkyFlak.Begin(_cam, _cubeTr, _halfViewWidth, _halfViewHeight,
+                PlayPlaneZ, _level.flak);
+            SkyZeppelin zeppelin = SkyZeppelin.Begin(_cam, _halfViewWidth, _halfViewHeight,
+                PlayPlaneZ, CameraDistance, _level.zeppelins);
+
+            if (ApronEndX <= 0f) return;
+            if (flak != null) flak.SetLeftLimit(ApronEndX);
+            if (zeppelin != null) zeppelin.SetLeftLimit(ApronEndX);
+        }
+
         bool IntroActive => _intro != null && _intro.Active;
 
         void BeginIntro()
         {
-            _intro = LevelIntro.Begin(gameObject, _cube, _shooter, _bomber, _boost, _roll, StartX,
-                _halfViewWidth, BeginScript);
+            _intro = LevelIntro.Begin(gameObject, _cube, _shooter, _bomber, _boost, _roll,
+                IntroHoldX, _halfViewWidth, BeginScript);
         }
 
         void BeginSupply()
@@ -219,7 +290,7 @@ namespace MetalRaptors
             _cube.OnScraped += OnPlayerScraped;
 
             _cube.Initialize(flight, 0f, float.MinValue, float.MaxValue,
-                WorldTop - CubeHalf, 0f, hardLeftWall: true);
+                WorldTop - CubeHalf, 0f, hardWalls: true);
 
             var muzzle = PlaneFactory.MountMuzzle(go, model, planeModel, out var flashPoint);
             var hitbox = go.GetComponentInChildren<Collider>();
@@ -315,6 +386,7 @@ namespace MetalRaptors
             : _level.title.ToLowerInvariant();
 
         const string HudObjective = "no turning back  •  don't hit the ground";
+        const string HudObjectiveBounded = "hold the sector  •  don't hit the ground";
 
         void LateUpdate()
         {
@@ -324,8 +396,11 @@ namespace MetalRaptors
                 _camShake = Mathf.Max(0f, _camShake - Time.unscaledDeltaTime / CamShakeDuration);
             if (_cam != null && !_camHold) PositionCamera(instant: false);
 
-            if (_cube != null && !IntroActive)
-                _cube.SetLeftWall(_camBasePos.x - _halfViewWidth + CubeHalf);
+            if (_cube != null && !IntroActive && !_outro)
+            {
+                if (Bounded) _cube.SetWalls(CubeHalf, WorldRight - CubeHalf);
+                else _cube.SetLeftWall(_camBasePos.x - _halfViewWidth + CubeHalf);
+            }
 
             if (_cube != null) _cube.SetCinematic(Cinematic);
             if (_curtain != null) _curtain.Set(!Cinematic);
@@ -360,13 +435,18 @@ namespace MetalRaptors
 
             if (instant)
             {
-                _camBasePos = new Vector3(Mathf.Max(StartX, cubePos.x), targetY, CamZ);
+                float x = Bounded
+                    ? Mathf.Clamp(cubePos.x, CamMinX, CamMaxX)
+                    : Mathf.Max(StartX, cubePos.x);
+                _camBasePos = new Vector3(x, targetY, CamZ);
             }
             else
             {
                 float response = _playerFalling ? FallCamResponse : CamResponse;
                 float t = 1f - Mathf.Exp(-response * Time.deltaTime);
-                float x = Mathf.Max(_camBasePos.x, Mathf.Lerp(_camBasePos.x, cubePos.x, t));
+                float x = Bounded
+                    ? Mathf.Lerp(_camBasePos.x, Mathf.Clamp(cubePos.x, CamMinX, CamMaxX), t)
+                    : Mathf.Max(_camBasePos.x, Mathf.Lerp(_camBasePos.x, cubePos.x, t));
                 _camBasePos = new Vector3(x, Mathf.Lerp(_camBasePos.y, targetY, t), CamZ);
             }
 
@@ -426,7 +506,11 @@ namespace MetalRaptors
             if (_enemies != null) _enemies.StandDown();
             if (_supply != null) _supply.StandDown();
             if (_dialogue != null) _dialogue.Hide();
-            if (_cube != null) _cube.FlyLevel();
+            if (_cube != null)
+            {
+                _cube.ClearWalls();
+                _cube.FlyLevel();
+            }
 
             if (!CustomBattle.Requested) CampaignProgress.Complete(_levelNumber);
 
@@ -576,8 +660,8 @@ namespace MetalRaptors
             var canvas = UIFactory.CreateCanvas("Campaign HUD");
             _hud = canvas.gameObject;
 
-            _hudView = new LevelHud(canvas.transform, HudObjective, _cube, _shooter, _bomber,
-                _boost, _roll, _searchlight, TryPause);
+            _hudView = new LevelHud(canvas.transform, Bounded ? HudObjectiveBounded : HudObjective,
+                _cube, _shooter, _bomber, _boost, _roll, _searchlight, TryPause);
 
             _curtain = HudCurtain.Attach(_hud);
             _curtain.Set(false);
