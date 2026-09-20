@@ -65,7 +65,7 @@ namespace MetalRaptors
         HudCurtain _curtain;
 
         CampaignEnemies _enemies;
-        CampaignTrucks _trucks;
+        CampaignConvoy _convoy;
         Airfield _airfield;
         CompanionFlight _wing;
         SupplyDrop _supply;
@@ -87,7 +87,7 @@ namespace MetalRaptors
 
         public int EnemiesAlive =>
             (_enemies != null ? _enemies.AliveCount : 0)
-            + (_trucks != null ? _trucks.AliveCount : 0);
+            + (_convoy != null ? _convoy.AliveCount : 0);
 
         public bool CompanionReady => _wing == null || _wing.Formed;
 
@@ -115,7 +115,7 @@ namespace MetalRaptors
         {
             _levelNumber = CampaignRun.Level;
             _level = CustomBattle.Requested
-                ? CampaignLevels.Custom(CustomBattle.Map, CustomBattle.Daytime)
+                ? CampaignLevels.Custom(CustomBattle.Map, CustomBattle.Daytime, CustomBattle.Shape)
                 : CampaignLevels.ForNumber(_levelNumber);
 
             var config = Resources.Load<PlayerConfig>("PlayerConfig");
@@ -296,12 +296,12 @@ namespace MetalRaptors
                 _enemies = new CampaignEnemies(_cube.GetComponent<Rigidbody>(), AiGroundY,
                     WorldTop, _level);
 
-            if (_trucks == null)
-                _trucks = new CampaignTrucks(_cube.GetComponent<Rigidbody>(), _terrain, PlayPlaneZ,
+            if (_convoy == null)
+                _convoy = new CampaignConvoy(_cube.GetComponent<Rigidbody>(), _terrain, PlayPlaneZ,
                     ApronEndX > 0f ? AerodromeRoad.SurfaceLift : 0f);
         }
 
-        float TruckEdgeX => Bounded ? WorldRight : _camBasePos.x + _halfViewWidth;
+        float ConvoyEdgeX => Bounded ? WorldRight : _camBasePos.x + _halfViewWidth;
 
         float AiGroundY => Coast ? SeaSurface.Level : ProceduralTerrain.MaxHeight;
 
@@ -415,7 +415,7 @@ namespace MetalRaptors
         {
             if (_gameOver) return;
             PlaneScrapes.Check(_cube, _cubeTr, _enemies != null ? _enemies.Live : null,
-                _trucks != null ? _trucks.Live : null);
+                _convoy != null ? _convoy.Live : null);
             if (_wing != null && _wing.CheckBump(_cubeTr)) OnCompanionBump();
         }
 
@@ -427,6 +427,7 @@ namespace MetalRaptors
 
         string Subtitle => CustomBattle.Requested
             ? $"{CustomBattle.Map.Name} | {DaytimeNames.For(_level.daytime)}"
+              + $" | {BattleShapeNames.For(CustomBattle.Shape)}"
             : _level.title.ToLowerInvariant();
 
         const string HudObjective = "no turning back  •  don't hit the ground";
@@ -507,12 +508,12 @@ namespace MetalRaptors
         {
             if (_gameOver || groups == null) return;
 
-            int trucks = 0;
-            foreach (EnemyGroup group in groups)
-                if (group.kind == EnemyKind.Truck) trucks += group.count;
-
             if (_enemies != null) _enemies.Spawn(groups, _camBasePos.x, _halfViewWidth);
-            if (trucks > 0 && _trucks != null) _trucks.Spawn(trucks, TruckEdgeX);
+            if (_convoy == null) return;
+
+            foreach (EnemyGroup group in groups)
+                if (group.kind != EnemyKind.Plane)
+                    _convoy.Spawn(group.kind, group.count, ConvoyEdgeX);
         }
 
         public bool CanDevSpawn =>
@@ -527,12 +528,16 @@ namespace MetalRaptors
                 _camBasePos.x, _halfViewWidth);
         }
 
-        public void DevSpawnTruck()
+        public void DevSpawnTruck() => DevSpawnVehicle(EnemyKind.Truck);
+
+        public void DevSpawnTank() => DevSpawnVehicle(EnemyKind.Tank);
+
+        void DevSpawnVehicle(EnemyKind kind)
         {
             if (!CanDevSpawn) return;
 
             EnsureEnemies();
-            _trucks.Spawn(1, TruckEdgeX);
+            _convoy.Spawn(kind, 1, ConvoyEdgeX);
         }
 
         public void ArmSupply(bool open)
@@ -562,7 +567,7 @@ namespace MetalRaptors
 
             StopWeapons();
             if (_enemies != null) _enemies.StandDown();
-            if (_trucks != null) _trucks.StandDown();
+            if (_convoy != null) _convoy.StandDown();
             if (_supply != null) _supply.StandDown();
             if (_dialogue != null) _dialogue.Hide();
             if (_cube != null)
@@ -633,7 +638,7 @@ namespace MetalRaptors
         {
             if (_runner != null) _runner.Stop();
             if (_enemies != null) _enemies.StandDown();
-            if (_trucks != null) _trucks.StandDown();
+            if (_convoy != null) _convoy.StandDown();
             if (_wing != null) _wing.StandDown();
             if (_supply != null) _supply.StandDown();
         }

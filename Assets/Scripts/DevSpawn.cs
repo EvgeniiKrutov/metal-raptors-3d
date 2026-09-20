@@ -7,6 +7,8 @@ namespace MetalRaptors
         void DevSpawnPlane(EnemyRole role);
 
         void DevSpawnTruck();
+
+        void DevSpawnTank();
     }
 
     public static class DevSpawn
@@ -32,6 +34,11 @@ namespace MetalRaptors
         public static void SpawnTruck()
         {
             if (Available) _host.DevSpawnTruck();
+        }
+
+        public static void SpawnTank()
+        {
+            if (Available) _host.DevSpawnTank();
         }
     }
 }

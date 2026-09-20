@@ -366,9 +366,9 @@ standing model about the world Y axis.
 Trees and houses take their colour entirely from the asset — each FBX carries one flat
 Phong material and is rendered with whatever the importer builds from it
 (`materialImportMode: 2`, embedded). The tank is the exception: it carries five
-materials and a **texture**, and the code binds that texture (see *Skinning the tank*
-below), so its authored diffuse values only show if the texture fails to load. They are
-listed here as that fallback:
+materials, and exactly **one** of them is textured (see *Skinning the tank* below). The
+other four render from their authored diffuse exactly as listed, so these values are what
+is actually on screen, not a fallback:
 
 | Models | Material | Diffuse |
 | --- | --- | --- |
@@ -400,27 +400,54 @@ value the wreck falls back *to*, so it is worth having right.
 The tank's 2048² camo atlas is bound in code, from
 `Assets/Textures/Resources/machines/tank_ww1.png`, and it is the one place anything here
 touches a prop's appearance. The importer cannot do it: the FBX names its map `123.png`,
-a file that is not in the project and never was, and it wires that name to
-`tank_material` alone — one small roof rail out of five materials. Renaming the texture to
-match would therefore skin the rail and nothing else.
+a file that is not in the project and never was.
 
-Every mesh in the model is unwrapped into that single atlas — all sixteen have UVs inside
-`[0, 1]` covering different islands of it — so the fix is to put the map on **all** of the
-model's renderers. `TankBlock` loads it once per level and fills one shared
-`MaterialPropertyBlock` with `_BaseMap`, `_MainTex` and a **white `_BaseColor`**; `Build`
-sets that block on every renderer in the instantiated view, in the loop that was already
-walking them to turn shadow casting on.
+That map belongs to **`tank_material` alone**. It is the material on `unditchRailTail.001`,
+the 406-vertex body mesh, and the FBX wires the texture to its `DiffuseColor`; the other
+four materials are flat baked colours with no map. The model carries **no vertex colours**
+at all (every `LayerElementColor` is empty), so those four diffuse values are the only
+place their colour lives.
 
-The white base colour is the part that is easy to miss. URP Lit multiplies `_BaseColor`
-by the map, and four of the five authored materials sit between 0.02 and 0.07 — binding
-the atlas without overriding the tint would crush the camo to near-black on everything but
-the rear hatch. One block is shared by every wreck: it holds no per-renderer state, so
-there is nothing to read back with `GetPropertyBlock` first, and streaming tanks in and out
-allocates nothing.
+`TankSkin` loads the atlas once, fills one shared `MaterialPropertyBlock` with `_BaseMap`,
+`_MainTex` and a white `_BaseColor`, then walks each renderer's `sharedMaterials` and calls
+`SetPropertyBlock(block, i)` on the body's slot alone. The per-slot overload is the whole
+trick: a whole-renderer block would hit every submesh, and `rearHatch` and the grilles each
+carry two materials.
 
-If the texture is missing, `TankBlock` logs once, latches `_tankSkinMissing`, and every
-tank renders in the flat authored colours above rather than spamming the console per
-wreck.
+**It picks that slot by excluding the four flat ones, not by naming the textured one.** The
+importer is set to `materialName: 0` (`BasedOnTextureName`), which names a material after its
+diffuse map where it has one — so `tank_material` does not necessarily arrive in Unity under
+that name, while `black_steel`, `steel`, `hull` and `tracks` have no map and always keep
+theirs. Matching `tank_material` by name skinned nothing at all and left the tank a uniform
+grey. `FlatMaterials` lists the four; every other slot gets the atlas.
+
+The exclusion is guarded: if **none** of the four turn up, the model is not the one this code
+was written against, so it binds nothing and logs the material names it actually found rather
+than painting the whole tank again.
+
+**The earlier version put the block on every renderer, and that was the bug.** The reasoning
+was that all sixteen meshes are unwrapped inside `[0, 1]`, so they must be islands of one
+atlas. They are not islands — each mesh is independently unwrapped across most of the square:
+
+| mesh | material | u | v |
+| --- | --- | --- | --- |
+| `unditchRailTail.001` | `tank_material` | 0.011 – 0.987 | 0.011 – 0.989 |
+| `trackLeft`, `trackRight` | `tracks` | 0.010 – 0.988 | 0.010 – 0.990 |
+| `gunMount`, `gunMount.001` | `steel` | 0.056 – 0.722 | 0.541 – 0.746 |
+| `cannon` | `black_steel` | 0.010 – 0.438 | 0.272 – 0.945 |
+
+So the tracks and the guns each sampled a large arbitrary patch of the camo image instead of
+their own colour, and the white `_BaseColor` wiped the tint that should have replaced it —
+the whole tank wore the body's texture.
+
+The white base colour still matters on the one slot that keeps it. URP Lit multiplies
+`_BaseColor` by the map, and `tank_material` is authored at 0.12, 0.10, 0.085 — binding the
+atlas without overriding that tint would crush the camo to near-black. One block is shared by
+every wreck: it holds no per-renderer state, so there is nothing to read back with
+`GetPropertyBlock` first, and streaming tanks in and out allocates nothing.
+
+If the texture is missing, `TankSkin` logs once, latches its missing flag, and every tank
+renders in the flat authored colours above rather than spamming the console per wreck.
 
 ### Scale, seating and colliders
 
@@ -471,6 +498,9 @@ its Z band keeps it well behind the flight lane — but it is the same box a hou
 gets, so the wreck is solid to anything that ever does reach it.
 
 ### Tank wrecks (`WreckFire.cs`)
+
+The same Mark IV mesh is also level 3's heavy ground enemy, at a different scale and with
+its guns live (docs/ground-vehicles.md); `TankSkin` is shared between the two.
 
 One `machines/tank_ww1` — a Mark IV — on a 400-unit grid, so **one or two are on
 screen at a time** once craters and steep ground have taken their cut of the

@@ -36,13 +36,8 @@ namespace MetalRaptors
         const float ProbeY = -5000f;
 
         const string ModelFolder = "objects/";
-        const string TankTexture = "machines/tank_ww1";
 
         static readonly Quaternion StandUp = Quaternion.Euler(-90f, 0f, 0f);
-
-        static readonly int BaseMapId = Shader.PropertyToID("_BaseMap");
-        static readonly int MainTexId = Shader.PropertyToID("_MainTex");
-        static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
 
         static readonly string[] TreeModels =
         {
@@ -89,8 +84,6 @@ namespace MetalRaptors
         float _houseCell = HouseCellSize;
         float _tankCell = TankCellSize;
         float _spread = 1f;
-        MaterialPropertyBlock _tankBlock;
-        bool _tankSkinMissing;
 
         public static BattlefieldProps Begin(Battlefield field, int seed)
         {
@@ -252,12 +245,10 @@ namespace MetalRaptors
             view.transform.localPosition = proto.offset;
             view.transform.localRotation = StandUp;
 
-            var skin = kind == Kind.Tank ? TankBlock() : null;
             foreach (var r in view.GetComponentsInChildren<Renderer>())
-            {
                 r.shadowCastingMode = ShadowCastingMode.On;
-                if (skin != null) r.SetPropertyBlock(skin);
-            }
+
+            if (kind == Kind.Tank) TankSkin.Apply(view.transform);
 
             AddCollider(root, proto.bounds, kind == Kind.Tree);
 
@@ -265,25 +256,6 @@ namespace MetalRaptors
             {
                 go = root, x = x, y = seat, z = z, radius = radius, seed = hash,
             };
-        }
-
-        MaterialPropertyBlock TankBlock()
-        {
-            if (_tankBlock != null || _tankSkinMissing) return _tankBlock;
-
-            var texture = Resources.Load<Texture2D>(TankTexture);
-            if (texture == null)
-            {
-                Debug.LogError($"BattlefieldProps: {TankTexture} not found in Resources.");
-                _tankSkinMissing = true;
-                return null;
-            }
-
-            _tankBlock = new MaterialPropertyBlock();
-            _tankBlock.SetTexture(BaseMapId, texture);
-            _tankBlock.SetTexture(MainTexId, texture);
-            _tankBlock.SetColor(BaseColorId, Color.white);
-            return _tankBlock;
         }
 
         static float Oversize(Kind kind)

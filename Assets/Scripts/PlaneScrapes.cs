@@ -21,14 +21,14 @@ namespace MetalRaptors
         }
 
         public static void Check(CubeController player, Transform playerTr,
-            IReadOnlyList<EnemyController> enemies, IReadOnlyList<EnemyTruck> trucks)
+            IReadOnlyList<EnemyController> enemies, IReadOnlyList<GroundVehicle> vehicles)
         {
             if (player == null || playerTr == null
                 || player.CurrentHealth <= 0f || player.Evading) return;
 
             Vector3 playerPos = playerTr.position;
             CheckPlanes(player, playerPos, enemies);
-            CheckTrucks(player, playerPos, trucks);
+            CheckVehicles(player, playerPos, vehicles);
         }
 
         static void CheckPlanes(CubeController player, Vector3 playerPos,
@@ -53,18 +53,18 @@ namespace MetalRaptors
             }
         }
 
-        static void CheckTrucks(CubeController player, Vector3 playerPos,
-            IReadOnlyList<EnemyTruck> trucks)
+        static void CheckVehicles(CubeController player, Vector3 playerPos,
+            IReadOnlyList<GroundVehicle> vehicles)
         {
-            if (trucks == null) return;
+            if (vehicles == null) return;
 
-            for (int i = 0; i < trucks.Count; i++)
+            for (int i = 0; i < vehicles.Count; i++)
             {
-                EnemyTruck truck = trucks[i];
-                if (truck == null || !truck.Touches(playerPos, HitboxRadius)) continue;
+                GroundVehicle vehicle = vehicles[i];
+                if (vehicle == null || !vehicle.Touches(playerPos, HitboxRadius)) continue;
 
                 player.Scrape();
-                truck.Scrape();
+                vehicle.Scrape();
             }
         }
     }

@@ -11,7 +11,7 @@ from their own `LateUpdate`. Everything it makes is a direct child of the HUD ca
 | Element | Where |
 | --- | --- |
 | Health bar | Top-left, hung from the top-left corner of the canvas. |
-| Airfield bar | Directly under it, on the aerodrome level only — the same bar captioned `AIRFIELD  87%` instead of `100 / 100`, reading the field's own health pool (docs/trucks.md). It is built only when an `Airfield` exists, and the column below shifts down by one bar when it is. |
+| Airfield bar | Directly under it, on the aerodrome level only — the same bar captioned `AIRFIELD  87%` instead of `100 / 100`, reading the field's own health pool (docs/ground-vehicles.md). It is built only when an `Airfield` exists, and the column below shifts down by one bar when it is. |
 | Action column | Under the bars: **bomb**, **boost**, **roll**, **fire** (touch only), and **light** on night levels — one square per row. |
 | Pause | Top-**right** corner, touch only — a `P` square wired to the controller's `TryPause`. |
 | Steering stick | Bottom-right corner, touch only — a ring on an invisible base (docs/mobile-steering.md). |

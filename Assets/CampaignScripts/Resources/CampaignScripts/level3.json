@@ -5,14 +5,17 @@
     { "op": "say", "speaker": "you", "line": "l3_line3" },
 
     { "op": "wave", "enemies": [ { "ground": "truck", "count": 1 } ] },
+    { "op": "wave", "enemies": [ { "ground": "tank", "count": 1 } ] },
 
     { "op": "wait", "seconds": 1.5 },
     { "op": "say", "speaker": "wing", "line": "l3_line4" },
     { "op": "say", "speaker": "hq", "line": "l3_line5" },
 
     { "op": "wave", "enemies": [ { "ground": "truck", "count": 1 } ] },
+    { "op": "wave", "enemies": [ { "ground": "tank", "count": 1 } ] },
     { "op": "wait", "seconds": 3 },
     { "op": "wave", "enemies": [ { "ground": "truck", "count": 1 } ] },
+    { "op": "wave", "enemies": [ { "ground": "tank", "count": 1 } ] },
 
     { "op": "wait", "seconds": 1.5 },
     { "op": "say", "speaker": "wing", "line": "l3_line6" },

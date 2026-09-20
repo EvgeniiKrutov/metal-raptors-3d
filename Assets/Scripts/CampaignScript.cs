@@ -21,6 +21,7 @@ namespace MetalRaptors
         public const string ResourceFolder = "CampaignScripts/";
 
         const string TruckId = "truck";
+        const string TankId = "tank";
 
         const float ReadBase = 1.4f;
         const float ReadPerWord = 0.32f;
@@ -156,14 +157,12 @@ namespace MetalRaptors
 
                     if (ground.Length > 0)
                     {
-                        if (ground != TruckId)
-                        {
+                        if (ground == TruckId) groups.Add(new EnemyGroup(EnemyKind.Truck, count));
+                        else if (ground == TankId) groups.Add(new EnemyGroup(EnemyKind.Tank, count));
+                        else
                             Debug.LogError(
                                 $"CampaignScript {origin}[{index}]: unknown ground '{ground}'.");
-                            continue;
-                        }
 
-                        groups.Add(new EnemyGroup(EnemyKind.Truck, count));
                         continue;
                     }
 

@@ -57,7 +57,7 @@ namespace MetalRaptors
         }
     }
 
-    public enum EnemyKind { Plane, Truck }
+    public enum EnemyKind { Plane, Truck, Tank }
 
     public class EnemyGroup
     {

@@ -41,7 +41,7 @@ UI — the `MainMenu` scene only holds a camera, a light and the controller obje
 | `OptionsPage.cs` | The options screen: categories on the left, the focused category's rows on the right. |
 | `AudioOptions.cs` | The three volumes behind that screen, on a 5% grid, persisted to `PlayerPrefs`. |
 | `IMenuFocusGroup.cs` | What the navigation keys drive (`MenuPanel`, `MenuCardRow`, `MenuLevelRow`) and, as `IMenuFocusable`, what a panel can highlight. |
-| `CustomBattle.cs` | The maps a custom battle can pick, and the pick itself, read by the endless scene. |
+| `CustomBattle.cs` | The maps and shapes a custom battle can pick, and the pick itself, read by the endless scene. |
 | `CareerEras.cs` | The four eras: title, years, description, emblem, unlocked. |
 | `CampaignRun.cs` | The level the next campaign scene flies, career progress (`CampaignProgress`), and the card list. |
 | `MenuLayout.cs` | The column/page/band rects and the title + accent rule, shared with the in-level menu. |
@@ -281,8 +281,9 @@ column plus one card in the right band — the first screen to use both halves.
    │  ───                    │  │           │            │
    │  map      ◀ verdun  ▶   │  │           │            │  ← the map's preview,
    │  weather  ◀ morning ▶   │  │           │            │    empty until its
-   │                         │  │verdun | morning│       │    screenshot lands
-   │  start                  │  └───────────┘            │  → CampaignLevel1, endless
+   │  mode     ◀ story   ▶   │  │verdun | morning | story│    screenshot lands
+   │                         │  └───────────┘            │
+   │  start                  │                           │  → CampaignLevel1, endless
    │                         │                           │
    │  back                   │                           │  → main list
    └─────────────────────────┴───────────────────────────┘
@@ -294,28 +295,66 @@ column plus one card in the right band — the first screen to use both halves.
   one place in the menu that is not left-aligned. Left-aligned, a short value (`green`) would
   hug the left triangle and leave a hole in front of the right one; centred, the pair of
   triangles reads as a control wrapped around its value whatever the value's length.
-* The labels (`map`, `weather`) are `Fg`, the same weight and colour as `start` and `back`
+* The labels (`map`, `weather`, `mode`) are `Fg`, the same weight and colour as `start` and `back`
   — they name rows the player acts on, so they read as entries, not as captions.
 * The list does **not** wrap. The triangle at either end greys out.
 * `map` picks a `BattleMap` from `BattleMaps.All` — **verdun**, **flanders** and
   **dolomites**, each a name, a terrain seed and a `TerrainKind`; `weather` picks a `Daytime`,
-  in the enum's own order. Neither is persisted: a custom battle's picks are not settings, so
-  the screen opens on verdun/morning every time the menu is built.
+  in the enum's own order. None of the three is persisted: a custom battle's picks are not
+  settings, so the screen opens on verdun/morning/story every time the menu is built.
 * Flanders Coast is listed as `flanders` rather than its full name so it fits the 190px
   `SelectorValueWidth` that `verdun` was sized against; the full name is what career's level
   list tags its row with. `dolomites` (docs/dolomites.md) is the longest value the row
   carries and still fits at `ItemSize` 30.
 * Dolomites is no longer custom-battle-only: career levels 6 and 8 fly it (docs/campaign.md).
+* `mode` picks a `BattleShape` — **story** or **battle** — and is the one pick that changes
+  the shape of the world rather than its look. See *Story and battle* below.
 * `start` fills in `CustomBattle` and loads the endless `CampaignLevel1` scene, where
-  `CampaignLevelController` builds `CampaignLevels.Custom(map, daytime)` instead of the
+  `CampaignLevelController` builds `CampaignLevels.Custom(map, daytime, shape)` instead of the
   authored level. Career's own `start` calls `CustomBattle.Clear()` first, so an era keeps
   its authored atmosphere after a custom battle has been flown.
 * The preview card is a `MenuPreviewCard` — the era card's white square and foot label
   without the frame, the hit box or the focus. Its upper two thirds are where the map's
   screenshot goes.
-* The card's foot carries **both** picks, `map | weather` (`verdun | morning`), rebuilt by
-  `MainMenuController.PreviewTitle` from either selector — so the card states the whole
-  battle about to be flown, not just the land.
+* The card's foot carries **all three** picks, `map | weather | mode`
+  (`verdun | morning | story`), rebuilt by `MainMenuController.PreviewTitle` from any of the
+  selectors — so the card states the whole battle about to be flown, not just the land.
+  `CampaignLevelController.Subtitle` prints the same three into the pause and end cards.
+
+## Story and battle
+
+`story` is the endless scroll the custom battle has always been: the camera only ever moves
+right, terrain chunks stream in ahead and out behind, and there is no right-hand edge.
+`battle` is the shape career level 3 flies (docs/aerodrome.md) — a **fixed** strip of world
+the player flies back and forth across.
+
+Everything that makes a level fixed already hangs off two `CampaignDefinition` fields, so the
+switch only has to fill them in:
+
+| | `story` | `battle` |
+| --- | --- | --- |
+| `worldWidth` | `0` | `CustomWorldWidth` (2000) |
+| `aerodrome` | `false` | `true` on verdun only |
+
+`worldWidth > 0` is what `CampaignLevelController.Bounded` reads, and it is the single switch
+behind all of it: the terrain stops streaming and builds a fixed chunk range
+(`CampaignTerrain.Configure`), the camera clamps to `CamMinX`–`CamMaxX` instead of ratcheting
+right, the player gets a wall at either end rather than one behind them, the zeppelins get a
+left edge, ground convoys enter from `WorldRight`, and the HUD objective becomes *hold the
+sector*. None of that is new — `battle` just turns it on for a map the player picked.
+
+**Verdun gets the aerodrome; flanders and dolomites do not.** The field is a Verdun-sector
+object with its own placed model, road and `Airfield`, and it is derived from the terrain the
+same way `zeppelins` already is. On the other two maps `battle` is the plain fixed strip: the
+coast and the valley keep their own battlefields, because `CampaignLevelController`'s
+`Coast`/`Alpine` branches are tested before `Bounded` and `Battlefield.BeginBounded` is only
+reached on Verdun. The bounding still applies to all three — it comes from the camera clamp
+and `CampaignTerrain`, neither of which cares which terrain is underneath.
+
+A `battle` verdun therefore spawns a live `Airfield`: dev-spawned trucks and tanks
+(docs/ground-vehicles.md) will drive the road and shell it, and losing it ends the run, which
+is what makes the custom battle useful for working on level 3's enemies without flying the
+level's script.
 
 ## Weather
 

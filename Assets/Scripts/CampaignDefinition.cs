@@ -54,6 +54,8 @@ namespace MetalRaptors
     {
         public const int Count = 9;
 
+        const float CustomWorldWidth = 2000f;
+
         const string Lore1 =
             "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor "
             + "incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud "
@@ -328,15 +330,21 @@ namespace MetalRaptors
             journal = JournalLorem,
         };
 
-        public static CampaignDefinition Custom(BattleMap map, Daytime daytime) => new CampaignDefinition
+        public static CampaignDefinition Custom(BattleMap map, Daytime daytime, BattleShape shape)
         {
-            seed = map.Seed,
-            terrain = map.Terrain,
-            daytime = daytime,
-            weather = Weather.Calm,
-            clouds = new CloudsPart(),
-            zeppelins = map.Terrain == TerrainKind.Verdun,
-        };
+            bool fixedGround = shape == BattleShape.Battle;
+            return new CampaignDefinition
+            {
+                seed = map.Seed,
+                terrain = map.Terrain,
+                daytime = daytime,
+                weather = Weather.Calm,
+                clouds = new CloudsPart(),
+                zeppelins = map.Terrain == TerrainKind.Verdun,
+                worldWidth = fixedGround ? CustomWorldWidth : 0f,
+                aerodrome = fixedGround && map.Terrain == TerrainKind.Verdun,
+            };
+        }
 
         public static CampaignDefinition ForNumber(int number)
         {

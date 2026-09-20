@@ -36,6 +36,7 @@ namespace MetalRaptors
         int _mapIndex;
         int _eraIndex;
         Daytime _daytime = Daytime.Morning;
+        BattleShape _shape = BattleShape.Story;
 
         IMenuFocusGroup _group;
         MenuPanel _homePanel;
@@ -226,6 +227,7 @@ namespace MetalRaptors
             _customPanel = new MenuPanel(column, "Custom Panel", MenuTheme.ListTop);
             _customPanel.AddSelector("map", BattleMaps.Names(), _mapIndex, PickMap);
             _customPanel.AddSelector("weather", DaytimeNames.All, (int)_daytime, PickWeather);
+            _customPanel.AddSelector("mode", BattleShapeNames.All, (int)_shape, PickShape);
 
             _customPanel.AddGap(MenuTheme.SectionGap);
             _customPanel.AddNav("start level", StartCustomBattle);
@@ -250,12 +252,19 @@ namespace MetalRaptors
             _mapPreview.SetTitle(PreviewTitle());
         }
 
+        void PickShape(int index)
+        {
+            _shape = (BattleShape)index;
+            _mapPreview.SetTitle(PreviewTitle());
+        }
+
         string PreviewTitle() =>
-            $"{BattleMaps.All[_mapIndex].Name} | {DaytimeNames.All[(int)_daytime]}";
+            $"{BattleMaps.All[_mapIndex].Name} | {DaytimeNames.All[(int)_daytime]}"
+            + $" | {BattleShapeNames.All[(int)_shape]}";
 
         void StartCustomBattle()
         {
-            CustomBattle.Request(BattleMaps.All[_mapIndex], _daytime);
+            CustomBattle.Request(BattleMaps.All[_mapIndex], _daytime, _shape);
             ScreenFade.Load(SceneNames.CampaignLevel1);
         }
 

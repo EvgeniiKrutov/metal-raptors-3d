@@ -6,14 +6,18 @@ field at the player's own depth and runs off the right-hand edge. Nothing else i
 places a single fixed building yet — every other structure is streamed from
 `BattlefieldProps` (docs/battlefield.md) — so this is a one-off placed object, not a prop grid.
 
+A custom battle can raise the same field outside the campaign: **verdun** on the `battle`
+mode (docs/main-menu.md) sets the same `aerodrome` and `worldWidth` the level does. The other
+two maps get the fixed strip without a field.
+
 ## The model
 
 `Assets/Resources/objects/aerodrome_stow_maries.fbx` (untracked, like everything under
 `objects/`). One `Aerodrome` root null over eight groups: `Ground` (apron tracks), `Hangars`
 (three), `Quarters` (a barrack and two huts), `Sheds` (three), `Tower` (a water tower),
 `Aircraft` (three parked Sopwith Camels), `Windsock` and `Fence` (the perimeter, which is what
-sets the overall footprint — and, from 2026-09-20, what the level's trucks drive up the road to
-shell, docs/trucks.md).
+sets the overall footprint — and, from 2026-09-20, what the level's trucks and tanks drive up the road to
+shell, docs/ground-vehicles.md).
 
 It is authored in **real metres, Z-up**, the same Blender pipeline every plane comes from
 (docs/plane-scale.md) — but unlike the plane and prop models its root null already carries the
@@ -191,9 +195,9 @@ The player's depth is inside `ProceduralTerrain.FrontStrip`, where the ground is
 so the ribbon is level across its width except where a crater reaches forward into the strip —
 and there it simply follows the hole down.
 
-**It is a lane, not scenery.** The level's three enemy trucks drive down it from the map's far
-edge to the fence, riding `AerodromeRoad.SurfaceLift` — the ribbon's lift plus its crown — over
-the sampled ground, so they follow it over ridges and through craters (docs/trucks.md).
+**It is a lane, not scenery.** The level's enemy trucks and tanks drive down it from the map's
+far edge to the fence, riding `AerodromeRoad.SurfaceLift` — the ribbon's lift plus its crown — over
+the sampled ground, so they follow it over ridges and through craters (docs/ground-vehicles.md).
 
 ## Files
 
@@ -204,4 +208,4 @@ the sampled ground, so they follow it over ridges and through craters (docs/truc
 | `CampaignTerrain.cs` | `CampaignLandOptions` — depth, map width, apron line, road corridor. |
 | `VerdunTerrain.cs` | The apron flattening, crater exclusion and grass exclusion. |
 | `CampaignLevelController.cs` | `BuildLand` / `BuildAerodrome` — where the numbers above are chosen. |
-| `Airfield.cs` | The fence line and the field's health pool, created with the model (docs/trucks.md). |
+| `Airfield.cs` | The fence line and the field's health pool, created with the model (docs/ground-vehicles.md). |

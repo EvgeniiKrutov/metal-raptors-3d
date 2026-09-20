@@ -1,3 +1,5 @@
+using UnityEngine;
+
 namespace MetalRaptors
 {
     public class BattleMap
@@ -31,17 +33,29 @@ namespace MetalRaptors
         }
     }
 
+    public enum BattleShape { Story, Battle }
+
+    public static class BattleShapeNames
+    {
+        public static readonly string[] All = { "story", "battle" };
+
+        public static string For(BattleShape shape) =>
+            All[Mathf.Clamp((int)shape, 0, All.Length - 1)];
+    }
+
     public static class CustomBattle
     {
         public static bool Requested { get; private set; }
         public static BattleMap Map { get; private set; } = BattleMaps.All[0];
         public static Daytime Daytime { get; private set; } = Daytime.Morning;
+        public static BattleShape Shape { get; private set; } = BattleShape.Story;
 
-        public static void Request(BattleMap map, Daytime daytime)
+        public static void Request(BattleMap map, Daytime daytime, BattleShape shape)
         {
             Requested = true;
             Map = map;
             Daytime = daytime;
+            Shape = shape;
         }
 
         public static void Clear() => Requested = false;

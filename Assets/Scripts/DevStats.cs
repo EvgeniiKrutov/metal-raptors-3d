@@ -88,6 +88,7 @@ namespace MetalRaptors
         SpawnAction _scoutSpawn;
         SpawnAction _fighterSpawn;
         SpawnAction _truckSpawn;
+        SpawnAction _tankSpawn;
         float _statsHeight;
         float _spawnPanelHeight;
         bool _spawnShown;
@@ -220,6 +221,8 @@ namespace MetalRaptors
                 () => DevSpawn.Spawn(EnemyRole.Fighter), ref y);
             _truckSpawn = CreateSpawnButton(go.transform, "SPAWN TRUCK",
                 DevSpawn.SpawnTruck, ref y);
+            _tankSpawn = CreateSpawnButton(go.transform, "SPAWN TANK",
+                DevSpawn.SpawnTank, ref y);
 
             _spawnPanelHeight = -y - SpawnButtonGap + 2f * PadY;
             go.SetActive(false);
@@ -359,6 +362,7 @@ namespace MetalRaptors
             Countdown(_scoutSpawn);
             Countdown(_fighterSpawn);
             Countdown(_truckSpawn);
+            Countdown(_tankSpawn);
         }
 
         void ShowSpawnSection(bool shown)
@@ -374,6 +378,7 @@ namespace MetalRaptors
             ResetSpawn(_scoutSpawn);
             ResetSpawn(_fighterSpawn);
             ResetSpawn(_truckSpawn);
+            ResetSpawn(_tankSpawn);
         }
 
         void BeginSpawn(SpawnAction action)
