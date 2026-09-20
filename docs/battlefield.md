@@ -303,11 +303,27 @@ object's X inside its cell, its Z, which model, its yaw and its size. Nothing is
 stored between passes, so an object streamed out and back in returns to exactly
 the same spot, and a level replays identically.
 
-| Grid | Cell | Result |
-| --- | --- | --- |
-| Trees | 58 | ~12 on screen |
-| Houses | 620 | ~1 on screen |
-| Tanks | 400 | 1–2 on screen |
+| Grid | Cell | Result | On a 1150-deep land |
+| --- | --- | --- | --- |
+| Trees | 58 | ~12 on screen | 40 → ~21 |
+| Houses | 620 | ~1 on screen | 300 → ~3 |
+| Tanks | 400 | 1–2 on screen | 194 → ~4 |
+
+### Deeper land, denser field (2026-09-20)
+
+A grid puts **one object per cell of X**, at a Z drawn uniformly out of `[ZMin, ZMax]` —
+20…700, or 175…650 for tanks. Those were written against the 800-deep default strip, so on the
+aerodrome level's 1150-deep one (docs/aerodrome.md) every prop still stopped at 700 and the last
+400 units of ground were bare. Worse, widening the Z draw alone would only have spread the same
+objects thinner.
+
+So `BattlefieldProps.Begin` takes one number, `_spread` = `field.LandDepth / 800`, clamped to at
+least 1, and applies it three ways: the Z ceilings scale **up** by it (700 → 1006, 650 → 934,
+still held under `ZBack`), the tree cell divides **by** it, and the house and tank cells divide by
+it **twice** — once to hold the count per unit of ground over the deeper strip, once again for the
+thicker far field the campaign wanted. `TreeDepthBoost` scales its far end with it too, so distant
+trees still grow toward the horizon rather than saturating at 700. Every ordinary map has
+`_spread` 1 and is untouched, to the float.
 
 **The grids are updated tanks first, then houses, then trees**, and each one only
 has to avoid the kinds already placed: a house candidate is dropped inside a tank's

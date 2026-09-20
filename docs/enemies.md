@@ -1,5 +1,8 @@
 # Enemy roles: scout and fighter
 
+This file is about the **aircraft**. The one enemy that does not fly — the ground truck that
+attacks the aerodrome on level 3 — has its own AI and its own file, docs/trucks.md.
+
 Implemented in `EnemyController`, split by `EnemyConfig.role`. Two assets carry the
 numbers — `Assets/Resources/EnemyScoutConfig.asset` and `EnemyFighterConfig.asset` —
 loaded through `EnemyConfigs.Load` by `CampaignEnemies` (campaign and custom battle) and

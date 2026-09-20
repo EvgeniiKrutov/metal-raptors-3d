@@ -53,6 +53,9 @@ namespace MetalRaptors
         const float AimSpread = 7f;
         const float FireCullMargin = 120f;
 
+        // Index 0 is the horizon blue our own men wear; 1 is the field grey opposite it.
+        public const int BlueUniform = 0;
+
         static readonly Color[] UniformColors =
         {
             new Color(0.40f, 0.47f, 0.56f),
@@ -65,6 +68,8 @@ namespace MetalRaptors
             new Color(0.70f, 0.53f, 0.40f),
             new Color(0.58f, 0.42f, 0.31f),
         };
+
+        Rect _pocket;
 
         static Material[] _uniformMats;
         static Material[] _skinMats;
@@ -84,6 +89,7 @@ namespace MetalRaptors
 
         class Group
         {
+            public bool garrison;
             public GameObject root;
             public int faction;
             public float x, z;
@@ -144,6 +150,40 @@ namespace MetalRaptors
                    + Random.Range(-Spacing, Spacing) * 0.35f;
         }
 
+        // A pocket of our own ground crew inside a friendly enclosure — the aerodrome's fence.
+        // They stand outside the battlefield band, hold their ground instead of being recycled
+        // ahead of the camera, and are all one uniform. See docs/aerodrome.md.
+        public void Garrison(Rect area, int groups, int uniform)
+        {
+            if (groups <= 0 || area.width <= 0f) return;
+
+            // The pocket is where they live, not merely where they appear: `Confine` holds a
+            // garrison inside it instead of inside the battlefield band, which starts at the
+            // field's far fence and would otherwise shove every one of them straight out of it.
+            _pocket = area;
+
+            float zMin = Mathf.Max(area.yMin, ZMin);
+            float zMax = Mathf.Min(area.yMax, ZMax);
+            if (zMax - zMin < 1f) return;
+
+            for (int i = 0; i < groups; i++)
+            {
+                float x = Mathf.Lerp(area.xMin, area.xMax, (i + 0.5f) / groups)
+                          + Random.Range(-1f, 1f) * area.width / (groups * 3f);
+
+                Group group = SpawnGroup(x, Random.Range(zMin, zMax), uniform);
+                if (group != null) group.garrison = true;
+            }
+        }
+
+        int FieldGroups()
+        {
+            int count = 0;
+            foreach (var group in _groups)
+                if (!group.garrison) count++;
+            return count;
+        }
+
         public void Tick(float camX, float dt)
         {
             for (int i = _groups.Count - 1; i >= 0; i--)
@@ -157,7 +197,7 @@ namespace MetalRaptors
                 ForgetFoe(group);
             }
 
-            while (_groups.Count < _targetGroups)
+            while (FieldGroups() < _targetGroups)
                 if (SpawnGroup(RespawnX(camX)) == null) break;
         }
 
@@ -183,7 +223,7 @@ namespace MetalRaptors
         bool Expired(Group group, float camX)
         {
             if (group.figures.Count == 0) return true;
-            if (_field.Bounded) return false;
+            if (group.garrison || _field.Bounded) return false;
 
             return group.x < camX - ScrollerBehind || group.x > camX + ScrollerAhead + CullMargin;
         }
@@ -204,9 +244,11 @@ namespace MetalRaptors
                 : Random.Range(right, BandMaxX);
         }
 
-        Group SpawnGroup(float x)
+        Group SpawnGroup(float x) =>
+            SpawnGroup(x, Random.Range(ZMin + ZEdgeMargin, ZMax - ZEdgeMargin), PickFaction());
+
+        Group SpawnGroup(float x, float z, int faction)
         {
-            float z = Random.Range(ZMin + ZEdgeMargin, ZMax - ZEdgeMargin);
             if (!_field.SampleGround(x, z, out float groundY)) return null;
             if (_field.Props != null
                 && _field.Props.Blocks(x, z, GroupPropClearance, out _)) return null;
@@ -217,7 +259,7 @@ namespace MetalRaptors
             var group = new Group
             {
                 root = root,
-                faction = PickFaction(),
+                faction = faction,
                 x = x,
                 z = z,
                 headingDeg = Random.Range(0f, 360f),
@@ -259,16 +301,20 @@ namespace MetalRaptors
 
         int PickFaction()
         {
-            int first = 0;
+            int first = 0, field = 0;
             foreach (var group in _groups)
+            {
+                if (group.garrison) continue;
+                field++;
                 if (group.faction == 0) first++;
-            return first * 2 <= _groups.Count ? 0 : 1;
+            }
+            return first * 2 <= field ? 0 : 1;
         }
 
         void TickGroup(Group group, float dt)
         {
             group.foeTimer -= dt;
-            if (group.foeTimer <= 0f)
+            if (!group.garrison && group.foeTimer <= 0f)
             {
                 group.foe = NearestFoe(group);
                 group.foeTimer = Random.Range(FoeSearchMin, FoeSearchMax);
@@ -291,7 +337,7 @@ namespace MetalRaptors
                 float rad = group.headingDeg * Mathf.Deg2Rad;
                 group.x += Mathf.Cos(rad) * GroupDriftSpeed * dt;
                 group.z += Mathf.Sin(rad) * GroupDriftSpeed * dt;
-                Confine(ref group.x, ref group.z, ref group.headingDeg);
+                Confine(group, ref group.x, ref group.z, ref group.headingDeg);
             }
 
             for (int i = group.figures.Count - 1; i >= 0; i--)
@@ -332,7 +378,7 @@ namespace MetalRaptors
                 float rad = figure.headingDeg * Mathf.Deg2Rad;
                 figure.x += Mathf.Cos(rad) * figure.speed * dt;
                 figure.z += Mathf.Sin(rad) * figure.speed * dt;
-                Confine(ref figure.x, ref figure.z, ref figure.headingDeg);
+                Confine(group, ref figure.x, ref figure.z, ref figure.headingDeg);
             }
 
             TickFire(group, figure, dt);
@@ -359,6 +405,7 @@ namespace MetalRaptors
 
             foreach (var other in _groups)
             {
+                if (other.garrison) continue;
                 if (other.faction == group.faction || other.figures.Count == 0) continue;
 
                 float dx = other.x - group.x;
@@ -375,6 +422,9 @@ namespace MetalRaptors
 
         void TickFire(Group group, Figure figure, float dt)
         {
+            // Ground crew, not infantry: they walk the field and never raise a rifle.
+            if (group.garrison) return;
+
             figure.fireTimer -= dt;
             if (figure.fireTimer > 0f) return;
 
@@ -419,18 +469,30 @@ namespace MetalRaptors
             headingDeg = Mathf.MoveTowardsAngle(headingDeg, away, PropTurnRate * dt);
         }
 
-        void Confine(ref float x, ref float z, ref float headingDeg)
+        void Confine(Group group, ref float x, ref float z, ref float headingDeg)
         {
-            if (z < ZMin || z > ZMax)
+            float zMin = ZMin, zMax = ZMax, minX = BandMinX, maxX = BandMaxX;
+            bool walled = _field.Bounded;
+
+            if (group.garrison)
             {
-                z = Mathf.Clamp(z, ZMin, ZMax);
+                zMin = Mathf.Max(ZMin, _pocket.yMin);
+                zMax = Mathf.Min(ZMax, _pocket.yMax);
+                minX = _pocket.xMin;
+                maxX = _pocket.xMax;
+                walled = true;
+            }
+
+            if (z < zMin || z > zMax)
+            {
+                z = Mathf.Clamp(z, zMin, zMax);
                 headingDeg = -headingDeg;
             }
 
-            if (!_field.Bounded) return;
-            if (x >= BandMinX && x <= BandMaxX) return;
+            if (!walled) return;
+            if (x >= minX && x <= maxX) return;
 
-            x = Mathf.Clamp(x, BandMinX, BandMaxX);
+            x = Mathf.Clamp(x, minX, maxX);
             headingDeg = 180f - headingDeg;
         }
 

@@ -89,9 +89,10 @@ Shader "Hidden/AerialHaze"
                 s.discRadius     = _DiscRadius;
                 s.discEdge       = _DiscEdge;
                 s.mariaIntensity = _MariaIntensity;
-                // The moon is a body, not haze: geometry in front of it must occlude it, so
-                // the disc never paints here — only the gradient and the moonglow halo do.
-                s.discFill       = 0.0;
+                // The sun and the moon are bodies, not haze: geometry in front of one must
+                // occlude it, so neither the moon's disc nor the sun's core lobe paints here —
+                // only the gradient and the halo, which is scattering and belongs on the land.
+                s.bodyFill       = 0.0;
 
                 float above, discMask, halo;
                 float3 sky = MRSkyColor(d, s, above, discMask, halo) * _Exposure;

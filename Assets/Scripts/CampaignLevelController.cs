@@ -24,12 +24,21 @@ namespace MetalRaptors
         const float OutroExitMargin = 120f;
         const float OutroFadeSec = 1.2f;
 
-        const float AerodromeX = 0f;
         const float AerodromeZ = 0f;
         const float AerodromeLandMargin = 50f;
         const float AerodromeMaxDepth = 2000f;
         const float RoadOverlap = 60f;
-        const float RoadOverrun = 500f;
+        const float BandOverhang = 1100f;
+        const float WorldLeft = 0f;
+
+        const float AirfieldBurnSec = 3f;
+        const int AirfieldBlasts = 14;
+        const float AirfieldBlastSize = 90f;
+        const float AirfieldFireRadius = 16f;
+
+        const int GarrisonGroups = 3;
+        const float GarrisonFromX = 0.06f, GarrisonSpanX = 0.70f;
+        const float GarrisonNearZ = 100f, GarrisonFarZ = 620f;
 
         const float DitchSplashSize = 75f;
         const float SinkSpeed = 26f;
@@ -56,6 +65,8 @@ namespace MetalRaptors
         HudCurtain _curtain;
 
         CampaignEnemies _enemies;
+        CampaignTrucks _trucks;
+        Airfield _airfield;
         CompanionFlight _wing;
         SupplyDrop _supply;
         Transform _playerModel;
@@ -74,7 +85,9 @@ namespace MetalRaptors
 
         public bool IsOver => _gameOver;
 
-        public int EnemiesAlive => _enemies != null ? _enemies.AliveCount : 0;
+        public int EnemiesAlive =>
+            (_enemies != null ? _enemies.AliveCount : 0)
+            + (_trucks != null ? _trucks.AliveCount : 0);
 
         public bool CompanionReady => _wing == null || _wing.Formed;
 
@@ -91,6 +104,9 @@ namespace MetalRaptors
         float CamMaxX => Mathf.Max(WorldRight - _halfViewWidth, WorldRight * 0.5f);
 
         float IntroHoldX => Bounded ? CamMinX : StartX;
+
+        // Offset so the water tower stands on the first column of world the camera can see.
+        float AerodromeX => -Aerodrome.TowerLeft;
 
         float ApronEndX =>
             _level.aerodrome && Aerodrome.Ready && AerodromeFits ? AerodromeX + Aerodrome.Width : 0f;
@@ -129,8 +145,10 @@ namespace MetalRaptors
             }
             else if (Bounded)
             {
-                Battlefield.BeginBounded(_cam, _halfViewWidth, _level.seed, ApronEndX, WorldRight,
-                    _terrain.InCrater, _level.people, CampaignTerrain.Depth);
+                GarrisonAerodrome(Battlefield.BeginBounded(_cam, _halfViewWidth, _level.seed,
+                    ApronEndX, WorldRight + BandOverhang, _terrain.InCrater, _level.people,
+                    CampaignTerrain.Depth, PlayPlaneZ,
+                    ApronEndX > 0f ? AerodromeRoad.HalfWidth : 0f));
             }
             else
             {
@@ -174,6 +192,7 @@ namespace MetalRaptors
             land.apronUntilX = AerodromeX + Aerodrome.Width;
             land.roadZ = PlayPlaneZ;
             land.roadHalfWidth = AerodromeRoad.HalfWidth;
+            land.hardstanding = Aerodrome.Hardstanding(AerodromeX, AerodromeZ);
             return land;
         }
 
@@ -186,9 +205,14 @@ namespace MetalRaptors
         {
             if (!_level.aerodrome || !Aerodrome.Ready || !AerodromeFits) return;
 
-            Aerodrome.Place(AerodromeX, AerodromeZ, ProceduralTerrain.BaseLevel);
-            AerodromeRoad.Build(_terrain, ApronEndX - RoadOverlap, WorldRight + RoadOverrun,
+            Aerodrome.Place(AerodromeX, AerodromeZ, ProceduralTerrain.BaseLevel, _level.seed);
+            AerodromeRoad.Build(_terrain, ApronEndX - RoadOverlap, WorldRight + BandOverhang,
                 PlayPlaneZ);
+
+            _airfield = Airfield.Begin(
+                new Rect(AerodromeX, AerodromeZ, Aerodrome.Width, Aerodrome.LandDepth),
+                ProceduralTerrain.BaseLevel);
+            _airfield.OnLost += OnAirfieldLost;
         }
 
         void BeginSky()
@@ -198,9 +222,23 @@ namespace MetalRaptors
             SkyZeppelin zeppelin = SkyZeppelin.Begin(_cam, _halfViewWidth, _halfViewHeight,
                 PlayPlaneZ, CameraDistance, _level.zeppelins);
 
+            if (zeppelin != null && Bounded) zeppelin.SetLeftEdge(WorldLeft);
+
             if (ApronEndX <= 0f) return;
             if (flak != null) flak.SetLeftLimit(ApronEndX);
-            if (zeppelin != null) zeppelin.SetLeftLimit(ApronEndX);
+        }
+
+        // Ground crew inside the fence, among the hangars, sheds and quarters. They are ours,
+        // so they are all in blue whatever the battlefield outside is doing.
+        void GarrisonAerodrome(Battlefield field)
+        {
+            if (field == null || field.People == null || ApronEndX <= 0f) return;
+
+            var pocket = new Rect(
+                AerodromeX + Aerodrome.Width * GarrisonFromX, GarrisonNearZ,
+                Aerodrome.Width * GarrisonSpanX, GarrisonFarZ - GarrisonNearZ);
+
+            field.People.Garrison(pocket, GarrisonGroups, BattlefieldPeople.BlueUniform);
         }
 
         bool IntroActive => _intro != null && _intro.Active;
@@ -254,11 +292,16 @@ namespace MetalRaptors
 
         void EnsureEnemies()
         {
-            if (_enemies != null) return;
+            if (_enemies == null)
+                _enemies = new CampaignEnemies(_cube.GetComponent<Rigidbody>(), AiGroundY,
+                    WorldTop, _level);
 
-            _enemies = new CampaignEnemies(_cube.GetComponent<Rigidbody>(), AiGroundY, WorldTop,
-                _level);
+            if (_trucks == null)
+                _trucks = new CampaignTrucks(_cube.GetComponent<Rigidbody>(), _terrain, PlayPlaneZ,
+                    ApronEndX > 0f ? AerodromeRoad.SurfaceLift : 0f);
         }
+
+        float TruckEdgeX => Bounded ? WorldRight : _camBasePos.x + _halfViewWidth;
 
         float AiGroundY => Coast ? SeaSurface.Level : ProceduralTerrain.MaxHeight;
 
@@ -371,7 +414,8 @@ namespace MetalRaptors
         void FixedUpdate()
         {
             if (_gameOver) return;
-            PlaneScrapes.Check(_cube, _cubeTr, _enemies != null ? _enemies.Live : null);
+            PlaneScrapes.Check(_cube, _cubeTr, _enemies != null ? _enemies.Live : null,
+                _trucks != null ? _trucks.Live : null);
             if (_wing != null && _wing.CheckBump(_cubeTr)) OnCompanionBump();
         }
 
@@ -461,8 +505,14 @@ namespace MetalRaptors
 
         public void SpawnWave(EnemyGroup[] groups)
         {
-            if (_gameOver || _enemies == null) return;
-            _enemies.Spawn(groups, _camBasePos.x, _halfViewWidth);
+            if (_gameOver || groups == null) return;
+
+            int trucks = 0;
+            foreach (EnemyGroup group in groups)
+                if (group.kind == EnemyKind.Truck) trucks += group.count;
+
+            if (_enemies != null) _enemies.Spawn(groups, _camBasePos.x, _halfViewWidth);
+            if (trucks > 0 && _trucks != null) _trucks.Spawn(trucks, TruckEdgeX);
         }
 
         public bool CanDevSpawn =>
@@ -475,6 +525,14 @@ namespace MetalRaptors
             EnsureEnemies();
             _enemies.Spawn(new[] { new EnemyGroup(PlaneModels.EnemyFor(role), 1) },
                 _camBasePos.x, _halfViewWidth);
+        }
+
+        public void DevSpawnTruck()
+        {
+            if (!CanDevSpawn) return;
+
+            EnsureEnemies();
+            _trucks.Spawn(1, TruckEdgeX);
         }
 
         public void ArmSupply(bool open)
@@ -504,6 +562,7 @@ namespace MetalRaptors
 
             StopWeapons();
             if (_enemies != null) _enemies.StandDown();
+            if (_trucks != null) _trucks.StandDown();
             if (_supply != null) _supply.StandDown();
             if (_dialogue != null) _dialogue.Hide();
             if (_cube != null)
@@ -574,6 +633,7 @@ namespace MetalRaptors
         {
             if (_runner != null) _runner.Stop();
             if (_enemies != null) _enemies.StandDown();
+            if (_trucks != null) _trucks.StandDown();
             if (_wing != null) _wing.StandDown();
             if (_supply != null) _supply.StandDown();
         }
@@ -648,6 +708,44 @@ namespace MetalRaptors
             StartCoroutine(ShowFailScreenAfter(Explosion.Duration));
         }
 
+        void OnAirfieldLost()
+        {
+            if (_gameOver) return;
+            _gameOver = true;
+
+            StopScript();
+            StopWeapons();
+            if (_cube != null)
+            {
+                _cube.ClearWalls();
+                _cube.FlyLevel();
+            }
+            if (_sound != null) _sound.EnterGameOver();
+
+            StartCoroutine(BurnAirfield());
+        }
+
+        IEnumerator BurnAirfield()
+        {
+            var rng = new System.Random(_level.seed ^ 0x0F1E);
+            float step = AirfieldBurnSec / AirfieldBlasts;
+
+            for (int i = 0; i < AirfieldBlasts && _airfield != null; i++)
+            {
+                Vector3 point = _airfield.BlastPoint(rng);
+
+                Explosion.Spawn(point, AirfieldBlastSize);
+                GroundBlast.Spawn(point, AirfieldBlastSize,
+                    _cam != null ? _cam.transform.position : point);
+                WreckFire.Begin(null, point, AirfieldFireRadius, _level.seed + i);
+                _camShake = 1f;
+
+                yield return new WaitForSeconds(step);
+            }
+
+            GameMenu.Open(GameMenuKind.Failed, Subtitle, _hud);
+        }
+
         IEnumerator ShowFailScreenAfter(float delay)
         {
             yield return new WaitForSeconds(delay);
@@ -661,7 +759,7 @@ namespace MetalRaptors
             _hud = canvas.gameObject;
 
             _hudView = new LevelHud(canvas.transform, Bounded ? HudObjectiveBounded : HudObjective,
-                _cube, _shooter, _bomber, _boost, _roll, _searchlight, TryPause);
+                _cube, _shooter, _bomber, _boost, _roll, _searchlight, _airfield, TryPause);
 
             _curtain = HudCurtain.Attach(_hud);
             _curtain.Set(false);

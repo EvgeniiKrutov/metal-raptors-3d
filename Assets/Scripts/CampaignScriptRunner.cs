@@ -246,7 +246,8 @@ namespace MetalRaptors
         {
             int planes = 0;
             if (groups != null)
-                foreach (EnemyGroup group in groups) planes += group.count;
+                foreach (EnemyGroup group in groups)
+                    if (group.kind == EnemyKind.Plane) planes += group.count;
 
             if (planes <= 0) yield break;
 

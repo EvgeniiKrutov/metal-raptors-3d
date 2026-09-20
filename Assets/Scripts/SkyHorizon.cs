@@ -20,7 +20,7 @@ namespace MetalRaptors
 
         public static void Attach(Camera cam, Material sky, float sunViewportX = 0.5f,
             float sunLift = 0f, bool anchorSun = false,
-            float edgeY = ProceduralTerrain.BaseLevel, float edgeZ = ProceduralTerrain.Depth)
+            float edgeY = ProceduralTerrain.BaseLevel, float edgeZ = 0f)
         {
             var horizon = Create(cam, sky, sunViewportX, sunLift, anchorSun);
             horizon._edgeY = edgeY;
@@ -56,10 +56,11 @@ namespace MetalRaptors
             }
             else
             {
+                float edgeZ = _edgeZ > 0f ? _edgeZ : ProceduralTerrain.LandEdgeZ;
                 Vector3 camPos = _cam.transform.position;
-                var edge = new Vector3(camPos.x, _edgeY, _edgeZ);
+                var edge = new Vector3(camPos.x, _edgeY, edgeZ);
                 _sky.SetFloat(HorizonSlopeId,
-                    (_edgeY - camPos.y) / Mathf.Max(1f, _edgeZ - camPos.z));
+                    (_edgeY - camPos.y) / Mathf.Max(1f, edgeZ - camPos.z));
                 horizonViewportY = _cam.WorldToViewportPoint(edge).y;
             }
 

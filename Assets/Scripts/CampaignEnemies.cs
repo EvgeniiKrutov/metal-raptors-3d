@@ -69,6 +69,9 @@ namespace MetalRaptors
 
             int index = 0;
             foreach (EnemyGroup group in groups)
+            {
+                if (group.kind != EnemyKind.Plane) continue;
+
                 for (int i = 0; i < group.count; i++, index++)
                 {
                     EnemyConfig config = EnemyConfigs.For(group.plane, _scout, _fighter);
@@ -86,6 +89,7 @@ namespace MetalRaptors
                     enemy.OnDestroyed += OnDestroyed;
                     _live.Add(enemy);
                 }
+            }
         }
 
         public void StandDown()

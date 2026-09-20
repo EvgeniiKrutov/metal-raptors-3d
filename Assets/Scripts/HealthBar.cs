@@ -8,9 +8,12 @@ namespace MetalRaptors
         readonly float _width;
         readonly Image _fill;
         readonly Text _text;
+        readonly string _caption;
 
-        public HealthBar(Transform parent, Vector2 topLeft)
+        public HealthBar(Transform parent, Vector2 topLeft, string caption = null)
         {
+            _caption = caption;
+
             _width = HudTheme.BarWidth;
             float height = HudTheme.BarHeight;
 
@@ -59,7 +62,9 @@ namespace MetalRaptors
             size.x = _width * frac;
             _fill.rectTransform.sizeDelta = size;
 
-            _text.text = $"{Mathf.CeilToInt(current)} / {Mathf.CeilToInt(max)}";
+            _text.text = string.IsNullOrEmpty(_caption)
+                ? $"{Mathf.CeilToInt(current)} / {Mathf.CeilToInt(max)}"
+                : $"{_caption}   {Mathf.CeilToInt(frac * 100f)}%";
         }
     }
 }

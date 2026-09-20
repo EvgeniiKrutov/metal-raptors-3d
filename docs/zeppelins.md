@@ -50,31 +50,42 @@ never a smaller silhouette. The spawn altitude uses the same grade: 35–70 % of
 height above the camera's centre, which keeps it in the top of the frame, well clear of the
 play space.
 
-## One at a time, one per chunk
+## The relay
 
 `Begin` spawns the first one immediately, so a level opens with an airship already in the
 sky rather than waiting for one to sail in. That first spawn is the only one placed **inside**
 the window — `OnScreenMin`/`OnScreenMax`, −30 % to +60 % of the half window off the camera's
-centre — so it reads as having been there all along.
+centre — so it reads as having been there all along, and it is the only one the left edge can
+push right, since an airship drawn past that edge would be handed over the frame it appeared.
 
-After that `Consider` replaces one the moment it can, gated on only two things:
+After that, `Consider` sends the **next** one in off the right as soon as the newest airship
+alive is `Handover` (0.7) of its own length past the map's left edge. An airship spans its
+`length` about its own X, so that is its centre reaching `edge − 0.2 × length`. The map's left
+edge is set by `SetLeftEdge`, which `CampaignLevelController` calls with `WorldLeft` on a
+bounded level; unset, each airship measures against the left edge of its own window instead, so
+a scroller behaves the same way without knowing where its map ends.
 
-- none is alive — there is never more than one airship in the scene, and
-- the camera is in a different terrain chunk (`CampaignTerrain.ChunkLength`, 512) than the one
-  the last spawn happened in, which is the original "no more than one per open chunk" rule.
+This replaced a rule that allowed **one airship at a time**, gated on the camera entering a new
+512-unit terrain chunk (2026-09-20). On the endless levels that produced a steady relay because
+the camera never stopped moving, but level 3's camera is clamped to a 1138-unit span — less than
+three chunks, and never in a new one for long — so the sky kept one airship and then, once it
+died, went empty.
 
-There is no waiting period and no dice roll. Neither is needed: an airship lives long enough to
-cross several chunks, so by the time one dies the chunk gate is always already open, and the
-only gap left is the couple of seconds the replacement spends closing on the right edge. The
-variety comes from the per-airship draws — depth, size, altitude, speed — not from spawn
-timing.
+`SkyZeppelin` therefore holds a **list** of airships rather than one, each with its own speed,
+length and window; the handover deliberately overlaps, so the arriving one is already on the
+right while the departing one finishes leaving on the left. Two is the practical maximum: a
+third would need the first to still be alive after the second had crossed the whole map.
+
+If the list ever empties — the camera sitting at the right of a bounded map kills an airship
+off-screen before it reaches the handover line — the next one goes in at once, so the sky is
+never empty for a frame.
 
 ## Drift and death
 
 It moves along X only, always **westbound**, at 10–20 units/s — an idle drift next to the
 player's ~200, so nearly all of the crossing is parallax rather than the airship's own motion.
 Every spawn after the first one is placed just past the **right** edge of its own window
-(`_halfWindow`, the half view width at its depth), heading into the oncoming camera.
+(`halfWindow`, the half view width at its depth), heading into the oncoming camera.
 
 Spawn and death both use the same `HideMargin` (0.6 lengths past the window edge) — barely
 more than the half length it takes to be out of sight. Anything larger is time the airship
@@ -82,16 +93,24 @@ spends alive but invisible, which at this size is several seconds of empty sky a
 The left edge is the only exit test needed: the campaign camera's X never decreases and the
 airship's never increases, so the gap between them only ever closes.
 
-## The left limit
+**What the drift speed costs.** On level 3 an airship is spawned about 1410 units right of the
+camera and has to reach x ≈ −200 to hand over, ~2600 units at 10–20 units/s: **two and a half to
+four minutes** between arrivals. That is the drift's price, not the handover rule's — the rule
+could fire at the window's edge instead of the map's and only save a few hundred units.
+`SpeedMin`/`SpeedMax` are the knob if the relay should read as a procession rather than as one
+airship per sortie.
 
-`SetLeftLimit(x)` stops the airship at a world X and keeps it there. It exists for level 3,
-where the left end of the map is the squadron's own aerodrome and nothing hostile is meant to
-be over it (docs/aerodrome.md): the limit is the airfield's right edge. The drift is clamped
-rather than the airship destroyed, so it never blinks out mid-frame — it simply holds station
-at the boundary until the camera moves on and the ordinary off-screen death takes it. A spawn
-that would land left of the limit is refused outright, except the opening one, which is pushed
-to the limit instead so a level still opens with an airship in the sky. Unset, the limit is
-negative infinity and nothing above changes.
+## What replaced the left limit
+
+`SetLeftLimit(x)` used to stop the airship dead at a world X and hold it there — the airfield's
+right edge on level 3, so that nothing hostile drifted over the squadron's own aerodrome. With
+the camera clamped inside the arena, an airship parked there was never far enough behind the
+camera to die, so it hung over the field for the rest of the sortie and nothing else ever flew.
+
+`SetLeftEdge(x)` takes its place with the opposite meaning: the same line is now something an
+airship crosses rather than stops at, and crossing it is what calls the next one in. Airships do
+pass over the aerodrome now — which is what a raid looks like, and the flak battery's own
+`SetLeftLimit(ApronEndX)` is untouched, so the guns still do not fire over the field.
 
 ## Propellers
 

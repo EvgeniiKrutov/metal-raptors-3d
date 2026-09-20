@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -22,6 +23,10 @@ namespace MetalRaptors
         const float HideMargin = 0.6f;
         const float OnScreenMin = -0.3f, OnScreenMax = 0.6f;
 
+        // How much of the airship's length has to be past the map's left edge before the next
+        // one is put in off the right.
+        const float Handover = 0.7f;
+
         static readonly Quaternion NoseWest = Quaternion.Euler(-90f, -90f, 0f);
 
         static readonly string[] PropPivots =
@@ -37,12 +42,14 @@ namespace MetalRaptors
         float _halfViewWidth, _halfViewHeight;
         float _playPlaneZ, _cameraDistance;
 
-        Transform _airship;
-        float _speed;
-        float _length;
-        float _halfWindow;
-        float _leftLimit = float.NegativeInfinity;
-        int _spawnedChunk = int.MinValue;
+        class Airship
+        {
+            public Transform tr;
+            public float speed, length, halfWindow;
+        }
+
+        readonly List<Airship> _ships = new List<Airship>();
+        float _leftEdge = float.NegativeInfinity;
 
         public static SkyZeppelin Begin(Camera cam, float halfViewWidth, float halfViewHeight,
             float playPlaneZ, float cameraDistance, bool wanted)
@@ -60,14 +67,9 @@ namespace MetalRaptors
             return sky;
         }
 
-        public void SetLeftLimit(float x)
-        {
-            _leftLimit = x;
-            if (_airship == null) return;
-
-            Vector3 pos = _airship.position;
-            _airship.position = new Vector3(Mathf.Max(pos.x, x), pos.y, pos.z);
-        }
+        // The map's left edge: the line an airship has to be `Handover` past before the next
+        // one is sent in. Unset, each airship uses the left edge of its own window instead.
+        public void SetLeftEdge(float x) => _leftEdge = x;
 
         void LateUpdate()
         {
@@ -80,26 +82,39 @@ namespace MetalRaptors
 
         void Drift(Vector3 eye)
         {
-            if (_airship == null) return;
+            for (int i = _ships.Count - 1; i >= 0; i--)
+            {
+                Airship ship = _ships[i];
+                if (ship.tr == null) { _ships.RemoveAt(i); continue; }
 
-            Vector3 pos = _airship.position;
-            pos.x = Mathf.Max(pos.x + _speed * Time.deltaTime, _leftLimit);
-            _airship.position = pos;
+                Vector3 pos = ship.tr.position;
+                pos.x += ship.speed * Time.deltaTime;
+                ship.tr.position = pos;
 
-            if (pos.x - eye.x > -_halfWindow - _length * HideMargin) return;
+                if (pos.x - eye.x > -ship.halfWindow - ship.length * HideMargin) continue;
 
-            Destroy(_airship.gameObject);
-            _airship = null;
+                Destroy(ship.tr.gameObject);
+                _ships.RemoveAt(i);
+            }
         }
 
         void Consider(Vector3 eye)
         {
-            if (_airship != null || ChunkAt(eye.x) == _spawnedChunk) return;
+            if (_ships.Count > 0 && !HandedOver(_ships[_ships.Count - 1], eye)) return;
 
             Spawn(eye, onScreen: false);
         }
 
-        static int ChunkAt(float x) => Mathf.FloorToInt(x / CampaignTerrain.ChunkLength);
+        // The airship spans `length` about its own X, so `Handover` of it is past `edge` once
+        // its centre is `Handover - 0.5` lengths beyond it.
+        bool HandedOver(Airship ship, Vector3 eye)
+        {
+            float edge = _leftEdge > float.NegativeInfinity
+                ? _leftEdge
+                : eye.x - ship.halfWindow;
+
+            return ship.tr.position.x <= edge - (Handover - 0.5f) * ship.length;
+        }
 
         void Spawn(Vector3 eye, bool onScreen)
         {
@@ -123,16 +138,9 @@ namespace MetalRaptors
                 ? halfWindow * Random.Range(OnScreenMin, OnScreenMax)
                 : halfWindow + length * HideMargin);
 
-            if (x < _leftLimit)
-            {
-                if (!onScreen) return;
-                x = _leftLimit;
-            }
-
-            _spawnedChunk = ChunkAt(eye.x);
-            _length = length;
-            _halfWindow = halfWindow;
-            _speed = -Random.Range(SpeedMin, SpeedMax);
+            // The one that opens the level is the only one drawn inside the window, and never
+            // past the map's left edge — it would be handed over the moment it appeared.
+            if (onScreen) x = Mathf.Max(x, _leftEdge);
 
             var root = new GameObject("Zeppelin");
             root.transform.SetParent(transform, false);
@@ -145,11 +153,17 @@ namespace MetalRaptors
             model.name = "zeppelin";
             model.transform.localRotation = NoseWest;
 
-            Fit(model.transform, _length);
+            Fit(model.transform, length);
             Dress(model);
             StartPropellers(model.transform, root.transform);
 
-            _airship = root.transform;
+            _ships.Add(new Airship
+            {
+                tr = root.transform,
+                speed = -Random.Range(SpeedMin, SpeedMax),
+                length = length,
+                halfWindow = halfWindow,
+            });
         }
 
         static void Fit(Transform model, float length)

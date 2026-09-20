@@ -282,7 +282,7 @@ namespace MetalRaptors
         void FixedUpdate()
         {
             if (_gameOver) return;
-            PlaneScrapes.Check(_cube, _cubeTr, _enemies);
+            PlaneScrapes.Check(_cube, _cubeTr, _enemies, null);
         }
 
         void LateUpdate()
@@ -421,7 +421,7 @@ namespace MetalRaptors
 
             _hudView = new LevelHud(canvas.transform,
                 "destroy the enemy  •  don't hit the ground",
-                _cube, _shooter, _bomber, _boost, _roll, _searchlight, TryPause);
+                _cube, _shooter, _bomber, _boost, _roll, _searchlight, null, TryPause);
         }
 
         void UpdateHealthHud()

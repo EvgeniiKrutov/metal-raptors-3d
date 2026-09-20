@@ -56,7 +56,7 @@ namespace MetalRaptors
 
         class SpawnAction
         {
-            public EnemyRole Role;
+            public System.Action Release;
             public string Caption;
             public Button Button;
             public Text Label;
@@ -87,6 +87,7 @@ namespace MetalRaptors
         GameObject _spawnSection;
         SpawnAction _scoutSpawn;
         SpawnAction _fighterSpawn;
+        SpawnAction _truckSpawn;
         float _statsHeight;
         float _spawnPanelHeight;
         bool _spawnShown;
@@ -213,15 +214,19 @@ namespace MetalRaptors
                 TitleColor, UIFactory.MediumFont);
             y -= TitleRowHeight + SpawnCaptionGap;
 
-            _scoutSpawn = CreateSpawnButton(go.transform, "SPAWN SCOUT", EnemyRole.Scout, ref y);
-            _fighterSpawn = CreateSpawnButton(go.transform, "SPAWN FIGHTER", EnemyRole.Fighter,
-                ref y);
+            _scoutSpawn = CreateSpawnButton(go.transform, "SPAWN SCOUT",
+                () => DevSpawn.Spawn(EnemyRole.Scout), ref y);
+            _fighterSpawn = CreateSpawnButton(go.transform, "SPAWN FIGHTER",
+                () => DevSpawn.Spawn(EnemyRole.Fighter), ref y);
+            _truckSpawn = CreateSpawnButton(go.transform, "SPAWN TRUCK",
+                DevSpawn.SpawnTruck, ref y);
 
             _spawnPanelHeight = -y - SpawnButtonGap + 2f * PadY;
             go.SetActive(false);
         }
 
-        SpawnAction CreateSpawnButton(Transform parent, string caption, EnemyRole role, ref float y)
+        SpawnAction CreateSpawnButton(Transform parent, string caption, System.Action release,
+            ref float y)
         {
             Button button = UIFactory.CreateButton(parent, caption, Vector2.zero, null,
                 new Vector2(0f, SpawnButtonHeight), fontSize: SpawnFontSize);
@@ -236,7 +241,7 @@ namespace MetalRaptors
 
             var action = new SpawnAction
             {
-                Role = role,
+                Release = release,
                 Caption = caption,
                 Button = button,
                 Label = button.GetComponentInChildren<Text>(),
@@ -353,6 +358,7 @@ namespace MetalRaptors
 
             Countdown(_scoutSpawn);
             Countdown(_fighterSpawn);
+            Countdown(_truckSpawn);
         }
 
         void ShowSpawnSection(bool shown)
@@ -367,6 +373,7 @@ namespace MetalRaptors
 
             ResetSpawn(_scoutSpawn);
             ResetSpawn(_fighterSpawn);
+            ResetSpawn(_truckSpawn);
         }
 
         void BeginSpawn(SpawnAction action)
@@ -391,7 +398,7 @@ namespace MetalRaptors
             }
 
             ResetSpawn(action);
-            DevSpawn.Spawn(action.Role);
+            action.Release?.Invoke();
         }
 
         static void ResetSpawn(SpawnAction action)

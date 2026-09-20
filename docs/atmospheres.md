@@ -74,12 +74,33 @@ the coast is unaffected; only the anchored maps change, and they change by becom
   setting at the actual horizon, not the eye-level one behind it. Midday's overhead sun
   keeps its fixed screen anchor; only its band tracks the edge.
 
-Fog start distance per daytime (set in `ProceduralTerrain.Build`; the far anchor is the
-same for all — the last `FogHideMargin` of land sits in solid haze so the map edge never
-shows). That margin was cut from 250 to **120** on 2026-09-20, which moves the far anchor from
-870 out to **1000** and buys 130 units of readable distance on every Verdun map; 120 units of
-land still stand past the point where the haze goes solid, and a map cut deeper than 800 keeps
-its own `edge − 60` clamp on top:
+### The doubled horizon (2026-09-20)
+
+The edge `SkyHorizon` anchored to was the constant `ProceduralTerrain.Depth`, 800, while the
+campaign's streamed land sets its own depth per level — 1150 on the aerodrome level. A farther
+ground edge projects **higher** on the screen, so the sky's horizon plane sat about 0.031 of the
+frame *below* the land the player could see, and `AerialHaze` faithfully painted that plane onto
+the fogged land: `above` rises as `pow(h, 1/3.5)`, which climbs 29 % in the first hundredth of a
+unit, so the land above the plane was pulled sharply toward the zenith colour while the land
+below it stayed horizon-warm with the sun's halo on it. The result was a **second, sunlit
+horizon drawn across the ground a couple of degrees under the real one**.
+
+The land's edge is now one value, `ProceduralTerrain.LandEdgeZ`: `Build` sets it for a
+single-shot level, `CampaignTerrain.Depth` *is* it for a streamed one, and `SkyHorizon` reads it
+live each `LateUpdate` rather than baking a constant at attach time. The two horizons coincide
+and the band disappears. A map 800 deep is bit-for-bit unchanged. The anchored sun rides the same
+`SunHorizonLift` above the corrected line, so it also sits ~0.031 higher on the deep level than
+it did before the fix.
+
+Fog start distance per daytime (set in `ProceduralTerrain.Build`; the far anchor is the same
+for all — the last `FogHideMargin` of land sits in solid haze so the map edge never shows).
+Two changes on 2026-09-20 pushed that anchor out. The margin was cut from 250 to **120**, and
+the rule was made to read the land's **own** depth rather than the 800 constant:
+`cameraDistance − playPlaneZ + depth − FogHideMargin`, one formula for every map instead of a
+`Min` of an 800-deep figure and an `edge − 60` clamp. The old `Min` meant a deeper map was
+held to a shallower map's haze; now the margin is simply the last 120 units of whatever land
+there is. A standard map goes 870 → **1000**, and the aerodrome level's 1150-deep strip
+(docs/aerodrome.md) goes 870 → **1350**:
 
 | Daytime | Fog start past camera | Air |
 |---|---|---|
@@ -154,11 +175,18 @@ Mechanics:
 - The sky is evaluated by `Assets/Shaders/GradientSky.hlsl`, shared verbatim with
   `GradientSkybox.shader`, so the two cannot drift apart. Two terms are left out. Stars,
   because they are masked off the horizon band anyway and fogged land is always below it.
-  And the moon disc: `MRSky.discFill` is 1 in the skybox but 0 here, so the haze fogs
-  geometry into the gradient and the moonglow halo — scattered light, which genuinely sits
-  in front of things — but never into the disc body. With it on, anything past the fog start
-  that crossed the moon (the zeppelin above all, at 25–60% fog weight) had the moon painted
-  straight through it.
+  And the bodies: `MRSky.bodyFill` is 1 in the skybox but 0 here, so the haze fogs geometry
+  into the gradient and the halo — scattered light, which genuinely sits in front of things —
+  but never into the moon's disc or the sun's core lobe. With it on, anything past the fog
+  start that crossed the moon (the zeppelin above all, at 25–60 % fog weight) had the moon
+  painted straight through it, and at evening light the sun's core (`_SunIntensity` 6 through
+  a `_SunFalloff` 150 lobe) was added onto the aerodrome's hangars and the land around them —
+  a wash bounded by each object's own silhouette, which read as the sun shining through them
+  (2026-09-20). The field was the first thing on these maps tall and lit enough to show it.
+
+  The halo deliberately stays. It is what keeps the glow **continuous across the horizon**:
+  drop the whole pass instead and the sky's glow would stop dead at the land's edge, drawing
+  the straight line this pass exists to erase — the same artefact from the other side.
 - Sky pixels are skipped (they already *are* the sky; adding the difference again would
   double the halo), as are pixels in front of the fog start.
 - The addition is clamped to a brightening. Geometry only projects above the horizon band

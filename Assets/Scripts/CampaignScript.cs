@@ -20,6 +20,8 @@ namespace MetalRaptors
     {
         public const string ResourceFolder = "CampaignScripts/";
 
+        const string TruckId = "truck";
+
         const float ReadBase = 1.4f;
         const float ReadPerWord = 0.32f;
         const float ReadMin = 2.5f;
@@ -149,6 +151,22 @@ namespace MetalRaptors
                 {
                     if (!(entry is Dictionary<string, object> group)) continue;
 
+                    int count = Mathf.Max(1, Mathf.RoundToInt(Number(group, "count", 1f)));
+                    string ground = Text(group, "ground");
+
+                    if (ground.Length > 0)
+                    {
+                        if (ground != TruckId)
+                        {
+                            Debug.LogError(
+                                $"CampaignScript {origin}[{index}]: unknown ground '{ground}'.");
+                            continue;
+                        }
+
+                        groups.Add(new EnemyGroup(EnemyKind.Truck, count));
+                        continue;
+                    }
+
                     string id = Text(group, "plane");
                     PlaneModelConfig plane = PlaneModels.ById(id);
                     if (plane == null)
@@ -157,14 +175,13 @@ namespace MetalRaptors
                         continue;
                     }
 
-                    int count = Mathf.RoundToInt(Number(group, "count", 1f));
-                    groups.Add(new EnemyGroup(plane, Mathf.Max(1, count)));
+                    groups.Add(new EnemyGroup(plane, count));
                 }
             }
 
             if (groups.Count == 0)
             {
-                Debug.LogError($"CampaignScript {origin}[{index}]: '{op}' names no planes.");
+                Debug.LogError($"CampaignScript {origin}[{index}]: '{op}' names no enemies.");
                 return null;
             }
 

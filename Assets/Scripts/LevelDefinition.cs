@@ -57,14 +57,24 @@ namespace MetalRaptors
         }
     }
 
+    public enum EnemyKind { Plane, Truck }
+
     public class EnemyGroup
     {
+        public readonly EnemyKind kind;
         public readonly PlaneModelConfig plane;
         public readonly int count;
 
         public EnemyGroup(PlaneModelConfig plane, int count)
         {
+            kind = EnemyKind.Plane;
             this.plane = plane;
+            this.count = count;
+        }
+
+        public EnemyGroup(EnemyKind kind, int count)
+        {
+            this.kind = kind;
             this.count = count;
         }
     }

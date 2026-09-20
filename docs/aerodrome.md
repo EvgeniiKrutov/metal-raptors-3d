@@ -12,7 +12,8 @@ places a single fixed building yet — every other structure is streamed from
 `objects/`). One `Aerodrome` root null over eight groups: `Ground` (apron tracks), `Hangars`
 (three), `Quarters` (a barrack and two huts), `Sheds` (three), `Tower` (a water tower),
 `Aircraft` (three parked Sopwith Camels), `Windsock` and `Fence` (the perimeter, which is what
-sets the overall footprint).
+sets the overall footprint — and, from 2026-09-20, what the level's trucks drive up the road to
+shell, docs/trucks.md).
 
 It is authored in **real metres, Z-up**, the same Blender pipeline every plane comes from
 (docs/plane-scale.md) — but unlike the plane and prop models its root null already carries the
@@ -66,9 +67,16 @@ the probe's own placement into the answer.
 
 `Aerodrome.Place(leftX, nearZ, groundY)` positions the instance so its **scaled bounds minimum**
 lands on that point — the bounds being those of the *yawed* model, so the same call frames the
-field whichever way `FieldYaw` turns it. The level places it at `x = 0`, `z = 0`,
-`y = ProceduralTerrain.BaseLevel`: hard against the map's left wall, its front fence on the lip
-of the terrain's cut wall, and its ground plane exactly on the flattened apron.
+field whichever way `FieldYaw` turns it. The level places it at `z = 0`,
+`y = ProceduralTerrain.BaseLevel` — its front fence on the lip of the terrain's cut wall, its
+ground plane exactly on the flattened apron — and at `x = −Aerodrome.TowerLeft`, about **−89**.
+
+That X is measured, not chosen: `Measure` records the `Tower` node's near face as a distance from
+the whole model's own left edge, and the level negates it, so the **water tower stands on the
+first column of world the camera can see** as the level opens (the camera's clamped resting X is
+`halfViewWidth`, which puts the left edge of the frame on x 0). Re-export the field with the
+tower moved and the offset follows it. Everything downstream is relative — `apronUntilX` is
+`AerodromeX + Width`, so the apron line and the road's start do not move.
 
 With the quarter turn the field is read end-on: the **short end carrying the water tower is the
 near one** and the windsock ends up on the far edge of the strip. Where the pieces land, in
@@ -87,10 +95,56 @@ it — it is on `BattlefieldProps.Layer` and has no collider, so this costs noth
 And the hangars and parked machines now sit 600–1000 units deep instead of ~300, which reads
 smaller and hazier; `FogEndDistance` still closes the haze 60 units short of the back edge.
 
-It is decoration only. Every collider that comes in with the model is destroyed and the whole
-tree is put on `BattlefieldProps.Layer`, so the plane flies through it the way it flies through
-trees; only the terrain can be crashed into (`CubeController.GroundUnder` raycasts the ground
-layer alone).
+Every collider that comes in with the model is destroyed and the whole tree is put on
+`BattlefieldProps.Layer`. Most of it is then decoration — the apron, the fence, the windsock and
+the parked Camels are flown through — but the **buildings are solid** (2026-09-20):
+`Aerodrome.Solidify` walks `Hangars`, `Quarters`, `Sheds` and `Tower`, each of which holds its
+buildings as direct children, and gives every child a trigger `BoxCollider` measured in that
+child's **own local space**, so the barrack's 12° yaw gets a box that fits it rather than the
+larger world-aligned one its bounds would give. Ten boxes: three hangars, a barrack and two
+huts, three sheds, the water tower.
+
+On `BattlefieldProps.Layer` that is what `CubeController.OnTriggerEnter` reads as a **scrape** —
+`CollisionDamage`, sparks and a shake, on the collision cooldown — the same answer a battlefield
+house gives, and the same one `EnemyController` gives, so an enemy chasing the player through
+the field takes it too. Only the terrain is a crash (`CubeController.GroundUnder` raycasts the
+ground layer alone).
+
+## What lives on it
+
+The field was bare ground under a bare model: the apron was excluded from the grass, and the
+battlefield's props, people and smoke all start at `ApronEndX`, so nothing at all was inside the
+fence. Three things fill it now (2026-09-20).
+
+**Grass.** `VerdunTerrain` no longer skips the apron when planting. Stow Maries is a grass field
+and so is this one; what stays bare is only the model's **own** apron slabs, measured off its
+`Ground` node by `Aerodrome.Hardstanding(leftX, nearZ)` and passed to the land as
+`CampaignLandOptions.hardstanding` — blades would otherwise grow through them. As a side effect
+the flattened ground that runs off to the left of the field, out to the map's widened edge, is
+grass too rather than bare dirt.
+
+**Fire.** `Aerodrome.LightFires` puts `FireCount` (5) `WreckFire`s down the field — each one
+flames plus a `SmokeColumn` — at seeded positions across the front 58 % of its depth and the
+middle 74 % of its width, radius 7–14. They hang on their own unscaled holder: the model's root
+carries `localScale = Scale`, and a fire parented to it would come out ~7.8× too big.
+
+**Ground crew.** `BattlefieldPeople.Garrison(area, groups, uniform)` places `GarrisonGroups` (3)
+squads inside the fence, among the hangars, sheds and quarters — x from 6 % to 76 % of the
+field's width, z 100…620 — all in `BattlefieldPeople.BlueUniform`, index 0, the horizon blue our
+own men wear.
+
+The `area` is a **pocket they live in**, not merely where they appear. That distinction was the
+first version's bug: `Confine` clamps every group and figure to `[BandMinX, BandMaxX]`, and on
+this level the band starts at `ApronEndX` — the field's far fence — so the crew spawned inside
+the field and were shoved out of it on the first tick, ending up in a line just outside the
+fence. `Confine` now takes the group and holds a garrison inside its pocket instead.
+
+A garrison group differs from a battlefield one in six ways: its own pocket rather than the
+band, it never expires even on a scroller, it does not count toward `_targetGroups` (so it
+cannot crowd out the squads outside), `PickFaction` skips it (its blue/grey balance is about
+the battlefield, not our own airfield), it never looks for a foe, and `TickFire` returns
+immediately for it. `NearestFoe` also skips garrison groups as targets, so nobody shoots across
+the fence in either direction. They are crew: they walk the field and never raise a rifle.
 
 ## What the land does about it
 
@@ -100,8 +154,9 @@ The aerodrome drives three terrain decisions, passed to `CampaignTerrain.Begin` 
 - **`depth` = `Aerodrome.LandDepth + 50`** (≈ 1150 against the usual 800). The strip of land is
   cut to the field plus fifty units behind it, so the airfield fills the map's depth instead of
   sitting in the front third of it. `ProceduralTerrain.FogEndDistance` takes the depth as an
-  argument and closes the haze before the land's back edge — `Mathf.Min` of the usual distance
-  and `edge − 60`, so a full-depth map is unchanged and a shallow one is still hidden.
+  argument and closes the haze `FogHideMargin` (120) before the land's back edge, so this level
+  reaches 1350 where a standard 800-deep map reaches 1000 (docs/atmospheres.md). The same depth
+  is what `SkyHorizon` anchors the sky's horizon band and the sun to.
 - **`apronUntilX` = `Aerodrome.Width`** (≈ 591 since the yaw, so the bare apron is the map's
   left quarter rather than its left half). `VerdunTerrain` flattens every height to
   `ProceduralTerrain.BaseLevel` left of that line and blends back into the rolling ridge over
@@ -120,12 +175,25 @@ All three are pure functions of world position, so chunk seams still agree (docs
 centre, right verge — over the terrain, sampling `CampaignTerrain.SampleHeight` every 14 units
 and lifting the surface 1.6 units (plus a 1.4 crown) clear of it. It is 9 m wide at the plane
 conversion (≈ 70 units), runs at `PlayPlaneZ`, starts 60 units inside the airfield's boundary so
-it reads as leaving the field, and overruns the map's right wall by 500 units so its end is
-never in frame. Flat colour, no collider, casts no shadow.
+it reads as leaving the field, and overruns the map's right wall by `BandOverhang` (1100) so its
+end is never in frame — the same overhang the props and the land use, which is what lets
+everything that has to keep off the road test only Z. Flat colour, no collider, casts no shadow.
+
+**Nothing stands in it.** Grass was skipped inside the corridor from the start, but the props
+knew nothing about it and trees grew straight through the ribbon. `Battlefield` now carries the
+corridor (`roadZ` / `roadHalfWidth`, handed to `BeginBounded` beside the land depth) and
+`BattlefieldProps.Build` refuses a candidate whose own footprint reaches it —
+`OnRoad(z, radius)`, so a wide house is turned away further from the ribbon than a thin tree,
+and the cell is remembered as empty like any other refusal. Smoke columns never needed the test:
+they start at z 140, and the corridor ends at 135.
 
 The player's depth is inside `ProceduralTerrain.FrontStrip`, where the ground is constant in Z,
 so the ribbon is level across its width except where a crater reaches forward into the strip —
 and there it simply follows the hole down.
+
+**It is a lane, not scenery.** The level's three enemy trucks drive down it from the map's far
+edge to the fence, riding `AerodromeRoad.SurfaceLift` — the ribbon's lift plus its crown — over
+the sampled ground, so they follow it over ridges and through craters (docs/trucks.md).
 
 ## Files
 
@@ -136,3 +204,4 @@ and there it simply follows the hole down.
 | `CampaignTerrain.cs` | `CampaignLandOptions` — depth, map width, apron line, road corridor. |
 | `VerdunTerrain.cs` | The apron flattening, crater exclusion and grass exclusion. |
 | `CampaignLevelController.cs` | `BuildLand` / `BuildAerodrome` — where the numbers above are chosen. |
+| `Airfield.cs` | The fence line and the field's health pool, created with the model (docs/trucks.md). |

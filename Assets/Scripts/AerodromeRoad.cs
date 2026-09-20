@@ -11,6 +11,8 @@ namespace MetalRaptors
         const float Lift = 1.6f;
         const float Crown = 1.4f;
 
+        public const float SurfaceLift = Lift + Crown;
+
         static readonly Color RoadColor = new Color(0.52f, 0.47f, 0.39f);
 
         Mesh _mesh;

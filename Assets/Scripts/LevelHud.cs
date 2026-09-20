@@ -5,6 +5,8 @@ namespace MetalRaptors
 {
     public class LevelHud
     {
+        const string AirfieldCaption = "AIRFIELD";
+
         const string KeyHint = "A / D to steer  •  F to fire  •  H to bomb  •  R to boost  •  "
                                + "B to roll  •  ";
 
@@ -16,6 +18,8 @@ namespace MetalRaptors
         readonly PlaneSearchlight _searchlight;
 
         readonly HealthBar _health;
+        readonly HealthBar _airfieldBar;
+        readonly Airfield _airfield;
         readonly CooldownSquare _bombSquare;
         readonly CooldownSquare _boostSquare;
         readonly CooldownSquare _rollSquare;
@@ -28,9 +32,10 @@ namespace MetalRaptors
 
         public LevelHud(Transform parent, string objective, CubeController plane,
             PlaneShooter shooter, PlaneBomber bomber, PlaneBoost boost, PlaneBarrelRoll roll,
-            PlaneSearchlight searchlight, System.Action onPause)
+            PlaneSearchlight searchlight, Airfield airfield, System.Action onPause)
         {
             _plane = plane;
+            _airfield = airfield;
             _shooter = shooter;
             _bomber = bomber;
             _boost = boost;
@@ -42,6 +47,12 @@ namespace MetalRaptors
 
             _health = new HealthBar(parent, new Vector2(x, -y));
             y += HudTheme.BarHeight + HudTheme.BarToColumn;
+
+            if (_airfield != null)
+            {
+                _airfieldBar = new HealthBar(parent, new Vector2(x, -y), AirfieldCaption);
+                y += HudTheme.BarHeight + HudTheme.BarToColumn;
+            }
 
             _bombSquare = Square(parent, x, ref y, HudTheme.Label("H", "BOMB"), RequestBomb);
             _boostSquare = Square(parent, x, ref y, HudTheme.Label("R", "BOOST"), RequestBoost);
@@ -100,6 +111,9 @@ namespace MetalRaptors
                 _lightSquare.Set(0f, _searchlight.IsOn);
             if (_health != null && _plane != null)
                 _health.Set(_plane.CurrentHealth, _plane.MaxHealth);
+
+            if (_airfieldBar != null && _airfield != null)
+                _airfieldBar.Set(_airfield.CurrentHealth, Airfield.MaxHealth);
 
             TickSteering();
         }

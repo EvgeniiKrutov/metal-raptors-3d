@@ -35,10 +35,11 @@ condition.
 campaign's story source verbatim — eleven lines climbing out, ten after the first two Fokkers, ten
 flying home — and its ground scene is written with them. Level 2 is authored to its final *shape*
 — four cutscenes, seventeen machines in nine waves, two placed supply windows and a mid-level
-change of background foe — but every one of its lines is still placeholder Latin. Levels 3 and 5–9
+change of background foe — but every one of its lines is still placeholder Latin. Levels 5–9
 are the same scroller shape each time (opening exchange → waves → closing exchange → `finish`)
-with Latin in every line, and level 4 is the one variation, using `spawn` + `waitclear` for a
-running fight instead of blocking waves. The real levels are
+with Latin in every line, level 4 is the one variation, using `spawn` + `waitclear` for a
+running fight instead of blocking waves, and **level 3 is the one level with no aircraft in it
+at all** — its three waves are one ground truck each (docs/trucks.md). The real levels are
 designed in `Assets/Resources/docs/campaign-ww1-scenario.md` — including four modes and two boss
 fights this grammar cannot express yet.
 
@@ -56,6 +57,7 @@ step rather than the whole level.
 | `{ "op": "say", "speaker": "you", "line": "l1_line6", "seconds": 3.5 }` | Same, but hold it for exactly 3.5 s. |
 | `{ "op": "wave", "enemies": [ { "plane": "albatros", "count": 2 } ] }` | Spawn the wave **and block** until every plane in it is destroyed. |
 | `{ "op": "wave", "enemies": [ { "plane": "albatros", "count": 2 }, { "plane": "sopwith", "count": 1 } ] }` | A wave of mixed types. |
+| `{ "op": "wave", "enemies": [ { "ground": "truck", "count": 1 } ] }` | A ground enemy instead of a plane — `ground` where `plane` would go (docs/trucks.md). A wave can mix the two. |
 | `{ "op": "spawn", "enemies": [ … ] }` | Same spawn, but the script continues immediately. |
 | `{ "op": "waitclear" }` | Block until no scripted enemy is alive (pairs with `spawn`). |
 | `{ "op": "supply" }` | Open a supply-crate window for the phase that follows (docs/supply-drops.md). |

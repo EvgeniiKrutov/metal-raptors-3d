@@ -86,6 +86,9 @@ namespace MetalRaptors
         Battlefield _field;
         int _seed;
         float _treeCell = TreeCellSize;
+        float _houseCell = HouseCellSize;
+        float _tankCell = TankCellSize;
+        float _spread = 1f;
         MaterialPropertyBlock _tankBlock;
         bool _tankSkinMissing;
 
@@ -97,7 +100,14 @@ namespace MetalRaptors
             var props = go.AddComponent<BattlefieldProps>();
             props._field = field;
             props._seed = seed;
-            props._treeCell = TreeCellSize * GraphicsOptions.TreeCellScale;
+            // How much deeper this land runs than the default strip: 1 on an ordinary map. The
+            // props reach back with it, and the grids tighten by it twice over — once to hold
+            // the count per unit of ground, once again for the thicker far field the campaign
+            // wants. See docs/battlefield.md.
+            props._spread = Mathf.Max(1f, field.LandDepth / ProceduralTerrain.Depth);
+            props._treeCell = TreeCellSize * GraphicsOptions.TreeCellScale / props._spread;
+            props._houseCell = HouseCellSize / (props._spread * props._spread);
+            props._tankCell = TankCellSize / (props._spread * props._spread);
 
             Physics.IgnoreLayerCollision(Layer, 0, true);
 
@@ -107,16 +117,16 @@ namespace MetalRaptors
 
         public void Tick(float camX)
         {
-            UpdateGrid(_tanks, TankModels, TankCellSize, 13, camX, Kind.Tank);
-            UpdateGrid(_houses, HouseModels, HouseCellSize, 11, camX, Kind.House);
+            UpdateGrid(_tanks, TankModels, _tankCell, 13, camX, Kind.Tank);
+            UpdateGrid(_houses, HouseModels, _houseCell, 11, camX, Kind.House);
             UpdateGrid(_trees, TreeModels, _treeCell, 12, camX, Kind.Tree);
             TickBurning(camX);
         }
 
         public bool Blocks(float x, float z, float margin, out Vector2 centre)
         {
-            if (Nearest(_houses, HouseCellSize, x, z, margin, out centre)) return true;
-            if (Nearest(_tanks, TankCellSize, x, z, margin, out centre)) return true;
+            if (Nearest(_houses, _houseCell, x, z, margin, out centre)) return true;
+            if (Nearest(_tanks, _tankCell, x, z, margin, out centre)) return true;
             return Nearest(_trees, _treeCell, x, z, margin, out centre);
         }
 
@@ -149,8 +159,10 @@ namespace MetalRaptors
 
                 float back = _field.ZBack;
                 float z = kind == Kind.Tank
-                    ? Mathf.Lerp(TankZMin, Mathf.Min(TankZMax, back), (float)rng.NextDouble())
-                    : Mathf.Lerp(ZMin, Mathf.Min(ZMax, back), (float)rng.NextDouble());
+                    ? Mathf.Lerp(TankZMin, Mathf.Min(TankZMax * _spread, back),
+                        (float)rng.NextDouble())
+                    : Mathf.Lerp(ZMin, Mathf.Min(ZMax * _spread, back),
+                        (float)rng.NextDouble());
                 string model = models[rng.Next(models.Length)];
                 float yaw = (float)rng.NextDouble() * 360f;
                 float jitter = kind == Kind.Tank ? TankSizeJitter : SizeJitter;
@@ -179,9 +191,9 @@ namespace MetalRaptors
         bool Occupied(Kind kind, float x, float z)
         {
             if (kind == Kind.Tank) return false;
-            if (Nearest(_tanks, TankCellSize, x, z, TankClearance, out _)) return true;
+            if (Nearest(_tanks, _tankCell, x, z, TankClearance, out _)) return true;
 
-            return kind == Kind.Tree && Nearest(_houses, HouseCellSize, x, z, 0f, out _);
+            return kind == Kind.Tree && Nearest(_houses, _houseCell, x, z, 0f, out _);
         }
 
         void TickBurning(float camX)
@@ -222,6 +234,10 @@ namespace MetalRaptors
 
             float scale = MetreScale * Oversize(kind) * size;
             float radius = Mathf.Max(proto.bounds.extents.x, proto.bounds.extents.z) * scale;
+
+            // Nothing stands in the road. The test is the prop's own footprint, so a wide house
+            // is refused further from the ribbon than a thin tree.
+            if (_field.OnRoad(z, radius)) return null;
             float seat = LowestGround(x, z, radius, y)
                          - (kind == Kind.Tank ? TankSink : 0f);
 
@@ -352,8 +368,8 @@ namespace MetalRaptors
             return bounds;
         }
 
-        static float DepthBoost(float z) =>
-            Mathf.InverseLerp(TreeDepthNear, ZMax, z) * TreeDepthBoost;
+        float DepthBoost(float z) =>
+            Mathf.InverseLerp(TreeDepthNear, ZMax * _spread, z) * TreeDepthBoost;
 
         float SlopeDeg(float x, float z, float y)
         {

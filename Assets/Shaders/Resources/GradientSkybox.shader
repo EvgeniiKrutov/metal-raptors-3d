@@ -120,7 +120,7 @@ Shader "Custom/GradientSkybox"
                 s.discRadius     = _DiscRadius;
                 s.discEdge       = _DiscEdge;
                 s.mariaIntensity = _MariaIntensity;
-                s.discFill       = 1.0;
+                s.bodyFill       = 1.0;
 
                 float above, discMask, halo;
                 float3 col = MRSkyColor(d, s, above, discMask, halo);

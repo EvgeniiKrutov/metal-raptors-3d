@@ -5,6 +5,8 @@ namespace MetalRaptors
         bool CanDevSpawn { get; }
 
         void DevSpawnPlane(EnemyRole role);
+
+        void DevSpawnTruck();
     }
 
     public static class DevSpawn
@@ -25,6 +27,11 @@ namespace MetalRaptors
         public static void Spawn(EnemyRole role)
         {
             if (Available) _host.DevSpawnPlane(role);
+        }
+
+        public static void SpawnTruck()
+        {
+            if (Available) _host.DevSpawnTruck();
         }
     }
 }

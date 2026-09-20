@@ -58,7 +58,10 @@ namespace MetalRaptors
             return 1f - Mathf.SmoothStep(0f, 1f, (worldX - _apronUntilX) / ApronRamp);
         }
 
-        bool OnApron(float worldX) => _apronUntilX > 0f && worldX < _apronUntilX;
+        // The airfield itself is grass, like the field it is modelled on; only the model's own
+        // apron slabs stay bare, or the blades would grow through them.
+        bool OnHardstanding(float worldX, float z) =>
+            _hardstanding.width > 0f && _hardstanding.Contains(new Vector2(worldX, z));
 
         bool OnRoad(float z) =>
             _roadHalfWidth > 0f && Mathf.Abs(z - _roadZ) < _roadHalfWidth + RoadGrassMargin;
@@ -236,7 +239,7 @@ namespace MetalRaptors
                     float lx = Mathf.Min((col + (float)rng.NextDouble()) * cellX, ChunkLength);
                     float lz = Mathf.Min((row + (float)rng.NextDouble()) * cellZ, Depth);
 
-                    if (OnApron(x0 + lx) || OnRoad(lz)) continue;
+                    if (OnRoad(lz) || OnHardstanding(x0 + lx, lz)) continue;
                     if (InCrater(x0 + lx, lz, craters)) continue;
                     float xNorm = lx / ChunkLength, zNorm = lz / Depth;
                     if (data.GetSteepness(xNorm, zNorm) > ProceduralTerrain.GrassMaxSlopeDeg) continue;

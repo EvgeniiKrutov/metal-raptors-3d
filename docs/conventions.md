@@ -17,7 +17,7 @@ who loads it:
 | `Assets/Resources/*.asset` | The `ScriptableObject` tunables — `PlayerConfig`, `EnemyScoutConfig`, `EnemyFighterConfig`. | yes |
 | `Assets/Resources/objects/planes/<era>/` | Aircraft FBX, one folder per career era (`world_war_1` today, matching `CareerEras`). | no |
 | `Assets/Resources/objects/trees`, `objects/burned_houses` | Scenery prop FBX (docs/battlefield.md). | no |
-| `Assets/Resources/objects/machines/` | Non-flyable machines — the background `zeppelin` (docs/zeppelins.md) and the wrecked `tank_ww1` (docs/battlefield.md). | no |
+| `Assets/Resources/objects/machines/` | Non-flyable machines — the background `zeppelin` (docs/zeppelins.md), the wrecked `tank_ww1` (docs/battlefield.md) and the armed `truck_ww1` (docs/trucks.md). | no |
 | `Assets/Resources/Sounds/` | Every sound effect (docs/sounds.md). | no |
 
 Model textures that the FBX importer binds itself sit loose in `Assets/Textures`. The two

@@ -160,9 +160,15 @@ one field changes five things:
   soft `FlightSteering.EdgeSteer` boundaries of the fixed challenge levels stay off.
 - **The camera stops ratcheting.** It follows the plane both ways and clamps to
   `[halfView, worldWidth − halfView]`, so the frame never crosses the map's edges.
-- **The land is finite and built once.** `CampaignTerrain` builds every chunk from one before the
-  left wall to one past the right wall in `Begin` and then streams nothing — there is no chunk to
-  drop and none to add, and the land reaches past both walls, so no edge is ever in frame.
+- **The land is finite and built once.** `CampaignTerrain` builds every chunk from
+  `BoundsMarginChunks` before the left wall to as many past the right wall in `Begin` and then
+  streams nothing — there is no chunk to drop and none to add. That margin went from 1 to **2**
+  on 2026-09-20: one chunk (512) is enough to cover the frame at the play plane, but the land is
+  seen in perspective and the far ground at the haze's end distance spans `halfViewWidth ×
+  1350/420` ≈ 1385 units either side of the camera. From the clamped corners that wants ground
+  out to x −954 and 2954; two chunks give −1024 and 3072. `Battlefield`'s prop band is widened
+  by `BandOverhang` (1100) to match, so the ground added on the right carries scenery rather than
+  standing bare.
 - **`Battlefield` is bounded**, so infantry spread evenly across the map instead of being fed in
   ahead of a moving camera (docs/battlefield.md, "Bounded maps vs scrollers"), and props, smoke,
   ground blasts, flak and the zeppelin are all held inside the same band.

@@ -39,6 +39,7 @@ namespace MetalRaptors
         float _peopleZMax = PeopleZMaxDefault;
         float _peopleDensity = 1f;
         float _landDepth = ProceduralTerrain.Depth;
+        float _roadZ, _roadHalfWidth;
         bool _explicitBand;
         bool _placeProps = true;
         bool _placePeople = true;
@@ -66,8 +67,14 @@ namespace MetalRaptors
         public float LandDepth => _landDepth;
         public float ZBack => _landDepth - BackMargin;
         public BattlefieldProps Props => _props;
+        public BattlefieldPeople People => _people;
         public float PeopleZMax => _peopleZMax;
         public float PeopleDensity => _peopleDensity;
+
+        // The road's corridor, for anything that has to keep off it. The ribbon runs the whole
+        // width of the prop band, so where a prop sits in X never matters — only its Z.
+        public bool OnRoad(float z, float margin) =>
+            _roadHalfWidth > 0f && Mathf.Abs(z - _roadZ) < _roadHalfWidth + margin;
 
         public static Battlefield Begin(Camera cam, float halfViewWidth, int seed,
             System.Func<float, float, bool> inCrater, float peopleDensity = 1f)
@@ -90,7 +97,7 @@ namespace MetalRaptors
 
         public static Battlefield BeginBounded(Camera cam, float halfViewWidth, int seed,
             float bandMinX, float bandMaxX, System.Func<float, float, bool> inCrater,
-            float peopleDensity, float landDepth)
+            float peopleDensity, float landDepth, float roadZ, float roadHalfWidth)
         {
             var field = Create(cam, halfViewWidth, seed, bandMinX, bandMaxX, inCrater);
             if (field == null) return null;
@@ -98,6 +105,8 @@ namespace MetalRaptors
             field._explicitBand = true;
             field._peopleDensity = peopleDensity;
             field._landDepth = landDepth;
+            field._roadZ = roadZ;
+            field._roadHalfWidth = roadHalfWidth;
             field._peopleZMax = Mathf.Min(PeopleZMaxDefault, field.ZBack);
             field.Populate();
             return field;

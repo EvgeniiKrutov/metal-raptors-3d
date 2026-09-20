@@ -15,8 +15,11 @@ namespace MetalRaptors
         internal const float MinHeight = 4f;
         public const float MaxHeight = 85f;
         internal const float FrontStrip = 130f;
+
+        // Where the land actually stops. `Depth` for a single-shot level; the campaign's
+        // streamed land moves it, and the fog and `SkyHorizon` both follow it there.
+        public static float LandEdgeZ { get; internal set; } = Depth;
         const float FogHideMargin = 120f;
-        const float FogEdgeMargin = 60f;
         const int Res = 1025;
 
         internal const float CratersPerMetre = 0.017f;
@@ -97,6 +100,7 @@ namespace MetalRaptors
                 mr.shadowCastingMode = ShadowCastingMode.Off;
             }
 
+            LandEdgeZ = Depth;
             ApplyFog(daytime, cameraDistance, playPlaneZ);
 
             return (x, z) => InCrater(
@@ -151,11 +155,10 @@ namespace MetalRaptors
         }
 
         internal static float FogEndDistance(float cameraDistance, float playPlaneZ)
-            => cameraDistance - playPlaneZ + Depth - FogHideMargin;
+            => FogEndDistance(cameraDistance, playPlaneZ, Depth);
 
         internal static float FogEndDistance(float cameraDistance, float playPlaneZ, float depth)
-            => Mathf.Min(FogEndDistance(cameraDistance, playPlaneZ),
-                cameraDistance - playPlaneZ + depth - FogEdgeMargin);
+            => cameraDistance - playPlaneZ + depth - FogHideMargin;
 
         internal static void ApplyFog(Daytime daytime, float cameraDistance, float playPlaneZ)
             => ApplyFog(daytime, cameraDistance, playPlaneZ, Depth);

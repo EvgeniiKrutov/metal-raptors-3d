@@ -12,6 +12,7 @@ namespace MetalRaptors
         public float apronUntilX;
         public float roadZ;
         public float roadHalfWidth;
+        public Rect hardstanding;
     }
 
     public abstract class CampaignTerrain : MonoBehaviour
@@ -20,15 +21,21 @@ namespace MetalRaptors
         protected const int Res = 257;
         protected const float XStep = ChunkLength / (Res - 1);
         const double BuildBudgetMs = 3.0;
-        const int BoundsMarginChunks = 1;
+        const int BoundsMarginChunks = 2;
 
-        public static float Depth { get; private set; } = ProceduralTerrain.Depth;
+        public static float Depth
+        {
+            get => ProceduralTerrain.LandEdgeZ;
+            private set => ProceduralTerrain.LandEdgeZ = value;
+        }
+
         protected static float ZStep => Depth / (Res - 1);
 
         protected int _seed;
         protected float _apronUntilX;
         protected float _roadZ;
         protected float _roadHalfWidth;
+        protected Rect _hardstanding;
         float _keepBehind, _keepAhead;
         bool _bounded;
         int _firstChunk, _lastChunk;
@@ -106,6 +113,7 @@ namespace MetalRaptors
             _apronUntilX = options.apronUntilX;
             _roadZ = options.roadZ;
             _roadHalfWidth = options.roadHalfWidth;
+            _hardstanding = options.hardstanding;
 
             if (options.worldWidth <= 0f) return;
 

@@ -118,8 +118,12 @@ namespace MetalRaptors
 
         bool Hostile(IDamageable target)
         {
-            if (target == null || _fromEnemy == (target is EnemyController)) return false;
-            return !(target is CubeController player) || !player.Evading;
+            if (target == null) return false;
+
+            var player = target as CubeController;
+            if (!_fromEnemy) return player == null;
+
+            return player != null && !player.Evading;
         }
 
         void Hit(IDamageable target)
