@@ -8,8 +8,8 @@ namespace MetalRaptors
     {
         public const int Layer = 9;
 
-        const float TreeCellSize = 58f;
-        const float HouseCellSize = 620f;
+        const float TreeCellSize = 44.6f;
+        const float HouseCellSize = 477f;
         const float TankCellSize = 400f;
         const float StreamMargin = 500f;
         const float TankBurnMargin = 120f;

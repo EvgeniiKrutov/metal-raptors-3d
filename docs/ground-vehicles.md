@@ -1,6 +1,7 @@
 # Ground vehicles (`GroundVehicle.cs`, `EnemyTruck.cs`, `EnemyTank.cs`)
 
-Level 3 (`FIXED GROUND`, docs/aerodrome.md) is the one level with **no flying enemies at all**.
+Level 3 (`FIXED GROUND`, docs/aerodrome.md) is the one level with **no enemy aircraft at all**;
+its only airborne enemy is the zeppelin that closes it (docs/enemy-zeppelin.md).
 Its enemy is a column of vehicles that come down the aerodrome road from the map's far edge,
 shoot at the player on the way in, park at the wire and shell the airfield until they are
 stopped. Two types today, and every level from here is meant to introduce one more.
@@ -32,7 +33,9 @@ wait / say ×2
 wave truck  →  wave tank
 wait 3
 wave truck  →  wave tank
-wait / say ×2
+zeppelin    →  hanging over the fence
+wait 30
+say ×2
 finish
 ```
 
@@ -322,11 +325,13 @@ player the whole way, the tank tracking them with its roof gun.
 | File | Role |
 | --- | --- |
 | `GroundVehicle.cs` | The shared half: drive, queue, collider, health, bar, damage, death, shots. |
+| `FloatingHealthBar.cs` | The world-space bar over the roof, shared with the enemy zeppelin. |
+| `Gunnery.cs` | Lead aiming and the on-camera test, shared with the enemy zeppelin. |
 | `EnemyTruck.cs` | The truck's model, colour lift, spinning wheels and one gun. |
 | `EnemyTank.cs` | The tank's model, the traversing roof gun and the two sponsons. |
 | `VehicleModel.cs` | Measuring and building either model at the plane conversion. |
 | `CampaignConvoy.cs` | The live column in road order, spawn points, stop lines, re-linking, stand-down. |
-| `TankSkin.cs` | The camo atlas block, bound to the body slot alone. Shared with the battlefield's wrecks. |
+| `TankSkin.cs` | The camo atlas, on a skinned copy of the body slot's material alone. Shared with the battlefield's wrecks. |
 | `Airfield.cs` | The fence line, the field's footprint, its health and its loss. |
 | `CampaignScript.cs` | `ground: "truck"` in a wave. |
 | `LevelDefinition.cs` | `EnemyKind`, and `EnemyGroup`'s second constructor. |

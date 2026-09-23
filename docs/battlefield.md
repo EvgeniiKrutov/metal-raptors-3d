@@ -305,9 +305,12 @@ the same spot, and a level replays identically.
 
 | Grid | Cell | Result | On a 1150-deep land |
 | --- | --- | --- | --- |
-| Trees | 58 | ~12 on screen | 40 → ~21 |
-| Houses | 620 | ~1 on screen | 300 → ~3 |
+| Trees | 44.6 | ~16 on screen | 31 → ~27 |
+| Houses | 477 | ~1–2 on screen | 231 → ~4 |
 | Tanks | 400 | 1–2 on screen | 194 → ~4 |
+
+The tree and house cells were 58 and 620 until 2026-09-23; both were divided by 1.3 for
+30 % more trees and burned houses on every Verdun map (props are placed on Verdun only).
 
 ### Deeper land, denser field (2026-09-20)
 
@@ -408,11 +411,20 @@ four materials are flat baked colours with no map. The model carries **no vertex
 at all (every `LayerElementColor` is empty), so those four diffuse values are the only
 place their colour lives.
 
-`TankSkin` loads the atlas once, fills one shared `MaterialPropertyBlock` with `_BaseMap`,
-`_MainTex` and a white `_BaseColor`, then walks each renderer's `sharedMaterials` and calls
-`SetPropertyBlock(block, i)` on the body's slot alone. The per-slot overload is the whole
-trick: a whole-renderer block would hit every submesh, and `rearHatch` and the grilles each
-carry two materials.
+`TankSkin` loads the atlas once, then walks each renderer's `sharedMaterials` and swaps the
+body's slot alone for a **skinned copy** of its material — `_BaseMap` and `_MainTex` set to
+the atlas, `_BaseColor` white. Swapping per slot is the whole trick: `rearHatch` and the
+grilles each carry two materials, and only the non-flat one may change.
+
+**It is a material copy, not a `MaterialPropertyBlock`, because the per-slot block never
+rendered.** The previous version bound one shared block with `SetPropertyBlock(block, i)`.
+With the SRP Batcher on (both `PC_RPAsset` and `Mobile_RPAsset`), a per-material-index block
+is ignored — the renderer is still batched from the material's own constant buffer — so the
+body drew in its flat authored 0.12 brown and every tank, wreck and enemy alike, came out
+with no texture. The copy is made once per source material, cached in a static dictionary
+and shared by every tank, so streaming wrecks in and out allocates nothing and the tank stays
+SRP-Batcher compatible. The imported material itself is never written to, and a slot that
+already holds a skinned copy is left alone, so applying twice is harmless.
 
 **It picks that slot by excluding the four flat ones, not by naming the textured one.** The
 importer is set to `materialName: 0` (`BasedOnTextureName`), which names a material after its
@@ -425,7 +437,7 @@ The exclusion is guarded: if **none** of the four turn up, the model is not the 
 was written against, so it binds nothing and logs the material names it actually found rather
 than painting the whole tank again.
 
-**The earlier version put the block on every renderer, and that was the bug.** The reasoning
+**An earlier version put the atlas on every renderer, and that was a bug too.** The reasoning
 was that all sixteen meshes are unwrapped inside `[0, 1]`, so they must be islands of one
 atlas. They are not islands — each mesh is independently unwrapped across most of the square:
 
@@ -440,11 +452,9 @@ So the tracks and the guns each sampled a large arbitrary patch of the camo imag
 their own colour, and the white `_BaseColor` wiped the tint that should have replaced it —
 the whole tank wore the body's texture.
 
-The white base colour still matters on the one slot that keeps it. URP Lit multiplies
+The white base colour still matters on the one slot that gets the atlas. URP Lit multiplies
 `_BaseColor` by the map, and `tank_material` is authored at 0.12, 0.10, 0.085 — binding the
-atlas without overriding that tint would crush the camo to near-black. One block is shared by
-every wreck: it holds no per-renderer state, so there is nothing to read back with
-`GetPropertyBlock` first, and streaming tanks in and out allocates nothing.
+atlas without overriding that tint would crush the camo to near-black.
 
 If the texture is missing, `TankSkin` logs once, latches its missing flag, and every tank
 renders in the flat authored colours above rather than spamming the console per wreck.

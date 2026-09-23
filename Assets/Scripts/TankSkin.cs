@@ -12,34 +12,32 @@ namespace MetalRaptors
         static readonly int BaseMapId = Shader.PropertyToID("_BaseMap");
         static readonly int MainTexId = Shader.PropertyToID("_MainTex");
         static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+        static readonly int ColorId = Shader.PropertyToID("_Color");
 
-        static MaterialPropertyBlock _block;
+        static readonly Dictionary<Material, Material> Skinned = new Dictionary<Material, Material>();
+
+        static Texture2D _texture;
         static bool _missing;
         static bool _warned;
 
-        static MaterialPropertyBlock Block()
+        static Texture2D Atlas()
         {
-            if (_block != null || _missing) return _block;
+            if (_texture != null || _missing) return _texture;
 
-            var texture = Resources.Load<Texture2D>(Texture);
-            if (texture == null)
+            _texture = Resources.Load<Texture2D>(Texture);
+            if (_texture == null)
             {
                 Debug.LogError($"TankSkin: {Texture} not found in Resources.");
                 _missing = true;
-                return null;
             }
 
-            _block = new MaterialPropertyBlock();
-            _block.SetTexture(BaseMapId, texture);
-            _block.SetTexture(MainTexId, texture);
-            _block.SetColor(BaseColorId, Color.white);
-            return _block;
+            return _texture;
         }
 
         public static void Apply(Transform view)
         {
-            MaterialPropertyBlock block = Block();
-            if (view == null || block == null) return;
+            Texture2D atlas = Atlas();
+            if (view == null || atlas == null) return;
 
             Renderer[] renderers = view.GetComponentsInChildren<Renderer>(true);
             if (!Recognised(renderers))
@@ -51,9 +49,33 @@ namespace MetalRaptors
             foreach (Renderer renderer in renderers)
             {
                 Material[] slots = renderer.sharedMaterials;
+                bool changed = false;
+
                 for (int i = 0; i < slots.Length; i++)
-                    if (!Flat(slots[i])) renderer.SetPropertyBlock(block, i);
+                {
+                    if (Flat(slots[i])) continue;
+                    slots[i] = SkinnedMaterial(slots[i], atlas);
+                    changed = true;
+                }
+
+                if (changed) renderer.sharedMaterials = slots;
             }
+        }
+
+        static Material SkinnedMaterial(Material source, Texture2D atlas)
+        {
+            if (Skinned.ContainsValue(source)) return source;
+            if (Skinned.TryGetValue(source, out Material cached) && cached != null) return cached;
+
+            var copy = new Material(source) { name = source.name + " (skinned)" };
+
+            if (copy.HasProperty(BaseMapId)) copy.SetTexture(BaseMapId, atlas);
+            if (copy.HasProperty(MainTexId)) copy.SetTexture(MainTexId, atlas);
+            if (copy.HasProperty(BaseColorId)) copy.SetColor(BaseColorId, Color.white);
+            if (copy.HasProperty(ColorId)) copy.SetColor(ColorId, Color.white);
+
+            Skinned[source] = copy;
+            return copy;
         }
 
         static bool Recognised(Renderer[] renderers)

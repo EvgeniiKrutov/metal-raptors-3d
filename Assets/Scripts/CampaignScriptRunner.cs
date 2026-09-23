@@ -13,6 +13,8 @@ namespace MetalRaptors
         float WarnIncoming(int planes);
         void ArmSupply(bool open);
         void SetCompanionFoe(PlaneModelConfig plane);
+        bool SpawnZeppelin();
+        bool ZeppelinHanging { get; }
         void CompleteLevel();
     }
 
@@ -102,6 +104,10 @@ namespace MetalRaptors
 
                     case CampaignOp.Foe:
                         _host.SetCompanionFoe(step.plane);
+                        break;
+
+                    case CampaignOp.Zeppelin:
+                        if (_host.SpawnZeppelin()) yield return WaitForZeppelin();
                         break;
 
                     case CampaignOp.Finish:
@@ -273,6 +279,11 @@ namespace MetalRaptors
         {
             yield return null;
             while (Running && _host.EnemiesAlive > 0) yield return null;
+        }
+
+        IEnumerator WaitForZeppelin()
+        {
+            while (Running && !_host.ZeppelinHanging) yield return null;
         }
     }
 }

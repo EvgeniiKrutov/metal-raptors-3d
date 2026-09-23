@@ -87,6 +87,8 @@ namespace MetalRaptors
         bool _headingSteering;
         float _targetHeading;
 
+        ISolid _solid;
+
         public void Initialize(PlayerConfig config, float startHeadingRad, float minX, float maxX,
             float ceilingY, float edgeMargin, bool hardWalls = false)
         {
@@ -255,9 +257,10 @@ namespace MetalRaptors
             if (pos.y >= _ceilingY && vel.y > 0f) vel.y = 0f;
             if (_hardWalls && pos.x <= _wallMinX && vel.x < 0f) vel.x = 0f;
             if (_hardWalls && pos.x >= _wallMaxX && vel.x > 0f) vel.x = 0f;
+            bool clamped = _solid != null
+                           && _solid.Repel(ref pos, ref vel, PlaneScrapes.HitboxRadius);
             _rb.linearVelocity = vel;
 
-            bool clamped = false;
             if (pos.y > _ceilingY) { pos.y = _ceilingY; clamped = true; }
             if (_hardWalls && pos.x < _wallMinX) { pos.x = _wallMinX; clamped = true; }
             if (_hardWalls && pos.x > _wallMaxX) { pos.x = _wallMaxX; clamped = true; }
@@ -288,6 +291,8 @@ namespace MetalRaptors
             deck = hit ? info.point.y + GroundSkim : 0f;
             return hit;
         }
+
+        public void SetSolid(ISolid solid) => _solid = solid;
 
         public void SetLeftWall(float x) => _wallMinX = Mathf.Max(_wallMinX, x);
 

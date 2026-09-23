@@ -36,6 +36,8 @@ namespace MetalRaptors
         const float AirfieldBlastSize = 90f;
         const float AirfieldFireRadius = 16f;
 
+        const float ZeppelinY = 380f;
+
         const int GarrisonGroups = 3;
         const float GarrisonFromX = 0.06f, GarrisonSpanX = 0.70f;
         const float GarrisonNearZ = 100f, GarrisonFarZ = 620f;
@@ -67,6 +69,8 @@ namespace MetalRaptors
         CampaignEnemies _enemies;
         CampaignConvoy _convoy;
         Airfield _airfield;
+        SkyZeppelin _skyZeppelin;
+        EnemyZeppelin _zeppelin;
         CompanionFlight _wing;
         SupplyDrop _supply;
         Transform _playerModel;
@@ -219,10 +223,10 @@ namespace MetalRaptors
         {
             SkyFlak flak = SkyFlak.Begin(_cam, _cubeTr, _halfViewWidth, _halfViewHeight,
                 PlayPlaneZ, _level.flak);
-            SkyZeppelin zeppelin = SkyZeppelin.Begin(_cam, _halfViewWidth, _halfViewHeight,
+            _skyZeppelin = SkyZeppelin.Begin(_cam, _halfViewWidth, _halfViewHeight,
                 PlayPlaneZ, CameraDistance, _level.zeppelins);
 
-            if (zeppelin != null && Bounded) zeppelin.SetLeftEdge(WorldLeft);
+            if (_skyZeppelin != null && Bounded) _skyZeppelin.SetLeftEdge(WorldLeft);
 
             if (ApronEndX <= 0f) return;
             if (flak != null) flak.SetLeftLimit(ApronEndX);
@@ -532,6 +536,35 @@ namespace MetalRaptors
 
         public void DevSpawnTank() => DevSpawnVehicle(EnemyKind.Tank);
 
+        public bool OffersZeppelin => CustomBattle.Requested && _airfield != null;
+
+        public bool ZeppelinAloft => _zeppelin != null;
+
+        public void DevSpawnZeppelin()
+        {
+            if (CanDevSpawn && OffersZeppelin) SpawnZeppelin();
+        }
+
+        public bool SpawnZeppelin()
+        {
+            if (_gameOver || _zeppelin != null || _airfield == null || _cube == null) return false;
+
+            _zeppelin = EnemyZeppelin.Spawn(_camBasePos.x + _halfViewWidth, _airfield.FenceX,
+                ZeppelinY, PlayPlaneZ, _cube.GetComponent<Rigidbody>());
+            if (_zeppelin == null) return false;
+
+            _zeppelin.Sighted += RetireSkyZeppelins;
+            _cube.SetSolid(_zeppelin);
+            return true;
+        }
+
+        public bool ZeppelinHanging => _zeppelin != null && _zeppelin.Hanging;
+
+        void RetireSkyZeppelins()
+        {
+            if (_skyZeppelin != null) _skyZeppelin.Retire();
+        }
+
         void DevSpawnVehicle(EnemyKind kind)
         {
             if (!CanDevSpawn) return;
@@ -568,6 +601,7 @@ namespace MetalRaptors
             StopWeapons();
             if (_enemies != null) _enemies.StandDown();
             if (_convoy != null) _convoy.StandDown();
+            if (_zeppelin != null) _zeppelin.StandDown();
             if (_supply != null) _supply.StandDown();
             if (_dialogue != null) _dialogue.Hide();
             if (_cube != null)
@@ -639,6 +673,7 @@ namespace MetalRaptors
             if (_runner != null) _runner.Stop();
             if (_enemies != null) _enemies.StandDown();
             if (_convoy != null) _convoy.StandDown();
+            if (_zeppelin != null) _zeppelin.StandDown();
             if (_wing != null) _wing.StandDown();
             if (_supply != null) _supply.StandDown();
         }

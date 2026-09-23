@@ -88,7 +88,7 @@ The glyph is disabled — not moved off-screen — when it should not be seen, i
 heading. From then on `FixedUpdate` computes
 
 ```
-desiredRate = FlightSteering.SteerToHeading(heading, target, maxRate, dt, angularVelocity)
+desiredRate = FlightSteering.SteerToHeading(heading, target, maxRate, lag, angularVelocity)
 ```
 
 instead of reading `Keyboard.current`, and everything downstream is untouched: `EdgeSteer` still
@@ -105,29 +105,65 @@ what the rate command has to compensate for, below.
 round. What is done with it is the whole of why the plane flies steady:
 
 ```
-residual    = error - angularVelocity * lag        lag = mass / turnResponsiveness
-desiredRate = clamp(residual / lag, ±maxRate)
+lag         = mass / turnResponsiveness           0.5 s at the stock mass 2.5, responsiveness 5
+residual    = error - angularVelocity * lag * BrakeHorizon
+desiredRate = clamp(residual * Gain / lag, ±maxRate)
 ```
 
 **The braking term is the point.** The first cut was the 2D sibling's `clamp(error / dt, ±maxRate)`,
-which saturates for any error over `maxRate * dt` — about 3.6° — so it is bang-bang: full rate
+which saturates for any error over `maxRate * dt` — about 2.4° — so it is bang-bang: full rate
 right up to the target. But `angularVelocity` is not the commanded rate, it *chases* it with a
-time constant of `lag` (0.5 s at the stock mass 2.5 and `turnResponsiveness` 5). Arriving on the
-target with the rate still near maximum, the plane sails straight past, the command flips to full
-opposite rate, and the same thing happens on the way back — a limit cycle. On screen that is a
-plane wobbling around the arrow instead of settling on it, whether or not a finger is on the
-stick.
+time constant of `lag`. Arriving on the target with the rate still near maximum, the plane sails
+straight past, the command flips to full opposite rate, and the same thing happens on the way
+back — a limit cycle. On screen that is a plane wobbling around the arrow instead of settling on
+it, whether or not a finger is on the stick.
 
-Subtracting `angularVelocity * lag` is the angle the plane will *still* cover while its rate
-decays to zero — its stopping distance. Commanding `residual / lag` therefore asks for exactly
-the rate whose own stopping distance is the angle left to travel. Solving the loop
-(`ë + 2k·ė + k²e = 0` with `k = 1 / lag`) gives damping ratio **1**: critically damped, the
-fastest approach that cannot overshoot, and no tuning constant to pick — `lag` is read from the
-plane's own `mass` and `turnResponsiveness`, so a heavy plane brakes earlier on its own.
+Subtracting a multiple of `angularVelocity * lag` is the angle the plane will *still* cover while
+its rate decays — its stopping distance. Commanding a rate proportional to what is left after
+that reserves exactly enough runway to arrive without sailing past.
 
-The cost is honest: at full rate the plane needs `maxRate * lag` — 90° at the stock numbers — to
-stop, so a 180° reversal turns hard for the first half and eases through the second. That is the
-inertia the model already had; the keyboard just left the player to unwind it by hand.
+**`Urgency` is how hard it flies that approach**, and it is the only number picked by hand.
+Writing `G = Gain` and `B = BrakeHorizon`, the unsaturated loop is
+
+```
+ë + ((G·B + 1) / lag)·ė + (G / lag²)·e = 0        ζ = (G·B + 1) / (2·√G)
+```
+
+so the two are not free of each other: fixing **ζ = 1** pins `B = (2√G − 1) / G`. With
+`G = Urgency²` that is exactly what the two consts compute, and the peak turn rate the law
+reaches on an error `e` works out as `Urgency · e / (2 · lag)` — linear in `Urgency`, critically
+damped at every value of it. One knob, and the no-overshoot guarantee stays structural rather
+than tuned. `lag` is still read from the plane's own `mass` and `turnResponsiveness`, so a heavy
+plane brakes earlier on its own.
+
+**Why it is 4 and not 1.** `Urgency = 1` gives `B = 1` — the plain critically damped law, which
+assumes the command drops to *zero* and so reserves the whole `angularVelocity * lag`. At the
+stock numbers that is 60° of runway at full rate, which means the law commands full rate only
+past a 60° error, and its peak rate is capped at `error / lag` however high the gain goes. Every
+ordinary correction was therefore flown at a fraction of the plane's turn rate:
+
+| turn | `Urgency` 1 | `Urgency` 4 | desktop, holding `A` |
+| --- | --- | --- | --- |
+| 10° | 7°/s, 1.96 s | 29°/s, 0.54 s | 57°/s, 0.30 s |
+| 30° | 22°/s, 1.96 s | 64°/s, 0.70 s | 84°/s, 0.56 s |
+| 90° | 66°/s, 2.00 s | 102°/s, 1.18 s | 109°/s, 1.12 s |
+| 180° | 105°/s, 2.38 s | 116°/s, 1.84 s | 118°/s, 1.84 s |
+
+(peak turn rate reached, and the time to cover 90% of the turn, at `maxRate` 120°/s.)
+
+`Urgency = 4` shortens the reserved runway to `0.44 · lag` and lands within a few °/s of the
+keyboard from 90° up, while still stopping dead on the arrow. It was swept to **zero** overshoot
+over every turn from 1° to 180° in both directions, under boost, and at heavier, twitchier and
+more sluggish `mass` / `turnResponsiveness` than the stock pair.
+
+**Desktop is not the ceiling it looks like.** Holding `A` never has to stop, so it can carry
+120°/s through a 30° turn and leave the player to unwind the overshoot by hand. The stick's
+target is a heading the plane must *arrive* on, so part of every turn is spent braking — the gap
+left in the table is that, not slack in the controller.
+
+The cost is honest: at full rate the plane still needs `maxRate * lag * BrakeHorizon` — 26° at
+the stock numbers — to stop, so a 180° reversal turns hard and eases only through the last of
+it. That is the inertia the model already had.
 
 **The 180° guard.** `DeltaAngle` returns `+180` for an exact reversal, so a plane already
 rolling left would be told to reverse and turn right — the same angle, but the long way in

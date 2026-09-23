@@ -11,7 +11,7 @@ namespace MetalRaptors
         const float DepthBehindDuelMin = 50f;
         const float DepthBehindDuelMax = 120f;
 
-        const float ApparentLength = 560f;
+        public const float ApparentLength = 560f;
         const float LengthJitter = 0.12f;
 
         const float RiseMin = 0.35f, RiseMax = 0.70f;
@@ -50,6 +50,7 @@ namespace MetalRaptors
 
         readonly List<Airship> _ships = new List<Airship>();
         float _leftEdge = float.NegativeInfinity;
+        bool _retired;
 
         public static SkyZeppelin Begin(Camera cam, float halfViewWidth, float halfViewHeight,
             float playPlaneZ, float cameraDistance, bool wanted)
@@ -70,6 +71,8 @@ namespace MetalRaptors
         // The map's left edge: the line an airship has to be `Handover` past before the next
         // one is sent in. Unset, each airship uses the left edge of its own window instead.
         public void SetLeftEdge(float x) => _leftEdge = x;
+
+        public void Retire() => _retired = true;
 
         void LateUpdate()
         {
@@ -100,6 +103,7 @@ namespace MetalRaptors
 
         void Consider(Vector3 eye)
         {
+            if (_retired) return;
             if (_ships.Count > 0 && !HandedOver(_ships[_ships.Count - 1], eye)) return;
 
             Spawn(eye, onScreen: false);
@@ -118,14 +122,6 @@ namespace MetalRaptors
 
         void Spawn(Vector3 eye, bool onScreen)
         {
-            var prefab = Resources.Load<GameObject>(ModelResource);
-            if (prefab == null)
-            {
-                Debug.LogError($"SkyZeppelin: {ModelResource} not found in Resources.");
-                enabled = false;
-                return;
-            }
-
             float z = _playPlaneZ + CompanionFlight.Depth
                       + Random.Range(DepthBehindDuelMin, DepthBehindDuelMax);
             float grade = (z - eye.z) / _cameraDistance;
@@ -149,13 +145,15 @@ namespace MetalRaptors
                 eye.y + _halfViewHeight * grade * Random.Range(RiseMin, RiseMax),
                 z);
 
-            var model = Instantiate(prefab, root.transform, false);
-            model.name = "zeppelin";
-            model.transform.localRotation = NoseWest;
+            Transform model = BuildModel(root.transform, length);
+            if (model == null)
+            {
+                Destroy(root);
+                enabled = false;
+                return;
+            }
 
-            Fit(model.transform, length);
-            Dress(model);
-            StartPropellers(model.transform, root.transform);
+            HideShadows(model);
 
             _ships.Add(new Airship
             {
@@ -164,6 +162,27 @@ namespace MetalRaptors
                 length = length,
                 halfWindow = halfWindow,
             });
+        }
+
+        public static Transform BuildModel(Transform root, float length)
+        {
+            var prefab = Resources.Load<GameObject>(ModelResource);
+            if (prefab == null)
+            {
+                Debug.LogError($"SkyZeppelin: {ModelResource} not found in Resources.");
+                return null;
+            }
+
+            var model = Instantiate(prefab, root, false);
+            model.name = "zeppelin";
+            model.transform.localRotation = NoseWest;
+
+            foreach (Collider col in model.GetComponentsInChildren<Collider>())
+                Destroy(col);
+
+            Fit(model.transform, length);
+            StartPropellers(model.transform, root);
+            return model.transform;
         }
 
         static void Fit(Transform model, float length)
@@ -175,7 +194,7 @@ namespace MetalRaptors
             model.localPosition -= model.parent.InverseTransformPoint(bounds.center);
         }
 
-        static bool Measure(Transform model, out Bounds bounds)
+        public static bool Measure(Transform model, out Bounds bounds)
         {
             var renderers = model.GetComponentsInChildren<Renderer>();
             bounds = new Bounds(model.position, Vector3.zero);
@@ -186,16 +205,13 @@ namespace MetalRaptors
             return true;
         }
 
-        static void Dress(GameObject model)
+        static void HideShadows(Transform model)
         {
             foreach (Renderer renderer in model.GetComponentsInChildren<Renderer>())
             {
                 renderer.shadowCastingMode = ShadowCastingMode.Off;
                 renderer.receiveShadows = false;
             }
-
-            foreach (Collider col in model.GetComponentsInChildren<Collider>())
-                Destroy(col);
         }
 
         static void StartPropellers(Transform model, Transform hull)

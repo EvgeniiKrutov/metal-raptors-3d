@@ -39,7 +39,8 @@ change of background foe — but every one of its lines is still placeholder Lat
 are the same scroller shape each time (opening exchange → waves → closing exchange → `finish`)
 with Latin in every line, level 4 is the one variation, using `spawn` + `waitclear` for a
 running fight instead of blocking waves, and **level 3 is the one level with no aircraft in it
-at all** — its three waves are a ground truck and then a tank each (docs/ground-vehicles.md). The real levels are
+at all** — its three waves are a ground truck and then a tank each (docs/ground-vehicles.md),
+and it closes on the enemy zeppelin (docs/enemy-zeppelin.md). The real levels are
 designed in `Assets/Resources/docs/campaign-ww1-scenario.md` — including four modes and two boss
 fights this grammar cannot express yet.
 
@@ -62,6 +63,7 @@ step rather than the whole level.
 | `{ "op": "waitclear" }` | Block until no scripted enemy is alive (pairs with `spawn`). |
 | `{ "op": "supply" }` | Open a supply-crate window for the phase that follows (docs/supply-drops.md). |
 | `{ "op": "foe", "plane": "albatros" }` | Re-cast the wingman's background opponent from the next peel onward (docs/companion.md). |
+| `{ "op": "zeppelin" }` | Send the enemy zeppelin in and **block** until it hangs over the fence (docs/enemy-zeppelin.md). One per level; it is never counted by `waitclear`. Returns at once if the level has no airfield. |
 | `{ "op": "finish" }` | End the level, and stop reading the script. It does not open LEVEL COMPLETED directly any more — it starts the outro, which flies the patrol out and shows the ground scene and the journal first (docs/level-outro.md). |
 
 `count` defaults to 1. Plane ids are matched against `PlaneModelConfig.resourceName` either in full

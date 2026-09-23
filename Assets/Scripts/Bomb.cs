@@ -200,7 +200,9 @@ namespace MetalRaptors
                 ? collision.GetContact(0).point
                 : transform.position;
 
-            Detonate(point, collision.gameObject.GetComponentInParent<EnemyController>() != null);
+            GameObject hit = collision.gameObject;
+            Detonate(point, hit.GetComponentInParent<EnemyController>() != null
+                            || hit.GetComponentInParent<EnemyZeppelin>() != null);
         }
 
         void OnTriggerEnter(Collider other)

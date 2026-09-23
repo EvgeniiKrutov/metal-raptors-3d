@@ -89,9 +89,12 @@ namespace MetalRaptors
         SpawnAction _fighterSpawn;
         SpawnAction _truckSpawn;
         SpawnAction _tankSpawn;
+        SpawnAction _zeppelinSpawn;
         float _statsHeight;
         float _spawnPanelHeight;
+        float _zeppelinPanelHeight;
         bool _spawnShown;
+        bool _zeppelinShown;
 
         double _frameSum;
         double _cpuSum;
@@ -225,6 +228,12 @@ namespace MetalRaptors
                 DevSpawn.SpawnTank, ref y);
 
             _spawnPanelHeight = -y - SpawnButtonGap + 2f * PadY;
+
+            _zeppelinSpawn = CreateSpawnButton(go.transform, "SPAWN ZEPPELIN",
+                DevSpawn.SpawnZeppelin, ref y);
+            _zeppelinSpawn.Button.gameObject.SetActive(false);
+            _zeppelinPanelHeight = -y - SpawnButtonGap + 2f * PadY;
+
             go.SetActive(false);
         }
 
@@ -356,23 +365,32 @@ namespace MetalRaptors
         void TickSpawn()
         {
             bool available = DevSpawn.Available;
-            if (available != _spawnShown) ShowSpawnSection(available);
+            bool zeppelin = DevSpawn.ZeppelinOffered;
+            if (available != _spawnShown || zeppelin != _zeppelinShown)
+                ShowSpawnSection(available, zeppelin);
             if (!available) return;
 
             Countdown(_scoutSpawn);
             Countdown(_fighterSpawn);
             Countdown(_truckSpawn);
             Countdown(_tankSpawn);
+            Countdown(_zeppelinSpawn);
+
+            if (zeppelin && _zeppelinSpawn.Remaining <= 0f)
+                _zeppelinSpawn.Button.interactable = DevSpawn.ZeppelinReady;
         }
 
-        void ShowSpawnSection(bool shown)
+        void ShowSpawnSection(bool shown, bool zeppelin)
         {
             _spawnShown = shown;
+            _zeppelinShown = zeppelin;
             if (_spawnSection != null) _spawnSection.SetActive(shown);
+            if (_zeppelinSpawn != null) _zeppelinSpawn.Button.gameObject.SetActive(zeppelin);
             if (_panelRt != null)
-                _panelRt.sizeDelta =
-                    new Vector2(PanelWidth, shown ? _spawnPanelHeight : _statsHeight);
+                _panelRt.sizeDelta = new Vector2(PanelWidth,
+                    !shown ? _statsHeight : zeppelin ? _zeppelinPanelHeight : _spawnPanelHeight);
 
+            if (!zeppelin) ResetSpawn(_zeppelinSpawn);
             if (shown) return;
 
             ResetSpawn(_scoutSpawn);

@@ -27,6 +27,10 @@ namespace MetalRaptors
 
         const float ReverseGuard = 0.15f;
 
+        const float Urgency = 4f;
+        const float Gain = Urgency * Urgency;
+        const float BrakeHorizon = (2f * Urgency - 1f) / Gain;
+
         public static float SteerToHeading(float heading, float target, float maxRate,
             float lag, float angularVelocity)
         {
@@ -38,8 +42,8 @@ namespace MetalRaptors
             if (Mathf.PI - Mathf.Abs(error) < ReverseGuard && Mathf.Abs(angularVelocity) > 1e-3f)
                 error = Mathf.Sign(angularVelocity) * Mathf.Abs(error);
 
-            float residual = error - angularVelocity * lag;
-            return Mathf.Clamp(residual / lag, -maxRate, maxRate);
+            float residual = error - angularVelocity * lag * BrakeHorizon;
+            return Mathf.Clamp(residual * Gain / lag, -maxRate, maxRate);
         }
 
         public static float TurnToward(float heading, float targetXDir)

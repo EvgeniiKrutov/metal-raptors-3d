@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace MetalRaptors
 {
-    public enum CampaignOp { Wait, Say, Wave, Spawn, WaitClear, Supply, Foe, Finish }
+    public enum CampaignOp { Wait, Say, Wave, Spawn, WaitClear, Supply, Foe, Zeppelin, Finish }
 
     public class CampaignStep
     {
@@ -97,6 +97,7 @@ namespace MetalRaptors
                 case "waitclear": return new CampaignStep { op = CampaignOp.WaitClear };
                 case "supply": return new CampaignStep { op = CampaignOp.Supply };
                 case "foe": return ParseFoe(step, origin, index);
+                case "zeppelin": return new CampaignStep { op = CampaignOp.Zeppelin };
                 case "finish": return new CampaignStep { op = CampaignOp.Finish };
                 default:
                     Debug.LogError($"CampaignScript {origin}[{index}]: unknown op '{op}'.");

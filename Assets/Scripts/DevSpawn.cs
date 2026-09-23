@@ -9,6 +9,12 @@ namespace MetalRaptors
         void DevSpawnTruck();
 
         void DevSpawnTank();
+
+        bool OffersZeppelin { get; }
+
+        bool ZeppelinAloft { get; }
+
+        void DevSpawnZeppelin();
     }
 
     public static class DevSpawn
@@ -18,6 +24,10 @@ namespace MetalRaptors
         static IDevSpawnHost _host;
 
         public static bool Available => _host != null && _host.CanDevSpawn;
+
+        public static bool ZeppelinOffered => Available && _host.OffersZeppelin;
+
+        public static bool ZeppelinReady => ZeppelinOffered && !_host.ZeppelinAloft;
 
         public static void Register(IDevSpawnHost host) => _host = host;
 
@@ -39,6 +49,11 @@ namespace MetalRaptors
         public static void SpawnTank()
         {
             if (Available) _host.DevSpawnTank();
+        }
+
+        public static void SpawnZeppelin()
+        {
+            if (ZeppelinReady) _host.DevSpawnZeppelin();
         }
     }
 }

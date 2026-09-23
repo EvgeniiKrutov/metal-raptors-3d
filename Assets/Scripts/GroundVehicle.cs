@@ -66,9 +66,7 @@ namespace MetalRaptors
         bool _dead;
         bool _reported;
 
-        Transform _bar;
-        Transform _barFillPivot;
-        Renderer _barFill;
+        FloatingHealthBar _bar;
 
         protected void Begin(Vector3 size, float fenceStopX, float roadLift, Rigidbody target,
             CampaignTerrain land)
@@ -97,7 +95,9 @@ namespace MetalRaptors
             _audio.playOnAwake = false;
             _audio.spatialBlend = 0f;
 
-            BuildHealthBar();
+            _bar = new FloatingHealthBar("VehicleHealthBar", BarWidth, BarHeight);
+            UpdateHealthBar();
+            PlaceHealthBar();
             Settle(transform.position.x);
         }
 
@@ -179,29 +179,10 @@ namespace MetalRaptors
 
         protected virtual void Roll(float dt) { }
 
-        protected bool OnCamera(Vector3 worldPoint)
-        {
-            if (_cam == null) return true;
+        protected bool OnCamera(Vector3 worldPoint) => Gunnery.OnCamera(_cam, worldPoint);
 
-            Vector3 vp = _cam.WorldToViewportPoint(worldPoint);
-            return vp.z > 0f && vp.x > -0.1f && vp.x < 1.1f && vp.y > -0.1f && vp.y < 1.1f;
-        }
-
-        protected Vector3 Intercept(Vector3 muzzle, float bulletSpeed, float lead)
-        {
-            if (_target == null) return muzzle;
-
-            Vector3 point = _target.position;
-            Vector3 velocity = _target.linearVelocity;
-
-            float t = 0f;
-            for (int i = 0; i < 2; i++)
-            {
-                float distance = Vector3.Distance(muzzle, point + velocity * (t * lead));
-                t = bulletSpeed > 0f ? distance / bulletSpeed : 0f;
-            }
-            return point + velocity * (t * lead);
-        }
+        protected Vector3 Intercept(Vector3 muzzle, float bulletSpeed, float lead) =>
+            Gunnery.Intercept(muzzle, _target, bulletSpeed, lead);
 
         protected void FireRound(GameObject template, Vector3 muzzle, Vector3 dir, float speed,
             float damage, float flashSize)
@@ -236,7 +217,7 @@ namespace MetalRaptors
             if (_smoke != null) _smoke.Ignite(ModelSize);
             _fire = PlaneFire.Ignite(gameObject, ModelSize);
             if (_collider != null) _collider.enabled = false;
-            if (_bar != null) Destroy(_bar.gameObject);
+            if (_bar != null) _bar.Destroy();
 
             Report();
             Destroy(gameObject, BurnSeconds);
@@ -249,58 +230,21 @@ namespace MetalRaptors
             OnDestroyed?.Invoke(this);
         }
 
-        void BuildHealthBar()
-        {
-            _bar = new GameObject("VehicleHealthBar").transform;
-
-            var back = UIFactory.CreatePrimitive3D(PrimitiveType.Cube,
-                Vector3.zero, new Vector3(BarWidth, BarHeight, 0.5f),
-                new Color(0.06f, 0.06f, 0.06f), emissive: false, keepCollider: false);
-            back.name = "Back";
-            back.transform.SetParent(_bar, false);
-
-            _barFillPivot = new GameObject("FillPivot").transform;
-            _barFillPivot.SetParent(_bar, false);
-            _barFillPivot.localPosition = new Vector3(-BarWidth / 2f, 0f, -0.5f);
-
-            var fill = UIFactory.CreatePrimitive3D(PrimitiveType.Cube,
-                Vector3.zero, new Vector3(BarWidth - 1f, BarHeight - 0.8f, 0.4f),
-                new Color(0.25f, 0.9f, 0.3f), emissive: true, keepCollider: false);
-            fill.name = "Fill";
-            fill.transform.SetParent(_barFillPivot, false);
-            fill.transform.localPosition = new Vector3((BarWidth - 1f) / 2f, 0f, 0f);
-            _barFill = fill.GetComponent<Renderer>();
-
-            UpdateHealthBar();
-            PlaceHealthBar();
-        }
-
         void UpdateHealthBar()
         {
-            if (_barFillPivot == null || _barFill == null) return;
-
-            float frac = Mathf.Clamp01(CurrentHealth / Mathf.Max(1f, MaxHealth));
-            Vector3 s = _barFillPivot.localScale;
-            s.x = frac;
-            _barFillPivot.localScale = s;
-
-            var color = Color.Lerp(new Color(0.95f, 0.2f, 0.12f),
-                new Color(0.25f, 0.9f, 0.3f), frac);
-            var mat = _barFill.sharedMaterial;
-            mat.SetColor("_BaseColor", color);
-            mat.SetColor("_EmissionColor", color * 2f);
+            if (_bar != null) _bar.Set(CurrentHealth / Mathf.Max(1f, MaxHealth));
         }
 
         void PlaceHealthBar()
         {
             if (_bar != null)
-                _bar.position = transform.position + Vector3.up * (_size.y + BarLiftMargin);
+                _bar.Place(transform.position + Vector3.up * (_size.y + BarLiftMargin));
         }
 
         protected virtual void OnDestroy()
         {
             Report();
-            if (_bar != null) Destroy(_bar.gameObject);
+            if (_bar != null) _bar.Destroy();
             if (_fire != null) _fire.Extinguish();
         }
 

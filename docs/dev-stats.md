@@ -115,3 +115,9 @@ fighter, the same mapping campaign scripts get through `PlaneModelConfig.enemyRo
 (docs/enemies.md). It goes through `CampaignEnemies.Spawn` as a one-plane wave, so it
 enters off the right edge of the view and behaves exactly like a scripted wave's plane.
 The custom battle's `CampaignEnemies` is created lazily on the first spawn.
+
+**SPAWN ZEPPELIN** is the one conditional button. It sits last in the section and is shown only
+while `DevSpawn.ZeppelinOffered` is true, which the host answers as "a custom battle with an
+airfield": Verdun in battle mode. The panel then uses a third, taller height. The button is
+non-interactable while a zeppelin is already up (`DevSpawn.ZeppelinReady`), so there is only ever
+one. It flies in from the right of the view and hangs over the fence (docs/enemy-zeppelin.md).

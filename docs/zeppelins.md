@@ -29,6 +29,10 @@ on **−X** and its top on **+Y**. That is the same rotation the planes get from
 + `rollWheelsDown` mirrored end for end, written directly rather than as a two-step
 composition because the airship has no pitch trim.
 
+`BuildModel(root, length)` does the instantiating, the rotation, the collider stripping, the fit
+and the propellers, and is public because the level 3 enemy airship is built from the same
+model (docs/enemy-zeppelin.md). The background ship adds `HideShadows` on top of it.
+
 `Fit` then measures the model's world AABB, scales it so its X extent is the wanted length,
 and shifts it so that box centres on the root's origin — the root is what the drift moves and
 what the off-screen tests measure, so an off-centre pivot would make the margins lie.
@@ -75,6 +79,11 @@ died, went empty.
 length and window; the handover deliberately overlaps, so the arriving one is already on the
 right while the departing one finishes leaving on the left. Two is the practical maximum: a
 third would need the first to still be alive after the second had crossed the whole map.
+
+**Retiring the relay.** `Retire()` stops `Consider` from ever sending another airship in. The
+ones already out keep drifting and die off the left edge as usual, so the sky empties by itself.
+`CampaignLevelController` calls it the first frame the enemy zeppelin is in the camera frustum
+(docs/enemy-zeppelin.md), because only one hostile airship is wanted in the frame.
 
 If the list ever empties — the camera sitting at the right of a bounded map kills an airship
 off-screen before it reaches the handover line — the next one goes in at once, so the sky is
