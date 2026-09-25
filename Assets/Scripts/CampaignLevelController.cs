@@ -149,15 +149,17 @@ namespace MetalRaptors
             }
             else if (Bounded)
             {
-                GarrisonAerodrome(Battlefield.BeginBounded(_cam, _halfViewWidth, _level.seed,
+                var field = Battlefield.BeginBounded(_cam, _halfViewWidth, _level.seed,
                     ApronEndX, WorldRight + BandOverhang, _terrain.InCrater, _level.people,
                     CampaignTerrain.Depth, PlayPlaneZ,
-                    ApronEndX > 0f ? AerodromeRoad.HalfWidth : 0f));
+                    ApronEndX > 0f ? AerodromeRoad.HalfWidth : 0f);
+                GarrisonAerodrome(field);
+                ScatterRubble(field);
             }
             else
             {
-                Battlefield.Begin(_cam, _halfViewWidth, _level.seed, _terrain.InCrater,
-                    _level.people);
+                ScatterRubble(Battlefield.Begin(_cam, _halfViewWidth, _level.seed,
+                    _terrain.InCrater, _level.people));
             }
 
             BeginSky();
@@ -243,6 +245,13 @@ namespace MetalRaptors
                 Aerodrome.Width * GarrisonSpanX, GarrisonFarZ - GarrisonNearZ);
 
             field.People.Garrison(pocket, GarrisonGroups, BattlefieldPeople.BlueUniform);
+        }
+
+        void ScatterRubble(Battlefield field)
+        {
+            if (field == null || _level.terrain != TerrainKind.Verdun) return;
+
+            field.ScatterRubble();
         }
 
         bool IntroActive => _intro != null && _intro.Active;

@@ -17,7 +17,7 @@ namespace MetalRaptors
         const float ZMin = 20f, ZMax = 700f;
         const float TankZMin = 175f, TankZMax = 650f;
 
-        const float MetreScale = 7.2f;
+        public const float MetreScale = 7.2f;
         const float TreeOversize = 1.5f;
         const float HouseOversize = 1.5f;
         const float TankOversize = 1.15f;
@@ -122,6 +122,11 @@ namespace MetalRaptors
             if (Nearest(_tanks, _tankCell, x, z, margin, out centre)) return true;
             return Nearest(_trees, _treeCell, x, z, margin, out centre);
         }
+
+        public bool Settled(float x, float margin) =>
+            Resolved(_houses, _houseCell, x, margin)
+            && Resolved(_tanks, _tankCell, x, margin)
+            && Resolved(_trees, _treeCell, x, margin);
 
         void UpdateGrid(Dictionary<int, Prop> grid, string[] models, float cellSize, int salt,
             float camX, Kind kind)
@@ -378,7 +383,19 @@ namespace MetalRaptors
             return best < float.MaxValue;
         }
 
-        static int Hash(int seed, int cell, int salt)
+        static bool Resolved(Dictionary<int, Prop> grid, float cellSize, float x, float margin)
+        {
+            float reach = MaxPropRadius + margin;
+            int first = Mathf.FloorToInt((x - reach) / cellSize);
+            int last = Mathf.FloorToInt((x + reach) / cellSize);
+
+            for (int cell = first; cell <= last; cell++)
+                if (!grid.ContainsKey(cell)) return false;
+
+            return true;
+        }
+
+        internal static int Hash(int seed, int cell, int salt)
         {
             unchecked
             {

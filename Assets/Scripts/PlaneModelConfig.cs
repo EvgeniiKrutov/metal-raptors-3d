@@ -51,6 +51,8 @@ namespace MetalRaptors
 
         public string propBladesNode;
 
+        public bool straightenProp;
+
         public PlaneSkin[] skins;
 
         public PlaneStats stats;
@@ -126,6 +128,8 @@ namespace MetalRaptors
             heightMeters   = 2.95f,
             propPivotNode  = "propPivot",
             propBladesNode = "propBlades",
+            straightenProp = true,
+            skins          = PlaneSkins.FokkerDr1,
             stats = new PlaneStats
             {
                 maxSpeed      = 264f,

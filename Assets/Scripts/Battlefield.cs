@@ -49,6 +49,7 @@ namespace MetalRaptors
         readonly List<int> _columnScratch = new List<int>();
         BattlefieldPeople _people;
         BattlefieldProps _props;
+        BattlefieldRubble _rubble;
         System.Func<float, float, bool> _inCrater;
 
         public static Battlefield Current { get; private set; }
@@ -169,6 +170,11 @@ namespace MetalRaptors
             if (_placePeople) _people = BattlefieldPeople.Begin(this);
         }
 
+        public void ScatterRubble()
+        {
+            if (_rubble == null) _rubble = BattlefieldRubble.Begin(this, _seed);
+        }
+
         public bool InCrater(float x, float z) => _inCrater != null && _inCrater(x, z);
 
         public void KillPeopleWithin(Vector3 centre, float radius)
@@ -227,6 +233,7 @@ namespace MetalRaptors
             TickBlasts(camX);
             TickSeaBlasts(camX);
             if (_props != null) _props.Tick(camX);
+            if (_rubble != null) _rubble.Tick(camX);
             if (_people != null) _people.Tick(camX, Time.deltaTime);
         }
 

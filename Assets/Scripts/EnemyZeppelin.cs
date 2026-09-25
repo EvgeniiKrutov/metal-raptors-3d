@@ -103,6 +103,7 @@ namespace MetalRaptors
         struct Gun
         {
             public Vector3 local;
+            public float side;
             public float cooldown;
         }
 
@@ -335,13 +336,16 @@ namespace MetalRaptors
                 _guns[i].cooldown += FireInterval;
 
                 Vector3 muzzle = transform.position + _guns[i].local;
-                if (InReach(muzzle) && Lead(muzzle, out Vector3 dir)) Fire(muzzle, dir);
+                if (InReach(muzzle) && Covers(_guns[i]) && Lead(muzzle, out Vector3 dir))
+                    Fire(muzzle, dir);
             }
         }
 
         bool InReach(Vector3 muzzle) =>
             _target != null && Gunnery.OnCamera(_cam, muzzle)
             && Vector3.Distance(muzzle, _target.position) <= FireRange;
+
+        bool Covers(Gun gun) => (_target.position.y - transform.position.y) * gun.side >= 0f;
 
         bool Lead(Vector3 muzzle, out Vector3 dir)
         {
@@ -355,8 +359,6 @@ namespace MetalRaptors
 
         void Fire(Vector3 muzzle, Vector3 dir)
         {
-            if (_collider.Raycast(new Ray(muzzle, dir), out _, FireRange)) return;
-
             Vector3 start = muzzle + dir * MuzzleClear;
             GameObject go = Instantiate(_bulletTemplate, start,
                 Quaternion.FromToRotation(Vector3.up, dir));
@@ -397,7 +399,8 @@ namespace MetalRaptors
             for (int i = 0; i < _guns.Length; i++)
             {
                 float y = Muzzles[i].y * _size.x;
-                _guns[i].local = new Vector3(Muzzles[i].x * _size.x, y + Mathf.Sign(y) * GunClear,
+                _guns[i].side = Mathf.Sign(y);
+                _guns[i].local = new Vector3(Muzzles[i].x * _size.x, y + _guns[i].side * GunClear,
                     0f);
                 _guns[i].cooldown = FireInterval * Phases[i];
             }

@@ -187,6 +187,7 @@ namespace MetalRaptors
             var spin = spinner.gameObject.AddComponent<PropellerSpin>();
             spin.axisSpace = body;
             spin.axisInSpace = Vector3.right;
+            spin.straighten = plane.straightenProp;
         }
 
         public static Transform FindDeep(Transform root, string name)

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.UI;
 
 namespace MetalRaptors
 {
@@ -32,6 +33,12 @@ namespace MetalRaptors
         const float SpinDownSeconds = 1.6f;
         const float SpinPeakDegreesPerSecond = 1100f;
 
+        const string LockedLabel = "LOCKED";
+        const float LockedPadX = 22f;
+        const float LockedHeight = 50f;
+        const float LockedBobPixels = 7f;
+        const float LockedBobSpeed = 2.4f;
+
         PlanePreviewRig _rig;
         PlaneModelConfig _plane;
         PlaneSkin _skin;
@@ -39,6 +46,8 @@ namespace MetalRaptors
         Transform _model;
         Transform _ground;
         PropellerSpin _propeller;
+        RectTransform _lockedBadge;
+        Vector3 _center;
 
         float _spinTime = -1f;
 
@@ -76,7 +85,14 @@ namespace MetalRaptors
         public void SetSkin(PlaneSkin skin)
         {
             _skin = skin;
-            PlaneSkins.Apply(_model, skin);
+            Paint();
+        }
+
+        void Paint()
+        {
+            bool locked = PlaneSkins.IsLocked(_skin);
+            PlaneSkins.Apply(_model, _skin, locked);
+            _lockedBadge.gameObject.SetActive(locked);
         }
 
         public void PlaySpinUp() => _spinTime = 0f;
@@ -98,7 +114,32 @@ namespace MetalRaptors
                 regionBottomFraction = RegionBottomFraction,
             }, GarageSize(plane));
 
+            _lockedBadge = CreateLockedBadge(_rig.RegionRect);
             BuildBody();
+        }
+
+        static RectTransform CreateLockedBadge(RectTransform region)
+        {
+            var go = new GameObject("Locked Badge", typeof(RectTransform), typeof(Image));
+            go.transform.SetParent(region, false);
+
+            var face = go.GetComponent<Image>();
+            face.color = MenuTheme.Colors.Accent;
+            face.raycastTarget = false;
+
+            Text text = UIFactory.CreateText(go.transform, LockedLabel, MenuTheme.ItemSize,
+                Vector2.zero, Vector2.zero, TextAnchor.MiddleCenter, FontStyle.Bold);
+            text.color = MenuTheme.Colors.Bg;
+
+            float height = LockedHeight * MenuTheme.TextScale;
+            var size = new Vector2(text.preferredWidth + 2f * LockedPadX * MenuTheme.TextScale, height);
+            text.rectTransform.sizeDelta = size;
+
+            var rt = (RectTransform)go.transform;
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = size;
+            go.SetActive(false);
+            return rt;
         }
 
         void BuildBody()
@@ -107,8 +148,9 @@ namespace MetalRaptors
             _body.transform.position = PlanePreviewRig.Origin;
             _body.transform.rotation = Quaternion.identity;
 
-            Transform model = PlaneFactory.BuildPlaneModel(_body.transform, _plane, skin: _skin);
+            Transform model = PlaneFactory.BuildPlaneModel(_body.transform, _plane);
             _model = model;
+            Paint();
 
             _propeller = model.GetComponentInChildren<PropellerSpin>();
             if (_propeller != null) _propeller.degreesPerSecond = 0f;
@@ -123,7 +165,9 @@ namespace MetalRaptors
                 groundY - ContactHeight(model),
                 PlanePreviewRig.Origin.z - bounds.center.z);
 
-            PlaceGround(MeasureBounds(model), groundY);
+            Bounds placed = MeasureBounds(model);
+            _center = placed.center;
+            PlaceGround(placed, groundY);
         }
 
         static Bounds MeasureBounds(Transform model)
@@ -260,6 +304,18 @@ namespace MetalRaptors
             _rig.Update();
             UpdateDrag();
             UpdatePropeller();
+            UpdateLockedBadge();
+        }
+
+        void UpdateLockedBadge()
+        {
+            if (!_lockedBadge.gameObject.activeSelf) return;
+
+            Vector2 anchor = _rig.ViewportPoint(_center);
+            _lockedBadge.anchorMin = anchor;
+            _lockedBadge.anchorMax = anchor;
+            _lockedBadge.anchoredPosition =
+                new Vector2(0f, Mathf.Sin(Time.unscaledTime * LockedBobSpeed) * LockedBobPixels);
         }
 
         void UpdateDrag()

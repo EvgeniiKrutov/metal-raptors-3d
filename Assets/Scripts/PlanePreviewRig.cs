@@ -34,6 +34,9 @@ namespace MetalRaptors
 
         public RectTransform RegionRect => _image != null ? _image.rectTransform : null;
 
+        public Vector2 ViewportPoint(Vector3 world) =>
+            _camera != null ? (Vector2)_camera.WorldToViewportPoint(world) : new Vector2(0.5f, 0.5f);
+
         public PlanePreviewRig(Transform canvas, Transform owner, PlanePreviewFraming framing, float planeSize)
         {
             _framing = framing;

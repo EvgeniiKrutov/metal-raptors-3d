@@ -77,12 +77,13 @@ namespace MetalRaptors
             if (plane == null) return null;
 
             string id = PlayerPrefs.GetString(PrefSkinPrefix + plane.resourceName, string.Empty);
-            return PlaneSkins.ById(plane, id) ?? PlaneSkins.Default(plane);
+            PlaneSkin skin = PlaneSkins.ById(plane, id);
+            return skin != null && !skin.locked ? skin : PlaneSkins.Default(plane);
         }
 
         public void SetSkin(PlaneModelConfig plane, PlaneSkin skin)
         {
-            if (plane == null || skin == null) return;
+            if (plane == null || skin == null || skin.locked) return;
 
             PlayerPrefs.SetString(PrefSkinPrefix + plane.resourceName, skin.id);
             PlayerPrefs.Save();

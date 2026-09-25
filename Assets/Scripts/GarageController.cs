@@ -22,6 +22,7 @@ namespace MetalRaptors
         Text _description;
 
         int _index;
+        PlaneSkin _shownSkin;
         float[] _barTops;
         float _selectTop;
         float _backTop;
@@ -35,10 +36,11 @@ namespace MetalRaptors
         void Start()
         {
             _index = GameManager.Instance != null ? GameManager.Instance.SelectedPlaneIndex : 0;
+            _shownSkin = SkinOf(Plane);
 
             var canvas = UIFactory.CreateCanvas("Garage Canvas");
             UIFactory.CreateBackground(canvas.transform, MenuTheme.Colors.Bg);
-            _planeView = GaragePlaneView.Build(canvas.transform, Plane, SkinOf(Plane));
+            _planeView = GaragePlaneView.Build(canvas.transform, Plane, _shownSkin);
 
             Transform screen = MenuLayout.CreateScreen(canvas.transform, "Garage Screen");
             Transform column = MenuLayout.CreateRegion(screen, "Garage Column", 0f,
@@ -144,13 +146,20 @@ namespace MetalRaptors
             PlaneSkin[] skins = PlaneSkins.Of(Plane);
             if (index < 0 || index >= skins.Length) return;
 
-            if (GameManager.Instance != null) GameManager.Instance.SetSkin(Plane, skins[index]);
-            _planeView.SetSkin(skins[index]);
+            _shownSkin = skins[index];
+            _planeView.SetSkin(_shownSkin);
+            RefreshSelect();
         }
 
         void SelectPlane()
         {
-            if (GameManager.Instance != null) GameManager.Instance.SetSelectedPlane(_index);
+            if (PlaneSkins.IsLocked(_shownSkin)) return;
+
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.SetSelectedPlane(_index);
+                GameManager.Instance.SetSkin(Plane, _shownSkin);
+            }
             _planeView.PlaySpinUp();
             Refresh();
         }
@@ -170,14 +179,20 @@ namespace MetalRaptors
                 _bars[i].SetFill(bar.read(plane.stats) / bar.ceiling);
             }
 
+            _shownSkin = SkinOf(plane);
             RefreshColour(plane);
 
-            _planeView.SetPlane(plane, SkinOf(plane));
+            _planeView.SetPlane(plane, _shownSkin);
+            RefreshSelect();
+        }
 
+        void RefreshSelect()
+        {
             bool selected = GameManager.Instance != null
-                            && GameManager.Instance.SelectedPlaneIndex == _index;
+                            && GameManager.Instance.SelectedPlaneIndex == _index
+                            && SkinOf(Plane) == _shownSkin;
             _selectItem.SetLabel(selected ? "selected" : "select plane");
-            _selectItem.SetInteractable(!selected);
+            _selectItem.SetInteractable(!selected && !PlaneSkins.IsLocked(_shownSkin));
         }
 
         void RefreshColour(PlaneModelConfig plane)
@@ -185,8 +200,7 @@ namespace MetalRaptors
             bool selectable = PlaneSkins.Selectable(plane);
 
             if (selectable)
-                _colour.SetValues(PlaneSkins.Labels(plane),
-                    PlaneSkins.IndexOf(plane, SkinOf(plane)));
+                _colour.SetValues(PlaneSkins.Labels(plane), PlaneSkins.IndexOf(plane, _shownSkin));
 
             _colour.gameObject.SetActive(selectable);
 
