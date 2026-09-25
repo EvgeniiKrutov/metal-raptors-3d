@@ -108,7 +108,7 @@ namespace MetalRaptors
                 mass          = 2.5f,
                 fireRate      = 5f,
                 damage        = 10f,
-                health        = 150f,
+                health        = 200f,
             },
         };
 
@@ -137,7 +137,7 @@ namespace MetalRaptors
                 mass          = 2.1f,
                 fireRate      = 5.5f,
                 damage        = 10f,
-                health        = 128f,
+                health        = 171f,
             },
         };
 
@@ -166,7 +166,7 @@ namespace MetalRaptors
                 mass          = 3f,
                 fireRate      = 5.5f,
                 damage        = 10f,
-                health        = 165f,
+                health        = 220f,
             },
         };
 
@@ -195,7 +195,7 @@ namespace MetalRaptors
                 mass          = 1.8f,
                 fireRate      = 4.5f,
                 damage        = 9f,
-                health        = 105f,
+                health        = 140f,
             },
         };
 

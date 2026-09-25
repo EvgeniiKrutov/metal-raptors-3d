@@ -10,7 +10,7 @@ namespace MetalRaptors
         const float Speed = 18f;
 
         const float RoofDamage = 12f;
-        const float RoofBulletSpeed = 200f;
+        const float RoofBulletSpeed = 140f;
         const float RoofReload = 2.5f;
         const float RoofRange = 500f;
         const float RoofLead = 1f;
@@ -21,7 +21,7 @@ namespace MetalRaptors
         const float ShellScale = 1.6f;
 
         const float SponsonDamage = 6f;
-        const float SponsonBulletSpeed = 280f;
+        const float SponsonBulletSpeed = 200f;
         const float SponsonInterval = 0.5f;
         const float ShellSeconds = 22f;
         const float FenceSparkSize = 20f;

@@ -14,6 +14,8 @@ namespace MetalRaptors
         const float CollisionDamage = 10f;
         const float CollisionCooldown = 0.5f;
         const float SmokeHealthThreshold = 30f;
+        const float SmokeScalePerUnit = 0.018f;
+        const float SmokeLift = 0.7f;
         const float BurnSeconds = 4f;
 
         const float BarWidth = 36f;
@@ -51,7 +53,7 @@ namespace MetalRaptors
         CampaignTerrain _land;
         Camera _cam;
         BoxCollider _collider;
-        SmokeTrail _smoke;
+        SmokeColumn _smoke;
         PlaneFire _fire;
         AudioSource _audio;
         AudioClip _shotClip;
@@ -87,8 +89,6 @@ namespace MetalRaptors
             var rb = gameObject.AddComponent<Rigidbody>();
             rb.isKinematic = true;
             rb.useGravity = false;
-
-            _smoke = gameObject.AddComponent<SmokeTrail>();
 
             _shotClip = Resources.Load<AudioClip>("Sounds/bullet_shot_1");
             _audio = gameObject.AddComponent<AudioSource>();
@@ -203,7 +203,7 @@ namespace MetalRaptors
         {
             CurrentHealth = Mathf.Max(0f, CurrentHealth - amount);
             UpdateHealthBar();
-            if (CurrentHealth < SmokeHealthThreshold && _smoke != null) _smoke.Arm(ModelSize);
+            if (CurrentHealth < SmokeHealthThreshold) Smoke();
             if (CurrentHealth <= 0f) Die();
         }
 
@@ -214,13 +214,22 @@ namespace MetalRaptors
             _stopped = true;
 
             Explosion.Spawn(Centre, ModelSize);
-            if (_smoke != null) _smoke.Ignite(ModelSize);
+            Smoke();
+            _smoke.Thicken();
             _fire = PlaneFire.Ignite(gameObject, ModelSize);
             if (_collider != null) _collider.enabled = false;
             if (_bar != null) _bar.Destroy();
 
             Report();
             Destroy(gameObject, BurnSeconds);
+        }
+
+        void Smoke()
+        {
+            if (_smoke != null) return;
+
+            _smoke = SmokeColumn.Follow(transform, Vector3.up * (_size.y * SmokeLift),
+                UnityEngine.Random.Range(0, int.MaxValue), ModelSize * SmokeScalePerUnit);
         }
 
         void Report()

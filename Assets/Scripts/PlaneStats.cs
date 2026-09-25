@@ -65,7 +65,7 @@ namespace MetalRaptors
             new PlaneStatBar { label = "mass",           ceiling = 4f,   read = s => s.mass },
             new PlaneStatBar { label = "fire rate",      ceiling = 8f,   read = s => s.fireRate },
             new PlaneStatBar { label = "damage",         ceiling = 15f,  read = s => s.damage },
-            new PlaneStatBar { label = "health",         ceiling = 200f, read = s => s.health },
+            new PlaneStatBar { label = "health",         ceiling = 220f, read = s => s.health },
         };
     }
 }

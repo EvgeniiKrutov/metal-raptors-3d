@@ -17,6 +17,10 @@ namespace MetalRaptors
         const float Opacity = 0.5f;
         const float SpinMin = 5f, SpinMax = 20f;
 
+        const float DenseEmitInterval = 0.3f;
+        const float DenseSizeFactor = 1.35f;
+        const float TrailWindFactor = 1.5f;
+
         const float EmberSize = 9f;
         const float EmberGlow = 1.6f;
         const float EmberPulseRate = 1.7f;
@@ -46,6 +50,16 @@ namespace MetalRaptors
         float _emitTimer;
         float _emberPhase;
         float _scale = 1f;
+        Transform _anchor;
+        Vector3 _anchorOffset;
+        bool _follows;
+        bool _dense;
+
+        bool Emitting => !_follows || _anchor != null;
+
+        Vector3 Origin => _follows ? _anchor.TransformPoint(_anchorOffset) : Vector3.zero;
+
+        float Wind => _follows ? WindX * _scale * TrailWindFactor : WindX;
 
         public static SmokeColumn Begin(Transform parent, Vector3 position, int seed,
             float scale = 1f)
@@ -62,6 +76,22 @@ namespace MetalRaptors
             column.Prewarm();
             return column;
         }
+
+        public static SmokeColumn Follow(Transform anchor, Vector3 localOffset, int seed,
+            float scale = 1f)
+        {
+            var go = new GameObject("Smoke Column");
+
+            var column = go.AddComponent<SmokeColumn>();
+            column._rng = new System.Random(seed);
+            column._scale = Mathf.Max(MinScale, scale);
+            column._anchor = anchor;
+            column._anchorOffset = localOffset;
+            column._follows = true;
+            return column;
+        }
+
+        public void Thicken() => _dense = true;
 
         void BuildEmber()
         {
@@ -88,11 +118,19 @@ namespace MetalRaptors
         {
             float dt = Time.deltaTime;
 
-            _emitTimer -= dt;
-            if (_emitTimer <= 0f)
+            if (Emitting)
             {
-                _emitTimer = EmitInterval;
-                EmitPuff(0f);
+                _emitTimer -= dt;
+                if (_emitTimer <= 0f)
+                {
+                    _emitTimer = _dense ? DenseEmitInterval : EmitInterval;
+                    EmitPuff(0f);
+                }
+            }
+            else if (_puffs.Count == 0)
+            {
+                Destroy(gameObject);
+                return;
             }
 
             Animate(dt);
@@ -101,7 +139,8 @@ namespace MetalRaptors
 
         void EmitPuff(float initialAge)
         {
-            float scale = Range(StartSizeMin, StartSizeMax) * _scale;
+            float scale = Range(StartSizeMin, StartSizeMax) * _scale
+                          * (_dense ? DenseSizeFactor : 1f);
 
             var go = UIFactory.CreatePrimitive3D(PrimitiveType.Cube, transform.position,
                 Vector3.one * scale, SmokeColor, emissive: false, keepCollider: false);
@@ -112,7 +151,7 @@ namespace MetalRaptors
             renderer.shadowCastingMode = ShadowCastingMode.Off;
 
             go.transform.SetParent(transform, false);
-            go.transform.localPosition = new Vector3(
+            go.transform.localPosition = Origin + new Vector3(
                 Range(-StartSpread, StartSpread) * _scale, 0f,
                 Range(-StartSpread, StartSpread) * _scale);
             go.transform.localRotation = Quaternion.Euler(
@@ -122,7 +161,7 @@ namespace MetalRaptors
             {
                 tr = go.transform,
                 mat = renderer.sharedMaterial,
-                velocity = new Vector3(WindX + Range(-WindJitter, WindJitter) * _scale,
+                velocity = new Vector3(Wind + Range(-WindJitter, WindJitter) * _scale,
                     Range(RiseMin, RiseMax) * _scale,
                     Range(-WindJitter, WindJitter) * 0.5f * _scale),
                 spinAxis = new Vector3(Range(-1f, 1f), Range(-1f, 1f), Range(-1f, 1f)).normalized,

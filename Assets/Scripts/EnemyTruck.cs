@@ -11,7 +11,7 @@ namespace MetalRaptors
         const float Speed = 30f;
 
         const float BulletDamage = 6f;
-        const float BulletSpeed = 280f;
+        const float BulletSpeed = 200f;
         const float FireInterval = 1f;
         const float FireRange = 500f;
         const float LeadFactor = 1f;

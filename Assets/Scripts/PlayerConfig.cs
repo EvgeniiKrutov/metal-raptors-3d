@@ -48,7 +48,7 @@ namespace MetalRaptors
 
         [Tooltip("Damage at the dead centre of a bomb blast, falling off linearly to zero at " +
                  "bombBlastRadius (see docs/bombs.md). Hurts the player's own plane too.")]
-        public float bombDamage = 60f;
+        public float bombDamage = 66f;
 
         [Tooltip("Radius of the bomb blast in metres. Everything damageable inside it is hit, " +
                  "scaled by its distance from the centre.")]

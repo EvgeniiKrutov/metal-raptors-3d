@@ -13,7 +13,7 @@ namespace MetalRaptors
 
         const float Health = 6000f;
         const float HealthFloor = 500f;
-        const float SmokeBelow = 3000f;
+        const float SmokeBelow = 5000f;
         const float BurnBelow = 1000f;
 
         const float Speed = 30f;
@@ -25,7 +25,7 @@ namespace MetalRaptors
         const float BobPeriod = 7f;
 
         const float BulletDamage = 6f;
-        const float BulletSpeed = 200f;
+        const float BulletSpeed = 140f;
         const float FireInterval = 1f;
         const float FireRange = 500f;
         const float LeadFactor = 1f;
@@ -44,7 +44,7 @@ namespace MetalRaptors
         const float BarHeight = 5f;
         const float BarLiftMargin = 25f;
 
-        const float SmokeSize = 110f;
+        const float SmokeScale = 1.2f;
         const float FireSize = 100f;
 
         static readonly Vector2[] Muzzles =
@@ -79,13 +79,13 @@ namespace MetalRaptors
             new Vector2(-71f, -4.95f),
         };
 
-        static readonly Vector3[] Vents =
-        {
-            new Vector3(-0.2f, 0.85f, -0.45f),
-            new Vector3(0.1f, 0.8f, -0.45f),
-        };
-
-        static readonly Quaternion SmokeUp = Quaternion.Euler(0f, 0f, -90f);
+        const int VentCount = 3;
+        const float VentSpanMin = -0.3f;
+        const float VentSpanMax = 0.12f;
+        const float VentSlotMargin = 0.15f;
+        const float VentDepth = 0.88f;
+        const float VentAngleMin = 40f;
+        const float VentAngleMax = 65f;
 
         static readonly Color RoundCore = new Color(1f, 0.2f, 0.12f);
         static readonly Color RoundRim = new Color(0.05f, 0.04f, 0.04f);
@@ -108,8 +108,9 @@ namespace MetalRaptors
         }
 
         readonly Gun[] _guns = new Gun[3];
-        readonly SmokeTrail[] _smoke = new SmokeTrail[2];
-        readonly Transform[] _fires = new Transform[2];
+        readonly Vector3[] _vents = new Vector3[VentCount];
+        readonly SmokeColumn[] _smoke = new SmokeColumn[VentCount];
+        readonly Transform[] _fires = new Transform[VentCount];
 
         Rigidbody _target;
         Camera _cam;
@@ -408,20 +409,22 @@ namespace MetalRaptors
 
         void MountVents()
         {
-            for (int i = 0; i < Vents.Length; i++)
-            {
-                var at = new Vector3(_size.x * Vents[i].x, Radius * Vents[i].y,
-                    Radius * Vents[i].z);
+            float slot = (VentSpanMax - VentSpanMin) / VentCount;
 
-                var smoke = new GameObject("Smoke Vent").transform;
-                smoke.SetParent(transform, false);
-                smoke.localPosition = at;
-                smoke.localRotation = SmokeUp;
-                _smoke[i] = smoke.gameObject.AddComponent<SmokeTrail>();
+            for (int i = 0; i < VentCount; i++)
+            {
+                float start = VentSpanMin + slot * i;
+                float x = UnityEngine.Random.Range(start + slot * VentSlotMargin,
+                    start + slot * (1f - VentSlotMargin));
+                float angle = UnityEngine.Random.Range(VentAngleMin, VentAngleMax)
+                              * Mathf.Deg2Rad;
+
+                _vents[i] = new Vector3(_size.x * x, Radius * VentDepth * Mathf.Sin(angle),
+                    -Radius * VentDepth * Mathf.Cos(angle));
 
                 var fire = new GameObject("Fire Vent").transform;
                 fire.SetParent(transform, false);
-                fire.localPosition = at;
+                fire.localPosition = _vents[i];
                 _fires[i] = fire;
             }
         }
@@ -429,17 +432,19 @@ namespace MetalRaptors
         void StartSmoking()
         {
             _smoking = true;
-            foreach (SmokeTrail smoke in _smoke)
-                if (smoke != null) smoke.Arm(SmokeSize);
+            for (int i = 0; i < VentCount; i++)
+                if (_smoke[i] == null)
+                    _smoke[i] = SmokeColumn.Follow(transform, _vents[i],
+                        UnityEngine.Random.Range(0, int.MaxValue), SmokeScale);
         }
 
         void StartBurning()
         {
-            _smoking = true;
+            StartSmoking();
             _burning = true;
 
-            foreach (SmokeTrail smoke in _smoke)
-                if (smoke != null) smoke.Ignite(SmokeSize);
+            foreach (SmokeColumn smoke in _smoke)
+                if (smoke != null) smoke.Thicken();
 
             foreach (Transform fire in _fires)
                 if (fire != null) PlaneFire.Ignite(fire.gameObject, FireSize);
