@@ -16,6 +16,12 @@ namespace MetalRaptors
 
         public bool IsReady => enabled && _cooldown <= 0f && !CinematicBars.AnyShowing;
 
+        public float Cooldown
+        {
+            get => _cooldown;
+            set => _cooldown = Mathf.Max(0f, value);
+        }
+
         PlayerConfig _config;
         Collider _planeCollider;
         Rigidbody _rb;

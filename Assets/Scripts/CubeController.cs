@@ -151,6 +151,16 @@ namespace MetalRaptors
             _barrelAngle += _barrelRate * dt;
         }
 
+        public void Restore(float headingRad, float health)
+        {
+            _heading = headingRad;
+            _targetHeading = headingRad;
+            _angularVelocity = 0f;
+            CurrentHealth = Mathf.Clamp(health, 1f, MaxHealth);
+            if (CurrentHealth < SmokeHealthThreshold && _smoke != null) _smoke.Arm(ExplosionSize);
+            ApplyRotation();
+        }
+
         public void SetControlled(bool value) => _controlled = value;
 
         public bool Steerable => _active && _controlled && !_falling;

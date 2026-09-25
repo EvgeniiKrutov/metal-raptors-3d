@@ -43,6 +43,12 @@ namespace MetalRaptors
             return airfield;
         }
 
+        public void Restore(float health)
+        {
+            if (_lost) return;
+            _health = Mathf.Clamp(health, 1f, MaxHealth);
+        }
+
         public void Shell(float amount)
         {
             if (_lost || amount <= 0f) return;

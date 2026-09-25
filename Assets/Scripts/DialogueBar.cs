@@ -81,6 +81,12 @@ namespace MetalRaptors
             _bars.Raise();
         }
 
+        public void OpenInstant()
+        {
+            _open = true;
+            _bars.Snap();
+        }
+
         public List<string> Split(CampaignSpeaker speaker, string message)
         {
             Dress(speaker);

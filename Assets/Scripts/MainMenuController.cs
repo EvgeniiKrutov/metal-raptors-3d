@@ -13,6 +13,8 @@ namespace MetalRaptors
         MenuPanel _customPanel;
         MenuCardRow _eras;
         MenuLevelRow _levels;
+        MenuBackedRow _erasGroup;
+        MenuBackedRow _levelsGroup;
 
         GameObject _column;
         GameObject _erasPage;
@@ -80,7 +82,7 @@ namespace MetalRaptors
         MenuPanel BuildMainPanel(Transform column)
         {
             var panel = new MenuPanel(column, "Main Panel", MenuTheme.ListTop);
-            panel.AddNav("career", () => ScreenFade.Swap(ShowEras));
+            panel.AddNav("career", () => ScreenFade.Swap(() => ShowEras(0)));
             panel.AddNav("challenges", null, interactable: false);
             panel.AddNav("custom battle", () => ScreenFade.Swap(ShowCustom));
             panel.AddNav("garage", () => ScreenFade.Load(SceneNames.Garage));
@@ -127,6 +129,10 @@ namespace MetalRaptors
 
             _eras.Layout();
             _eras.FocusChanged += ShowEraHeader;
+
+            MenuItemView back = MenuBackedRow.CreateBack(page, "back to main menu", top,
+                _eras.CardSize, GoHome);
+            _erasGroup = new MenuBackedRow(_eras, back);
             return page.gameObject;
         }
 
@@ -140,7 +146,7 @@ namespace MetalRaptors
             _eraPanel.AddNav("level select", () => ScreenFade.Swap(ShowLevels));
 
             _eraPanel.AddGap(MenuTheme.SectionGap);
-            _eraPanel.AddNav("back", GoHome);
+            _eraPanel.AddNav("back", GoToEras);
             return page.gameObject;
         }
 
@@ -173,6 +179,10 @@ namespace MetalRaptors
             _levels.Layout();
             _levels.FocusChanged += ShowLevelHeader;
             _levels.ViewChanged += UpdateLevelArrows;
+
+            MenuItemView back = MenuBackedRow.CreateBack(page, "back to chapter menu",
+                MenuTheme.LevelCardsTop, _levels.CardSize, () => ScreenFade.Swap(ShowEraPage));
+            _levelsGroup = new MenuBackedRow(_levels, back);
 
             BuildLevelArrows(screen);
             return screen.gameObject;
@@ -294,6 +304,8 @@ namespace MetalRaptors
 
         void GoHome() => ScreenFade.Swap(() => ShowHome(_main));
 
+        void GoToEras() => ScreenFade.Swap(() => ShowEras(_eraIndex));
+
         void ShowHome(MenuPanel panel)
         {
             SetScreen(MenuScreen.Home);
@@ -303,11 +315,11 @@ namespace MetalRaptors
             _group = panel;
         }
 
-        void ShowEras()
+        void ShowEras(int focus)
         {
             SetScreen(MenuScreen.Eras);
-            _eras.FocusFirst();
-            _group = _eras;
+            _eras.FocusOn(focus);
+            _group = _erasGroup;
         }
 
         void ShowEra(int index)
@@ -325,7 +337,7 @@ namespace MetalRaptors
             SetScreen(MenuScreen.Levels);
             _levels.FocusOn(CampaignProgress.NextLevel - CampaignRun.FirstLevel);
             UpdateLevelArrows();
-            _group = _levels;
+            _group = _levelsGroup;
         }
 
         void ShowCustom()
@@ -358,6 +370,11 @@ namespace MetalRaptors
             if (_screen == MenuScreen.Levels)
             {
                 ScreenFade.Swap(ShowEraPage);
+                return;
+            }
+            if (_screen == MenuScreen.Era)
+            {
+                GoToEras();
                 return;
             }
             if (_screen == MenuScreen.Options)

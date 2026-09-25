@@ -9,6 +9,14 @@ namespace MetalRaptors
         void ActivateFocused();
     }
 
+    public interface IMenuRow : IMenuFocusGroup
+    {
+        event Action<int> FocusChanged;
+
+        void Refocus();
+        void Blur();
+    }
+
     public interface IMenuFocusable
     {
         event Action<IMenuFocusable> Hovered;

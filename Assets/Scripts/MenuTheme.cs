@@ -224,6 +224,9 @@ namespace MetalRaptors
         public const float CardTitleToArt = 14f;
         public const float CardTitleLineHeight = 38f;
         public const float CardBottomMargin = 48f;
+        public const float CardsToBack = 36f;
+
+        public static float BackRowReserve => CardsToBack + ItemRowHeight;
 
         const float CardGapRatio = CardGap / CardSizeMax;
 
@@ -256,7 +259,8 @@ namespace MetalRaptors
             if (visible <= 0) return CardSizeMax;
 
             float byWidth = RowWidth / (visible + (visible - 1) * CardGapRatio);
-            float byHeight = _canvasHeight * (1f - PadTopFraction) + top - CardBottomMargin;
+            float byHeight = _canvasHeight * (1f - PadTopFraction) + top - CardBottomMargin
+                             - BackRowReserve;
             return Mathf.Max(CardSizeMin, Mathf.Min(byWidth, byHeight));
         }
 

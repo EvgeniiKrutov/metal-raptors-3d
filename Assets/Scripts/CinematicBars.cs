@@ -65,6 +65,12 @@ namespace MetalRaptors
 
         public void Lower() => _target = 0f;
 
+        public void Snap()
+        {
+            _slide = _target = 1f;
+            Apply();
+        }
+
         void OnEnable() => Live.Add(this);
 
         void OnDisable() => Live.Remove(this);

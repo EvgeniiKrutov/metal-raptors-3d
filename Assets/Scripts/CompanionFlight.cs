@@ -96,11 +96,14 @@ namespace MetalRaptors
         float _floorY;
         float _ceilingY;
 
+        public PlaneModelConfig FoePlane => _foePlane;
+
         CompanionFlight(CampaignDefinition level, PlayerConfig playerFlight, Transform player,
-            float playZ, float groundY, float worldTop, float cameraDistance)
+            float playZ, float groundY, float worldTop, float cameraDistance,
+            PlaneModelConfig foe)
         {
             _level = level;
-            _foePlane = level.companionFoe;
+            _foePlane = foe != null ? foe : level.companionFoe;
             _flight = playerFlight;
             _player = player;
             _playZ = playZ;
@@ -112,12 +115,13 @@ namespace MetalRaptors
         }
 
         public static CompanionFlight Begin(CampaignDefinition level, PlayerConfig playerFlight,
-            Transform player, float playZ, float groundY, float worldTop, float cameraDistance)
+            Transform player, float playZ, float groundY, float worldTop, float cameraDistance,
+            PlaneModelConfig foe = null)
         {
             if (level == null || !level.companion || player == null) return null;
 
             var flight = new CompanionFlight(level, playerFlight, player, playZ, groundY, worldTop,
-                cameraDistance);
+                cameraDistance, foe);
 
             flight._support = level.supportCompanion;
 

@@ -16,6 +16,7 @@ namespace MetalRaptors
         bool SpawnZeppelin();
         bool ZeppelinHanging { get; }
         void CompleteLevel();
+        void Checkpoint(int step, bool warnedFirst, bool warnedPair);
     }
 
     public class CampaignScriptRunner : MonoBehaviour
@@ -32,9 +33,12 @@ namespace MetalRaptors
         int _skipFrame = -1;
         bool _warnedFirst;
         bool _warnedPair;
+        int _start;
+        int _firstSay = -1;
+        bool _resumed;
 
         public static CampaignScriptRunner Begin(GameObject owner, CampaignScript script,
-            ICampaignScriptHost host, DialogueBar bar)
+            ICampaignScriptHost host, DialogueBar bar, CampaignSnapshot resume = null)
         {
             if (script == null || host == null) return null;
 
@@ -42,8 +46,25 @@ namespace MetalRaptors
             runner._script = script;
             runner._host = host;
             runner._bar = bar;
+            runner._firstSay = FirstSay(script);
+
+            if (resume != null)
+            {
+                runner._start = Mathf.Clamp(resume.step, 0, script.Steps.Length);
+                runner._warnedFirst = resume.warnedFirst;
+                runner._warnedPair = resume.warnedPair;
+                runner._resumed = true;
+            }
+
             runner.StartCoroutine(runner.Run());
             return runner;
+        }
+
+        static int FirstSay(CampaignScript script)
+        {
+            for (int i = 0; i < script.Steps.Length; i++)
+                if (script.Steps[i].op == CampaignOp.Say) return i;
+            return -1;
         }
 
         public void Stop()
@@ -67,11 +88,17 @@ namespace MetalRaptors
 
         IEnumerator Run()
         {
-            foreach (CampaignStep step in _script.Steps)
+            CampaignStep[] steps = _script.Steps;
+            for (int index = _start; index < steps.Length; index++)
             {
+                CampaignStep step = steps[index];
                 if (!Running) yield break;
 
-                if (step.op != CampaignOp.Say) yield return CloseBar();
+                if (step.op != CampaignOp.Say)
+                {
+                    _resumed = false;
+                    yield return CloseBar();
+                }
 
                 switch (step.op)
                 {
@@ -80,7 +107,7 @@ namespace MetalRaptors
                         break;
 
                     case CampaignOp.Say:
-                        yield return Say(step);
+                        yield return Say(step, index);
                         break;
 
                     case CampaignOp.Spawn:
@@ -147,6 +174,13 @@ namespace MetalRaptors
             }
         }
 
+        void FreezeInstant()
+        {
+            _frozen = true;
+            CutscenePause.Hold(0f);
+            CutsceneBlur.Set(1f);
+        }
+
         IEnumerator Unblur()
         {
             if (!_frozen) yield break;
@@ -176,7 +210,7 @@ namespace MetalRaptors
             CutscenePause.Release();
         }
 
-        IEnumerator Say(CampaignStep step)
+        IEnumerator Say(CampaignStep step, int index)
         {
             if (_bar == null)
             {
@@ -187,12 +221,25 @@ namespace MetalRaptors
             if (!_bar.IsOpen)
             {
                 _host.ArmSupply(false);
-                _bar.Open();
-                while (Running && !_bar.IsReady) yield return null;
-                while (Running && !_host.CompanionReady) yield return null;
-                if (!Running) yield break;
 
-                yield return Freeze();
+                if (_resumed)
+                {
+                    _resumed = false;
+                    _bar.OpenInstant();
+                    FreezeInstant();
+                }
+                else
+                {
+                    _bar.Open();
+                    while (Running && !_bar.IsReady) yield return null;
+                    while (Running && !_host.CompanionReady) yield return null;
+                    if (!Running) yield break;
+
+                    yield return Freeze();
+                    if (!Running) yield break;
+                    if (index > _firstSay) _host.Checkpoint(index, _warnedFirst, _warnedPair);
+                }
+
                 yield return Wait(DialogueBar.LeadInSec);
                 if (!Running) yield break;
             }

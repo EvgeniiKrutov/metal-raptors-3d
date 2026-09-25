@@ -46,20 +46,52 @@ namespace MetalRaptors
             float queue = length + GroundVehicle.QueueGap;
             float spawnX = Mathf.Max(rightEdgeX + SpawnMargin, RearOfConvoy() + queue);
 
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < count; i++) SpawnOne(tank, length, spawnX + i * queue);
+        }
+
+        public void Capture(List<VehicleSnapshot> into)
+        {
+            foreach (GroundVehicle vehicle in _live)
             {
-                var point = new Vector3(spawnX + i * queue, ProceduralTerrain.BaseLevel, _roadZ);
-                GroundVehicle vehicle = tank
-                    ? (GroundVehicle)EnemyTank.Spawn(point, StopLine(length), _roadLift, _player,
-                        _land)
-                    : EnemyTruck.Spawn(point, StopLine(length), _roadLift, _player, _land);
+                if (vehicle == null || !vehicle.IsAlive) continue;
 
-                if (vehicle == null) continue;
-
-                vehicle.SetAhead(_live.Count > 0 ? _live[_live.Count - 1] : null);
-                vehicle.OnDestroyed += Remove;
-                _live.Add(vehicle);
+                into.Add(new VehicleSnapshot
+                {
+                    kind = vehicle is EnemyTank ? EnemyKind.Tank : EnemyKind.Truck,
+                    x = vehicle.transform.position.x,
+                    health = vehicle.CurrentHealth,
+                });
             }
+        }
+
+        public void Restore(IReadOnlyList<VehicleSnapshot> saved)
+        {
+            if (saved == null) return;
+
+            foreach (VehicleSnapshot snapshot in saved)
+            {
+                bool tank = snapshot.kind == EnemyKind.Tank;
+                if (!(tank ? EnemyTank.Measure() : EnemyTruck.Measure())) continue;
+
+                float length = tank ? EnemyTank.BodyLength : EnemyTruck.BodyLength;
+                GroundVehicle vehicle = SpawnOne(tank, length, snapshot.x);
+                if (vehicle != null) vehicle.Restore(snapshot.health);
+            }
+        }
+
+        GroundVehicle SpawnOne(bool tank, float length, float x)
+        {
+            var point = new Vector3(x, ProceduralTerrain.BaseLevel, _roadZ);
+            GroundVehicle vehicle = tank
+                ? (GroundVehicle)EnemyTank.Spawn(point, StopLine(length), _roadLift, _player, _land)
+                : EnemyTruck.Spawn(point, StopLine(length), _roadLift, _player, _land);
+
+            if (vehicle == null) return null;
+
+            vehicle.SetAhead(_live.Count > 0 ? _live[_live.Count - 1] : null);
+            vehicle.OnDestroyed += Remove;
+            _live.Add(vehicle);
+            return vehicle;
         }
 
         public void StandDown()

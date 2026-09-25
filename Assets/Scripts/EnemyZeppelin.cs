@@ -189,6 +189,33 @@ namespace MetalRaptors
 
         public void StandDown() => _standDown = true;
 
+        public ZeppelinSnapshot Capture() => new ZeppelinSnapshot
+        {
+            position = transform.position,
+            baseY = _baseY,
+            bobTime = _bobTime,
+            hanging = Hanging,
+            health = CurrentHealth,
+        };
+
+        public void Restore(ZeppelinSnapshot snapshot)
+        {
+            if (snapshot == null) return;
+
+            Vector3 pos = snapshot.position;
+            if (snapshot.hanging) pos.x = _hoverX;
+
+            transform.position = pos;
+            _baseY = snapshot.baseY;
+            _bobTime = snapshot.bobTime;
+            Hanging = snapshot.hanging;
+
+            CurrentHealth = Mathf.Clamp(snapshot.health, HealthFloor, Health);
+            if (_bar != null) _bar.Set(CurrentHealth / Health);
+            if (CurrentHealth <= SmokeBelow) StartSmoking();
+            if (CurrentHealth <= BurnBelow) StartBurning();
+        }
+
         public void TakeDamage(float amount)
         {
             if (amount <= 0f) return;

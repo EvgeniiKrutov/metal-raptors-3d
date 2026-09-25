@@ -32,6 +32,16 @@ namespace MetalRaptors
             return drop;
         }
 
+        public int Left => _left + (_crate != null ? 1 : 0);
+
+        public bool Open => _open || _crate != null;
+
+        public void Restore(int left, bool open)
+        {
+            _left = Mathf.Max(0, left);
+            _open = open;
+        }
+
         public void TakeScriptControl()
         {
             _scripted = true;

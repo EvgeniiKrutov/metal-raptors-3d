@@ -15,6 +15,12 @@ namespace MetalRaptors
 
         public bool IsRunning => _running > 0f;
 
+        public float Cooldown
+        {
+            get => _running > 0f && _config != null ? _config.boostCooldown : _cooldown;
+            set => _cooldown = Mathf.Max(0f, value);
+        }
+
         PlayerConfig _config;
         CubeController _plane;
         WingStreaks _trails;

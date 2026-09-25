@@ -103,6 +103,15 @@ namespace MetalRaptors
 
         public void SetAhead(GroundVehicle ahead) => _ahead = ahead;
 
+        public void Restore(float health)
+        {
+            if (_dead) return;
+
+            CurrentHealth = Mathf.Clamp(health, 1f, MaxHealth);
+            UpdateHealthBar();
+            if (CurrentHealth < SmokeHealthThreshold) Smoke();
+        }
+
         public void StandDown() => _standDown = true;
 
         public bool Touches(Vector3 point, float radius)

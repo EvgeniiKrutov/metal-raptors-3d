@@ -13,6 +13,8 @@ namespace MetalRaptors
         const float LeashScreens = 2f;
 
         readonly List<EnemyController> _live = new List<EnemyController>();
+        readonly Dictionary<EnemyController, PlaneModelConfig> _planes =
+            new Dictionary<EnemyController, PlaneModelConfig>();
         readonly EnemyConfig _scout;
         readonly EnemyConfig _fighter;
         readonly Rigidbody _player;
@@ -75,21 +77,63 @@ namespace MetalRaptors
                 for (int i = 0; i < group.count; i++, index++)
                 {
                     EnemyConfig config = EnemyConfigs.For(group.plane, _scout, _fighter);
-                    float ceilingY = _worldTop - group.plane.OnScreenSize / 2f;
-
-                    var go = new GameObject("Enemy");
-                    go.transform.position =
-                        SpawnPoint(camX, halfViewWidth, index, config, ceilingY);
-                    PlaneFactory.BuildPlaneModel(go.transform, group.plane, mirrored: true,
-                        skin: PlaneSkins.Default(group.plane));
-
-                    var enemy = go.AddComponent<EnemyController>();
-                    enemy.Initialize(config, _player, _minX, _maxX, _groundY,
-                        ceilingY, EdgeMargin);
-                    enemy.OnDestroyed += OnDestroyed;
-                    _live.Add(enemy);
+                    SpawnOne(group.plane, SpawnPoint(camX, halfViewWidth, index, config,
+                        CeilingFor(group.plane)));
                 }
             }
+        }
+
+        public void Capture(List<PlaneSnapshot> into)
+        {
+            foreach (EnemyController enemy in _live)
+            {
+                if (enemy == null || !enemy.IsAlive) continue;
+                if (!_planes.TryGetValue(enemy, out PlaneModelConfig plane)) continue;
+
+                into.Add(new PlaneSnapshot
+                {
+                    plane = plane,
+                    position = enemy.transform.position,
+                    heading = enemy.Heading,
+                    health = enemy.CurrentHealth,
+                });
+            }
+        }
+
+        public void Restore(IReadOnlyList<PlaneSnapshot> saved, float camX, float halfViewWidth)
+        {
+            if (saved == null) return;
+
+            SetWindow(camX, halfViewWidth);
+
+            float z = _player != null ? _player.position.z : 0f;
+            foreach (PlaneSnapshot snapshot in saved)
+            {
+                if (snapshot.plane == null) continue;
+
+                var at = new Vector3(snapshot.position.x, snapshot.position.y, z);
+                SpawnOne(snapshot.plane, at).Restore(snapshot.heading, snapshot.health);
+            }
+        }
+
+        float CeilingFor(PlaneModelConfig plane) => _worldTop - plane.OnScreenSize / 2f;
+
+        EnemyController SpawnOne(PlaneModelConfig plane, Vector3 position)
+        {
+            EnemyConfig config = EnemyConfigs.For(plane, _scout, _fighter);
+
+            var go = new GameObject("Enemy");
+            go.transform.position = position;
+            PlaneFactory.BuildPlaneModel(go.transform, plane, mirrored: true,
+                skin: PlaneSkins.Default(plane));
+
+            var enemy = go.AddComponent<EnemyController>();
+            enemy.Initialize(config, _player, _minX, _maxX, _groundY, CeilingFor(plane),
+                EdgeMargin);
+            enemy.OnDestroyed += OnDestroyed;
+            _live.Add(enemy);
+            _planes[enemy] = plane;
+            return enemy;
         }
 
         public void StandDown()
@@ -110,6 +154,10 @@ namespace MetalRaptors
                 Random.Range(minY, maxY), z);
         }
 
-        void OnDestroyed(EnemyController enemy) => _live.Remove(enemy);
+        void OnDestroyed(EnemyController enemy)
+        {
+            _live.Remove(enemy);
+            _planes.Remove(enemy);
+        }
     }
 }

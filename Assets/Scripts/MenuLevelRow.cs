@@ -5,7 +5,7 @@ using UnityEngine.UI;
 
 namespace MetalRaptors
 {
-    public class MenuLevelRow : MonoBehaviour, IMenuFocusGroup
+    public class MenuLevelRow : MonoBehaviour, IMenuRow
     {
         public event Action<int> FocusChanged;
         public event Action ViewChanged;
@@ -100,6 +100,13 @@ namespace MetalRaptors
         }
 
         public void FocusOn(int index) => FocusIndex(index, true);
+
+        public void Refocus() => FocusIndex(_focus < 0 ? 0 : _focus, true);
+
+        public void Blur()
+        {
+            foreach (MenuLevelCard card in _cards) card.SetFocused(false);
+        }
 
         void Focus(MenuLevelCard card)
         {

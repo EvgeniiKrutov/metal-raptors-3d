@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace MetalRaptors
 {
-    public class MenuCardRow : IMenuFocusGroup
+    public class MenuCardRow : IMenuRow
     {
         public event Action<int> FocusChanged;
 
@@ -12,6 +12,8 @@ namespace MetalRaptors
         readonly RectTransform _root;
         readonly CardMetrics _metrics;
         int _focus = -1;
+
+        public float CardSize => _metrics.Size;
 
         public MenuCardRow(Transform parent, string name, float top, int count)
         {
@@ -58,6 +60,15 @@ namespace MetalRaptors
         }
 
         public void FocusFirst() => FocusIndex(0);
+
+        public void FocusOn(int index) => FocusIndex(index);
+
+        public void Refocus() => FocusIndex(_focus < 0 ? 0 : _focus);
+
+        public void Blur()
+        {
+            foreach (MenuCardView card in _cards) card.SetFocused(false);
+        }
 
         void Focus(MenuCardView card)
         {

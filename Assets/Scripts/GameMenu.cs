@@ -18,10 +18,20 @@ namespace MetalRaptors
         const float ExpandSec = 0.28f;
         const float MaxStep = 0.05f;
 
+        const string ConfirmTitle = "RESTART LEVEL";
+        const string ConfirmMessage = "Are you sure? This will erase all level progress.";
+        const float ConfirmLineSpacing = 1.15f;
+        const float ConfirmMessageGap = 24f;
+
         static bool _pending;
 
         MenuPanel _panel;
         MenuItemView _optionsItem;
+        MenuItemView _restartLevelItem;
+        MenuPanel _confirmPanel;
+        Text _confirmMessage;
+        GameObject _confirm;
+        bool _confirmOpen;
         GameObject _hud;
         Image _band;
         Image _scrim;
@@ -87,7 +97,10 @@ namespace MetalRaptors
 
             if (kind == GameMenuKind.Pause) _panel.AddNav("resume", Close);
 
-            _panel.AddNav("restart", Restart);
+            _panel.AddNav(CampaignCheckpoint.Available ? "load last checkpoint" : "restart", Restart);
+
+            if (CampaignCheckpoint.InCareer && kind != GameMenuKind.Completed)
+                _restartLevelItem = _panel.AddNav("restart level", RestartLevel);
 
             if (kind == GameMenuKind.Completed)
             {
@@ -102,7 +115,70 @@ namespace MetalRaptors
             _panel.AddGap(MenuTheme.SectionGap);
             _panel.AddNav("quit to menu", () => Load(SceneNames.MainMenu));
 
+            if (_restartLevelItem != null) _confirm = BuildConfirm(canvas.transform);
+
             _panel.FocusFirst();
+        }
+
+        GameObject BuildConfirm(Transform canvas)
+        {
+            Transform column = MenuLayout.CreatePage(canvas, "Confirm Column", MenuTheme.ColumnFraction);
+            MenuLayout.BuildTitle(column, ConfirmTitle);
+
+            _confirmMessage = UIFactory.CreateParagraph(column, ConfirmMessage, MenuTheme.ItemSize,
+                MenuTheme.ListTop, 0f, MenuTheme.ItemRowHeight, ConfirmLineSpacing,
+                MenuTheme.Colors.Muted, UIFactory.MediumFont);
+            _confirmMessage.rectTransform.anchorMax = Vector2.one;
+
+            _confirmPanel = new MenuPanel(column, "Confirm Panel",
+                MenuTheme.ListTop - MenuTheme.ItemRowHeight - ConfirmMessageGap);
+            _confirmPanel.AddNav("no", CloseConfirm);
+            _confirmPanel.AddNav("yes", ReplayLevel);
+
+            column.gameObject.SetActive(false);
+            return column.gameObject;
+        }
+
+        void OpenConfirm()
+        {
+            if (_confirm == null || _sliding || _optionsOpen) return;
+
+            _confirmOpen = true;
+            _columnGroup.gameObject.SetActive(false);
+            _confirm.SetActive(true);
+            FitConfirm();
+            _confirmPanel.FocusFirst();
+        }
+
+        void FitConfirm()
+        {
+            Canvas.ForceUpdateCanvases();
+
+            RectTransform message = _confirmMessage.rectTransform;
+            float height = Mathf.Max(MenuTheme.ItemRowHeight, _confirmMessage.preferredHeight);
+            message.sizeDelta = new Vector2(message.sizeDelta.x, height);
+
+            var panel = (RectTransform)_confirmPanel.Root.transform;
+            panel.anchoredPosition = new Vector2(0f, MenuTheme.ListTop - height - ConfirmMessageGap);
+        }
+
+        void CloseConfirm()
+        {
+            if (!_confirmOpen) return;
+
+            _confirmOpen = false;
+            _confirm.SetActive(false);
+            _columnGroup.gameObject.SetActive(true);
+            _panel.Focus(_restartLevelItem);
+        }
+
+        void UpdateConfirm()
+        {
+            int step = MenuInput.ReadStep();
+            if (step != 0) _confirmPanel.MoveFocus(step);
+
+            if (MenuInput.ReadSubmit()) _confirmPanel.ActivateFocused();
+            if (MenuInput.ReadCancel()) CloseConfirm();
         }
 
         static string TitleFor(GameMenuKind kind)
@@ -197,6 +273,12 @@ namespace MetalRaptors
                 return;
             }
 
+            if (_confirmOpen)
+            {
+                UpdateConfirm();
+                return;
+            }
+
             int step = MenuInput.ReadStep();
             if (step != 0) _panel.MoveFocus(step);
 
@@ -215,7 +297,38 @@ namespace MetalRaptors
             Destroy(gameObject);
         }
 
-        void Restart() => Load(SceneManager.GetActiveScene().name);
+        static string ActiveScene => SceneManager.GetActiveScene().name;
+
+        void Restart()
+        {
+            if (!CampaignCheckpoint.InCareer)
+            {
+                Load(ActiveScene);
+                return;
+            }
+
+            if (!CampaignCheckpoint.Available)
+            {
+                ReplayLevel();
+                return;
+            }
+
+            CampaignCheckpoint.RequestRestore();
+            ScreenFade.Load(ActiveScene, Release, CampaignCheckpoint.RestoreOutSec,
+                CampaignCheckpoint.RestoreHoldSec, CampaignCheckpoint.RestoreInSec);
+        }
+
+        void RestartLevel()
+        {
+            if (CampaignCheckpoint.Available) OpenConfirm();
+            else ReplayLevel();
+        }
+
+        void ReplayLevel()
+        {
+            CampaignCheckpoint.RequestReplay();
+            Load(ActiveScene);
+        }
 
         void Load(string scene) => ScreenFade.Load(scene, Release);
 

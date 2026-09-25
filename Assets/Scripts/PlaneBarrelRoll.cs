@@ -15,6 +15,12 @@ namespace MetalRaptors
 
         public bool IsRunning => _plane != null && _plane.BarrelRolling;
 
+        public float Cooldown
+        {
+            get => IsRunning && _config != null ? _config.rollCooldown : _cooldown;
+            set => _cooldown = Mathf.Max(0f, value);
+        }
+
         PlayerConfig _config;
         CubeController _plane;
         WingStreaks _trails;

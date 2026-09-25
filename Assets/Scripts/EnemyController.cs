@@ -88,6 +88,8 @@ namespace MetalRaptors
 
         public float ModelSize => _bodyRadius > 0f ? _bodyRadius * 2f : 30f;
 
+        public float Heading => _heading;
+
         enum AiState { Attack, Fly, Evade, Recover, Return, DiveClimb, DiveRun, DiveZoom, Tail }
 
         EnemyConfig _config;
@@ -209,6 +211,15 @@ namespace MetalRaptors
             _shooter = target != null ? target.GetComponent<PlaneShooter>() : null;
 
             BuildHealthBar();
+            ApplyRotation();
+        }
+
+        public void Restore(float headingRad, float health)
+        {
+            _heading = headingRad;
+            CurrentHealth = Mathf.Clamp(health, 1f, Mathf.Max(1f, _config.health));
+            UpdateHealthBar();
+            if (CurrentHealth < SmokeHealthThreshold && _smoke != null) _smoke.Arm(ModelSize);
             ApplyRotation();
         }
 

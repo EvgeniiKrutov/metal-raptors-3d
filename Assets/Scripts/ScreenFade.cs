@@ -32,10 +32,14 @@ namespace MetalRaptors
                 return;
             }
 
-            Rig().Begin(change, null, outSec);
+            Rig().Begin(change, null, outSec, 0f, FadeSec);
         }
 
-        public static void Load(string scene, Action atBlack = null)
+        public static void Load(string scene, Action atBlack = null) =>
+            Load(scene, atBlack, FadeSec, 0f, FadeSec);
+
+        public static void Load(string scene, Action atBlack, float outSec, float holdSec,
+            float inSec)
         {
             if (string.IsNullOrEmpty(scene)) return;
 
@@ -46,17 +50,18 @@ namespace MetalRaptors
                 return;
             }
 
-            Rig().Begin(atBlack, scene, FadeSec);
+            Rig().Begin(atBlack, scene, outSec, holdSec, inSec);
         }
 
-        void Begin(Action atBlack, string scene, float outSec)
+        void Begin(Action atBlack, string scene, float outSec, float holdSec, float inSec)
         {
             _busy = true;
             _sheet.raycastTarget = true;
-            StartCoroutine(Run(atBlack, scene, Mathf.Max(0.01f, outSec)));
+            StartCoroutine(Run(atBlack, scene, Mathf.Max(0.01f, outSec), Mathf.Max(0f, holdSec),
+                Mathf.Max(0.01f, inSec)));
         }
 
-        IEnumerator Run(Action atBlack, string scene, float outSec)
+        IEnumerator Run(Action atBlack, string scene, float outSec, float holdSec, float inSec)
         {
             yield return Ramp(0f, 1f, outSec);
 
@@ -68,7 +73,9 @@ namespace MetalRaptors
                 yield return null;
             }
 
-            yield return Ramp(1f, 0f, FadeSec);
+            for (float t = 0f; t < holdSec; t += Time.unscaledDeltaTime) yield return null;
+
+            yield return Ramp(1f, 0f, inSec);
 
             _sheet.raycastTarget = false;
             _busy = false;

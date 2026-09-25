@@ -49,6 +49,8 @@ namespace MetalRaptors
 
         CampaignDefinition _level;
         int _levelNumber;
+        CampaignSnapshot _resume;
+        bool _replay;
         CubeController _cube;
         PlaneShooter _shooter;
         PlaneBomber _bomber;
@@ -122,6 +124,12 @@ namespace MetalRaptors
                 ? CampaignLevels.Custom(CustomBattle.Map, CustomBattle.Daytime, CustomBattle.Shape)
                 : CampaignLevels.ForNumber(_levelNumber);
 
+            bool career = !CustomBattle.Requested;
+            _resume = career ? CampaignCheckpoint.TakeRestore(_levelNumber) : null;
+            _replay = CampaignCheckpoint.TakeReplay() && career;
+            if (_resume == null) CampaignCheckpoint.Clear();
+            CampaignCheckpoint.InCareer = career;
+
             var config = Resources.Load<PlayerConfig>("PlayerConfig");
             if (config == null) config = ScriptableObject.CreateInstance<PlayerConfig>();
 
@@ -130,7 +138,8 @@ namespace MetalRaptors
             Firelight.Clear();
             ConfigureShadows();
             _terrain = CampaignTerrain.Begin(_level.terrain, _level.seed, _level.daytime,
-                _level.weather, CameraDistance, PlayPlaneZ, StartX, BuildLand());
+                _level.weather, CameraDistance, PlayPlaneZ,
+                _resume != null ? _resume.camera.x : StartX, BuildLand());
             BuildAerodrome();
             SpawnPlayer(config);
             SetupCamera();
@@ -169,16 +178,66 @@ namespace MetalRaptors
             BuildHud();
             BeginSupply();
             _sound = SoundSystem.Begin(_cube, null, silent: HasBriefing);
-            BeginIntro();
+            if (_resume == null) BeginIntro();
             BeginCompanion(config);
             ShowBriefing();
+            if (_resume != null) Resume();
 
             if (CustomBattle.Requested) DevSpawn.Register(this);
         }
 
-        void OnDestroy() => DevSpawn.Unregister(this);
+        void OnDestroy()
+        {
+            DevSpawn.Unregister(this);
+            CampaignCheckpoint.InCareer = false;
+        }
 
-        bool HasBriefing => !CustomBattle.Requested && !string.IsNullOrEmpty(_level.title);
+        bool HasBriefing => !CustomBattle.Requested && !string.IsNullOrEmpty(_level.title)
+                            && !_replay && _resume == null;
+
+        void Resume()
+        {
+            EnsureEnemies();
+            _enemies.Restore(_resume.enemies, _camBasePos.x, _halfViewWidth);
+            _convoy.Restore(_resume.vehicles);
+            if (_resume.zeppelin != null && SpawnZeppelin()) _zeppelin.Restore(_resume.zeppelin);
+
+            BeginScript();
+            if (_supply != null) _supply.Restore(_resume.suppliesLeft, _resume.supplyOpen);
+        }
+
+        public void Checkpoint(int step, bool warnedFirst, bool warnedPair)
+        {
+            if (CustomBattle.Requested || _gameOver || _playerFalling || _cube == null) return;
+
+            var snapshot = new CampaignSnapshot
+            {
+                level = _levelNumber,
+                step = step,
+                warnedFirst = warnedFirst,
+                warnedPair = warnedPair,
+                playerPosition = _cubeTr.position,
+                playerHeading = _cube.Heading,
+                playerHealth = _cube.CurrentHealth,
+                bombCooldown = _bomber != null ? _bomber.Cooldown : 0f,
+                boostCooldown = _boost != null ? _boost.Cooldown : 0f,
+                rollCooldown = _roll != null ? _roll.Cooldown : 0f,
+                camera = _camBasePos,
+                companionFoe = _wing != null ? _wing.FoePlane : null,
+            };
+
+            if (_airfield != null) snapshot.airfieldHealth = _airfield.CurrentHealth;
+            if (_supply != null)
+            {
+                snapshot.suppliesLeft = _supply.Left;
+                snapshot.supplyOpen = _supply.Open;
+            }
+            if (_enemies != null) _enemies.Capture(snapshot.enemies);
+            if (_convoy != null) _convoy.Capture(snapshot.vehicles);
+            if (_zeppelin != null) snapshot.zeppelin = _zeppelin.Capture();
+
+            CampaignCheckpoint.Save(snapshot);
+        }
 
         CampaignLandOptions BuildLand()
         {
@@ -219,6 +278,7 @@ namespace MetalRaptors
                 new Rect(AerodromeX, AerodromeZ, Aerodrome.Width, Aerodrome.LandDepth),
                 ProceduralTerrain.BaseLevel);
             _airfield.OnLost += OnAirfieldLost;
+            if (_resume != null) _airfield.Restore(_resume.airfieldHealth);
         }
 
         void BeginSky()
@@ -273,7 +333,7 @@ namespace MetalRaptors
             if (CustomBattle.Requested) return;
 
             _wing = CompanionFlight.Begin(_level, config, _cubeTr, PlayPlaneZ, AiGroundY, WorldTop,
-                CameraDistance);
+                CameraDistance, _resume != null ? _resume.companionFoe : null);
         }
 
         void ShowBriefing()
@@ -300,7 +360,7 @@ namespace MetalRaptors
 
             EnsureEnemies();
             _dialogue = new DialogueBar(_hud.transform);
-            _runner = CampaignScriptRunner.Begin(gameObject, script, this, _dialogue);
+            _runner = CampaignScriptRunner.Begin(gameObject, script, this, _dialogue, _resume);
         }
 
         void EnsureEnemies()
@@ -329,7 +389,9 @@ namespace MetalRaptors
         void SpawnPlayer(PlayerConfig config)
         {
             var go = new GameObject("PlayerPlane");
-            go.transform.position = new Vector3(StartX, SpawnY, PlayPlaneZ);
+            go.transform.position = _resume != null
+                ? new Vector3(_resume.playerPosition.x, _resume.playerPosition.y, PlayPlaneZ)
+                : new Vector3(StartX, SpawnY, PlayPlaneZ);
 
             var planeModel = GameManager.CurrentPlane;
             var model = PlaneFactory.BuildPlaneModel(go.transform, planeModel,
@@ -366,6 +428,13 @@ namespace MetalRaptors
 
             _searchlight = PlaneSearchlight.Mount(go,
                 PlaneFactory.NoseLocal(go, model, planeModel), _level.daytime);
+
+            if (_resume == null) return;
+
+            _cube.Restore(_resume.playerHeading, _resume.playerHealth);
+            _bomber.Cooldown = _resume.bombCooldown;
+            _boost.Cooldown = _resume.boostCooldown;
+            _roll.Cooldown = _resume.rollCooldown;
         }
 
         void SetupCamera()
@@ -400,6 +469,11 @@ namespace MetalRaptors
             CutsceneBlur.Focus(CameraDistance);
 
             PositionCamera(instant: true);
+            if (_resume != null)
+            {
+                _camBasePos = _resume.camera;
+                _cam.transform.position = _camBasePos;
+            }
 
             if (_level.clouds == null) return;
 
@@ -620,6 +694,7 @@ namespace MetalRaptors
             }
 
             if (!CustomBattle.Requested) CampaignProgress.Complete(_levelNumber);
+            CampaignCheckpoint.Clear();
 
             StartCoroutine(FlyOut());
         }
