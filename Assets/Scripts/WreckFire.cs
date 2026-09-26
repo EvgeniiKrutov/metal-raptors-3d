@@ -31,7 +31,8 @@ namespace MetalRaptors
 
         Flame[] _flames;
 
-        public static WreckFire Begin(Transform parent, Vector3 basePoint, float radius, int seed)
+        public static WreckFire Begin(Transform parent, Vector3 basePoint, float radius, int seed,
+            bool smoke = true)
         {
             var go = new GameObject("Wreck Fire");
             go.transform.SetParent(parent, false);
@@ -41,8 +42,9 @@ namespace MetalRaptors
             var fire = go.AddComponent<WreckFire>();
             fire.Build(size, new System.Random(seed));
 
-            SmokeColumn.Begin(go.transform, basePoint + Vector3.up * (size * SmokeLift),
-                seed, SmokeScale);
+            if (smoke)
+                SmokeColumn.Begin(go.transform, basePoint + Vector3.up * (size * SmokeLift),
+                    seed, SmokeScale);
             return fire;
         }
 

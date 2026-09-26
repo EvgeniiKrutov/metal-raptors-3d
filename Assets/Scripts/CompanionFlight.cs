@@ -7,8 +7,12 @@ namespace MetalRaptors
     {
         public const float Depth = 250f;
 
-        const float StationAhead = 65f;
         const float StationAbove = 32f;
+
+        const float SlotAhead = 90f;
+        const float SlotAbove = 50f;
+        const float EntryClearance = 20f;
+        const string LeadPilot = "roussel";
 
         const float PeelSeconds = 1.6f;
         const float CloseSeconds = 2.2f;
@@ -59,6 +63,7 @@ namespace MetalRaptors
             public float roleTimer;
             public bool friendHunts = true;
             public bool crossing;
+            public bool peeling;
         }
 
         readonly CampaignDefinition _level;
@@ -80,6 +85,7 @@ namespace MetalRaptors
 
         Phase _phase = Phase.Escort;
         bool _cinematic = true;
+        bool _flyIn;
         bool _standDown;
         float _phaseTimer;
         float _roleTimer;
@@ -116,7 +122,7 @@ namespace MetalRaptors
 
         public static CompanionFlight Begin(CampaignDefinition level, PlayerConfig playerFlight,
             Transform player, float playZ, float groundY, float worldTop, float cameraDistance,
-            PlaneModelConfig foe = null)
+            PlaneModelConfig foe = null, bool flyIn = false)
         {
             if (level == null || !level.companion || player == null) return null;
 
@@ -124,8 +130,9 @@ namespace MetalRaptors
                 cameraDistance, foe);
 
             flight._support = level.supportCompanion;
+            flight._flyIn = flyIn;
 
-            Vector3 slot = flight.Station;
+            Vector3 slot = flyIn ? flight.Slot(0) : flight.Station;
             Vector3 station = player.position + slot;
             station.z = playZ;
             flight._companion = DuelPlane.Spawn("Companion", level.companionPlane, playerFlight,
@@ -143,14 +150,50 @@ namespace MetalRaptors
             return flight;
         }
 
+        public static Vector3 SlotFor(CampaignDefinition level, int index)
+        {
+            if (level.CompanionPilot(index) == LeadPilot)
+                return new Vector3(SlotAhead, SlotAbove, 0f);
+
+            int trail = 0;
+            for (int i = 0; i < index; i++)
+                if (level.CompanionPilot(i) != LeadPilot) trail++;
+
+            int rank = trail / 2 + 1;
+            float side = trail % 2 == 0 ? 1f : -1f;
+            return new Vector3(-SlotAhead * rank, SlotAbove * side * rank, 0f);
+        }
+
+        static int FlightSize(CampaignDefinition level) =>
+            level != null && level.companion ? 1 + Mathf.Max(0, level.backCompanions) : 0;
+
+        public static float EntryLead(CampaignDefinition level)
+        {
+            float lead = 0f;
+            for (int i = 0; i < FlightSize(level); i++) lead = Mathf.Max(lead, SlotFor(level, i).x);
+            return lead;
+        }
+
+        public static float EntryLift(CampaignDefinition level)
+        {
+            float low = 0f;
+            for (int i = 0; i < FlightSize(level); i++) low = Mathf.Min(low, SlotFor(level, i).y);
+            return low < 0f ? EntryClearance - low : 0f;
+        }
+
+        Vector3 Slot(int index) => SlotFor(_level, index);
+
         PlaneSkin SkinFor(int index) =>
             PlaneSkins.Companion(_level.companionPlane,
                 CampaignSpeakers.SkinOf(_level.CompanionPilot(index)));
 
         void AddBackPair(int index, PlayerConfig playerFlight)
         {
-            Vector3 at = _player.position
-                       + new Vector3(-BackSpread * index, StationAbove + BackRise * index, Depth);
+            Vector3 slot = Slot(index + 1);
+            Vector3 at = _flyIn
+                ? _player.position + slot
+                : _player.position
+                  + new Vector3(-BackSpread * index, StationAbove + BackRise * index, Depth);
 
             var pair = new BackPair
             {
@@ -162,8 +205,37 @@ namespace MetalRaptors
             pair.friend.SetGround(_groundY);
             _backs.Add(pair);
 
+            if (_flyIn)
+            {
+                pair.friend.SetEscort(_player, slot);
+                pair.friend.SetEscortBounds(EscortFloorY, EscortCeilingY);
+                pair.friend.SetRole(DuelRole.Escort, null);
+                return;
+            }
+
             SpawnBackFoe(pair, at + new Vector3(BackSpread, 0f, 0f), playerFlight);
             BeginBackDuel(pair);
+        }
+
+        Vector3 BackFoeEntry(BackPair pair) => new Vector3(_camX + _halfView + FoeEntryMargin,
+            Mathf.Clamp(pair.friend != null ? pair.friend.transform.position.y : _player.position.y,
+                _floorY, _ceilingY),
+            _playZ + Depth);
+
+        void PeelBacks()
+        {
+            foreach (BackPair pair in _backs)
+            {
+                if (pair.friend == null) continue;
+
+                pair.peeling = true;
+                pair.roleTimer = PeelSeconds;
+                pair.friend.SetRole(DuelRole.Peel, null);
+                pair.friend.SetDepth(_playZ + Depth, PeelSeconds);
+
+                SpawnBackFoe(pair, BackFoeEntry(pair), _flight);
+                if (pair.foe != null) pair.foe.SetRole(DuelRole.Hunt, pair.friend);
+            }
         }
 
         void SpawnBackFoe(BackPair pair, Vector3 at, PlayerConfig playerFlight)
@@ -175,6 +247,7 @@ namespace MetalRaptors
 
         void BeginBackDuel(BackPair pair)
         {
+            pair.peeling = false;
             pair.crossing = false;
             pair.friendHunts = Random.value < 0.5f;
             pair.roleTimer = Random.Range(HuntMin, HuntMax);
@@ -199,7 +272,11 @@ namespace MetalRaptors
                 pair.roleTimer -= dt;
                 if (pair.roleTimer > 0f) continue;
 
-                if (pair.crossing)
+                if (pair.peeling)
+                {
+                    BeginBackDuel(pair);
+                }
+                else if (pair.crossing)
                 {
                     pair.crossing = false;
                     pair.friendHunts = !pair.friendHunts;
@@ -218,7 +295,7 @@ namespace MetalRaptors
 
         Vector3 Station => _support
             ? new Vector3(SupportStationAhead, SupportStationAbove, 0f)
-            : new Vector3(StationAhead, StationAbove, 0f);
+            : Slot(0);
 
         float EscortFloorY => _groundY + EscortFloorMargin;
 
@@ -350,6 +427,8 @@ namespace MetalRaptors
             _cinematic = value;
             if (_standDown || _companion == null) return;
 
+            if (!value && _flyIn) BreakFormation();
+
             if (_support)
             {
                 _companion.SetMark(null);
@@ -474,13 +553,7 @@ namespace MetalRaptors
                 pair.wreck = pair.foe;
                 pair.foe = null;
 
-                Vector3 at = new Vector3(_camX + _halfView + FoeEntryMargin,
-                    Mathf.Clamp(pair.friend != null ? pair.friend.transform.position.y
-                                                    : _player.position.y,
-                        _floorY, _ceilingY),
-                    _playZ + Depth);
-
-                SpawnBackFoe(pair, at, _flight);
+                SpawnBackFoe(pair, BackFoeEntry(pair), _flight);
                 BeginBackDuel(pair);
             }
         }
@@ -496,6 +569,13 @@ namespace MetalRaptors
                 if (pair.friend != null) pair.friend.StandDown();
                 if (pair.foe != null) pair.foe.StandDown();
             }
+        }
+
+        void BreakFormation()
+        {
+            _flyIn = false;
+            _companion.SetEscort(_player, Station);
+            PeelBacks();
         }
 
         void Peel()

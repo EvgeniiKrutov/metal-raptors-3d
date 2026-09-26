@@ -19,13 +19,14 @@ namespace MetalRaptors
         Action _onCue;
         float _cueX;
         float _handoverX;
+        bool _holdToCutscene;
         bool _active = true;
 
         public bool Active => _active;
 
         public static LevelIntro Begin(GameObject owner, CubeController plane, PlaneShooter shooter,
             PlaneBomber bomber, PlaneBoost boost, PlaneBarrelRoll roll, float holdX,
-            float halfViewWidth, Action onCue)
+            float halfViewWidth, Action onCue, float lead = 0f, bool holdToCutscene = false)
         {
             if (plane == null) return null;
 
@@ -37,11 +38,13 @@ namespace MetalRaptors
             intro._roll = roll;
             intro._tr = plane.transform;
             intro._onCue = onCue;
-            intro._cueX = holdX - halfViewWidth * CueFraction;
+            intro._holdToCutscene = holdToCutscene;
+            intro._cueX = holdToCutscene ? holdX : holdX - halfViewWidth * CueFraction;
             intro._handoverX = holdX - halfViewWidth * HandoverFraction;
 
             Vector3 pos = intro._tr.position;
-            intro._tr.position = new Vector3(holdX - halfViewWidth - EntryMargin, pos.y, pos.z);
+            intro._tr.position = new Vector3(holdX - halfViewWidth - EntryMargin - lead,
+                pos.y, pos.z);
 
             plane.SetControlled(false);
             if (shooter != null) shooter.Stop();
@@ -60,7 +63,13 @@ namespace MetalRaptors
 
             _onCue?.Invoke();
 
-            while (_tr != null && _tr.position.x < _handoverX) yield return null;
+            if (_holdToCutscene)
+            {
+                yield return null;
+                while (CinematicBars.AnyShowing) yield return null;
+            }
+            else
+                while (_tr != null && _tr.position.x < _handoverX) yield return null;
 
             Handover();
         }

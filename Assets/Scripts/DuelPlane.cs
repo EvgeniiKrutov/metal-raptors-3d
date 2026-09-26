@@ -22,8 +22,8 @@ namespace MetalRaptors
         const float StationCloseSpeed = 220f;
         const float TrackFilter = 8f;
         const float WobbleHz = 0.19f;
-        const float WobbleRise = 10f;
-        const float WobbleDrift = 12f;
+        const float WobbleRise = 4f;
+        const float WobbleDrift = 5f;
 
         const float PeelClimbDeg = 24f;
 
@@ -32,7 +32,7 @@ namespace MetalRaptors
         const float FormGain = 0.55f;
         const float FormPush = 95f;
         const float FormTrim = 70f;
-        const float FormMinSpeed = 40f;
+        const float StallFraction = 0.7f;
         const float FormReach = 70f;
 
         const float JinkHz = 0.5f;
@@ -449,11 +449,25 @@ namespace MetalRaptors
             if (correction.sqrMagnitude > maxStep * maxStep)
                 correction = correction.normalized * maxStep;
 
-            Vector3 next = pos + carry + correction;
+            Vector3 next = pos + KeepAirspeed(carry, carry + correction);
 
             Vector2 move = next - pos;
             if (move.sqrMagnitude > 1e-4f) TrackHeading(Mathf.Atan2(move.y, move.x), dt);
             return next;
+        }
+
+        static Vector3 KeepAirspeed(Vector3 carry, Vector3 move)
+        {
+            Vector2 lead = carry;
+            float length = lead.magnitude;
+            if (length < 1e-4f) return move;
+
+            Vector2 dir = lead / length;
+            float along = Vector2.Dot(move, dir);
+            float least = length * StallFraction;
+            if (along >= least) return move;
+
+            return move + (Vector3)(dir * (least - along));
         }
 
         Vector3 Fly(Vector3 pos, float dt)
@@ -475,7 +489,7 @@ namespace MetalRaptors
             if (_role == DuelRole.Form || _role == DuelRole.Support)
             {
                 cruise = FormCruise(pos);
-                floor = FormMinSpeed;
+                floor = _leadSpeed * StallFraction;
             }
             UpdateSpeed(cruise, floor, dt);
 

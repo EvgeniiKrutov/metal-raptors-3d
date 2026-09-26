@@ -11,7 +11,7 @@ namespace MetalRaptors
         bool CompanionReady { get; }
         void SpawnWave(EnemyGroup[] groups);
         float WarnIncoming(int planes);
-        void ArmSupply(bool open);
+        void ArmSupply(int crates);
         void SetCompanionFoe(PlaneModelConfig plane);
         bool SpawnZeppelin();
         bool ZeppelinHanging { get; }
@@ -126,7 +126,7 @@ namespace MetalRaptors
                         break;
 
                     case CampaignOp.Supply:
-                        _host.ArmSupply(true);
+                        _host.ArmSupply(step.count);
                         break;
 
                     case CampaignOp.Foe:
@@ -220,7 +220,7 @@ namespace MetalRaptors
 
             if (!_bar.IsOpen)
             {
-                _host.ArmSupply(false);
+                _host.ArmSupply(0);
 
                 if (_resumed)
                 {

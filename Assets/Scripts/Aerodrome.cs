@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -13,6 +14,7 @@ namespace MetalRaptors
 
         // Every group null holds its buildings as direct children, so one rule covers all four.
         static readonly string[] SolidGroups = { "Hangars", "Quarters", "Sheds", "Tower" };
+        static readonly string[] AircraftGroups = { "Aircraft" };
         const float ProbeY = -9000f;
         const float Epsilon = 0.0001f;
 
@@ -30,6 +32,14 @@ namespace MetalRaptors
         static Vector3 _modelMin;
         static float _towerLeft;
         static Vector3 _hardMin, _hardSize;
+
+        Transform _view;
+        int _seed;
+        AerodromeBlaze _blaze;
+
+        public static Aerodrome Current { get; private set; }
+
+        public bool Burning => _blaze != null;
 
         public static bool Ready => _measured && _prefab != null;
         public static float Scale => _scale;
@@ -122,7 +132,49 @@ namespace MetalRaptors
             Solidify(view.transform);
             SetLayer(root.transform, BattlefieldProps.Layer);
             LightFires(leftX, nearZ, groundY, seed);
-            return root.AddComponent<Aerodrome>();
+
+            var aerodrome = root.AddComponent<Aerodrome>();
+            aerodrome._view = view.transform;
+            aerodrome._seed = seed;
+            Current = aerodrome;
+            return aerodrome;
+        }
+
+        public void SetBurning(bool burning)
+        {
+            if (burning == Burning) return;
+
+            if (burning)
+            {
+                _blaze = AerodromeBlaze.Begin(Footprints(SolidGroups), Footprints(AircraftGroups),
+                    _seed);
+                return;
+            }
+
+            Destroy(_blaze.gameObject);
+            _blaze = null;
+        }
+
+        List<Bounds> Footprints(string[] groups)
+        {
+            var footprints = new List<Bounds>();
+            foreach (string group in groups)
+            {
+                Transform node = PlaneFactory.FindDeep(_view, group);
+                if (node == null) continue;
+
+                for (int i = 0; i < node.childCount; i++)
+                {
+                    Bounds bounds = BoundsIn(Matrix4x4.identity, node.GetChild(i));
+                    if (bounds.size.sqrMagnitude > Epsilon) footprints.Add(bounds);
+                }
+            }
+            return footprints;
+        }
+
+        void OnDestroy()
+        {
+            if (Current == this) Current = null;
         }
 
         // The buildings are the one part of the field a plane cannot fly through. Each gets a

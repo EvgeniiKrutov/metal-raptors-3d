@@ -37,6 +37,9 @@ namespace MetalRaptors
         const float SpawnButtonGap = 8f;
         const int SpawnFontSize = 14;
 
+        const string FireOffCaption = "AERODROME FIRE   OFF";
+        const string FireOnCaption = "AERODROME FIRE   ON";
+
         static readonly Color PanelColor = new Color(0.04f, 0.05f, 0.07f, 0.84f);
         static readonly Color TitleColor = new Color(0.52f, 0.58f, 0.66f, 1f);
         static readonly Color LabelColor = new Color(0.60f, 0.66f, 0.74f, 1f);
@@ -84,7 +87,14 @@ namespace MetalRaptors
         Row _ram;
         Row _fps;
 
+        GameObject _fireSection;
+        Text _fireLabel;
+        float _fireHeight;
+        bool _fireShown;
+        bool _fireOn;
+
         GameObject _spawnSection;
+        RectTransform _spawnRt;
         SpawnAction _scoutSpawn;
         SpawnAction _fighterSpawn;
         SpawnAction _truckSpawn;
@@ -193,15 +203,15 @@ namespace MetalRaptors
 
             _panelRt = rt;
             _statsHeight = -y - RowGap + 2f * PadY;
+            BuildFireSection(content, y);
             BuildSpawnSection(content, y);
             rt.sizeDelta = new Vector2(PanelWidth, _statsHeight);
         }
 
-        void BuildSpawnSection(Transform content, float y)
+        static RectTransform CreateSection(Transform content, string name)
         {
-            var go = new GameObject("Spawn", typeof(RectTransform));
+            var go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(content, false);
-            _spawnSection = go;
 
             var rt = (RectTransform)go.transform;
             rt.anchorMin = Vector2.zero;
@@ -209,6 +219,37 @@ namespace MetalRaptors
             rt.pivot = new Vector2(0.5f, 1f);
             rt.offsetMin = Vector2.zero;
             rt.offsetMax = Vector2.zero;
+            return rt;
+        }
+
+        void BuildFireSection(Transform content, float y)
+        {
+            RectTransform rt = CreateSection(content, "Aerodrome");
+            _fireSection = rt.gameObject;
+            float top = y;
+
+            UIFactory.CreateRule(rt, y, new Vector2(PanelWidth - 2f * PadX, 1f), MeterTrackColor);
+            y -= SpawnRuleGap;
+
+            UIFactory.CreateLabel(rt, "AERODROME", TitleSize, y, TitleRowHeight,
+                TitleColor, UIFactory.MediumFont);
+            y -= TitleRowHeight + SpawnCaptionGap;
+
+            Button button = CreateButton(rt, FireOffCaption, ref y);
+            button.onClick.AddListener(ToggleFire);
+            _fireLabel = button.GetComponentInChildren<Text>();
+            _fireLabel.color = ValueColor;
+
+            _fireHeight = top - y - SpawnButtonGap + RowGap;
+            _fireSection.SetActive(false);
+        }
+
+        void BuildSpawnSection(Transform content, float y)
+        {
+            RectTransform rt = CreateSection(content, "Spawn");
+            GameObject go = rt.gameObject;
+            _spawnSection = go;
+            _spawnRt = rt;
 
             UIFactory.CreateRule(go.transform, y, new Vector2(PanelWidth - 2f * PadX, 1f),
                 MeterTrackColor);
@@ -237,8 +278,7 @@ namespace MetalRaptors
             go.SetActive(false);
         }
 
-        SpawnAction CreateSpawnButton(Transform parent, string caption, System.Action release,
-            ref float y)
+        static Button CreateButton(Transform parent, string caption, ref float y)
         {
             Button button = UIFactory.CreateButton(parent, caption, Vector2.zero, null,
                 new Vector2(0f, SpawnButtonHeight), fontSize: SpawnFontSize);
@@ -250,6 +290,13 @@ namespace MetalRaptors
             rt.sizeDelta = new Vector2(0f, SpawnButtonHeight);
             rt.anchoredPosition = new Vector2(0f, y);
             y -= SpawnButtonHeight + SpawnButtonGap;
+            return button;
+        }
+
+        SpawnAction CreateSpawnButton(Transform parent, string caption, System.Action release,
+            ref float y)
+        {
+            Button button = CreateButton(parent, caption, ref y);
 
             var action = new SpawnAction
             {
@@ -335,6 +382,7 @@ namespace MetalRaptors
             Keyboard kb = Keyboard.current;
             if (kb != null && kb.tabKey.wasPressedThisFrame) SetVisible(!_visible);
 
+            TickFire();
             TickSpawn();
 
             if (!_visible) return;
@@ -380,15 +428,49 @@ namespace MetalRaptors
                 _zeppelinSpawn.Button.interactable = DevSpawn.ZeppelinReady;
         }
 
+        void TickFire()
+        {
+            Aerodrome field = Aerodrome.Current;
+            bool shown = field != null;
+            bool on = shown && field.Burning;
+
+            if (shown != _fireShown)
+            {
+                _fireShown = shown;
+                if (_fireSection != null) _fireSection.SetActive(shown);
+                Layout();
+            }
+
+            if (on == _fireOn || _fireLabel == null) return;
+
+            _fireOn = on;
+            _fireLabel.text = on ? FireOnCaption : FireOffCaption;
+            _fireLabel.color = on ? SpawnPendingColor : ValueColor;
+        }
+
+        static void ToggleFire()
+        {
+            Aerodrome field = Aerodrome.Current;
+            if (field != null) field.SetBurning(!field.Burning);
+        }
+
+        void Layout()
+        {
+            float fire = _fireShown ? _fireHeight : 0f;
+            if (_spawnRt != null) _spawnRt.offsetMax = new Vector2(0f, -fire);
+            if (_panelRt != null)
+                _panelRt.sizeDelta = new Vector2(PanelWidth, fire
+                    + (!_spawnShown ? _statsHeight
+                        : _zeppelinShown ? _zeppelinPanelHeight : _spawnPanelHeight));
+        }
+
         void ShowSpawnSection(bool shown, bool zeppelin)
         {
             _spawnShown = shown;
             _zeppelinShown = zeppelin;
             if (_spawnSection != null) _spawnSection.SetActive(shown);
             if (_zeppelinSpawn != null) _zeppelinSpawn.Button.gameObject.SetActive(zeppelin);
-            if (_panelRt != null)
-                _panelRt.sizeDelta = new Vector2(PanelWidth,
-                    !shown ? _statsHeight : zeppelin ? _zeppelinPanelHeight : _spawnPanelHeight);
+            Layout();
 
             if (!zeppelin) ResetSpawn(_zeppelinSpawn);
             if (shown) return;

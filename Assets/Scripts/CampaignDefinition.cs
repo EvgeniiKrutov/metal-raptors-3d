@@ -39,7 +39,7 @@ namespace MetalRaptors
         public float enemyRotationScale = 1f;
         public int supplyDrops;
         public float supplyHealthFraction = 0.3f;
-        public float supplyHeal = 50f;
+        public float supplyHeal = 55f;
         public PlaneModelConfig companionPlane = PlaneModels.Sopwith;
         public PlaneModelConfig companionFoe = PlaneModels.Albatros;
         public string[] companionPilots;
@@ -178,7 +178,7 @@ namespace MetalRaptors
             flak = 1.1f,
             enemyHealthScale = 0.60f,
             enemyRotationScale = 0.84f,
-            supplyDrops = 2,
+            supplyDrops = 3,
             companionFoe = PlaneModels.Eindecker,
             companionPilots = new[] { "crane", "roussel", "marchand" },
             title = "THE NUMBERS",

@@ -63,7 +63,7 @@
     { "op": "say", "speaker": "roussel", "line": "l2_line35" },
     { "op": "say", "speaker": "you", "line": "l2_line36" },
 
-    { "op": "supply" },
+    { "op": "supply", "count": 2 },
 
     { "op": "wave", "enemies": [ { "plane": "albatros", "count": 2 } ] },
     { "op": "wait", "seconds": 4 },

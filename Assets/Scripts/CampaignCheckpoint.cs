@@ -45,7 +45,7 @@ namespace MetalRaptors
 
         public float airfieldHealth = Airfield.MaxHealth;
         public int suppliesLeft;
-        public bool supplyOpen;
+        public int suppliesArmed;
         public PlaneModelConfig companionFoe;
 
         public readonly List<PlaneSnapshot> enemies = new List<PlaneSnapshot>();

@@ -11,6 +11,8 @@ namespace MetalRaptors
         const float RecoverLookaheadSec = 1f;
         const int RecoverProbeSteps = 6;
         const float RecoverSideBias = 15f;
+        const float RunDownClearance = 30f;
+        const float RunDownLookaheadSec = 0.6f;
         const float CeilingMargin = 130f;
         const float ReturnSpeedFactor = 1.35f;
         const float BreakRoomCap = 300f;
@@ -437,7 +439,7 @@ namespace MetalRaptors
 
         bool CheckGroundAvoidance()
         {
-            if (RunningDown) return false;
+            if (RunningDown && !Scouting) return false;
             if (!GroundThreat()) return false;
             if (_state != AiState.Recover) EnterRecover();
             return true;
@@ -445,16 +447,19 @@ namespace MetalRaptors
 
         bool GroundThreat()
         {
-            Vector2 p = _rb.position;
-            if (p.y - GroundRef < _config.minAltitudeMargin) return true;
+            float margin = RunningDown ? _bodyRadius + RunDownClearance : _config.minAltitudeMargin;
+            float lookahead = RunningDown ? RunDownLookaheadSec : RecoverLookaheadSec;
 
-            float travel = FlightSpeed() * (RecoverLookaheadSec / RecoverProbeSteps);
+            Vector2 p = _rb.position;
+            if (p.y - GroundRef < margin) return true;
+
+            float travel = FlightSpeed() * (lookahead / RecoverProbeSteps);
             var step = new Vector2(Mathf.Cos(_heading), Mathf.Sin(_heading)) * travel;
 
             for (int i = 0; i < RecoverProbeSteps; i++)
             {
                 p += step;
-                if (p.y - GroundAt(p.x) < _config.minAltitudeMargin) return true;
+                if (p.y - GroundAt(p.x) < margin) return true;
             }
             return false;
         }

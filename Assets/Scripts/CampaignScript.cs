@@ -14,6 +14,7 @@ namespace MetalRaptors
         public string text;
         public EnemyGroup[] groups;
         public PlaneModelConfig plane;
+        public int count;
     }
 
     public class CampaignScript
@@ -95,7 +96,12 @@ namespace MetalRaptors
                 case "wave": return ParseWave(CampaignOp.Wave, step, origin, index);
                 case "spawn": return ParseWave(CampaignOp.Spawn, step, origin, index);
                 case "waitclear": return new CampaignStep { op = CampaignOp.WaitClear };
-                case "supply": return new CampaignStep { op = CampaignOp.Supply };
+                case "supply":
+                    return new CampaignStep
+                    {
+                        op = CampaignOp.Supply,
+                        count = Mathf.Max(1, Mathf.RoundToInt(Number(step, "count", 1f))),
+                    };
                 case "foe": return ParseFoe(step, origin, index);
                 case "zeppelin": return new CampaignStep { op = CampaignOp.Zeppelin };
                 case "finish": return new CampaignStep { op = CampaignOp.Finish };

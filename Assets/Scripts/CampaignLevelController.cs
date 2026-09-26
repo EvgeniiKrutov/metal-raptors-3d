@@ -203,7 +203,7 @@ namespace MetalRaptors
             if (_resume.zeppelin != null && SpawnZeppelin()) _zeppelin.Restore(_resume.zeppelin);
 
             BeginScript();
-            if (_supply != null) _supply.Restore(_resume.suppliesLeft, _resume.supplyOpen);
+            if (_supply != null) _supply.Restore(_resume.suppliesLeft, _resume.suppliesArmed);
         }
 
         public void Checkpoint(int step, bool warnedFirst, bool warnedPair)
@@ -230,7 +230,7 @@ namespace MetalRaptors
             if (_supply != null)
             {
                 snapshot.suppliesLeft = _supply.Left;
-                snapshot.supplyOpen = _supply.Open;
+                snapshot.suppliesArmed = _supply.Armed;
             }
             if (_enemies != null) _enemies.Capture(snapshot.enemies);
             if (_convoy != null) _convoy.Capture(snapshot.vehicles);
@@ -319,7 +319,8 @@ namespace MetalRaptors
         void BeginIntro()
         {
             _intro = LevelIntro.Begin(gameObject, _cube, _shooter, _bomber, _boost, _roll,
-                IntroHoldX, _halfViewWidth, BeginScript);
+                IntroHoldX, _halfViewWidth, BeginScript, CompanionFlight.EntryLead(_level),
+                _level.companion);
         }
 
         void BeginSupply()
@@ -333,7 +334,7 @@ namespace MetalRaptors
             if (CustomBattle.Requested) return;
 
             _wing = CompanionFlight.Begin(_level, config, _cubeTr, PlayPlaneZ, AiGroundY, WorldTop,
-                CameraDistance, _resume != null ? _resume.companionFoe : null);
+                CameraDistance, _resume != null ? _resume.companionFoe : null, _resume == null);
         }
 
         void ShowBriefing()
@@ -391,7 +392,7 @@ namespace MetalRaptors
             var go = new GameObject("PlayerPlane");
             go.transform.position = _resume != null
                 ? new Vector3(_resume.playerPosition.x, _resume.playerPosition.y, PlayPlaneZ)
-                : new Vector3(StartX, SpawnY, PlayPlaneZ);
+                : new Vector3(StartX, SpawnY + CompanionFlight.EntryLift(_level), PlayPlaneZ);
 
             var planeModel = GameManager.CurrentPlane;
             var model = PlaneFactory.BuildPlaneModel(go.transform, planeModel,
@@ -656,9 +657,9 @@ namespace MetalRaptors
             _convoy.Spawn(kind, 1, ConvoyEdgeX);
         }
 
-        public void ArmSupply(bool open)
+        public void ArmSupply(int crates)
         {
-            if (_supply != null) _supply.Arm(open);
+            if (_supply != null) _supply.Arm(crates);
         }
 
         public void SetCompanionFoe(PlaneModelConfig plane)
