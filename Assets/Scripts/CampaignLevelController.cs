@@ -95,6 +95,12 @@ namespace MetalRaptors
             (_enemies != null ? _enemies.AliveCount : 0)
             + (_convoy != null ? _convoy.AliveCount : 0);
 
+        public int CountAlive(EnemyKind kind, PlaneModelConfig plane)
+        {
+            if (kind == EnemyKind.Plane) return _enemies != null ? _enemies.CountAlive(plane) : 0;
+            return _convoy != null ? _convoy.CountAlive(kind) : 0;
+        }
+
         public bool CompanionReady => _wing == null || _wing.Formed;
 
         bool Coast => _level.terrain == TerrainKind.Flanders;
@@ -147,8 +153,8 @@ namespace MetalRaptors
             if (Coast)
             {
                 _sea = SeaSurface.Begin(_cam, _level.daytime);
-                Battlefield.BeginCoast(_cam, _halfViewWidth, _level.seed,
-                    SeaSurface.Level, SeaSurface.NearEdge);
+                ScatterRubble(Battlefield.BeginCoast(_cam, _halfViewWidth, _level.seed,
+                    SeaSurface.Level, SeaSurface.NearEdge));
             }
             else if (Alpine)
             {
@@ -309,7 +315,7 @@ namespace MetalRaptors
 
         void ScatterRubble(Battlefield field)
         {
-            if (field == null || _level.terrain != TerrainKind.Verdun) return;
+            if (field == null || (_level.terrain != TerrainKind.Verdun && !Coast)) return;
 
             field.ScatterRubble();
         }
@@ -480,7 +486,7 @@ namespace MetalRaptors
 
             if (Coast)
                 CloudSystem.Begin(_cam, CoastSky.CloudColor(_level.daytime),
-                    CoastSky.CloudGlow(_level.daytime), _level.clouds, PlayPlaneZ);
+                    CoastSky.CloudGlow(_level.daytime), _level.clouds, PlayPlaneZ, lowBand: true);
             else if (Alpine)
                 CloudSystem.Begin(_cam, DolomitesSky.CloudColor(_level.daytime),
                     DolomitesSky.CloudGlow(_level.daytime), _level.clouds, PlayPlaneZ);

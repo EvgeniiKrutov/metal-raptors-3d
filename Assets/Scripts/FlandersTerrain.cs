@@ -37,6 +37,12 @@ namespace MetalRaptors
         const float MaxDykeReach = 150f;
         const float DykeFadeFrom = 120f, DykeFadeTo = 190f;
 
+        const float GroyneCellSize = 320f;
+        const float GroyneXMin = 0.35f, GroyneXMax = 0.65f;
+        const float GroyneInsetMin = 4f, GroyneInsetMax = 14f;
+        const float GroyneAngleMin = 40f, GroyneAngleMax = 52f;
+        const float GroyneDrop = 6f;
+
         const int AlphaRes = 128;
         const int RowsPerStep = 16;
 
@@ -49,6 +55,7 @@ namespace MetalRaptors
         static readonly Color SandColor = new Color(0.74f, 0.70f, 0.59f);
 
         float _p1, _p2, _p3, _p4, _p5, _p6, _d1, _d2, _m1, _m2, _m3, _m4;
+        float _groyneSide;
 
         TerrainLayer _groundLayer, _sandLayer;
         Material _wallMat;
@@ -82,6 +89,7 @@ namespace MetalRaptors
             _d1 = Offset(rng); _d2 = Offset(rng);
             _m1 = Offset(rng); _m2 = Offset(rng);
             _m3 = Offset(rng); _m4 = Offset(rng);
+            _groyneSide = rng.NextDouble() < 0.5 ? -1f : 1f;
 
             _groundLayer = TerrainSurfaces.GrainLayer("Coast (grain)", GroundColor, GroundTile, _seed);
             _sandLayer = TerrainSurfaces.FlatLayer("Coast (flat sand)", SandColor, SandTile);
@@ -156,6 +164,33 @@ namespace MetalRaptors
 
             AddMesh(root, "Cut Wall", ProceduralTerrain.BuildCutWallMesh(cutLine, ChunkLength),
                 _wallMat, new Vector3(x0 + ChunkLength / 2f, 0f, 0f), owned);
+
+            AddGroynes(index, root);
+        }
+
+        void AddGroynes(int index, Transform root)
+        {
+            if (!FlandersGroyne.Measure()) return;
+
+            float x0 = index * ChunkLength;
+            int c0 = Mathf.FloorToInt(x0 / GroyneCellSize);
+            int c1 = Mathf.FloorToInt((x0 + ChunkLength) / GroyneCellSize);
+
+            for (int cell = c0; cell <= c1; cell++)
+            {
+                var rng = new System.Random(Hash(_seed, cell, 17));
+                float x = (cell + Range(rng, GroyneXMin, GroyneXMax)) * GroyneCellSize;
+                if (x < x0 || x >= x0 + ChunkLength) continue;
+
+                float z = ShoreCentre(x) - ShoreHalf(x) - Range(rng, GroyneInsetMin, GroyneInsetMax);
+                float angle = Range(rng, GroyneAngleMin, GroyneAngleMax) * Mathf.Deg2Rad;
+                Vector3 run = new Vector3(_groyneSide * Mathf.Sin(angle), 0f, Mathf.Cos(angle))
+                              * FlandersGroyne.Length;
+
+                var land = new Vector3(x, BaseHeight(x, z), z);
+
+                FlandersGroyne.Place(root, land, land + run + Vector3.down * GroyneDrop, BaseHeight);
+            }
         }
 
         void CacheShore(int chunkIndex)

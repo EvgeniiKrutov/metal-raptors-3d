@@ -203,7 +203,7 @@ namespace MetalRaptors
             flak = 0.9f,
             enemyHealthScale = 0.65f,
             enemyRotationScale = 0.88f,
-            supplyDrops = 1,
+            supplyDrops = 6,
             companionPilots = new[] { "marchand" },
             title = "FIXED GROUND",
             dateline = "12 February 1917 — Vaux-le-Bois — failing light",

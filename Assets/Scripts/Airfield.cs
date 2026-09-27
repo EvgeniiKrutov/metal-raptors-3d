@@ -5,9 +5,11 @@ namespace MetalRaptors
 {
     public class Airfield : MonoBehaviour
     {
-        public const float MaxHealth = 100f;
+        public const float BaseHealth = 100f;
+        public const float MaxHealth = BaseHealth * HealthMargin;
         public const float ShellSeconds = 45f;
 
+        const float HealthMargin = 1.3f;
         const float FenceAimHeight = 12f;
 
         public static Airfield Current { get; private set; }

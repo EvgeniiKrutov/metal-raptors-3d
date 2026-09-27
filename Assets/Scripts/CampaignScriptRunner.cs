@@ -8,6 +8,7 @@ namespace MetalRaptors
     {
         bool IsOver { get; }
         int EnemiesAlive { get; }
+        int CountAlive(EnemyKind kind, PlaneModelConfig plane);
         bool CompanionReady { get; }
         void SpawnWave(EnemyGroup[] groups);
         float WarnIncoming(int planes);
@@ -36,6 +37,8 @@ namespace MetalRaptors
         int _start;
         int _firstSay = -1;
         bool _resumed;
+
+        public static string WaveStatus { get; private set; }
 
         public static CampaignScriptRunner Begin(GameObject owner, CampaignScript script,
             ICampaignScriptHost host, DialogueBar bar, CampaignSnapshot resume = null)
@@ -80,6 +83,7 @@ namespace MetalRaptors
 
         static void Wake()
         {
+            WaveStatus = null;
             CutsceneBlur.Clear();
             CutscenePause.Release();
         }
@@ -134,7 +138,11 @@ namespace MetalRaptors
                         break;
 
                     case CampaignOp.Zeppelin:
-                        if (_host.SpawnZeppelin()) yield return WaitForZeppelin();
+                        if (_host.SpawnZeppelin()) yield return Zeppelin(step, index);
+                        break;
+
+                    case CampaignOp.Onslaught:
+                        yield return Onslaught(step, index);
                         break;
 
                     case CampaignOp.Finish:
@@ -328,9 +336,64 @@ namespace MetalRaptors
             while (Running && _host.EnemiesAlive > 0) yield return null;
         }
 
-        IEnumerator WaitForZeppelin()
+        IEnumerator Zeppelin(CampaignStep step, int index)
         {
-            while (Running && !_host.ZeppelinHanging) yield return null;
+            int wave = WaveNumber(index);
+
+            while (Running && !_host.ZeppelinHanging)
+            {
+                WaveStatus = $"W{wave}  INBOUND";
+                yield return null;
+            }
+
+            float left = step.seconds;
+            while (left > 0f && Running)
+            {
+                WaveStatus = $"W{wave}  {Clock(left)}";
+                left -= CutscenePause.Delta;
+                yield return null;
+            }
+
+            WaveStatus = null;
+        }
+
+        IEnumerator Onslaught(CampaignStep step, int index)
+        {
+            int wave = WaveNumber(index);
+            var onslaught = new CampaignOnslaught(_host, step.seconds, step.air, _warnedFirst);
+
+            while (Running && !onslaught.Over)
+            {
+                onslaught.Tick(CutscenePause.Delta);
+                _warnedFirst = onslaught.Warned;
+                WaveStatus = $"W{wave}  {Clock(onslaught.Left)}";
+                yield return null;
+            }
+
+            while (Running && _host.EnemiesAlive > 0)
+            {
+                WaveStatus = $"W{wave}  CLEANUP {_host.EnemiesAlive}";
+                yield return null;
+            }
+
+            WaveStatus = null;
+        }
+
+        int WaveNumber(int index)
+        {
+            int wave = 0;
+            for (int i = 0; i <= index && i < _script.Steps.Length; i++)
+            {
+                CampaignOp op = _script.Steps[i].op;
+                if (op == CampaignOp.Onslaught || op == CampaignOp.Zeppelin) wave++;
+            }
+            return wave;
+        }
+
+        static string Clock(float seconds)
+        {
+            int total = Mathf.CeilToInt(seconds);
+            return $"{total / 60}:{total % 60:00}";
         }
     }
 }

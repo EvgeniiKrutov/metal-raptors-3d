@@ -177,6 +177,8 @@ namespace MetalRaptors
 
         public bool InCrater(float x, float z) => _inCrater != null && _inCrater(x, z);
 
+        public bool Dry(float z, float y) => z < _waterFromZ || y >= _seaLevel + DryClearance;
+
         public void KillPeopleWithin(Vector3 centre, float radius)
         {
             if (_people != null) _people.KillWithin(centre, radius);

@@ -186,7 +186,7 @@ namespace MetalRaptors
             FireRound(_sponsonTemplate, muzzle, dir.normalized, SponsonBulletSpeed, SponsonDamage,
                 Size.y * 0.5f);
 
-            field.Shell(Airfield.MaxHealth * SponsonInterval / ShellSeconds);
+            field.Shell(Airfield.BaseHealth * SponsonInterval / ShellSeconds);
             Sparks.Spawn(aim, FenceSparkSize);
         }
 

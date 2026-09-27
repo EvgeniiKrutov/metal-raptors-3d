@@ -4,7 +4,10 @@ using UnityEngine;
 
 namespace MetalRaptors
 {
-    public enum CampaignOp { Wait, Say, Wave, Spawn, WaitClear, Supply, Foe, Zeppelin, Finish }
+    public enum CampaignOp
+    {
+        Wait, Say, Wave, Spawn, WaitClear, Supply, Foe, Zeppelin, Onslaught, Finish
+    }
 
     public class CampaignStep
     {
@@ -15,6 +18,7 @@ namespace MetalRaptors
         public EnemyGroup[] groups;
         public PlaneModelConfig plane;
         public int count;
+        public bool air;
     }
 
     public class CampaignScript
@@ -103,7 +107,15 @@ namespace MetalRaptors
                         count = Mathf.Max(1, Mathf.RoundToInt(Number(step, "count", 1f))),
                     };
                 case "foe": return ParseFoe(step, origin, index);
-                case "zeppelin": return new CampaignStep { op = CampaignOp.Zeppelin };
+                case "zeppelin":
+                    return new CampaignStep { op = CampaignOp.Zeppelin, seconds = Seconds(step) };
+                case "onslaught":
+                    return new CampaignStep
+                    {
+                        op = CampaignOp.Onslaught,
+                        seconds = Seconds(step),
+                        air = Value(step, "air") is bool flag && flag,
+                    };
                 case "finish": return new CampaignStep { op = CampaignOp.Finish };
                 default:
                     Debug.LogError($"CampaignScript {origin}[{index}]: unknown op '{op}'.");

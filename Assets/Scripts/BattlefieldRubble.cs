@@ -113,6 +113,7 @@ namespace MetalRaptors
                 return true;
             if (Vector3.Angle(Vector3.up, normal) > MaxSlopeDeg) return true;
             if (!_field.SampleGround(x, z, out float y)) return true;
+            if (!_field.Dry(z, y)) return true;
 
             float sink = Mathf.Min(MaxSink, proto.height * scale * SinkFraction);
             piece = Place(proto, new Vector3(x, y - sink, z), normal, yaw, scale);

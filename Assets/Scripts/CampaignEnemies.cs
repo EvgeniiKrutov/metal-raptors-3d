@@ -28,6 +28,18 @@ namespace MetalRaptors
 
         public IReadOnlyList<EnemyController> Live => _live;
 
+        public int CountAlive(PlaneModelConfig plane)
+        {
+            int count = 0;
+            foreach (EnemyController enemy in _live)
+            {
+                if (enemy == null || !enemy.IsAlive) continue;
+                if (_planes.TryGetValue(enemy, out PlaneModelConfig model) && model == plane)
+                    count++;
+            }
+            return count;
+        }
+
         public CampaignEnemies(Rigidbody player, float groundY, float worldTop,
             CampaignDefinition level)
         {

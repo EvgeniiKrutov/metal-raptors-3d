@@ -86,6 +86,7 @@ namespace MetalRaptors
         Row _tris;
         Row _ram;
         Row _fps;
+        Row _wave;
 
         GameObject _fireSection;
         Text _fireLabel;
@@ -200,6 +201,7 @@ namespace MetalRaptors
             _tris = CreateRow(content, "TRIS", ref y, false);
             _ram = CreateRow(content, "RAM", ref y, false);
             _fps = CreateRow(content, "FPS", ref y, false);
+            _wave = CreateRow(content, "WAVE", ref y, false);
 
             _panelRt = rt;
             _statsHeight = -y - RowGap + 2f * PadY;
@@ -582,6 +584,8 @@ namespace MetalRaptors
 
             double fps = frameMs > 0d ? 1000d / frameMs : 0d;
             _fps.Value.text = $"{fps:0}   {frameMs:0.0} ms";
+
+            _wave.Value.text = CampaignScriptRunner.WaveStatus ?? "--";
 
             _frameSum = 0d;
             _cpuSum = 0d;

@@ -7,6 +7,7 @@ namespace MetalRaptors
     public class CloudSystem : MonoBehaviour
     {
         const float MinAltitude = 350f, MaxAltitude = 850f;
+        const float LowMinAltitude = 190f, LowMaxAltitude = 330f;
         const float DepthJitter = 0.08f;
         const float WindowMargin = 300f;
         const float BaseAlpha = 0.5f;
@@ -14,6 +15,7 @@ namespace MetalRaptors
 
         static readonly float[] LayerDepth = { -0.15f, 0.5f, 1.25f };
         static readonly float[] LayerFade = { 1f, 0.85f, 0.7f };
+        static readonly int[] LowLayers = { 1, 2 };
 
         static readonly float[] DriftSpeed = { 6f, 12f, 24f };
         static readonly float[] Spacing = { 440f, 250f, 135f };
@@ -38,6 +40,7 @@ namespace MetalRaptors
             public float grade;
             public float fade;
             public float jitter;
+            public float minAltitude, maxAltitude;
             public float left;
             public float nextSpawnU;
             public bool primed;
@@ -56,6 +59,7 @@ namespace MetalRaptors
         float _playPlaneZ;
         float _speed, _spacing, _width;
         Color _tint, _glow;
+        bool _lowBand;
         readonly List<Cloud> _clouds = new List<Cloud>();
         readonly List<Layer> _layers = new List<Layer>();
         float _time;
@@ -65,7 +69,7 @@ namespace MetalRaptors
             => Begin(cam, TintFor(daytime), GlowFor(daytime), part, playPlaneZ);
 
         public static CloudSystem Begin(Camera cam, Color tint, Color glow,
-            CloudsPart part, float playPlaneZ)
+            CloudsPart part, float playPlaneZ, bool lowBand = false)
         {
             var go = new GameObject("Clouds");
             var sys = go.AddComponent<CloudSystem>();
@@ -76,6 +80,7 @@ namespace MetalRaptors
             sys._width = CloudWidth[(int)part.size];
             sys._tint = tint;
             sys._glow = glow;
+            sys._lowBand = lowBand;
             return sys;
         }
 
@@ -144,19 +149,27 @@ namespace MetalRaptors
 
             float playDist = Mathf.Max(1f, _playPlaneZ - _cam.transform.position.z);
             for (int i = 0; i < LayerDepth.Length; i++)
-            {
-                float depth = playDist * LayerDepth[i];
-                float ratio = (playDist + depth) / playDist;
+                AddLayer(i, playDist, MinAltitude, MaxAltitude);
 
-                _layers.Add(new Layer
-                {
-                    depth = depth,
-                    ratio = ratio,
-                    grade = Mathf.Sqrt(ratio),
-                    fade = LayerFade[i],
-                    jitter = playDist * DepthJitter,
-                });
-            }
+            if (!_lowBand) return;
+            foreach (int i in LowLayers) AddLayer(i, playDist, LowMinAltitude, LowMaxAltitude);
+        }
+
+        void AddLayer(int index, float playDist, float minAltitude, float maxAltitude)
+        {
+            float depth = playDist * LayerDepth[index];
+            float ratio = (playDist + depth) / playDist;
+
+            _layers.Add(new Layer
+            {
+                depth = depth,
+                ratio = ratio,
+                grade = Mathf.Sqrt(ratio),
+                fade = LayerFade[index],
+                jitter = playDist * DepthJitter,
+                minAltitude = minAltitude,
+                maxAltitude = maxAltitude,
+            });
         }
 
         void Feed(Layer layer, Vector3 eye)
@@ -187,7 +200,7 @@ namespace MetalRaptors
             var root = new GameObject("Cloud");
             root.transform.SetParent(transform, false);
             root.transform.position = new Vector3(x,
-                eyeY + (Random.Range(MinAltitude, MaxAltitude) - eyeY) * layer.grade,
+                eyeY + (Random.Range(layer.minAltitude, layer.maxAltitude) - eyeY) * layer.grade,
                 _playPlaneZ + layer.depth + Random.Range(-layer.jitter, layer.jitter));
 
             var mat = BuildMaterial(layer.fade);

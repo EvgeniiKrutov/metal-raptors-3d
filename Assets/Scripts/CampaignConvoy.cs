@@ -25,6 +25,15 @@ namespace MetalRaptors
             }
         }
 
+        public int CountAlive(EnemyKind kind)
+        {
+            bool tank = kind == EnemyKind.Tank;
+            int count = 0;
+            foreach (GroundVehicle vehicle in _live)
+                if (vehicle != null && vehicle.IsAlive && (vehicle is EnemyTank) == tank) count++;
+            return count;
+        }
+
         public CampaignConvoy(Rigidbody player, CampaignTerrain land, float roadZ, float roadLift)
         {
             _player = player;
