@@ -1,0 +1,20 @@
+{
+  "steps": [
+    { "op": "wait", "seconds": 5 },
+    { "op": "warn", "planes": 1 },
+    { "op": "danger", "side": "left", "seconds": 2 },
+
+    { "op": "boss", "plane": "fokker", "skin": "raven", "health": 5, "speaker": "ravensberg" },
+
+    { "op": "say", "speaker": "ravensberg", "line": "l4_boss1" },
+    { "op": "say", "speaker": "you", "line": "l4_boss2" },
+    { "op": "say", "speaker": "ravensberg", "line": "l4_boss3" },
+    { "op": "say", "speaker": "you", "line": "l4_boss4" },
+    { "op": "say", "speaker": "ravensberg", "line": "l4_boss5" },
+
+    { "op": "duel" },
+
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "finish" }
+  ]
+}

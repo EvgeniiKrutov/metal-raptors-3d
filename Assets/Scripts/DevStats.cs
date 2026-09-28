@@ -94,6 +94,12 @@ namespace MetalRaptors
         bool _fireShown;
         bool _fireOn;
 
+        GameObject _skipSection;
+        RectTransform _skipRt;
+        Text _skipLabel;
+        float _skipHeight;
+        bool _skipShown;
+
         GameObject _spawnSection;
         RectTransform _spawnRt;
         SpawnAction _scoutSpawn;
@@ -206,6 +212,7 @@ namespace MetalRaptors
             _panelRt = rt;
             _statsHeight = -y - RowGap + 2f * PadY;
             BuildFireSection(content, y);
+            BuildSkipSection(content, y);
             BuildSpawnSection(content, y);
             rt.sizeDelta = new Vector2(PanelWidth, _statsHeight);
         }
@@ -244,6 +251,29 @@ namespace MetalRaptors
 
             _fireHeight = top - y - SpawnButtonGap + RowGap;
             _fireSection.SetActive(false);
+        }
+
+        void BuildSkipSection(Transform content, float y)
+        {
+            RectTransform rt = CreateSection(content, "Level");
+            _skipSection = rt.gameObject;
+            _skipRt = rt;
+            float top = y;
+
+            UIFactory.CreateRule(rt, y, new Vector2(PanelWidth - 2f * PadX, 1f), MeterTrackColor);
+            y -= SpawnRuleGap;
+
+            UIFactory.CreateLabel(rt, "LEVEL", TitleSize, y, TitleRowHeight,
+                TitleColor, UIFactory.MediumFont);
+            y -= TitleRowHeight + SpawnCaptionGap;
+
+            Button button = CreateButton(rt, string.Empty, ref y);
+            button.onClick.AddListener(DevSkip.Run);
+            _skipLabel = button.GetComponentInChildren<Text>();
+            _skipLabel.color = ValueColor;
+
+            _skipHeight = top - y - SpawnButtonGap + RowGap;
+            _skipSection.SetActive(false);
         }
 
         void BuildSpawnSection(Transform content, float y)
@@ -385,6 +415,7 @@ namespace MetalRaptors
             if (kb != null && kb.tabKey.wasPressedThisFrame) SetVisible(!_visible);
 
             TickFire();
+            TickSkip();
             TickSpawn();
 
             if (!_visible) return;
@@ -450,6 +481,17 @@ namespace MetalRaptors
             _fireLabel.color = on ? SpawnPendingColor : ValueColor;
         }
 
+        void TickSkip()
+        {
+            bool shown = DevSkip.Available;
+            if (shown == _skipShown) return;
+
+            _skipShown = shown;
+            if (_skipSection != null) _skipSection.SetActive(shown);
+            if (shown && _skipLabel != null) _skipLabel.text = DevSkip.Caption;
+            Layout();
+        }
+
         static void ToggleFire()
         {
             Aerodrome field = Aerodrome.Current;
@@ -459,9 +501,11 @@ namespace MetalRaptors
         void Layout()
         {
             float fire = _fireShown ? _fireHeight : 0f;
-            if (_spawnRt != null) _spawnRt.offsetMax = new Vector2(0f, -fire);
+            float skip = _skipShown ? _skipHeight : 0f;
+            if (_skipRt != null) _skipRt.offsetMax = new Vector2(0f, -fire);
+            if (_spawnRt != null) _spawnRt.offsetMax = new Vector2(0f, -(fire + skip));
             if (_panelRt != null)
-                _panelRt.sizeDelta = new Vector2(PanelWidth, fire
+                _panelRt.sizeDelta = new Vector2(PanelWidth, fire + skip
                     + (!_spawnShown ? _statsHeight
                         : _zeppelinShown ? _zeppelinPanelHeight : _spawnPanelHeight));
         }

@@ -64,6 +64,7 @@ namespace MetalRaptors
             public bool friendHunts = true;
             public bool crossing;
             public bool peeling;
+            public bool formed;
         }
 
         readonly CampaignDefinition _level;
@@ -92,6 +93,8 @@ namespace MetalRaptors
         bool _crossing;
         bool _companionHunts = true;
         float _bumpTime = -999f;
+        bool _regrouping;
+        float _regroupTime;
 
         float _camX;
         float _camY;
@@ -421,6 +424,76 @@ namespace MetalRaptors
         public bool Formed => _standDown || _companion == null
             || _phase == Phase.Escort || _phase == Phase.Peel || _phase == Phase.Duel;
 
+        public bool Regrouped
+        {
+            get
+            {
+                if (_standDown || _companion == null) return true;
+                if (!_regrouping) return false;
+                if (_regroupTime >= FormLimit) return true;
+                if (_regroupTime < CloseSeconds) return false;
+                if (!_support && _phase != Phase.Escort) return false;
+                if (!_companion.AtStation) return false;
+
+                foreach (BackPair pair in _backs)
+                    if (pair.friend != null && !pair.formed) return false;
+                return true;
+            }
+        }
+
+        public void Regroup()
+        {
+            if (_standDown || _companion == null || _regrouping) return;
+
+            _regrouping = true;
+            _regroupTime = 0f;
+            _flyIn = true;
+
+            if (_support)
+            {
+                _companion.SetMark(null);
+                _companion.SetEscort(_player, Slot(0));
+                _companion.SetEscortBounds(EscortFloorY, EscortCeilingY);
+                _companion.SetRole(DuelRole.Escort, null);
+            }
+
+            for (int i = 0; i < _backs.Count; i++)
+            {
+                BackPair pair = _backs[i];
+                if (pair.foe != null)
+                {
+                    pair.foe.Kill();
+                    pair.wreck = pair.foe;
+                    pair.foe = null;
+                }
+
+                if (pair.friend == null) continue;
+
+                pair.peeling = false;
+                pair.crossing = false;
+                pair.formed = false;
+                pair.friend.SetEscort(_player, Slot(i + 1));
+                pair.friend.SetEscortBounds(EscortFloorY, EscortCeilingY);
+                pair.friend.SetRole(DuelRole.Form, null);
+                pair.friend.SetDepth(_playZ, CloseSeconds);
+            }
+        }
+
+        void TickRegroup(float dt)
+        {
+            _regroupTime += dt;
+            if (_regroupTime < CloseSeconds) return;
+
+            foreach (BackPair pair in _backs)
+            {
+                if (pair.friend == null || pair.formed) continue;
+                if (!pair.friend.AtStation && _regroupTime < FormLimit) continue;
+
+                pair.formed = true;
+                pair.friend.SetRole(DuelRole.Escort, null);
+            }
+        }
+
         public void SetCinematic(bool value)
         {
             if (value == _cinematic) return;
@@ -485,6 +558,7 @@ namespace MetalRaptors
             if (_standDown || _companion == null) return;
 
             TickBack(dt);
+            if (_regrouping) TickRegroup(dt);
 
             if (_support)
             {
@@ -574,6 +648,7 @@ namespace MetalRaptors
         void BreakFormation()
         {
             _flyIn = false;
+            _regrouping = false;
             _companion.SetEscort(_player, Station);
             PeelBacks();
         }

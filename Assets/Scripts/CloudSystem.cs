@@ -249,17 +249,20 @@ namespace MetalRaptors
             });
         }
 
-        Material BuildMaterial(float fade)
+        Material BuildMaterial(float fade) =>
+            CloudMaterial(_tint, _glow, BaseAlpha * fade * Random.Range(0.88f, 1.12f));
+
+        public static Material CloudMaterial(Color tint, Color glow, float alpha)
         {
             var shader = Shader.Find("Universal Render Pipeline/Lit");
             if (shader == null) return null;
 
             var mat = new Material(shader) { name = "Cloud (runtime)" };
-            Color c = _tint;
-            c.a = BaseAlpha * fade * Random.Range(0.88f, 1.12f);
+            Color c = tint;
+            c.a = alpha;
             mat.SetColor(BaseColorId, c);
             mat.EnableKeyword("_EMISSION");
-            mat.SetColor(EmissionColorId, _glow);
+            mat.SetColor(EmissionColorId, glow);
             mat.SetFloat("_Smoothness", 0f);
             mat.SetFloat("_Surface", 1f);
             mat.SetOverrideTag("RenderType", "Transparent");

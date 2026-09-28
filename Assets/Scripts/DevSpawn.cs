@@ -56,4 +56,31 @@ namespace MetalRaptors
             if (ZeppelinReady) _host.DevSpawnZeppelin();
         }
     }
+
+    public static class DevSkip
+    {
+        static System.Action _skip;
+
+        public static bool Available => _skip != null;
+
+        public static string Caption { get; private set; }
+
+        public static void Offer(string caption, System.Action skip)
+        {
+            Caption = caption;
+            _skip = skip;
+        }
+
+        public static void Withdraw(System.Action skip)
+        {
+            if (_skip == skip) _skip = null;
+        }
+
+        public static void Run()
+        {
+            System.Action skip = _skip;
+            _skip = null;
+            skip?.Invoke();
+        }
+    }
 }

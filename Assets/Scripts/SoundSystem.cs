@@ -9,7 +9,11 @@ namespace MetalRaptors
         const float ThrottleVolume = 0.2f;
         const float StutterVolume = 0.3f;
         const float WindVolume = 0.35f;
-        const float EnemyThrottleVolume = 0.15f;
+        const float EnemyIdleVolume = 0.3f;
+        const float EnemyThrottleVolume = 0.3f;
+        const float BossShare = 0.7f;
+        const string EnemyIdleClip = "Sounds/enemy_motor_idle";
+        const string EnemyThrottleClip = "Sounds/enemy_motor_throttle";
 
         const float CrossfadeSeconds = 0.7f;
         const float RetireFadeSeconds = 0.3f;
@@ -119,6 +123,14 @@ namespace MetalRaptors
 
             protected static string RandomThrottleClip() =>
                 ThrottleClipPaths[Random.Range(0, ThrottleClipPaths.Length)];
+
+            protected static bool Maneuvering(float angularVelocity, float maxTurnRate,
+                float heading)
+            {
+                bool turning = Mathf.Abs(angularVelocity) > maxTurnRate * TurnRateThreshold;
+                bool climbing = Mathf.Sin(heading) > Mathf.Sin(ClimbAngleDeg * Mathf.Deg2Rad);
+                return turning || climbing;
+            }
         }
 
         class PlayerEngineVoice : EngineVoice
@@ -172,14 +184,9 @@ namespace MetalRaptors
                 _throttleLevel.Tick(dt);
             }
 
-            bool IsManeuvering()
-            {
-                if (_plane == null) return false;
-                bool turning = Mathf.Abs(_plane.AngularVelocity)
-                               > _plane.MaxTurnRate * TurnRateThreshold;
-                bool climbing = Mathf.Sin(_plane.Heading) > Mathf.Sin(ClimbAngleDeg * Mathf.Deg2Rad);
-                return turning || climbing;
-            }
+            bool IsManeuvering() =>
+                _plane != null
+                && Maneuvering(_plane.AngularVelocity, _plane.MaxTurnRate, _plane.Heading);
 
             void EnterThrottle()
             {
@@ -218,26 +225,80 @@ namespace MetalRaptors
 
         class EnemyEngineVoice : EngineVoice
         {
+            readonly EnemyController _plane;
+            readonly AudioSource _idle;
             readonly AudioSource _throttle;
+            readonly float _idleVolume;
 
-            public EnemyEngineVoice(GameObject host)
+            Ramp _idleLevel;
+            Ramp _throttleLevel;
+            bool _revving;
+            float _grace;
+
+            public EnemyEngineVoice(GameObject host, EnemyController plane, bool boss)
             {
-                _throttle = CreateLoop(host, RandomThrottleClip());
+                _plane = plane;
+                _idleVolume = boss ? IdleVolume * BossShare : EnemyIdleVolume;
+                _idle = CreateLoop(host, EnemyIdleClip);
+                Scatter(_idle);
+                if (!boss)
+                {
+                    _throttle = CreateLoop(host, EnemyThrottleClip);
+                    Scatter(_throttle);
+                }
+                _idleLevel.Jump(1f);
+                _throttleLevel.Jump(0f);
+            }
+
+            static void Scatter(AudioSource source)
+            {
+                if (source != null && source.clip != null)
+                    source.time = Random.Range(0f, source.clip.length);
             }
 
             protected override void Advance(float dt)
             {
+                if (_throttle != null)
+                {
+                    if (IsManeuvering())
+                    {
+                        _grace = ThrottleGraceSeconds;
+                        if (!_revving) Rev(true);
+                    }
+                    else if (_revving)
+                    {
+                        _grace -= dt;
+                        if (_grace <= 0f) Rev(false);
+                    }
+                }
+
+                _idleLevel.Tick(dt);
+                _throttleLevel.Tick(dt);
+            }
+
+            bool IsManeuvering() =>
+                _plane != null && _plane.IsAlive
+                && Maneuvering(_plane.AngularVelocity, _plane.MaxTurnRate, _plane.Heading);
+
+            void Rev(bool on)
+            {
+                _revving = on;
+                _idleLevel.Set(on ? 0f : 1f, CrossfadeSeconds);
+                _throttleLevel.Set(on ? 1f : 0f, CrossfadeSeconds);
             }
 
             protected override void Apply()
             {
+                float bed = Envelope.Value * Attenuation * PauseGain * AudioOptions.Sfx;
+
+                if (_idle != null) _idle.volume = _idleVolume * bed * _idleLevel.Value;
                 if (_throttle != null)
-                    _throttle.volume = EnemyThrottleVolume * Envelope.Value * Attenuation
-                                       * PauseGain * AudioOptions.Sfx;
+                    _throttle.volume = EnemyThrottleVolume * bed * _throttleLevel.Value;
             }
 
             public override void Dispose()
             {
+                if (_idle != null) UnityEngine.Object.Destroy(_idle);
                 if (_throttle != null) UnityEngine.Object.Destroy(_throttle);
             }
         }
@@ -254,6 +315,7 @@ namespace MetalRaptors
         CubeController _player;
         Transform _playerTr;
         IReadOnlyList<EnemyController> _enemies;
+        bool _boss;
 
         PlayerEngineVoice _playerVoice;
         readonly Dictionary<EnemyController, EnemyEngineVoice> _enemyVoices =
@@ -287,6 +349,12 @@ namespace MetalRaptors
 
             if (!silent) system.Arm();
             return system;
+        }
+
+        public void Track(IReadOnlyList<EnemyController> enemies, bool boss = false)
+        {
+            _enemies = enemies;
+            _boss = boss;
         }
 
         public void Arm()
@@ -466,7 +534,7 @@ namespace MetalRaptors
                 var enemy = _enemies[i];
                 if (enemy == null || !enemy.IsAlive) continue;
                 if (!_enemyVoices.ContainsKey(enemy))
-                    _enemyVoices[enemy] = new EnemyEngineVoice(gameObject);
+                    _enemyVoices[enemy] = new EnemyEngineVoice(gameObject, enemy, _boss);
             }
         }
 
@@ -493,8 +561,8 @@ namespace MetalRaptors
             for (int i = 0; i < _rankScratch.Count; i++)
             {
                 var entry = _rankScratch[i];
-                entry.Voice.TargetAttenuation =
-                    i < MaxAudibleEnemies ? AttenuationFor(entry.Distance) : 0f;
+                float near = _boss ? 1f : AttenuationFor(entry.Distance);
+                entry.Voice.TargetAttenuation = i < MaxAudibleEnemies ? near : 0f;
                 entry.Voice.Tick(dt, _pauseGain.Value * _duck.Value);
             }
         }

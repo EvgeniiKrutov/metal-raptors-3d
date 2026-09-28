@@ -112,7 +112,8 @@ namespace MetalRaptors
             Transform page = MenuLayout.CreatePage(parent, "Career Page", 1f);
             _erasTitle = MenuLayout.BuildTitle(page, string.Empty);
 
-            _erasDescription = UIFactory.CreateParagraph(page, string.Empty, MenuTheme.DescriptionSize,
+            _erasDescription = UIFactory.CreateParagraph(page, string.Empty,
+                MenuTheme.CareerDescriptionSize,
                 MenuTheme.ListTop, MenuTheme.DescriptionWidth, MenuTheme.DescriptionRowHeight,
                 MenuTheme.DescriptionLineSpacing, MenuTheme.Colors.Muted, UIFactory.MediumFont);
 
@@ -163,7 +164,8 @@ namespace MetalRaptors
 
             float briefTop = MenuTheme.ListTop - MenuTheme.LevelDateRowHeight
                              - MenuTheme.LevelDateToBrief;
-            _levelBrief = UIFactory.CreateParagraph(page, string.Empty, MenuTheme.DescriptionSize,
+            _levelBrief = UIFactory.CreateParagraph(page, string.Empty,
+                MenuTheme.CareerDescriptionSize,
                 briefTop, MenuTheme.DescriptionWidth, MenuTheme.LevelBriefRowHeight,
                 MenuTheme.DescriptionLineSpacing, MenuTheme.Colors.Muted, UIFactory.MediumFont);
 

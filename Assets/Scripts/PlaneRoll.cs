@@ -46,6 +46,13 @@ namespace MetalRaptors
             return _angle;
         }
 
+        public void Settle(float headingRad)
+        {
+            _progress = -1f;
+            _invertedTime = 0f;
+            if (Inverted(headingRad)) _angle = Wrap(_angle + HalfTurn);
+        }
+
         public void Flip(float headingRad, float maxTurnRateDeg)
         {
             if (Rolling || !Inverted(headingRad)) return;

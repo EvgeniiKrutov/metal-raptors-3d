@@ -48,8 +48,7 @@ namespace MetalRaptors
                 if (Mathf.Abs(pos.z - playerPos.z) > DepthBand) continue;
                 if (((Vector2)pos - (Vector2)playerPos).sqrMagnitude > reachSq) continue;
 
-                player.Scrape();
-                enemy.Scrape();
+                player.Brush();
             }
         }
 

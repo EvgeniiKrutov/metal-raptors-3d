@@ -92,6 +92,12 @@ namespace MetalRaptors
 
         public float Heading => _heading;
 
+        public float AngularVelocity => _angularVelocity;
+
+        public float MaxHealth => _config != null ? Mathf.Max(1f, _config.health) : 1f;
+
+        public float MaxTurnRate => _config != null ? _config.rotationSpeed * Mathf.Deg2Rad : 0f;
+
         enum AiState { Attack, Fly, Evade, Recover, Return, DiveClimb, DiveRun, DiveZoom, Tail }
 
         EnemyConfig _config;
@@ -141,6 +147,8 @@ namespace MetalRaptors
 
         float _deck;
         float _baseZ;
+        bool _scripted;
+        Vector3 _scriptPos;
         float _speed;
         float _engageSpeed;
         float _reversalCooldown;
@@ -296,9 +304,64 @@ namespace MetalRaptors
 
         float GroundAt(float x) => Scouting ? TerrainAt(x) : _groundY;
 
+        public void BeginScript()
+        {
+            if (_dead || _falling || _scripted || _rb == null) return;
+
+            _scripted = true;
+            _scriptPos = _rb.position;
+            CancelDodge();
+            CancelReversal();
+            _evade.Cancel();
+            EndDive();
+            SetStreaks(false);
+
+            _rb.linearVelocity = Vector3.zero;
+            _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+            _rb.isKinematic = true;
+        }
+
+        public void ScriptTo(Vector3 position, float headingRad)
+        {
+            if (!_scripted) return;
+
+            _scriptPos = new Vector3(position.x, position.y, _baseZ);
+            _heading = headingRad;
+            _angularVelocity = 0f;
+            _roll.Settle(headingRad);
+            ApplyRotation();
+        }
+
+        public void EndScript()
+        {
+            if (!_scripted) return;
+            _scripted = false;
+
+            _rb.isKinematic = false;
+            _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+            _speed = _config.flySpeed;
+            _rb.linearVelocity = new Vector3(Mathf.Cos(_heading), Mathf.Sin(_heading), 0f) * _speed;
+
+            _onCamera = true;
+            _appeared = true;
+            EnterAttack();
+        }
+
+        public void HideHealthBar()
+        {
+            if (_bar != null) Destroy(_bar.gameObject);
+            _bar = null;
+        }
+
         void FixedUpdate()
         {
             if (_dead || _config == null) return;
+
+            if (_scripted)
+            {
+                _rb.MovePosition(_scriptPos);
+                return;
+            }
 
             float dt = Time.fixedDeltaTime;
 
@@ -1515,7 +1578,7 @@ namespace MetalRaptors
 
         public void TakeDamage(float amount)
         {
-            if (_dead || _falling || OffPlane) return;
+            if (_dead || _falling || OffPlane || _scripted) return;
             ApplyDamage(amount);
             if (_falling || _dodge.Active) return;
 
@@ -1629,7 +1692,7 @@ namespace MetalRaptors
 
         public bool Scrape()
         {
-            if (_dead || _falling || OffPlane) return false;
+            if (_dead || _falling || OffPlane || _scripted) return false;
             if (Time.time - _lastCollisionTime < CollisionCooldown) return false;
             _lastCollisionTime = Time.time;
 

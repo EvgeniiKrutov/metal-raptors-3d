@@ -22,6 +22,8 @@ namespace MetalRaptors
         public Weather weather;
         public CloudsPart clouds;
         public string script;
+        public string arenaScript;
+        public CampaignOutroLine[] arenaLines;
         public string title;
         public string dateline;
         public string lore;
@@ -131,6 +133,24 @@ namespace MetalRaptors
             new CampaignOutroLine("you", "l2_after5"),
         };
 
+        static CampaignOutroLine[] Arena4 => new[]
+        {
+            new CampaignOutroLine("you", "l4_arena1"),
+            new CampaignOutroLine("roussel", "l4_arena2"),
+            new CampaignOutroLine("you", "l4_arena3"),
+            new CampaignOutroLine("roussel", "l4_arena4"),
+            new CampaignOutroLine("you", "l4_arena5"),
+        };
+
+        static CampaignOutroLine[] Outro4 => new[]
+        {
+            new CampaignOutroLine("roussel", "l4_after1"),
+            new CampaignOutroLine("you", "l4_after2"),
+            new CampaignOutroLine("crane", "l4_after3"),
+            new CampaignOutroLine("roussel", "l4_after4"),
+            new CampaignOutroLine("you", "l4_after5"),
+        };
+
         static CampaignOutroLine[] OutroLorem(int level) => new[]
         {
             new CampaignOutroLine("hq", $"l{level}_after1"),
@@ -220,15 +240,21 @@ namespace MetalRaptors
             weather = Weather.Calm,
             clouds = new CloudsPart(),
             script = "level4",
+            arenaScript = "level4_arena",
+            arenaLines = Arena4,
+            companion = true,
+            backCompanions = 2,
+            supportCompanion = true,
             flak = 1.2f,
             enemyHealthScale = 0.75f,
             enemyRotationScale = 1.00f,
-            supplyDrops = 1,
-            companionFoe = PlaneModels.Fokker,
+            supplyDrops = 2,
+            companionFoe = PlaneModels.Eindecker,
+            companionPilots = new[] { "roussel", "crane", "marchand" },
             title = "THE RAVEN",
             dateline = "6 April 1917 — Flanders — hard spring light",
             lore = Lore2,
-            outro = OutroLorem(4),
+            outro = Outro4,
             journal = JournalLorem,
         };
 

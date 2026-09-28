@@ -61,6 +61,7 @@ namespace MetalRaptors
 
         CampaignOutroLine[] _lines;
         Action _onDismissed;
+        bool _swapOut;
         RectTransform _column;
         RectTransform _stack;
         CanvasGroup _prompt;
@@ -77,7 +78,7 @@ namespace MetalRaptors
         bool _printed;
         bool _closing;
 
-        public static void Open(CampaignOutroLine[] lines, Action onDismissed)
+        public static void Open(CampaignOutroLine[] lines, Action onDismissed, bool swapOut = true)
         {
             if (IsOpen || lines == null || lines.Length == 0)
             {
@@ -92,6 +93,7 @@ namespace MetalRaptors
             Current = outro;
             outro._lines = lines;
             outro._onDismissed = onDismissed;
+            outro._swapOut = swapOut;
             outro.Build(canvas);
         }
 
@@ -356,6 +358,13 @@ namespace MetalRaptors
         void Close()
         {
             _closing = true;
+            if (!_swapOut)
+            {
+                Release();
+                _onDismissed?.Invoke();
+                return;
+            }
+
             ScreenFade.Swap(() =>
             {
                 Release();

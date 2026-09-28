@@ -10,6 +10,10 @@ namespace MetalRaptors
         const string KeyHint = "A / D to steer  •  F to fire  •  H to bomb  •  R to boost  •  "
                                + "B to roll  •  ";
 
+        const string ArenaKeyHint = "W A S D to fly  •  F to fire  •  B to roll  •  ";
+
+        const float BossGap = 0.35f;
+
         readonly CubeController _plane;
         readonly PlaneShooter _shooter;
         readonly PlaneBomber _bomber;
@@ -28,13 +32,18 @@ namespace MetalRaptors
 
         readonly TouchStick _stick;
         readonly HeadingArrow _arrow;
+        readonly bool _arena;
         Camera _cam;
+
+        public Vector2 BossSlot { get; }
 
         public LevelHud(Transform parent, string objective, CubeController plane,
             PlaneShooter shooter, PlaneBomber bomber, PlaneBoost boost, PlaneBarrelRoll roll,
-            PlaneSearchlight searchlight, Airfield airfield, System.Action onPause)
+            PlaneSearchlight searchlight, Airfield airfield, System.Action onPause,
+            bool arena = false)
         {
             _plane = plane;
+            _arena = arena;
             _airfield = airfield;
             _shooter = shooter;
             _bomber = bomber;
@@ -48,15 +57,26 @@ namespace MetalRaptors
             _health = new HealthBar(parent, new Vector2(x, -y));
             y += HudTheme.BarHeight + HudTheme.BarToColumn;
 
+            if (arena)
+            {
+                y += HudTheme.BarHeight * BossGap;
+                BossSlot = new Vector2(x, -y);
+                y += HudTheme.BarHeight + HudTheme.BarToColumn;
+            }
+
             if (_airfield != null)
             {
                 _airfieldBar = new HealthBar(parent, new Vector2(x, -y), AirfieldCaption);
                 y += HudTheme.BarHeight + HudTheme.BarToColumn;
             }
 
-            _bombSquare = Square(parent, x, ref y, HudTheme.Label("H", "BOMB"), RequestBomb);
-            _boostSquare = Square(parent, x, ref y, HudTheme.Label("R", "BOOST"), RequestBoost);
-            _rollSquare = Square(parent, x, ref y, HudTheme.Label("B", "ROLL"), RequestRoll);
+            if (!arena)
+            {
+                _bombSquare = Square(parent, x, ref y, HudTheme.Label("H", "BOMB"), RequestBomb);
+                _boostSquare = Square(parent, x, ref y, HudTheme.Label("R", "BOOST"), RequestBoost);
+            }
+            if (!arena || _roll != null)
+                _rollSquare = Square(parent, x, ref y, HudTheme.Label("B", "ROLL"), RequestRoll);
             if (HudTheme.IsTouch)
                 _fireSquare = Square(parent, x, ref y, "FIRE", null, holdable: true);
             if (_searchlight != null)
@@ -64,9 +84,9 @@ namespace MetalRaptors
 
             if (HudTheme.IsTouch && _plane != null)
             {
-                _plane.EnableHeadingSteering();
+                if (!arena) _plane.EnableHeadingSteering();
                 _stick = TouchStick.Create(parent);
-                _arrow = new HeadingArrow(parent);
+                if (!arena) _arrow = new HeadingArrow(parent);
             }
 
             if (HudTheme.IsTouch && onPause != null)
@@ -74,7 +94,7 @@ namespace MetalRaptors
                     "P", onPause, fromRight: true);
 
             Text hint = UIFactory.CreateText(parent,
-                HudTheme.IsTouch ? objective : KeyHint + objective,
+                HudTheme.IsTouch ? objective : (arena ? ArenaKeyHint : KeyHint) + objective,
                 HudTheme.HintSize, Vector2.zero, Vector2.zero);
             var rt = hint.rectTransform;
             rt.anchorMin = new Vector2(0f, 0f);
@@ -124,6 +144,14 @@ namespace MetalRaptors
 
             bool steerable = _plane.Steerable && !GameMenu.IsOpen;
             _stick.SetVisible(steerable);
+
+            if (_arena)
+            {
+                _plane.SetHoverInput(steerable && _stick.Steering
+                    ? new Vector2(Mathf.Cos(_stick.Angle), Mathf.Sin(_stick.Angle))
+                    : Vector2.zero);
+                return;
+            }
 
             if (!steerable) _plane.SetTargetHeading(_plane.Heading);
             else if (_stick.Steering) _plane.SetTargetHeading(_stick.Angle);

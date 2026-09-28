@@ -24,14 +24,17 @@ namespace MetalRaptors
         PlayerConfig _config;
         CubeController _plane;
         WingStreaks _trails;
+        float _spinScale = 1f;
         float _cooldown;
         bool _wasRolling;
 
-        public void Initialize(PlayerConfig config, CubeController plane, Transform model)
+        public void Initialize(PlayerConfig config, CubeController plane, Transform model,
+            float spinScale = 1f, bool streaks = true)
         {
             _config = config;
             _plane = plane;
-            _trails = WingStreaks.Mount(gameObject, model);
+            _spinScale = Mathf.Max(0.01f, spinScale);
+            if (streaks) _trails = WingStreaks.Mount(gameObject, model);
         }
 
         public void Stop()
@@ -53,7 +56,7 @@ namespace MetalRaptors
 
         float RollRate => _config == null
             ? 0f
-            : _config.rotationSpeed * Mathf.Max(1f, _config.rollRateMultiplier);
+            : _config.rotationSpeed * Mathf.Max(1f, _config.rollRateMultiplier) * _spinScale;
 
         void Update()
         {

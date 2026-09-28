@@ -1,24 +1,26 @@
 {
   "steps": [
-    { "op": "say", "speaker": "hq", "line": "l4_line1" },
+    { "op": "say", "speaker": "roussel", "line": "l4_line1" },
     { "op": "say", "speaker": "you", "line": "l4_line2" },
-    { "op": "say", "speaker": "hq", "line": "l4_line3" },
+    { "op": "say", "speaker": "roussel", "line": "l4_line3" },
+    { "op": "say", "speaker": "crane", "line": "l4_line4" },
+    { "op": "say", "speaker": "roussel", "line": "l4_line5" },
+    { "op": "say", "speaker": "marchand", "line": "l4_line6" },
+    { "op": "say", "speaker": "you", "line": "l4_line7" },
+    { "op": "say", "speaker": "roussel", "line": "l4_line8" },
 
-    { "op": "spawn", "enemies": [ { "plane": "albatros", "count": 2 } ] },
-    { "op": "wait", "seconds": 6 },
-    { "op": "spawn", "enemies": [ { "plane": "fokker", "count": 2 } ] },
-    { "op": "waitclear" },
+    { "op": "wait", "seconds": 2.5 },
 
-    { "op": "wait", "seconds": 1.5 },
-    { "op": "say", "speaker": "hq", "line": "l4_line4" },
-    { "op": "say", "speaker": "you", "line": "l4_line5", "seconds": 3.5 },
+    { "op": "supply", "count": 2 },
 
-    { "op": "wave", "enemies": [ { "plane": "albatros", "count": 2 }, { "plane": "fokker", "count": 2 } ] },
+    { "op": "wave", "spread": true, "enemies": [ { "plane": "eindecker", "count": 2 } ] },
+    { "op": "foe", "plane": "albatros" },
+    { "op": "wave", "spread": true, "enemies": [ { "plane": "albatros", "count": 3 } ] },
 
-    { "op": "wait", "seconds": 1.5 },
-    { "op": "say", "speaker": "hq", "line": "l4_line6" },
-    { "op": "say", "speaker": "you", "line": "l4_line7", "seconds": 4 },
-
-    { "op": "finish" }
+    { "op": "wait", "seconds": 1 },
+    { "op": "formation" },
+    { "op": "wait", "seconds": 2 },
+    { "op": "warn", "planes": 3 },
+    { "op": "arena" }
   ]
 }

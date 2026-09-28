@@ -203,6 +203,7 @@ namespace MetalRaptors
         public const float GarageDescriptionRowHeight = 96f;
 
         public const int DescriptionSize = 20;
+        public const int CareerDescriptionSize = 22;
         public const float DescriptionWidth = 940f;
         public const float DescriptionRowHeight = 124f;
         public const float DescriptionLineSpacing = 1.35f;

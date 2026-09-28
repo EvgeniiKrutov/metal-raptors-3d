@@ -30,6 +30,7 @@ namespace MetalRaptors
     public class CampaignSnapshot
     {
         public int level;
+        public bool arena;
         public int step;
         public bool warnedFirst;
         public bool warnedPair;

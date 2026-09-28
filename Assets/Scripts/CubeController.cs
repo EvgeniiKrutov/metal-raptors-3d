@@ -52,6 +52,10 @@ namespace MetalRaptors
         const float GroundProbe = 500f;
         const float GroundSkim = 14f;
 
+        const float HoverResponse = 8f;
+        const float HoverBankDeg = 16f;
+        const float HoverBankResponse = 5f;
+
         PlayerConfig _config;
         Rigidbody _rb;
         ShakeEffect _shake;
@@ -86,6 +90,13 @@ namespace MetalRaptors
 
         bool _headingSteering;
         float _targetHeading;
+
+        bool _hover;
+        float _hoverSpeed;
+        float _hoverFloorY;
+        Vector2 _hoverVelocity;
+        Vector2 _hoverInput;
+        float _bank;
 
         ISolid _solid;
 
@@ -163,6 +174,21 @@ namespace MetalRaptors
 
         public void SetControlled(bool value) => _controlled = value;
 
+        public void BeginHover(float speed, float floorY)
+        {
+            _hover = true;
+            _hoverSpeed = Mathf.Max(0f, speed);
+            _hoverFloorY = floorY;
+            _heading = 0f;
+            _targetHeading = 0f;
+            _angularVelocity = 0f;
+
+            Vector3 v = _rb != null ? _rb.linearVelocity : Vector3.zero;
+            _hoverVelocity = new Vector2(v.x, v.y);
+        }
+
+        public void SetHoverInput(Vector2 input) => _hoverInput = Vector2.ClampMagnitude(input, 1f);
+
         public bool Steerable => _active && _controlled && !_falling;
 
         public float TargetHeading => _targetHeading;
@@ -219,6 +245,12 @@ namespace MetalRaptors
                 _fall.Step(_rb, dt);
                 _heading = _fall.Heading;
                 ApplyRotation();
+                return;
+            }
+
+            if (_hover)
+            {
+                Hover(dt);
                 return;
             }
 
@@ -292,6 +324,49 @@ namespace MetalRaptors
             if (clamped) _rb.position = pos;
         }
 
+        void Hover(float dt)
+        {
+            Vector2 input = (_controlled ? HoverKeys() : Vector2.zero) + _hoverInput;
+            if (input.sqrMagnitude > 1f) input.Normalize();
+
+            Vector2 target = input * _hoverSpeed;
+            _hoverVelocity += (target - _hoverVelocity) * (1f - Mathf.Exp(-HoverResponse * dt));
+
+            Vector3 pos = _rb.position;
+            bool clamped = false;
+
+            if (pos.x <= _wallMinX && _hoverVelocity.x < 0f) _hoverVelocity.x = 0f;
+            if (pos.x >= _wallMaxX && _hoverVelocity.x > 0f) _hoverVelocity.x = 0f;
+            if (pos.y >= _ceilingY && _hoverVelocity.y > 0f) _hoverVelocity.y = 0f;
+            if (pos.y <= _hoverFloorY && _hoverVelocity.y < 0f) _hoverVelocity.y = 0f;
+
+            if (pos.x < _wallMinX) { pos.x = _wallMinX; clamped = true; }
+            if (pos.x > _wallMaxX) { pos.x = _wallMaxX; clamped = true; }
+            if (pos.y > _ceilingY) { pos.y = _ceilingY; clamped = true; }
+            if (pos.y < _hoverFloorY) { pos.y = _hoverFloorY; clamped = true; }
+
+            _rb.linearVelocity = new Vector3(_hoverVelocity.x, _hoverVelocity.y, 0f);
+            if (clamped) _rb.position = pos;
+
+            float lean = _hoverSpeed > 0f ? Mathf.Clamp(_hoverVelocity.y / _hoverSpeed, -1f, 1f) : 0f;
+            _bank += (lean * HoverBankDeg - _bank) * (1f - Mathf.Exp(-HoverBankResponse * dt));
+            _heading = 0f;
+            AdvanceBarrelRoll(dt);
+            ApplyRotation();
+        }
+
+        static Vector2 HoverKeys()
+        {
+            var kb = Keyboard.current;
+            if (kb == null) return Vector2.zero;
+
+            float x = (kb.dKey.isPressed || kb.rightArrowKey.isPressed ? 1f : 0f)
+                      - (kb.aKey.isPressed || kb.leftArrowKey.isPressed ? 1f : 0f);
+            float y = (kb.wKey.isPressed || kb.upArrowKey.isPressed ? 1f : 0f)
+                      - (kb.sKey.isPressed || kb.downArrowKey.isPressed ? 1f : 0f);
+            return new Vector2(x, y);
+        }
+
         static bool GroundUnder(Vector3 pos, out float deck)
         {
             bool hit = Physics.Raycast(pos + Vector3.up * GroundProbe, Vector3.down,
@@ -334,7 +409,7 @@ namespace MetalRaptors
 
         void ApplyRotation()
         {
-            float roll = _roll.Angle + _barrelAngle + (_fall != null ? _fall.Roll : 0f);
+            float roll = _roll.Angle + _barrelAngle + _bank + (_fall != null ? _fall.Roll : 0f);
             transform.rotation = Quaternion.Euler(0f, 0f, _heading * Mathf.Rad2Deg)
                                * Quaternion.Euler(roll, 0f, 0f);
         }
@@ -361,6 +436,11 @@ namespace MetalRaptors
             if (!_active || _falling) return;
 
             if (_shake != null) _shake.Play();
+        }
+
+        public void Brush()
+        {
+            if (!_active || _falling || Evading) return;
             OnScraped?.Invoke();
         }
 

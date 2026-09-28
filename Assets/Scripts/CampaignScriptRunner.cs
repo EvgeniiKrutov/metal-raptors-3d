@@ -10,14 +10,29 @@ namespace MetalRaptors
         int EnemiesAlive { get; }
         int CountAlive(EnemyKind kind, PlaneModelConfig plane);
         bool CompanionReady { get; }
-        void SpawnWave(EnemyGroup[] groups);
+        void SpawnWave(EnemyGroup[] groups, bool spread = false);
         float WarnIncoming(int planes);
         void ArmSupply(int crates);
         void SetCompanionFoe(PlaneModelConfig plane);
         bool SpawnZeppelin();
         bool ZeppelinHanging { get; }
+        void GatherFormation();
+        bool FormationReady { get; }
+        void EnterArena();
         void CompleteLevel();
         void Checkpoint(int step, bool warnedFirst, bool warnedPair);
+    }
+
+    public interface IBossHost
+    {
+        void EnterBoss(PlaneModelConfig plane, string skin, float health, string name);
+        bool BossReady { get; }
+        void BeginDuel();
+    }
+
+    public interface IDangerHost
+    {
+        float WarnDanger(ScreenEdge edge, float seconds);
     }
 
     public class CampaignScriptRunner : MonoBehaviour
@@ -116,12 +131,12 @@ namespace MetalRaptors
 
                     case CampaignOp.Spawn:
                         yield return Warn(step.groups);
-                        _host.SpawnWave(step.groups);
+                        _host.SpawnWave(step.groups, step.spread);
                         break;
 
                     case CampaignOp.Wave:
                         yield return Warn(step.groups);
-                        _host.SpawnWave(step.groups);
+                        _host.SpawnWave(step.groups, step.spread);
                         yield return WaitForClear();
                         break;
 
@@ -144,6 +159,38 @@ namespace MetalRaptors
                     case CampaignOp.Onslaught:
                         yield return Onslaught(step, index);
                         break;
+
+                    case CampaignOp.Formation:
+                        _host.GatherFormation();
+                        while (Running && !_host.FormationReady) yield return null;
+                        break;
+
+                    case CampaignOp.Warn:
+                        yield return Wait(_host.WarnIncoming(step.count));
+                        break;
+
+                    case CampaignOp.Danger:
+                        if (_host is IDangerHost dangerHost)
+                            yield return Wait(dangerHost.WarnDanger(step.edge, step.seconds));
+                        break;
+
+                    case CampaignOp.Boss:
+                        if (_host is IBossHost bossHost)
+                        {
+                            bossHost.EnterBoss(step.plane, step.skin, step.scale,
+                                step.speaker != null ? step.speaker.Name : null);
+                            while (Running && !bossHost.BossReady) yield return null;
+                        }
+                        break;
+
+                    case CampaignOp.Duel:
+                        if (_host is IBossHost duelHost) duelHost.BeginDuel();
+                        yield return WaitForClear();
+                        break;
+
+                    case CampaignOp.Arena:
+                        if (Running) _host.EnterArena();
+                        yield break;
 
                     case CampaignOp.Finish:
                         if (Running) _host.CompleteLevel();
