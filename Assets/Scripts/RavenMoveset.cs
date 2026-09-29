@@ -22,6 +22,8 @@ namespace MetalRaptors
         public System.Func<bool> over;
         public System.Func<Vector2, float, EnemyController> respawn;
         public System.Action<float> pin;
+        public System.Func<Vector2> ahead;
+        public System.Action<bool> cinematic;
     }
 
     public class RavenMoveset : MonoBehaviour
@@ -36,7 +38,8 @@ namespace MetalRaptors
         const float LeaveTurnDeg = 140f;
 
         const float TrailSec = 7f;
-        const float TrailHoldX = -0.72f;
+        const float TrailEdgePad = 6f;
+        const float TrailPinGap = 10f;
         const float TrailEnterSpeed = 182f;
         const float TrailClimbFactor = 0.55f;
         const float TrailResponse = 3f;
@@ -65,6 +68,17 @@ namespace MetalRaptors
         const float SmokeSettle = 4f;
         const float SmokeDamage = 20f;
 
+        const float RageHealth = 0.5f;
+        const float RageLeadSec = 0.8f;
+        const float RageStartSpeed = 105f;
+        const float RageTopSpeed = 294f;
+        const float RageAccel = 182f;
+        const float RageBrake = 210f;
+        const float RagePitchDelay = 0.5f;
+        const float RagePitchSec = 1.5f;
+        const float RagePitch = 1.25f;
+        const float RageShowSec = 1.5f;
+
         const float WallEdgePad = 6f;
         const float WallPinGap = 10f;
         const float WallSeam = 2f;
@@ -77,10 +91,14 @@ namespace MetalRaptors
 
         enum Move { Trail, Smoke, Wall }
 
-        static readonly Move[] Moves = { Move.Trail, Move.Smoke, Move.Wall };
+        static readonly Move[] PhaseOne = { Move.Trail, Move.Smoke, Move.Wall };
+
+        static readonly Move[] PhaseTwo = { Move.Trail, Move.Smoke, Move.Wall };
 
         readonly List<Move> _bag = new List<Move>();
         Move? _last;
+        bool _raged;
+        bool _cinematic;
 
         EnemyController _boss;
         EnemyController _upper;
@@ -110,6 +128,7 @@ namespace MetalRaptors
             Unpin();
             FadeSmoke();
             Throttle(false);
+            Cinematic(false);
 
             if (_upper != null) _upper.EndScript();
             if (_lower != null) _lower.EndScript();
@@ -117,6 +136,7 @@ namespace MetalRaptors
             _lower = null;
 
             if (_boss == null) return;
+            _boss.Featured = false;
             _boss.Sputter(false);
             _boss.EndScript();
         }
@@ -139,10 +159,14 @@ namespace MetalRaptors
         {
             Grab();
             _boss.Exposed = true;
+            _boss.HealthFloor = _boss.MaxHealth * RageHealth;
             yield return Leave();
 
             while (Live)
             {
+                if (!_raged && Wounded) yield return Rage();
+                if (!Live) yield break;
+
                 yield return Pause(GapSec);
                 if (!Live) yield break;
 
@@ -182,9 +206,11 @@ namespace MetalRaptors
             }
         }
 
+        bool Wounded => _boss.CurrentHealth <= _boss.MaxHealth * RageHealth;
+
         void Refill()
         {
-            _bag.AddRange(Moves);
+            _bag.AddRange(_raged ? PhaseTwo : PhaseOne);
             Shuffle(_bag);
 
             int top = _bag.Count - 1;
@@ -235,6 +261,14 @@ namespace MetalRaptors
             if (_boss != null) _boss.Throttling = on;
         }
 
+        void Cinematic(bool on)
+        {
+            if (_cinematic == on) return;
+
+            _cinematic = on;
+            _stage.cinematic?.Invoke(on);
+        }
+
         void Pin(float x) => _stage.pin?.Invoke(x);
 
         void Unpin() => _stage.pin?.Invoke(float.NegativeInfinity);
@@ -281,7 +315,7 @@ namespace MetalRaptors
             _climb = 0f;
             Arrive(new Vector2(Left - Offscreen, Player.y), 0f);
 
-            float holdX = _stage.camPos.x + _stage.halfW * TrailHoldX;
+            float holdX = Left + TrailEdgePad + _boss.BodyBack;
             float climb = _stage.playerSpeed * TrailClimbFactor;
             float fire = TrailFireSec;
 
@@ -291,11 +325,13 @@ namespace MetalRaptors
                 _pos.x = Mathf.MoveTowards(_pos.x, holdX, TrailEnterSpeed * dt);
                 Follow(Player.y, climb, dt);
                 Place();
+                Pin(_pos.x + _boss.BodyFront + TrailPinGap);
 
                 if (_pos.x > Left && Ready(ref fire, TrailFireSec, dt))
                     _boss.Fire(TrailBulletSpeed, TrailDamage);
                 yield return null;
             }
+            Unpin();
 
             float stopX = _stage.camPos.x;
             float midY = Mathf.Clamp(_stage.camPos.y, _stage.floorY, _stage.ceilingY)
@@ -362,22 +398,8 @@ namespace MetalRaptors
             _smoke = SmokeRibbon.Lay(_stage.player, _stage.scrollSpeed, Left,
                 _boss.transform.position.z, SmokeDamage);
 
-            float holdX = Right - SmokeHoldPad;
-            float speed = SmokeStartSpeed;
-            Throttle(true);
-            while (Live)
-            {
-                float dt = Time.deltaTime;
-                float left = Mathf.Max(0f, holdX - _pos.x);
-                if (left <= 1f) break;
-
-                float cap = Mathf.Min(SmokeTopSpeed, Mathf.Sqrt(2f * SmokeBrake * left));
-                speed = Mathf.MoveTowards(speed, cap, (cap > speed ? SmokeAccel : SmokeBrake) * dt);
-                _pos.x = Mathf.Min(holdX, _pos.x + speed * dt);
-                PlaceSmoking();
-                yield return null;
-            }
-            Throttle(false);
+            yield return Glide(Right - SmokeHoldPad, SmokeStartSpeed, SmokeTopSpeed, SmokeAccel,
+                SmokeBrake, true);
 
             float target = Random.value < 0.5f ? high : low;
 
@@ -395,6 +417,78 @@ namespace MetalRaptors
             FadeSmoke();
             if (!Live) yield break;
 
+            _speed = 0f;
+            yield return Leave();
+        }
+
+        IEnumerator Glide(float toX, float speed, float top, float accel, float brake, bool smoking)
+        {
+            Throttle(true);
+            while (Live)
+            {
+                float dt = Time.deltaTime;
+                float left = Mathf.Max(0f, toX - _pos.x);
+                if (left <= 1f) break;
+
+                float cap = Mathf.Min(top, Mathf.Sqrt(2f * brake * left));
+                speed = Mathf.MoveTowards(speed, cap, (cap > speed ? accel : brake) * dt);
+                _pos.x = Mathf.Min(toX, _pos.x + speed * dt);
+                if (smoking) PlaceSmoking();
+                else Place();
+                yield return null;
+            }
+            Throttle(false);
+        }
+
+        IEnumerator Hover(float seconds)
+        {
+            for (float t = 0f; t < seconds && Live; t += Time.deltaTime)
+            {
+                Place();
+                yield return null;
+            }
+        }
+
+        IEnumerator Rage()
+        {
+            _raged = true;
+            _bag.Clear();
+            Cinematic(true);
+
+            yield return Pause(RageLeadSec);
+            if (Live)
+            {
+                Vector2 spot = _stage.ahead != null ? _stage.ahead() : (Vector2)_stage.camPos;
+                Arrive(new Vector2(Left - Offscreen, spot.y), 0f);
+                _boss.Exposed = false;
+                _boss.Featured = true;
+
+                yield return Glide(spot.x, RageStartSpeed, RageTopSpeed, RageAccel, RageBrake, false);
+                Throttle(true);
+                yield return Hover(RagePitchDelay);
+            }
+
+            for (float t = 0f; t < RagePitchSec && Live; t += Time.deltaTime)
+            {
+                _boss.EnginePitch = Mathf.Lerp(1f, RagePitch, Mathf.SmoothStep(0f, 1f, t / RagePitchSec));
+                Place();
+                yield return null;
+            }
+
+            if (Live)
+            {
+                _boss.EnginePitch = RagePitch;
+                _boss.HealthFloor = 0f;
+                Explosion.Spawn(_boss.transform.position, _boss.ModelSize);
+                _boss.Blaze();
+                yield return Hover(RageShowSec);
+            }
+
+            Cinematic(false);
+            if (!Live) yield break;
+
+            _boss.Featured = false;
+            _boss.Exposed = true;
             _speed = 0f;
             yield return Leave();
         }

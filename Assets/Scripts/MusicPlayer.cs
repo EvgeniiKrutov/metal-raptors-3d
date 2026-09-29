@@ -9,10 +9,11 @@ namespace MetalRaptors
     {
         public static MusicPlayer Instance { get; private set; }
 
-        public const string MenuThemeId = "flak-parade";
         const float MusicVolume = 0.45f;
         const float FadeInSec = 1.5f;
-        const float FadeOutSec = 0.8f;
+        public const float FadeOutSec = 0.8f;
+        const float SwitchFadeSec = 0.3f;
+        const float BrowseFadeInSec = 0.5f;
         const double ScheduleDelaySec = 0.1;
 
         const float LoopBakeSafety = 1.3f;
@@ -35,22 +36,38 @@ namespace MetalRaptors
             public AudioClip IntroClip;
             public double IntroDuration;
             public double BakeSecPerAudioSec;
-            public bool IntroBaked, IntroStarted, LoopDone;
+            public bool IntroBaked, IntroStarted, LoopDone, Dropped;
             public double LoopDueDsp;
         }
 
         AudioSource _introSource;
         AudioSource _loopSource;
         string _currentId;
+        bool _menuScene = true;
         float _volume;
         float _volumeTarget;
         float _fadeSec = 1f;
         bool _stopWhenSilent;
         double _fadeAfterDsp;
 
-        BakeJob _job;
+        string _pendingId;
+        float _pendingFade;
+        float _pendingAt;
+
+        readonly List<BakeJob> _jobs = new List<BakeJob>();
+        readonly HashSet<string> _retain = new HashSet<string>();
+        readonly HashSet<string> _pinned = new HashSet<string>();
+        readonly List<string> _prewarmQueue = new List<string>();
+        readonly List<string> _trash = new List<string>();
 
         static float MusicTarget => MusicVolume * AudioOptions.Music;
+
+        public static bool IsAudible(string id) => Instance != null && Instance.Audible(id);
+
+        public static float LevelPresence => Instance != null ? Instance.Presence() : 0f;
+
+        static bool HasMenuMusic(string scene) =>
+            scene == SceneNames.MainMenu || scene == SceneNames.Garage;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         static void Bootstrap()
@@ -77,7 +94,7 @@ namespace MetalRaptors
             _loopSource = CreateSource(true);
             SceneManager.sceneLoaded += OnSceneLoaded;
             AudioSettings.OnAudioConfigurationChanged += OnAudioConfigurationChanged;
-            Prewarm(MenuThemeId);
+            Prewarm(MusicTracks.Selected);
         }
 
         void OnApplicationPause(bool paused)
@@ -96,8 +113,8 @@ namespace MetalRaptors
 
         void Start()
         {
-            if (_currentId == null && SceneManager.GetActiveScene().name == SceneNames.MainMenu)
-                Play(MenuThemeId, FadeInSec);
+            if (_currentId == null && HasMenuMusic(SceneManager.GetActiveScene().name))
+                Play(MusicTracks.Selected, FadeInSec);
         }
 
         void OnDestroy()
@@ -111,6 +128,13 @@ namespace MetalRaptors
         void Update()
         {
             PollBake();
+            Fade();
+            LaunchPending();
+            PrewarmNext();
+        }
+
+        void Fade()
+        {
             if (_currentId == null) return;
             if (!_stopWhenSilent && AudioSettings.dspTime < _fadeAfterDsp) return;
 
@@ -122,6 +146,32 @@ namespace MetalRaptors
             if (_stopWhenSilent && _volume <= 0f) Stop();
         }
 
+        void LaunchPending()
+        {
+            if (_pendingId == null || _currentId != null) return;
+            if (Time.realtimeSinceStartup < _pendingAt) return;
+
+            string id = _pendingId;
+            _pendingId = null;
+            Launch(id, _pendingFade);
+            Trim();
+        }
+
+        void PrewarmNext()
+        {
+            if (_jobs.Count > 0 || _pendingId != null) return;
+
+            while (_prewarmQueue.Count > 0)
+            {
+                string id = _prewarmQueue[0];
+                _prewarmQueue.RemoveAt(0);
+                if (RenderCache.ContainsKey(id) || !_retain.Contains(id)) continue;
+
+                StartJob(id, FadeInSec, wanted: false);
+                return;
+            }
+        }
+
         void OnVolumeChanged()
         {
             if (_currentId == null || _stopWhenSilent) return;
@@ -130,8 +180,161 @@ namespace MetalRaptors
 
         public void Play(string id, float fadeSec = FadeInSec)
         {
-            if (_currentId == id && !_stopWhenSilent) return;
+            if (string.IsNullOrEmpty(id)) return;
 
+            if (_currentId == id && (!_stopWhenSilent || LoopArmed(id)))
+            {
+                _pendingId = null;
+                if (!_stopWhenSilent) return;
+
+                _stopWhenSilent = false;
+                _volumeTarget = MusicTarget;
+                _fadeSec = fadeSec;
+                return;
+            }
+
+            BakeJob wanted = WantedJob();
+            if (_currentId == null && _pendingId == null && wanted == null)
+            {
+                Launch(id, fadeSec);
+                return;
+            }
+
+            if (_currentId == null && wanted != null && wanted.Id == id)
+            {
+                _pendingId = null;
+                wanted.Fade = fadeSec;
+                return;
+            }
+
+            _pendingId = id;
+            _pendingFade = fadeSec;
+            _pendingAt = Time.realtimeSinceStartup + SwitchFadeSec;
+
+            if (_currentId != null && _volume > 0f)
+            {
+                _volumeTarget = 0f;
+                _fadeSec = SwitchFadeSec;
+                _stopWhenSilent = true;
+            }
+            else
+            {
+                Stop();
+            }
+        }
+
+        public void Browse(string id, params string[] neighbours)
+        {
+            _retain.Clear();
+            _prewarmQueue.Clear();
+            _retain.Add(id);
+
+            foreach (string other in neighbours)
+            {
+                if (string.IsNullOrEmpty(other) || !_retain.Add(other)) continue;
+                _prewarmQueue.Add(other);
+            }
+
+            Play(id, BrowseFadeInSec);
+            Trim();
+        }
+
+        public void EndBrowse()
+        {
+            _retain.Clear();
+            _prewarmQueue.Clear();
+            Play(MusicTracks.Selected, BrowseFadeInSec);
+            Trim();
+        }
+
+        public void Prewarm(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return;
+
+            _pinned.Add(id);
+            if (RenderCache.ContainsKey(id) || FindJob(id) != null) return;
+            StartJob(id, FadeInSec, wanted: false);
+        }
+
+        public void FadeOutAndStop(float fadeSec = FadeOutSec)
+        {
+            _pendingId = null;
+            foreach (BakeJob job in _jobs) job.Wanted = false;
+            if (_currentId == null || _stopWhenSilent) return;
+            _volumeTarget = 0f;
+            _fadeSec = fadeSec;
+            _stopWhenSilent = true;
+        }
+
+        float Presence()
+        {
+            if (_menuScene || _currentId == null) return 0f;
+
+            float target = MusicTarget;
+            return target > 0f ? Mathf.Clamp01(_volume / target) : 0f;
+        }
+
+        bool Audible(string id) =>
+            _currentId == id && !_stopWhenSilent && AudioSettings.dspTime >= _fadeAfterDsp;
+
+        bool LoopArmed(string id)
+        {
+            if (_loopSource.clip != null) return true;
+            BakeJob job = FindJob(id);
+            return job != null && job.Wanted;
+        }
+
+        BakeJob FindJob(string id)
+        {
+            foreach (BakeJob job in _jobs)
+            {
+                if (job.Id == id) return job;
+            }
+            return null;
+        }
+
+        BakeJob WantedJob()
+        {
+            foreach (BakeJob job in _jobs)
+            {
+                if (job.Wanted) return job;
+            }
+            return null;
+        }
+
+        bool Keeps(string id)
+        {
+            if (id == MusicTracks.Selected || id == _currentId || id == _pendingId) return true;
+            if (_retain.Contains(id) || _pinned.Contains(id)) return true;
+
+            BakeJob wanted = WantedJob();
+            return wanted != null && wanted.Id == id;
+        }
+
+        void Trim()
+        {
+            _trash.Clear();
+            foreach (var kvp in RenderCache)
+            {
+                if (!Keeps(kvp.Key)) _trash.Add(kvp.Key);
+            }
+
+            foreach (string id in _trash)
+            {
+                RenderedMusic rendered = RenderCache[id];
+                RenderCache.Remove(id);
+                Discard(rendered.Intro);
+                Discard(rendered.Loop);
+            }
+        }
+
+        static void Discard(AudioClip clip)
+        {
+            if (clip != null) Destroy(clip);
+        }
+
+        void Launch(string id, float fadeSec)
+        {
             AudioOutput.EnsureStereo();
             Stop();
 
@@ -141,29 +344,15 @@ namespace MetalRaptors
                 return;
             }
 
-            if (_job != null && _job.Id == id)
+            BakeJob job = FindJob(id);
+            if (job != null)
             {
-                _job.Wanted = true;
-                _job.Fade = fadeSec;
+                job.Wanted = true;
+                job.Fade = fadeSec;
                 return;
             }
 
             StartJob(id, fadeSec, wanted: true);
-        }
-
-        public void Prewarm(string id)
-        {
-            if (RenderCache.ContainsKey(id) || (_job != null && _job.Id == id)) return;
-            StartJob(id, FadeInSec, wanted: false);
-        }
-
-        public void FadeOutAndStop(float fadeSec = FadeOutSec)
-        {
-            if (_job != null) _job.Wanted = false;
-            if (_currentId == null || _stopWhenSilent) return;
-            _volumeTarget = 0f;
-            _fadeSec = fadeSec;
-            _stopWhenSilent = true;
         }
 
         void StartJob(string id, float fadeSec, bool wanted)
@@ -187,19 +376,24 @@ namespace MetalRaptors
             if (loopStart > 0)
                 job.Intro = Task.Run(() => MusicSynth.BakeSection(config, rate, intro: true));
             job.Loop = Task.Run(() => MusicSynth.BakeSection(config, rate, intro: false));
-            _job = job;
+            _jobs.Add(job);
         }
 
         void PollBake()
         {
-            var job = _job;
-            if (job == null) return;
+            for (int i = _jobs.Count - 1; i >= 0; i--)
+            {
+                BakeJob job = _jobs[i];
 
-            if (!job.IntroBaked && job.Intro != null && job.Intro.IsCompleted) TakeIntro(job);
-            if (job.Wanted && job.IntroBaked && !job.IntroStarted && job.IntroClip != null) StartIntro(job);
+                if (!job.IntroBaked && job.Intro != null && job.Intro.IsCompleted) TakeIntro(job);
+                if (job.Wanted && job.IntroBaked && !job.IntroStarted && job.IntroClip != null) StartIntro(job);
 
-            if (!job.LoopDone && job.Loop.IsCompleted) TakeLoop(job);
-            if (job.LoopDone && (job.Intro == null || job.IntroBaked)) _job = null;
+                if (!job.LoopDone && job.Loop.IsCompleted) TakeLoop(job);
+                if (!job.LoopDone || (job.Intro != null && !job.IntroBaked)) continue;
+
+                if (job.Dropped) Discard(job.IntroClip);
+                _jobs.RemoveAt(i);
+            }
         }
 
         void TakeIntro(BakeJob job)
@@ -261,6 +455,13 @@ namespace MetalRaptors
             var loopClip = MusicSynth.ToClip(bake, intro: false, $"{job.Id}-loop");
             if (loopClip == null) return;
 
+            if (!job.Wanted && !Keeps(job.Id))
+            {
+                job.Dropped = true;
+                Discard(loopClip);
+                return;
+            }
+
             var rendered = new RenderedMusic
             {
                 Intro = job.IntroClip,
@@ -317,10 +518,10 @@ namespace MetalRaptors
             _volumeTarget = 0f;
             _stopWhenSilent = false;
             _fadeAfterDsp = 0;
-            if (_job != null)
+            foreach (BakeJob job in _jobs)
             {
-                _job.Wanted = false;
-                _job.IntroStarted = false;
+                job.Wanted = false;
+                job.IntroStarted = false;
             }
         }
 
@@ -337,8 +538,20 @@ namespace MetalRaptors
         void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
             if (mode != LoadSceneMode.Single) return;
-            if (scene.name == SceneNames.MainMenu) Play(MenuThemeId, FadeInSec);
-            else FadeOutAndStop(FadeOutSec);
+
+            _menuScene = HasMenuMusic(scene.name);
+            _retain.Clear();
+            _prewarmQueue.Clear();
+            if (HasMenuMusic(scene.name))
+            {
+                _pinned.Clear();
+                Play(MusicTracks.Selected, FadeInSec);
+            }
+            else
+            {
+                FadeOutAndStop(FadeOutSec);
+            }
+            Trim();
         }
     }
 }

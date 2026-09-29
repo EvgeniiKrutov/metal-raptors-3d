@@ -40,23 +40,23 @@ namespace MetalRaptors
 
         Flame[] _flames;
 
-        public static PlaneFire Ignite(GameObject plane, float size)
+        public static PlaneFire Ignite(GameObject plane, float size, Vector3? nose = null)
         {
             if (plane == null) return null;
 
             var root = new GameObject("Fire");
             root.transform.SetParent(plane.transform, false);
             var fire = root.AddComponent<PlaneFire>();
-            fire.Build(Mathf.Max(1f, size));
+            fire.Build(Mathf.Max(1f, size), nose);
             return fire;
         }
 
         public void Extinguish() => Destroy(gameObject);
 
-        void Build(float size)
+        void Build(float size, Vector3? tip)
         {
             var shader = Shader.Find("Universal Render Pipeline/Lit");
-            Vector3 nose = NoseLocal(transform.parent, size);
+            Vector3 nose = tip ?? NoseLocal(transform.parent, size);
             nose.x -= size * NoseSetback;
             _flames = new Flame[FlameCount];
 

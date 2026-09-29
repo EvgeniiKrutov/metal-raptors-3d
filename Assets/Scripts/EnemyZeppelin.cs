@@ -396,7 +396,7 @@ namespace MetalRaptors
                 fromEnemy: true);
 
             MuzzleFlash.Spawn(start, dir, FlashSize);
-            if (_shotClip != null) _audio.PlayOneShot(_shotClip, ShotVolume * AudioOptions.Sfx);
+            if (_shotClip != null) _audio.PlayOneShot(_shotClip, ShotVolume * AudioOptions.Effects);
         }
 
         static GameObject BuildRound()

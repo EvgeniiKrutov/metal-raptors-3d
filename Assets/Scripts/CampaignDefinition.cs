@@ -24,6 +24,7 @@ namespace MetalRaptors
         public string script;
         public string arenaScript;
         public CampaignOutroLine[] arenaLines;
+        public string bossMusic;
         public string title;
         public string dateline;
         public string lore;
@@ -242,6 +243,7 @@ namespace MetalRaptors
             script = "level4",
             arenaScript = "level4_arena",
             arenaLines = Arena4,
+            bossMusic = "black-tide",
             companion = true,
             backCompanions = 2,
             supportCompanion = true,

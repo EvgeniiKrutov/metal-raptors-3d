@@ -265,10 +265,13 @@ namespace MetalRaptors
                 ? PlaneFactory.GunLocal(go, model, plane, ModelScale, mirrored: true)
                 : Vector3.zero;
 
+            Vector3 nose = PlaneFactory.NoseLocal(go, model, plane);
+
             var enemy = go.AddComponent<EnemyController>();
             enemy.Initialize(config, _player, _minX, _maxX, _groundY, CeilingFor(plane),
                 EdgeMargin);
             if (gunned) enemy.MountGun(gun);
+            enemy.MountNose(nose);
             enemy.OnDestroyed += OnDestroyed;
             _live.Add(enemy);
             _planes[enemy] = plane;

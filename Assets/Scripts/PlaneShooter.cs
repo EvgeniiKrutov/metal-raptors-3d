@@ -85,7 +85,7 @@ namespace MetalRaptors
                 _planeCollider, fromEnemy: false);
 
             MuzzleFlash.Spawn(_flashPoint.position, dir, _bodyRadius);
-            if (_shotClip != null) _audio.PlayOneShot(_shotClip, ShotVolume * AudioOptions.Sfx);
+            if (_shotClip != null) _audio.PlayOneShot(_shotClip, ShotVolume * AudioOptions.Effects);
         }
 
         float MeasureBodyRadius()

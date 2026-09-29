@@ -7,6 +7,8 @@ namespace MetalRaptors
     {
         public const int Steps = 20;
 
+        const float MusicDuck = 0.2f;
+
         const string PrefMaster = "mr_master_volume";
         const string PrefMusic = "mr_music_volume";
         const string PrefSfx = "mr_sfx_volume";
@@ -23,6 +25,8 @@ namespace MetalRaptors
         public static float Music { get { Load(); return _music; } }
 
         public static float Sfx { get { Load(); return _sfx; } }
+
+        public static float Effects => Sfx * (1f - MusicDuck * MusicPlayer.LevelPresence);
 
         public static void SetMaster(float value)
         {

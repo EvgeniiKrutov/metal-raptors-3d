@@ -809,7 +809,7 @@ namespace MetalRaptors
 
             MuzzleFlash.Spawn(muzzle, dir, _size);
             if (_shotClip != null && _audio != null)
-                _audio.PlayOneShot(_shotClip, SupportShotVolume * AudioOptions.Sfx);
+                _audio.PlayOneShot(_shotClip, SupportShotVolume * AudioOptions.Effects);
         }
 
         bool Aimed()
@@ -828,7 +828,7 @@ namespace MetalRaptors
 
             Tracer.Spawn(muzzle, dir, TracerSpeed);
             MuzzleFlash.Spawn(muzzle, dir, _size);
-            if (_shotClip != null && _audio != null) _audio.PlayOneShot(_shotClip, ShotVolume * AudioOptions.Sfx);
+            if (_shotClip != null && _audio != null) _audio.PlayOneShot(_shotClip, ShotVolume * AudioOptions.Effects);
         }
 
         void OnDestroy()

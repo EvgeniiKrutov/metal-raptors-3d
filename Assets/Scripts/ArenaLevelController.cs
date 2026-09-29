@@ -86,6 +86,7 @@ namespace MetalRaptors
         EnemyController _boss;
         BossHealthBar _bossBar;
         CinematicBars _entryBars;
+        CinematicBars _rageBars;
         PlaneModelConfig _bossPlane;
         PlaneSkin _bossSkin;
         float _bossHealth;
@@ -161,6 +162,7 @@ namespace MetalRaptors
             _enemies.ModelScale = PlaneScale;
             _sound.Track(_enemies.Live, boss: true);
 
+            if (HasBossMusic) MusicPlayer.Instance.Prewarm(_level.bossMusic);
             StartCoroutine(FlyIn());
         }
 
@@ -171,6 +173,13 @@ namespace MetalRaptors
         }
 
         static float ScrollSpeed => DuelPlane.CruiseSpeed * CloudSpeedFactor;
+
+        bool HasBossMusic => MusicPlayer.Instance != null && !string.IsNullOrEmpty(_level.bossMusic);
+
+        static void StopBossMusic(float fadeSec)
+        {
+            if (MusicPlayer.Instance != null) MusicPlayer.Instance.FadeOutAndStop(fadeSec);
+        }
 
         void SetupCamera()
         {
@@ -429,6 +438,9 @@ namespace MetalRaptors
             if (fresh == null) return old;
 
             fresh.Restore(heading, old.CurrentHealth);
+            fresh.HealthFloor = old.HealthFloor;
+            fresh.EnginePitch = old.EnginePitch;
+            if (old.Blazing) fresh.Blaze();
             fresh.HideHealthBar();
             _enemies.Dismiss(old);
             _boss = fresh;
@@ -502,6 +514,7 @@ namespace MetalRaptors
 
             _bossBar = new BossHealthBar(_hud.transform, _hudView.BossSlot, _bossName);
             _bossBar.Set(_boss.CurrentHealth, _bossMax);
+            if (HasBossMusic) MusicPlayer.Instance.Play(_level.bossMusic);
 
             _moves = RavenMoveset.Begin(gameObject, _boss, Stage());
         }
@@ -524,7 +537,40 @@ namespace MetalRaptors
             over = () => _gameOver,
             respawn = RespawnBoss,
             pin = PinLeftWall,
+            ahead = BossTarget,
+            cinematic = BossCinematic,
         };
+
+        void BossCinematic(bool on)
+        {
+            if (on)
+            {
+                if (_gameOver || _cube == null || _bossEntry) return;
+
+                _bossEntry = true;
+                _cube.SetControlled(false);
+                if (_shooter != null) _shooter.Stop();
+                if (_roll != null) _roll.Stop();
+                StartCoroutine(CenterPlayer());
+
+                _rageBars = CinematicBars.Create(_hud.transform);
+                _rageBars.Raise();
+                return;
+            }
+
+            _bossEntry = false;
+            if (_rageBars != null)
+            {
+                _rageBars.Lower();
+                Destroy(_rageBars.gameObject, CinematicBars.SlideSec);
+                _rageBars = null;
+            }
+            if (_gameOver || _cube == null) return;
+
+            _cube.SetControlled(true);
+            if (_shooter != null) _shooter.Resume();
+            if (_roll != null) _roll.Resume();
+        }
 
         void PinLeftWall(float x)
         {
@@ -567,6 +613,7 @@ namespace MetalRaptors
             }
 
             if (_sound != null) _sound.FadeOut(OutroFadeSec);
+            StopBossMusic(OutroFadeSec);
             ScreenFade.Swap(ShowGroundScene, OutroFadeSec);
         }
 
@@ -596,6 +643,7 @@ namespace MetalRaptors
             if (_shooter != null) _shooter.Stop();
             if (_roll != null) _roll.Stop();
             if (_sound != null) _sound.EnterGameOver();
+            StopBossMusic(MusicPlayer.FadeOutSec);
 
             StartCoroutine(FailWhenGone());
         }
@@ -622,6 +670,7 @@ namespace MetalRaptors
             if (_shooter != null) _shooter.Stop();
             if (_roll != null) _roll.Stop();
             if (first && _sound != null) _sound.EnterGameOver();
+            if (first) StopBossMusic(MusicPlayer.FadeOutSec);
 
             StartCoroutine(FailAfter(Explosion.Duration));
         }

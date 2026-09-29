@@ -11,12 +11,18 @@ namespace MetalRaptors
             public GameObject Root;
             public IMenuOptionRow[] Rows;
             public Action Refresh;
+            public Action Leave;
+            public bool Live;
         }
 
         readonly GameObject _root;
         readonly MenuPanel _categories;
         readonly Category[] _cats;
         readonly Action _onBack;
+
+        MusicTrackInfo[] _tracks;
+        MenuTrackCard _trackCard;
+        MenuOptionButton _trackSelect;
 
         int _shown;
         int _row;
@@ -36,8 +42,8 @@ namespace MetalRaptors
 
             _categories = new MenuPanel(column, "Options Categories", MenuTheme.ListTop);
             _cats = GraphicsOptions.Mobile
-                ? new[] { BuildSound(screen) }
-                : new[] { BuildSound(screen), BuildGraphics(screen) };
+                ? new[] { BuildSound(screen), BuildMusic(screen) }
+                : new[] { BuildSound(screen), BuildMusic(screen), BuildGraphics(screen) };
 
             _categories.AddGap(MenuTheme.SectionGap);
             MenuItemView back = _categories.AddNav("back", () => _onBack?.Invoke());
@@ -70,6 +76,59 @@ namespace MetalRaptors
 
             Adopt(cat, "sound");
             return cat;
+        }
+
+        Category BuildMusic(Transform screen)
+        {
+            var cat = new Category();
+            Transform values = CreateValues(screen, "Options Music");
+            cat.Root = values.gameObject;
+
+            _tracks = MusicTracks.All;
+            _trackCard = MenuTrackCard.Create(values, _tracks, MusicTracks.IndexOf(MusicTracks.Selected),
+                BrowseTrack, SelectTrack);
+            _trackSelect = MenuOptionButton.Create(values, "select track",
+                -(_trackCard.Height + MenuTheme.CardsToBack), SelectTrack);
+
+            cat.Rows = new IMenuOptionRow[] { _trackCard, _trackSelect };
+            cat.Refresh = ResetTrack;
+            cat.Leave = () =>
+            {
+                ResetTrack();
+                if (MusicPlayer.Instance != null) MusicPlayer.Instance.EndBrowse();
+            };
+
+            Adopt(cat, "music");
+            return cat;
+        }
+
+        void ResetTrack()
+        {
+            _trackCard.SetIndex(MusicTracks.IndexOf(MusicTracks.Selected));
+            RefreshTrackSelect();
+        }
+
+        void BrowseTrack(int index)
+        {
+            RefreshTrackSelect();
+            if (MusicPlayer.Instance == null) return;
+
+            int count = _tracks.Length;
+            MusicPlayer.Instance.Browse(_tracks[index].Id,
+                _tracks[(index + count - 1) % count].Id, _tracks[(index + 1) % count].Id);
+        }
+
+        void SelectTrack()
+        {
+            MusicTracks.Select(_trackCard.TrackId);
+            RefreshTrackSelect();
+        }
+
+        void RefreshTrackSelect()
+        {
+            bool applied = _trackCard.TrackId == MusicTracks.Selected;
+            _trackSelect.SetLabel(applied ? "selected" : "select track");
+            _trackSelect.SetInteractable(!applied);
         }
 
         Category BuildGraphics(Transform screen)
@@ -126,6 +185,7 @@ namespace MetalRaptors
         {
             _root.SetActive(active);
             if (active) Enter();
+            else LeaveValues(null);
         }
 
         public void Enter()
@@ -160,7 +220,8 @@ namespace MetalRaptors
 
         public void ActivateFocused()
         {
-            if (!_live) _categories.ActivateFocused();
+            if (_live) Current.Rows[_row].Activate();
+            else _categories.ActivateFocused();
         }
 
         public bool Cancel()
@@ -222,13 +283,17 @@ namespace MetalRaptors
             {
                 Category cat = _cats[c];
                 bool shown = c == _shown;
+                bool live = shown && _live;
                 cat.Root.SetActive(shown);
 
                 for (int i = 0; i < cat.Rows.Length; i++)
                 {
-                    cat.Rows[i].SetLive(shown && _live);
-                    cat.Rows[i].SetFocused(shown && _live && i == _row);
+                    cat.Rows[i].SetLive(live);
+                    cat.Rows[i].SetFocused(live && i == _row);
                 }
+
+                if (cat.Live && !live) cat.Leave?.Invoke();
+                cat.Live = live;
             }
         }
     }

@@ -255,6 +255,10 @@ namespace MetalRaptors
             (_canvasWidth - 2f * PadLeft - (RowCards - 1) * CardGap) / RowCards,
             CardSizeMin, CardSizeMax);
 
+        public const float PreviewCardScale = 4f / 3f;
+
+        public static float PreviewCardSize => CardSize * PreviewCardScale;
+
         public static float RowCardSize(int visible, float top)
         {
             if (visible <= 0) return CardSizeMax;

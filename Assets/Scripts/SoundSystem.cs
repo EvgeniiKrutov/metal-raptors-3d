@@ -206,7 +206,7 @@ namespace MetalRaptors
 
             protected override void Apply()
             {
-                float bed = Envelope.Value * Attenuation * PauseGain * AudioOptions.Sfx;
+                float bed = Envelope.Value * Attenuation * PauseGain * AudioOptions.Effects;
                 float duck = Mathf.Lerp(1f, BoostDuck, _boostLevel.Value);
 
                 if (_idle != null) _idle.volume = IdleVolume * bed * _idleLevel.Value * duck;
@@ -236,6 +236,9 @@ namespace MetalRaptors
             Ramp _throttleLevel;
             bool _revving;
             float _grace;
+            float _pitch = 1f;
+
+            public bool Featured => _plane != null && _plane.Featured;
 
             public EnemyEngineVoice(GameObject host, EnemyController plane, bool boss)
             {
@@ -292,11 +295,19 @@ namespace MetalRaptors
 
             protected override void Apply()
             {
-                float bed = Envelope.Value * Attenuation * PauseGain * AudioOptions.Sfx;
+                float bed = Envelope.Value * Attenuation * PauseGain * AudioOptions.Effects;
+                if (_plane != null) _pitch = _plane.EnginePitch;
 
-                if (_idle != null) _idle.volume = _idleVolume * bed * _idleLevel.Value;
+                if (_idle != null)
+                {
+                    _idle.volume = _idleVolume * bed * _idleLevel.Value;
+                    _idle.pitch = _pitch;
+                }
                 if (_throttle != null)
+                {
                     _throttle.volume = _throttleVolume * bed * _throttleLevel.Value;
+                    _throttle.pitch = _pitch;
+                }
             }
 
             public override void Dispose()
@@ -398,7 +409,7 @@ namespace MetalRaptors
         public void PlayStutter()
         {
             if (_stutter == null || _stutter.clip == null || _stutter.isPlaying) return;
-            _stutter.volume = StutterVolume * AudioOptions.Sfx;
+            _stutter.volume = StutterVolume * AudioOptions.Effects;
             _stutter.Play();
         }
 
@@ -506,7 +517,7 @@ namespace MetalRaptors
         void ApplyAmbient()
         {
             if (_wind != null && !_windStopped)
-                _wind.volume = WindVolume * Gain * AudioOptions.Sfx;
+                _wind.volume = WindVolume * Gain * AudioOptions.Effects;
         }
 
         void StopWind()
@@ -566,7 +577,7 @@ namespace MetalRaptors
                 var entry = _rankScratch[i];
                 float near = _boss ? 1f : AttenuationFor(entry.Distance);
                 entry.Voice.TargetAttenuation = i < MaxAudibleEnemies ? near : 0f;
-                entry.Voice.Tick(dt, _pauseGain.Value * _duck.Value);
+                entry.Voice.Tick(dt, _pauseGain.Value * (entry.Voice.Featured ? 1f : _duck.Value));
             }
         }
 

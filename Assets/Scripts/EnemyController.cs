@@ -32,6 +32,7 @@ namespace MetalRaptors
         const float DefaultTargetRadius = 15f;
 
         const float SmokeHealthThreshold = 30f;
+        const float BlazeScale = 0.55f;
 
         const float BandPushMargin = 80f;
         const float BandPushFraction = 0.4f;
@@ -103,6 +104,14 @@ namespace MetalRaptors
         public bool Exposed { get; set; }
 
         public bool Throttling { get; set; }
+
+        public bool Featured { get; set; }
+
+        public float EnginePitch { get; set; } = 1f;
+
+        public float HealthFloor { get; set; }
+
+        public bool Blazing { get; private set; }
 
         public float BodyLow => _bodyLow;
 
@@ -185,6 +194,7 @@ namespace MetalRaptors
         GameObject _bulletTemplate;
         Vector3 _gunLocal;
         bool _gunMounted;
+        Vector3? _noseLocal;
         float _bodyLow;
         float _bodyHigh;
         float _bodyBack;
@@ -278,6 +288,8 @@ namespace MetalRaptors
             _maxX = maxX;
         }
 
+        public void MountNose(Vector3 local) => _noseLocal = local;
+
         public void MountGun(Vector3 local)
         {
             _gunLocal = local;
@@ -288,6 +300,15 @@ namespace MetalRaptors
         {
             if (_dead || _falling || _bulletTemplate == null) return;
             Shoot(bulletSpeed, damage);
+        }
+
+        public void Blaze()
+        {
+            if (_dead || _falling || Blazing) return;
+
+            Blazing = true;
+            if (_fire == null) _fire = PlaneFire.Ignite(gameObject, ModelSize * BlazeScale, _noseLocal);
+            if (_smoke != null) _smoke.Arm(ModelSize);
         }
 
         public void Sputter(bool on)
@@ -1633,7 +1654,7 @@ namespace MetalRaptors
             go.GetComponent<Bullet>().Launch(dir, bulletSpeed, damage, _collider, fromEnemy: true);
 
             MuzzleFlash.Spawn(muzzle, dir, _bodyRadius);
-            if (_shotClip != null) _audio.PlayOneShot(_shotClip, ShotVolume * AudioOptions.Sfx);
+            if (_shotClip != null) _audio.PlayOneShot(_shotClip, ShotVolume * AudioOptions.Effects);
         }
 
         bool HasFiringSolution(Vector2 point)
@@ -1710,7 +1731,8 @@ namespace MetalRaptors
 
         void ApplyDamage(float amount)
         {
-            CurrentHealth = Mathf.Max(0f, CurrentHealth - amount);
+            float floor = Mathf.Clamp(HealthFloor, 0f, CurrentHealth);
+            CurrentHealth = Mathf.Max(floor, CurrentHealth - amount);
             UpdateHealthBar();
             if (CurrentHealth < SmokeHealthThreshold && _smoke != null) _smoke.Arm(ModelSize);
 
@@ -1735,7 +1757,7 @@ namespace MetalRaptors
 
             if (_sputter != null) _sputter.Settle();
             if (_smoke != null) _smoke.Ignite(ModelSize);
-            _fire = PlaneFire.Ignite(gameObject, ModelSize);
+            if (_fire == null) _fire = PlaneFire.Ignite(gameObject, ModelSize);
 
             _fall = PlaneFall.Begin(_rb, _heading, _config.flySpeed);
             if (_bar != null) Destroy(_bar.gameObject);
