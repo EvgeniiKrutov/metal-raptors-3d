@@ -22,6 +22,9 @@ namespace MetalRaptors
 
         static readonly Color SmokeColor = new Color(0.10f, 0.10f, 0.11f, Opacity);
 
+        public static Vector2 Wind { get; set; }
+
+        Color _color = SmokeColor;
         bool _armed;
         bool _burning;
         bool _cleared;
@@ -50,6 +53,10 @@ namespace MetalRaptors
             Arm(planeSize);
             _burning = true;
         }
+
+        public void Tint(Color color) => _color = color;
+
+        public void Settle() => _armed = false;
 
         public void Clear()
         {
@@ -94,7 +101,7 @@ namespace MetalRaptors
             float sizeFactor = _burning ? BurnSizeFactor : StartSizeFactor;
             float scale = _size * sizeFactor * Random.Range(1f - StartSizeJitter, 1f + StartSizeJitter);
             var go = UIFactory.CreatePrimitive3D(PrimitiveType.Cube,
-                spawn, Vector3.one * scale, SmokeColor, emissive: false, keepCollider: false);
+                spawn, Vector3.one * scale, _color, emissive: false, keepCollider: false);
             go.name = "Smoke";
             var renderer = go.GetComponent<Renderer>();
             UIFactory.MakeTransparent(renderer.sharedMaterial);
@@ -103,13 +110,14 @@ namespace MetalRaptors
             var puff = go.AddComponent<SmokeTrail>();
             puff._isPuff = true;
             puff._emitter = this;
+            puff._color = _color;
             puff._startScale = scale;
             puff._life = Random.Range(LifeMin, LifeMax);
             puff._mat = renderer.sharedMaterial;
             _puffs.Add(puff);
             Vector2 drift = new Vector2(back.x, back.y).normalized * (_size * DriftSpeedFactor)
                             * Random.Range(0.7f, 1.3f);
-            puff._velocity = new Vector3(drift.x, drift.y + RiseSpeed, 0f);
+            puff._velocity = new Vector3(drift.x + Wind.x, drift.y + Wind.y + RiseSpeed, 0f);
             puff._spinAxis = Random.onUnitSphere;
             puff._spinRate = Random.Range(SpinMin, SpinMax) * (Random.value < 0.5f ? -1f : 1f);
         }
@@ -137,8 +145,8 @@ namespace MetalRaptors
 
             if (_mat != null)
             {
-                var c = SmokeColor;
-                c.a = Opacity * (1f - t);
+                var c = _color;
+                c.a = _color.a * (1f - t);
                 _mat.SetColor("_BaseColor", c);
             }
         }

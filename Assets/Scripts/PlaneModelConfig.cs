@@ -53,6 +53,8 @@ namespace MetalRaptors
 
         public bool straightenProp;
 
+        public float gunLift;
+
         public PlaneSkin[] skins;
 
         public PlaneStats stats;
@@ -129,6 +131,7 @@ namespace MetalRaptors
             propPivotNode  = "propPivot",
             propBladesNode = "propBlades",
             straightenProp = true,
+            gunLift        = 0.059f,
             skins          = PlaneSkins.FokkerDr1,
             stats = new PlaneStats
             {
@@ -158,6 +161,7 @@ namespace MetalRaptors
             garageZoom     = 1.1f,
             propPivotNode  = "propAssembly",
             propBladesNode = "prop",
+            gunLift        = 0.077f,
             skins          = PlaneSkins.AlbatrosD3,
             stats = new PlaneStats
             {

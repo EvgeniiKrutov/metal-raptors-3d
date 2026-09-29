@@ -229,6 +229,8 @@ namespace MetalRaptors
             readonly AudioSource _idle;
             readonly AudioSource _throttle;
             readonly float _idleVolume;
+            readonly float _throttleVolume;
+            readonly bool _steers;
 
             Ramp _idleLevel;
             Ramp _throttleLevel;
@@ -238,14 +240,13 @@ namespace MetalRaptors
             public EnemyEngineVoice(GameObject host, EnemyController plane, bool boss)
             {
                 _plane = plane;
+                _steers = !boss;
                 _idleVolume = boss ? IdleVolume * BossShare : EnemyIdleVolume;
+                _throttleVolume = boss ? IdleVolume * BossShare : EnemyThrottleVolume;
                 _idle = CreateLoop(host, EnemyIdleClip);
                 Scatter(_idle);
-                if (!boss)
-                {
-                    _throttle = CreateLoop(host, EnemyThrottleClip);
-                    Scatter(_throttle);
-                }
+                _throttle = CreateLoop(host, EnemyThrottleClip);
+                Scatter(_throttle);
                 _idleLevel.Jump(1f);
                 _throttleLevel.Jump(0f);
             }
@@ -278,7 +279,9 @@ namespace MetalRaptors
 
             bool IsManeuvering() =>
                 _plane != null && _plane.IsAlive
-                && Maneuvering(_plane.AngularVelocity, _plane.MaxTurnRate, _plane.Heading);
+                && (_plane.Throttling
+                    || _steers && Maneuvering(_plane.AngularVelocity, _plane.MaxTurnRate,
+                        _plane.Heading));
 
             void Rev(bool on)
             {
@@ -293,7 +296,7 @@ namespace MetalRaptors
 
                 if (_idle != null) _idle.volume = _idleVolume * bed * _idleLevel.Value;
                 if (_throttle != null)
-                    _throttle.volume = EnemyThrottleVolume * bed * _throttleLevel.Value;
+                    _throttle.volume = _throttleVolume * bed * _throttleLevel.Value;
             }
 
             public override void Dispose()

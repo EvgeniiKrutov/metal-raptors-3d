@@ -4,7 +4,7 @@
     { "op": "warn", "planes": 1 },
     { "op": "danger", "side": "left", "seconds": 2 },
 
-    { "op": "boss", "plane": "fokker", "skin": "raven", "health": 5, "speaker": "ravensberg" },
+    { "op": "boss", "plane": "fokker", "skin": "raven", "health": 6.5, "speaker": "ravensberg" },
 
     { "op": "say", "speaker": "ravensberg", "line": "l4_boss1" },
     { "op": "say", "speaker": "you", "line": "l4_boss2" },

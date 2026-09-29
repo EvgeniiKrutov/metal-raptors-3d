@@ -66,6 +66,15 @@ namespace MetalRaptors
             return muzzle;
         }
 
+        public static Vector3 GunLocal(GameObject body, Transform model, PlaneModelConfig plane,
+            float scale, bool mirrored)
+        {
+            Vector3 nose = NoseLocal(body, model, plane);
+            float lift = plane.gunLift * plane.LengthUnits * scale;
+            nose.y += mirrored ? -lift : lift;
+            return nose;
+        }
+
         public static Vector3 NoseLocal(GameObject body, Transform model, PlaneModelConfig plane)
         {
             const float MuzzleClearance = 2f;

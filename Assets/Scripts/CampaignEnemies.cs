@@ -226,6 +226,26 @@ namespace MetalRaptors
             return SpawnOne(plane, new Vector3(position.x, position.y, z), config, skin);
         }
 
+        public EnemyController SpawnEscort(PlaneModelConfig plane, Vector2 position)
+        {
+            if (plane == null) return null;
+
+            float z = _player != null ? _player.position.z : 0f;
+            EnemyController escort = SpawnOne(plane, new Vector3(position.x, position.y, z));
+            escort.HideHealthBar();
+            escort.BeginScript();
+            return escort;
+        }
+
+        public void Dismiss(EnemyController enemy)
+        {
+            if (enemy == null) return;
+
+            _live.Remove(enemy);
+            _planes.Remove(enemy);
+            Object.Destroy(enemy.gameObject);
+        }
+
         float CeilingFor(PlaneModelConfig plane) =>
             _worldTop - plane.OnScreenSize * ModelScale / 2f;
 
@@ -240,9 +260,15 @@ namespace MetalRaptors
                 skin: skin ?? PlaneSkins.Default(plane));
             if (!Mathf.Approximately(ModelScale, 1f)) model.localScale *= ModelScale;
 
+            bool gunned = plane.gunLift > 0f;
+            Vector3 gun = gunned
+                ? PlaneFactory.GunLocal(go, model, plane, ModelScale, mirrored: true)
+                : Vector3.zero;
+
             var enemy = go.AddComponent<EnemyController>();
             enemy.Initialize(config, _player, _minX, _maxX, _groundY, CeilingFor(plane),
                 EdgeMargin);
+            if (gunned) enemy.MountGun(gun);
             enemy.OnDestroyed += OnDestroyed;
             _live.Add(enemy);
             _planes[enemy] = plane;

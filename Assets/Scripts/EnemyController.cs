@@ -80,6 +80,8 @@ namespace MetalRaptors
         const float BarHeight = 3.2f;
         const float BarLiftMargin = 8f;
 
+        const float ScriptRollRate = 300f;
+
         public event Action<EnemyController> OnDestroyed;
 
         public float CurrentHealth { get; private set; }
@@ -97,6 +99,20 @@ namespace MetalRaptors
         public float MaxHealth => _config != null ? Mathf.Max(1f, _config.health) : 1f;
 
         public float MaxTurnRate => _config != null ? _config.rotationSpeed * Mathf.Deg2Rad : 0f;
+
+        public bool Exposed { get; set; }
+
+        public bool Throttling { get; set; }
+
+        public float BodyLow => _bodyLow;
+
+        public float BodyHigh => _bodyHigh;
+
+        public float BodyBack => _bodyBack;
+
+        public float BodyFront => _bodyFront;
+
+        static readonly Color SputterColor = new Color(0.92f, 0.92f, 0.9f, 0.6f);
 
         enum AiState { Attack, Fly, Evade, Recover, Return, DiveClimb, DiveRun, DiveZoom, Tail }
 
@@ -138,6 +154,7 @@ namespace MetalRaptors
         float _lastCollisionTime = -999f;
         ShakeEffect _shake;
         SmokeTrail _smoke;
+        SmokeTrail _sputter;
         PlaneFire _fire;
         readonly PlaneRoll _roll = new PlaneRoll(true);
 
@@ -166,6 +183,12 @@ namespace MetalRaptors
         WingStreaks _streaks;
 
         GameObject _bulletTemplate;
+        Vector3 _gunLocal;
+        bool _gunMounted;
+        float _bodyLow;
+        float _bodyHigh;
+        float _bodyBack;
+        float _bodyFront;
         AudioSource _audio;
         AudioClip _shotClip;
 
@@ -205,6 +228,7 @@ namespace MetalRaptors
             _collider = GetComponentInChildren<Collider>();
             _shake = GetComponentInChildren<ShakeEffect>();
             _bodyRadius = MeasureRadius(gameObject);
+            MeasureBand();
             _targetRadius = target != null
                 ? Mathf.Clamp(MeasureRadius(target.gameObject), 8f, 40f)
                 : DefaultTargetRadius;
@@ -254,9 +278,38 @@ namespace MetalRaptors
             _maxX = maxX;
         }
 
+        public void MountGun(Vector3 local)
+        {
+            _gunLocal = local;
+            _gunMounted = true;
+        }
+
+        public void Fire(float bulletSpeed, float damage)
+        {
+            if (_dead || _falling || _bulletTemplate == null) return;
+            Shoot(bulletSpeed, damage);
+        }
+
+        public void Sputter(bool on)
+        {
+            if (!on)
+            {
+                if (_sputter != null) _sputter.Settle();
+                return;
+            }
+
+            if (_dead || _falling) return;
+            if (_sputter == null)
+            {
+                _sputter = gameObject.AddComponent<SmokeTrail>();
+                _sputter.Tint(SputterColor);
+            }
+            _sputter.Arm(ModelSize);
+        }
+
         public void Reappear(float x)
         {
-            if (_dead || _falling || _config == null) return;
+            if (_dead || _falling || _config == null || _scripted) return;
 
             EnemyConfigs.SpawnBand(_config, _groundY, _ceilingY, out float minY, out float maxY);
 
@@ -329,6 +382,19 @@ namespace MetalRaptors
             _heading = headingRad;
             _angularVelocity = 0f;
             _roll.Settle(headingRad);
+            ApplyRotation();
+        }
+
+        public void ScriptSteer(Vector3 position, float headingRad, float dt)
+        {
+            if (!_scripted) return;
+
+            float turn = Mathf.DeltaAngle(_heading * Mathf.Rad2Deg, headingRad * Mathf.Rad2Deg);
+            _angularVelocity = dt > 0f ? turn * Mathf.Deg2Rad / dt : 0f;
+            _scriptPos = new Vector3(position.x, position.y, _baseZ);
+            _heading = headingRad;
+            _roll.Flip(headingRad, ScriptRollRate);
+            _roll.Tick(dt, headingRad, false, ScriptRollRate);
             ApplyRotation();
         }
 
@@ -1498,6 +1564,28 @@ namespace MetalRaptors
             return Mathf.Atan2(point.y - transform.position.y, point.x - transform.position.x);
         }
 
+        void MeasureBand()
+        {
+            var rends = GetComponentsInChildren<Renderer>();
+            if (rends.Length == 0)
+            {
+                _bodyLow = -_bodyRadius;
+                _bodyHigh = _bodyRadius;
+                _bodyBack = _bodyRadius;
+                _bodyFront = _bodyRadius;
+                return;
+            }
+
+            var b = rends[0].bounds;
+            for (int i = 1; i < rends.Length; i++) b.Encapsulate(rends[i].bounds);
+
+            Vector3 p = transform.position;
+            _bodyLow = p.y - b.max.y;
+            _bodyHigh = p.y - b.min.y;
+            _bodyBack = p.x - b.min.x;
+            _bodyFront = b.max.x - p.x;
+        }
+
         static float MeasureRadius(GameObject go)
         {
             var rends = go.GetComponentsInChildren<Renderer>();
@@ -1528,14 +1616,21 @@ namespace MetalRaptors
             if (_fireCooldown > 0f) return;
             _fireCooldown = Mathf.Max(0.01f, _config.fireRate);
 
+            Shoot(_config.bulletSpeed, _config.damage);
+        }
+
+        void Shoot(float bulletSpeed, float damage)
+        {
             Vector3 dir = new Vector3(Mathf.Cos(_heading), Mathf.Sin(_heading), 0f);
-            Vector3 muzzle = transform.position + dir * (_bodyRadius + 6f);
+            Vector3 muzzle = _gunMounted
+                ? transform.TransformPoint(_gunLocal)
+                : transform.position + dir * (_bodyRadius + 6f);
+            muzzle.z = transform.position.z;
             var go = Instantiate(_bulletTemplate, muzzle,
                 transform.rotation * Quaternion.Euler(0f, 0f, -90f));
             go.name = "EnemyBullet";
             go.SetActive(true);
-            go.GetComponent<Bullet>().Launch(dir, _config.bulletSpeed, _config.damage, _collider,
-                fromEnemy: true);
+            go.GetComponent<Bullet>().Launch(dir, bulletSpeed, damage, _collider, fromEnemy: true);
 
             MuzzleFlash.Spawn(muzzle, dir, _bodyRadius);
             if (_shotClip != null) _audio.PlayOneShot(_shotClip, ShotVolume * AudioOptions.Sfx);
@@ -1578,9 +1673,9 @@ namespace MetalRaptors
 
         public void TakeDamage(float amount)
         {
-            if (_dead || _falling || OffPlane || _scripted) return;
+            if (_dead || _falling || OffPlane || (_scripted && !Exposed)) return;
             ApplyDamage(amount);
-            if (_falling || _dodge.Active) return;
+            if (_falling || _dodge.Active || _scripted) return;
 
             if (_evadeCooldown <= 0f
                 && (_state == AiState.Attack || _state == AiState.Fly)) EnterEvade(circling: false);
@@ -1631,6 +1726,14 @@ namespace MetalRaptors
             CancelReversal();
             CancelDodge();
 
+            if (_scripted)
+            {
+                _scripted = false;
+                _rb.isKinematic = false;
+                _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+            }
+
+            if (_sputter != null) _sputter.Settle();
             if (_smoke != null) _smoke.Ignite(ModelSize);
             _fire = PlaneFire.Ignite(gameObject, ModelSize);
 

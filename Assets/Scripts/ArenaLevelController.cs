@@ -22,16 +22,18 @@ namespace MetalRaptors
         const float HoverSpeedFactor = 1.17f;
         const float PlaneScale = 1.4f;
         const float RollSpinScale = 1.3f;
+        const float RollCooldown = 3f;
 
         const float BossEntryMargin = 180f;
         const float BossAhead = 115f;
         const float BossAbove = 55f;
         const float BossPad = 30f;
+        const float CenterEase = 60f;
         const float BossLaneResponse = 4f;
-        const float BossStartSpeed = 150f;
-        const float BossTopSpeed = 420f;
-        const float BossAccel = 260f;
-        const float BossBrake = 300f;
+        const float BossStartSpeed = 105f;
+        const float BossTopSpeed = 294f;
+        const float BossAccel = 182f;
+        const float BossBrake = 210f;
         const float BossArrive = 1f;
         const float BossSpeedFactor = 1.125f;
 
@@ -79,10 +81,14 @@ namespace MetalRaptors
         ArenaClouds _clouds;
         CampaignEnemies _enemies;
         CampaignScriptRunner _runner;
+        RavenMoveset _moves;
 
         EnemyController _boss;
         BossHealthBar _bossBar;
         CinematicBars _entryBars;
+        PlaneModelConfig _bossPlane;
+        PlaneSkin _bossSkin;
+        float _bossHealth;
         float _bossMax = 1f;
         bool _bossEntry;
         bool _bossReady;
@@ -137,7 +143,8 @@ namespace MetalRaptors
 
             _clouds = ArenaClouds.Begin(_camPos, _halfW, _halfH, CameraDistance, PlayPlaneZ,
                 CoastSky.CloudColor(_level.daytime), CoastSky.CloudGlow(_level.daytime),
-                DuelPlane.CruiseSpeed * CloudSpeedFactor);
+                ScrollSpeed);
+            SmokeTrail.Wind = Vector2.left * ScrollSpeed;
 
             _floorY = _clouds.FloorY + FloorSkim * _halfH;
             _ceilingY = _camPos.y + _halfH - TopMargin;
@@ -157,7 +164,13 @@ namespace MetalRaptors
             StartCoroutine(FlyIn());
         }
 
-        void OnDestroy() => CampaignCheckpoint.InCareer = false;
+        void OnDestroy()
+        {
+            CampaignCheckpoint.InCareer = false;
+            SmokeTrail.Wind = Vector2.zero;
+        }
+
+        static float ScrollSpeed => DuelPlane.CruiseSpeed * CloudSpeedFactor;
 
         void SetupCamera()
         {
@@ -194,6 +207,7 @@ namespace MetalRaptors
             model.localScale *= PlaneScale;
 
             PlayerConfig flight = PlaneLoadout.Build(config, planeModel);
+            flight.rollCooldown = RollCooldown;
             _cruise = flight.flySpeed;
             _hoverSpeed = _cruise * HoverSpeedFactor;
 
@@ -373,13 +387,17 @@ namespace MetalRaptors
             _cube.SetControlled(false);
             if (_shooter != null) _shooter.Stop();
             if (_roll != null) _roll.Stop();
+            StartCoroutine(CenterPlayer());
 
             _entryBars = CinematicBars.Create(_hud.transform);
             _entryBars.Raise();
 
+            _bossPlane = plane;
+            _bossSkin = PlaneSkins.ById(plane, skin);
+            _bossHealth = health;
+
             var start = new Vector2(_camPos.x - _halfW - BossEntryMargin, BossTarget().y);
-            _boss = _enemies.SpawnBoss(plane, PlaneSkins.ById(plane, skin), health, start,
-                _camPos.x, _halfW, _cruise * BossSpeedFactor);
+            _boss = SpawnBoss(start, 0f);
             if (_boss == null)
             {
                 _bossReady = true;
@@ -388,27 +406,63 @@ namespace MetalRaptors
 
             _bossMax = _boss.MaxHealth;
             _boss.HideHealthBar();
-            _boss.BeginScript();
-            _boss.ScriptTo(start, 0f);
             StartCoroutine(FlyBossIn(start));
         }
 
+        EnemyController SpawnBoss(Vector2 at, float heading)
+        {
+            EnemyController boss = _enemies.SpawnBoss(_bossPlane, _bossSkin, _bossHealth, at,
+                _camPos.x, _halfW, _cruise * BossSpeedFactor);
+            if (boss == null) return null;
+
+            boss.BeginScript();
+            boss.ScriptTo(at, heading);
+            return boss;
+        }
+
+        EnemyController RespawnBoss(Vector2 at, float heading)
+        {
+            if (_gameOver || _enemies == null || _boss == null) return _boss;
+
+            EnemyController old = _boss;
+            EnemyController fresh = SpawnBoss(at, heading);
+            if (fresh == null) return old;
+
+            fresh.Restore(heading, old.CurrentHealth);
+            fresh.HideHealthBar();
+            _enemies.Dismiss(old);
+            _boss = fresh;
+            return fresh;
+        }
+
+        Vector2 PlayerMark => new Vector2(_camPos.x, Mathf.Clamp(_camPos.y, _floorY, _ceilingY));
+
         Vector2 BossTarget()
         {
-            Vector3 player = _cubeTr != null
-                ? _cubeTr.position
-                : new Vector3(_camPos.x, (_floorY + _ceilingY) * 0.5f, 0f);
-
-            float x = Mathf.Min(player.x + BossAhead, _maxX);
-            float y = player.y + BossAbove;
-            if (y > _ceilingY - BossPad) y = Mathf.Max(_floorY + BossPad, player.y - BossAbove);
+            Vector2 mark = PlayerMark;
+            float x = Mathf.Min(mark.x + BossAhead, _maxX);
+            float y = mark.y + BossAbove;
+            if (y > _ceilingY - BossPad) y = Mathf.Max(_floorY + BossPad, mark.y - BossAbove);
             return new Vector2(x, y);
+        }
+
+        IEnumerator CenterPlayer()
+        {
+            while (_bossEntry && !_gameOver && _cube != null && _cubeTr != null)
+            {
+                Vector2 to = PlayerMark - (Vector2)_cubeTr.position;
+                _cube.SetHoverInput(Vector2.ClampMagnitude(to / CenterEase, 1f));
+                yield return null;
+            }
+
+            if (_cube != null && !_outro) _cube.SetHoverInput(Vector2.zero);
         }
 
         IEnumerator FlyBossIn(Vector2 start)
         {
             Vector2 pos = start;
             float speed = BossStartSpeed;
+            if (_boss != null) _boss.Throttling = true;
 
             while (_boss != null && !_gameOver)
             {
@@ -426,6 +480,7 @@ namespace MetalRaptors
                 yield return null;
             }
 
+            if (_boss != null) _boss.Throttling = false;
             _bossReady = true;
         }
 
@@ -445,9 +500,35 @@ namespace MetalRaptors
             if (_roll != null) _roll.Resume();
             if (_boss == null) return;
 
-            _boss.EndScript();
             _bossBar = new BossHealthBar(_hud.transform, _hudView.BossSlot, _bossName);
             _bossBar.Set(_boss.CurrentHealth, _bossMax);
+
+            _moves = RavenMoveset.Begin(gameObject, _boss, Stage());
+        }
+
+        BossStage Stage() => new BossStage
+        {
+            camPos = _camPos,
+            halfW = _halfW,
+            halfH = _halfH,
+            floorY = _floorY,
+            ceilingY = _ceilingY,
+            playerSpeed = _hoverSpeed,
+            player = _cubeTr,
+            hud = _hud.transform,
+            curtain = _curtain,
+            sound = _sound,
+            enemies = _enemies,
+            escort = PlaneModels.Albatros,
+            scrollSpeed = ScrollSpeed,
+            over = () => _gameOver,
+            respawn = RespawnBoss,
+            pin = PinLeftWall,
+        };
+
+        void PinLeftWall(float x)
+        {
+            if (_cube != null) _cube.SetWalls(Mathf.Max(_minX, x), _maxX);
         }
 
         public void Checkpoint(int step, bool warnedFirst, bool warnedPair) { }
@@ -460,6 +541,7 @@ namespace MetalRaptors
 
             if (_shooter != null) _shooter.Stop();
             if (_roll != null) _roll.Stop();
+            if (_moves != null) _moves.Stop();
             if (_enemies != null) _enemies.StandDown();
             if (_dialogue != null) _dialogue.Hide();
             if (_cube != null)
@@ -493,6 +575,7 @@ namespace MetalRaptors
 
         void ShowGroundScene()
         {
+            SmokeTrail.Wind = Vector2.zero;
             if (_cube != null) _cube.Stop();
             CampaignFinale.Play(_level, _levelNumber, _hud, Subtitle);
         }
@@ -500,6 +583,7 @@ namespace MetalRaptors
         void StopScript()
         {
             if (_runner != null) _runner.Stop();
+            if (_moves != null) _moves.Stop();
             if (_enemies != null) _enemies.StandDown();
         }
 
