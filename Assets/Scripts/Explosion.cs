@@ -144,7 +144,7 @@ namespace MetalRaptors
             var audio = go.AddComponent<AudioSource>();
             audio.playOnAwake = false;
             audio.spatialBlend = 0f;
-            audio.PlayOneShot(clip, SoundVolume * AudioOptions.Effects);
+            audio.PlayOneShot(clip, SoundVolume * AudioOptions.Scene);
             Destroy(go, clip.length + 0.1f);
         }
     }

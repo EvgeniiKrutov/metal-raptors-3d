@@ -1654,7 +1654,7 @@ namespace MetalRaptors
             go.GetComponent<Bullet>().Launch(dir, bulletSpeed, damage, _collider, fromEnemy: true);
 
             MuzzleFlash.Spawn(muzzle, dir, _bodyRadius);
-            if (_shotClip != null) _audio.PlayOneShot(_shotClip, ShotVolume * AudioOptions.Effects);
+            if (_shotClip != null) _audio.PlayOneShot(_shotClip, ShotVolume * AudioOptions.Scene);
         }
 
         bool HasFiringSolution(Vector2 point)

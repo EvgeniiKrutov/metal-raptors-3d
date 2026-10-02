@@ -409,7 +409,7 @@ namespace MetalRaptors
         public void PlayStutter()
         {
             if (_stutter == null || _stutter.clip == null || _stutter.isPlaying) return;
-            _stutter.volume = StutterVolume * AudioOptions.Effects;
+            _stutter.volume = StutterVolume * AudioOptions.Scene;
             _stutter.Play();
         }
 
@@ -517,7 +517,7 @@ namespace MetalRaptors
         void ApplyAmbient()
         {
             if (_wind != null && !_windStopped)
-                _wind.volume = WindVolume * Gain * AudioOptions.Effects;
+                _wind.volume = WindVolume * Gain * AudioOptions.Scene;
         }
 
         void StopWind()

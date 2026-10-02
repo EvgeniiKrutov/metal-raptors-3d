@@ -39,6 +39,7 @@ namespace MetalRaptors
         readonly Image _avatar;
         readonly Text _name;
         readonly Text _text;
+        readonly DialogueVoice _voice;
 
         string _line = string.Empty;
         float _shown;
@@ -48,6 +49,7 @@ namespace MetalRaptors
         public DialogueBar(Transform parent)
         {
             _bars = CinematicBars.Create(parent);
+            _voice = new DialogueVoice(parent);
 
             _row = new GameObject("Radio Line", typeof(RectTransform));
             _row.transform.SetParent(_bars.Bottom, false);
@@ -108,6 +110,7 @@ namespace MetalRaptors
             Paint(0);
 
             _row.SetActive(true);
+            _voice.Play(speaker, _line);
         }
 
         public void Reveal(float deltaTime)
@@ -119,10 +122,12 @@ namespace MetalRaptors
 
             int now = Mathf.FloorToInt(_shown);
             if (now != was) Paint(now);
+            if (!IsRevealing) _voice.Finish();
         }
 
         public void ClearLine()
         {
+            _voice.Cut();
             _line = string.Empty;
             _shown = 0f;
             _row.SetActive(false);

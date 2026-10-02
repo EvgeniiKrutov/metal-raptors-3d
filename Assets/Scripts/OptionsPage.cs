@@ -58,13 +58,15 @@ namespace MetalRaptors
             Transform values = CreateValues(screen, "Options Sound");
             cat.Root = values.gameObject;
 
-            var rows = new MenuVolumeRow[3];
+            var rows = new MenuVolumeRow[4];
             rows[0] = MenuVolumeRow.Create(values, "general", AudioOptions.Master, RowTop(0),
                 AudioOptions.SetMaster);
             rows[1] = MenuVolumeRow.Create(values, "music", AudioOptions.Music, RowTop(1),
                 AudioOptions.SetMusic);
             rows[2] = MenuVolumeRow.Create(values, "sfx", AudioOptions.Sfx, RowTop(2),
                 AudioOptions.SetSfx);
+            rows[3] = MenuVolumeRow.Create(values, "voices", AudioOptions.Voices, RowTop(3),
+                AudioOptions.SetVoices);
 
             cat.Rows = rows;
             cat.Refresh = () =>
@@ -72,6 +74,7 @@ namespace MetalRaptors
                 rows[0].SetValue(AudioOptions.Master);
                 rows[1].SetValue(AudioOptions.Music);
                 rows[2].SetValue(AudioOptions.Sfx);
+                rows[3].SetValue(AudioOptions.Voices);
             };
 
             Adopt(cat, "sound");

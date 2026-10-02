@@ -10,7 +10,9 @@ namespace MetalRaptors
 
         static float _scale = 1f;
 
-        public static float Delta => Menu || ScreenFade.IsBusy ? 0f : Time.unscaledDeltaTime;
+        public static float Delta => Halted ? 0f : Time.unscaledDeltaTime;
+
+        public static bool Halted => Menu || ScreenFade.IsBusy;
 
         static bool Menu => GameMenu.IsOpen || LevelBriefing.IsOpen || LevelOutro.IsOpen;
 

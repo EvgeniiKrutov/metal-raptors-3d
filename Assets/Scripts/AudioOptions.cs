@@ -12,6 +12,7 @@ namespace MetalRaptors
         const string PrefMaster = "mr_master_volume";
         const string PrefMusic = "mr_music_volume";
         const string PrefSfx = "mr_sfx_volume";
+        const string PrefVoices = "mr_voices_volume";
 
         public static event Action Changed;
 
@@ -19,6 +20,7 @@ namespace MetalRaptors
         static float _master = 1f;
         static float _music = 1f;
         static float _sfx = 1f;
+        static float _voices = 1f;
 
         public static float Master { get { Load(); return _master; } }
 
@@ -26,7 +28,11 @@ namespace MetalRaptors
 
         public static float Sfx { get { Load(); return _sfx; } }
 
+        public static float Voices { get { Load(); return _voices; } }
+
         public static float Effects => Sfx * (1f - MusicDuck * MusicPlayer.LevelPresence);
+
+        public static float Scene => Effects * CutsceneMix.Level;
 
         public static void SetMaster(float value)
         {
@@ -48,6 +54,13 @@ namespace MetalRaptors
             Load();
             _sfx = Snap(value);
             Store(PrefSfx, _sfx);
+        }
+
+        public static void SetVoices(float value)
+        {
+            Load();
+            _voices = Snap(value);
+            Store(PrefVoices, _voices);
         }
 
         public static void Apply()
@@ -80,6 +93,7 @@ namespace MetalRaptors
             _master = Snap(PlayerPrefs.GetFloat(PrefMaster, 1f));
             _music = Snap(PlayerPrefs.GetFloat(PrefMusic, 1f));
             _sfx = Snap(PlayerPrefs.GetFloat(PrefSfx, 1f));
+            _voices = Snap(PlayerPrefs.GetFloat(PrefVoices, 1f));
         }
     }
 }

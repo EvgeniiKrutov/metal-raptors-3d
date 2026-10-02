@@ -205,7 +205,7 @@ namespace MetalRaptors
             go.GetComponent<Bullet>().Launch(dir, speed, damage, _collider, fromEnemy: true);
 
             MuzzleFlash.Spawn(muzzle, dir, flashSize);
-            if (_shotClip != null) _audio.PlayOneShot(_shotClip, ShotVolume * AudioOptions.Effects);
+            if (_shotClip != null) _audio.PlayOneShot(_shotClip, ShotVolume * AudioOptions.Scene);
         }
 
         void ApplyDamage(float amount)

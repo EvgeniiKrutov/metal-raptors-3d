@@ -140,8 +140,8 @@ namespace MetalRaptors
 
             _volume = Mathf.MoveTowards(_volume, _volumeTarget,
                 MusicVolume * Time.unscaledDeltaTime / Mathf.Max(_fadeSec, 0.01f));
-            _introSource.volume = _volume;
-            _loopSource.volume = _volume;
+            _introSource.volume = _volume * CutsceneMix.Level;
+            _loopSource.volume = _volume * CutsceneMix.Level;
 
             if (_stopWhenSilent && _volume <= 0f) Stop();
         }
