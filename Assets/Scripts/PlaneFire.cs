@@ -55,7 +55,7 @@ namespace MetalRaptors
 
         void Build(float size, Vector3? tip)
         {
-            var shader = Shader.Find("Universal Render Pipeline/Lit");
+            var shader = NightReceivers.Lit;
             Vector3 nose = tip ?? NoseLocal(transform.parent, size);
             nose.x -= size * NoseSetback;
             _flames = new Flame[FlameCount];

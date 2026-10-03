@@ -175,6 +175,8 @@ namespace MetalRaptors
 
             var model = Instantiate(prefab, root, false);
             model.name = "zeppelin";
+            NightReceivers.Adopt(model, 1f, 1f);
+            NightLights.MarkCaster(model);
             model.transform.localRotation = NoseWest;
 
             foreach (Collider col in model.GetComponentsInChildren<Collider>())

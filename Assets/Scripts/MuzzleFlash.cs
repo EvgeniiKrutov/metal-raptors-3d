@@ -12,6 +12,13 @@ namespace MetalRaptors
         const float SpikeSpreadDeg = 28f;
         const float EmissionStrength = 3f;
 
+        const float NightFlashIntensity = 1.2f;
+        const float NightFlashDuration = 0.06f;
+        const float NightFlashPerSize = 1.4f;
+        const float NightFlashMin = 18f;
+        const int NightFlashPriority = 10;
+        static readonly Color NightFlashColor = new Color(1f, 0.784f, 0.439f);
+
         static readonly Color HotColor = new Color(1f, 0.96f, 0.75f);
         static readonly Color FlameColor = new Color(1f, 0.7f, 0.25f);
 
@@ -30,6 +37,9 @@ namespace MetalRaptors
         {
             var root = new GameObject("MuzzleFlash");
             root.transform.position = position;
+
+            NightLights.Flash(position, NightFlashColor, NightFlashIntensity,
+                Mathf.Max(NightFlashMin, size * NightFlashPerSize), NightFlashDuration, NightFlashPriority);
             float ang = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
             root.transform.rotation = Quaternion.Euler(0f, 0f, ang);
 

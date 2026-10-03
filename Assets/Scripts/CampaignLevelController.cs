@@ -163,6 +163,8 @@ namespace MetalRaptors
             // The night sky turns this back on; everything else stays neutral. Reset before
             // the world is built, so nothing spawned there inherits the last level's grade.
             Firelight.Clear();
+            NightLightingController.Shutdown();
+            NightLights.PlaneZ = PlayPlaneZ;
             ConfigureShadows();
             _terrain = CampaignTerrain.Begin(_level.terrain, _level.seed, _level.daytime,
                 _level.weather, CameraDistance, PlayPlaneZ,

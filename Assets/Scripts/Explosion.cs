@@ -14,6 +14,13 @@ namespace MetalRaptors
         const float EmissionStrength = 2f;
         const float SoundVolume = 0.55f;
 
+        const float NightFlashIntensity = 2.5f;
+        const float NightFlashDuration = 0.35f;
+        const float NightFlashPerSize = 1.7f;
+        const float NightFlashMin = 40f, NightFlashMax = 220f;
+        const int NightFlashPriority = 50;
+        static readonly Color NightFlashColor = new Color(1f, 0.541f, 0.239f);
+
         static readonly Color Orange = new Color(1f, 0.45f, 0.08f);
         static readonly Color Yellow = new Color(1f, 0.93f, 0.45f);
         static readonly Color Grey = new Color(0.17f, 0.16f, 0.15f);
@@ -41,7 +48,11 @@ namespace MetalRaptors
             root.transform.position = position;
             var fx = root.AddComponent<Explosion>();
 
-            var shader = Shader.Find("Universal Render Pipeline/Lit");
+            NightLights.Flash(position, NightFlashColor, NightFlashIntensity,
+                Mathf.Clamp(size * NightFlashPerSize, NightFlashMin, NightFlashMax),
+                NightFlashDuration, NightFlashPriority);
+
+            var shader = NightReceivers.Lit;
             int count = Random.Range(BlobCountMin, BlobCountMax + 1);
             fx._blobs = new Blob[count];
             for (int i = 0; i < count; i++)

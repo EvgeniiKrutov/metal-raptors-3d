@@ -105,6 +105,7 @@ namespace MetalRaptors
             go.name = "Smoke";
             var renderer = go.GetComponent<Renderer>();
             UIFactory.MakeTransparent(renderer.sharedMaterial);
+            NightReceivers.SetResponse(renderer.sharedMaterial, NightReceivers.SmokeResponse);
             go.transform.rotation = Random.rotation;
 
             var puff = go.AddComponent<SmokeTrail>();

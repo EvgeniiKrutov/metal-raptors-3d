@@ -69,6 +69,8 @@ namespace MetalRaptors
                 new Vector3(-_size.x * 0.5f, 0f, -_size.z * 0.5f) - _yawedMin;
 
             GameObject view = Object.Instantiate(_prefab, holder.transform, false);
+            NightReceivers.Adopt(view, 1f, 1f);
+            NightLights.MarkCaster(view);
 
             foreach (Renderer renderer in view.GetComponentsInChildren<Renderer>())
             {

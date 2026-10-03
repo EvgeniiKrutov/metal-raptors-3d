@@ -239,7 +239,7 @@ namespace MetalRaptors
 
         static Material BuildMaterial(Daytime daytime)
         {
-            var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"))
+            var mat = new Material(NightReceivers.Lit)
             {
                 name = "Sea (runtime)",
             };

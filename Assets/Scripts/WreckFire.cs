@@ -50,7 +50,7 @@ namespace MetalRaptors
 
         void Build(float radius, System.Random rng)
         {
-            var shader = Shader.Find("Universal Render Pipeline/Lit");
+            var shader = NightReceivers.Lit;
             _flames = new Flame[FlameCount];
 
             for (int i = 0; i < FlameCount; i++)

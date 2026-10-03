@@ -524,7 +524,7 @@ namespace MetalRaptors
             go.transform.localScale = Vector3.one * scale;
 
             var renderer = go.GetComponent<Renderer>();
-            var shader = Shader.Find("Universal Render Pipeline/Lit");
+            var shader = NightReceivers.Lit;
             if (shader != null)
             {
                 var mat = new Material(shader);
@@ -553,7 +553,7 @@ namespace MetalRaptors
             }
 
             var renderer = go.GetComponent<Renderer>();
-            var shader = Shader.Find("Universal Render Pipeline/Lit");
+            var shader = NightReceivers.Lit;
             if (shader != null)
             {
                 var mat = new Material(shader);

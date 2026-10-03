@@ -417,6 +417,7 @@ namespace MetalRaptors
             TickFire();
             TickSkip();
             TickSpawn();
+            TickNight(kb);
 
             if (!_visible) return;
 
@@ -479,6 +480,16 @@ namespace MetalRaptors
             _fireOn = on;
             _fireLabel.text = on ? FireOnCaption : FireOffCaption;
             _fireLabel.color = on ? SpawnPendingColor : ValueColor;
+        }
+
+        static void TickNight(Keyboard kb)
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (kb == null) return;
+            if (kb.f7Key.wasPressedThisFrame)
+                NightLightingController.OverlayEnabled = !NightLightingController.OverlayEnabled;
+            if (kb.f8Key.wasPressedThisFrame) NightLightingController.DevToggle();
+#endif
         }
 
         void TickSkip()

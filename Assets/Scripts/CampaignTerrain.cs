@@ -89,7 +89,7 @@ namespace MetalRaptors
 
             land._seed = seed;
             land.Configure(options);
-            land._terrainMat = new Material(Shader.Find("Universal Render Pipeline/Terrain/Lit"));
+            land._terrainMat = new Material(NightReceivers.TerrainLit);
             land.Prepare(daytime, weather, cameraDistance, playPlaneZ);
 
             float keep = ProceduralTerrain.FogEndDistance(cameraDistance, playPlaneZ, Depth);

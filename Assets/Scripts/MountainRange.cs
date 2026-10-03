@@ -213,7 +213,7 @@ namespace MetalRaptors
 
         static Material RockMaterial(Daytime daytime)
         {
-            var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"))
+            var mat = new Material(NightReceivers.Lit)
             {
                 name = "Mountain rock (runtime)",
             };
@@ -223,6 +223,7 @@ namespace MetalRaptors
             mat.SetFloat("_SpecularHighlights", 0f);
             mat.EnableKeyword("_SPECULARHIGHLIGHTS_OFF");
             mat.SetFloat("_EnvironmentReflections", 0f);
+            NightReceivers.SetResponse(mat, NightReceivers.DistantResponse);
             mat.EnableKeyword("_ENVIRONMENTREFLECTIONS_OFF");
             return mat;
         }

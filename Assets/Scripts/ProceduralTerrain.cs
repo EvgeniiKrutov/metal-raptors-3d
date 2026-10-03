@@ -67,7 +67,7 @@ namespace MetalRaptors
             PaintTerrain(data);
             PlantGrass(rng, data, width, craters);
 
-            var terrainMat = new Material(Shader.Find("Universal Render Pipeline/Terrain/Lit"));
+            var terrainMat = new Material(NightReceivers.TerrainLit);
             Mesh wallMesh = BuildCutWallMesh(cutLine, width);
             var wallMat = CutWallMaterial();
 
@@ -601,7 +601,7 @@ namespace MetalRaptors
 
         internal static Material CutWallMaterial()
         {
-            var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            var mat = new Material(NightReceivers.Lit);
             mat.SetColor("_BaseColor", DirtColor);
             mat.SetFloat("_Smoothness", 0f);
             mat.SetFloat("_SpecularHighlights", 0f);

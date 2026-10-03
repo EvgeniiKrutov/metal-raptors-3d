@@ -86,6 +86,8 @@ namespace MetalRaptors
 
             var instance = Instantiate(prefab);
             instance.name = "supply_crate";
+            NightReceivers.Adopt(instance);
+            NightLights.MarkCaster(instance);
 
             Transform model = instance.transform;
             model.SetParent(transform, false);

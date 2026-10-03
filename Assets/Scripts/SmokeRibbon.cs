@@ -57,12 +57,13 @@ namespace MetalRaptors
             ribbon._z = z;
             ribbon._damage = damagePerSec;
 
-            var shader = Shader.Find("Universal Render Pipeline/Lit");
+            var shader = NightReceivers.Lit;
             if (shader != null)
             {
                 ribbon._mat = new Material(shader);
                 ribbon._mat.SetColor("_BaseColor", SmokeColor);
                 UIFactory.MakeTransparent(ribbon._mat);
+                NightReceivers.SetResponse(ribbon._mat, NightReceivers.SmokeResponse);
             }
             return ribbon;
         }

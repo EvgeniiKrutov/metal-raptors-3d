@@ -248,6 +248,8 @@ namespace MetalRaptors
 
             var view = Instantiate(proto.prefab, root.transform);
             view.transform.localPosition = proto.offset;
+            NightReceivers.Adopt(view);
+            if (kind != Kind.Tree) NightLights.MarkCaster(view);
             view.transform.localRotation = StandUp;
 
             foreach (var r in view.GetComponentsInChildren<Renderer>())

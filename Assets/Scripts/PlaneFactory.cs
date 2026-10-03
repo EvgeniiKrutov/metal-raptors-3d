@@ -42,6 +42,8 @@ namespace MetalRaptors
                 r.shadowCastingMode = ShadowCastingMode.On;
 
             PlaneSkins.Apply(model.transform, skin);
+            NightReceivers.Adopt(model, 1f, 1f);
+            NightLights.MarkCaster(model);
 
             AddPlaneCollider(model.transform);
             StartPropeller(model.transform, plane, parent);

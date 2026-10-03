@@ -137,6 +137,8 @@ namespace MetalRaptors
             if (config == null) config = ScriptableObject.CreateInstance<PlayerConfig>();
 
             Firelight.Clear();
+            NightLightingController.Shutdown();
+            NightLights.PlaneZ = PlayPlaneZ;
             if (GraphicsSettings.currentRenderPipeline is UniversalRenderPipelineAsset urp)
                 urp.shadowDistance = Mathf.Max(urp.shadowDistance, CameraDistance + 200f);
 

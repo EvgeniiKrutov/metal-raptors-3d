@@ -59,7 +59,7 @@ namespace MetalRaptors
 
         public static Material FlatMaterial(Color color)
         {
-            var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            var mat = new Material(NightReceivers.Lit);
             mat.SetColor("_BaseColor", color);
             mat.SetFloat("_Smoothness", 0f);
             mat.SetFloat("_SpecularHighlights", 0f);

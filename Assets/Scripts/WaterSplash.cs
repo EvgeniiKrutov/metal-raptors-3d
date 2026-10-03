@@ -236,7 +236,7 @@ namespace MetalRaptors
         {
             if (_shardMaterial != null) return _shardMaterial;
 
-            var shader = Shader.Find("Universal Render Pipeline/Lit");
+            var shader = NightReceivers.Lit;
             if (shader == null) return null;
 
             _shardMaterial = new Material(shader) { name = "Splash Spray" };

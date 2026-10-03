@@ -156,6 +156,7 @@ namespace MetalRaptors
 
             var view = Instantiate(proto.prefab, root.transform);
             view.transform.localPosition = proto.offset;
+            NightReceivers.Adopt(view);
 
             foreach (var r in view.GetComponentsInChildren<Renderer>())
                 r.shadowCastingMode = ShadowCastingMode.Off;

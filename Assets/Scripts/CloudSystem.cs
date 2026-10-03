@@ -254,7 +254,7 @@ namespace MetalRaptors
 
         public static Material CloudMaterial(Color tint, Color glow, float alpha)
         {
-            var shader = Shader.Find("Universal Render Pipeline/Lit");
+            var shader = NightReceivers.Lit;
             if (shader == null) return null;
 
             var mat = new Material(shader) { name = "Cloud (runtime)" };
@@ -271,6 +271,7 @@ namespace MetalRaptors
             mat.SetFloat("_ZWrite", 0f);
             mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
             mat.renderQueue = (int)RenderQueue.Transparent;
+            NightReceivers.SetResponse(mat, NightReceivers.CloudResponse);
             return mat;
         }
 

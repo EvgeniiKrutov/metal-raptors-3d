@@ -516,6 +516,7 @@ namespace MetalRaptors
                 body + face * 0.5f, Width * 0.85f, face, Thickness * 0.9f);
             AddSegment(root.transform, UniformMaterial(faction),
                 body + face + hat * 0.5f, Width * 1.05f, hat, Thickness * 1.05f);
+            NightLights.MarkCaster(root);
 
             return root.transform;
         }
@@ -552,7 +553,7 @@ namespace MetalRaptors
 
         static Material[] BuildMaterials(Color[] colors, string label)
         {
-            var shader = Shader.Find("Universal Render Pipeline/Lit");
+            var shader = NightReceivers.Lit;
             var mats = new Material[colors.Length];
             for (int i = 0; i < colors.Length; i++)
             {

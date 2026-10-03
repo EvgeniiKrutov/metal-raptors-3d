@@ -35,6 +35,7 @@ namespace MetalRaptors
             public float splitBalance, vignette, cloudGlow;
             // 0 leaves the warm-light gain neutral; see docs/atmospheres.md.
             public float firelightBoost;
+            public bool night;
         }
 
         static readonly Palette[] Palettes =
@@ -128,10 +129,10 @@ namespace MetalRaptors
             },
             new Palette
             {
-                haze = new Color(0.14f, 0.17f, 0.24f),
-                zenith = new Color(0.03f, 0.04f, 0.09f),
+                haze = new Color(0.148f, 0.198f, 0.351f),
+                zenith = new Color(0.033f, 0.052f, 0.145f),
                 cloud = new Color(0.39f, 0.44f, 0.56f),
-                disc = new Color(0.92f, 0.95f, 1.00f),
+                disc = new Color(0.681f, 0.765f, 1.000f),
                 keyLight = new Color(0.61f, 0.71f, 0.93f),
                 ambientSky = new Color(0.21f, 0.25f, 0.38f),
                 ambientEquator = new Color(0.23f, 0.26f, 0.36f),
@@ -139,23 +140,24 @@ namespace MetalRaptors
                 slope = new Color(0.12f, 0.17f, 0.13f),
                 rock = new Color(0.17f, 0.19f, 0.24f),
                 peak = new Color(0.46f, 0.51f, 0.62f),
-                rayColor = new Color(0.74f, 0.84f, 1.00f),
-                colorFilter = new Color(0.56f, 0.61f, 0.76f),
-                shadowTone = new Color(0.26f, 0.32f, 0.56f),
-                highlightTone = new Color(0.64f, 0.76f, 1.00f),
+                rayColor = new Color(0.545f, 0.675f, 1.000f),
+                colorFilter = Color.white,
+                shadowTone = Color.grey,
+                highlightTone = Color.grey,
                 horizonFalloff = 0.70f,
-                discFalloff = 60f, discIntensity = 2.6f,
-                haloFalloff = 14f, haloIntensity = 0.16f,
+                discFalloff = 60f, discIntensity = 5.6f,
+                haloFalloff = 14f, haloIntensity = 0.34f,
                 discRadius = 1.8f, mariaIntensity = 0.25f, starIntensity = 1.6f,
                 discViewportX = 0.74f, discViewportY = 0.92f,
                 lightRotation = Quaternion.Euler(52f, -12f, 0f),
                 lightIntensity = 1.02f,
                 fogStartOffset = 220f, fogEnd = NightFogEnd,
-                rayIntensity = 0.18f, rayDensity = 0.75f, rayFalloff = 1.5f,
+                rayIntensity = 0.39f, rayDensity = 0.75f, rayFalloff = 1.5f,
                 bloomThreshold = 0.85f, bloomIntensity = 1.1f,
-                temperature = -22f, postExposure = 2.0f, saturation = -12f, contrast = 4f,
-                splitBalance = 8f, vignette = 0.27f, cloudGlow = 0.55f,
-                firelightBoost = 1.3f,
+                temperature = 0f, postExposure = 0f, saturation = 0f, contrast = 4f,
+                splitBalance = 0f, vignette = 0.27f, cloudGlow = 0.55f,
+                firelightBoost = 1.85f,
+                night = true,
             },
         };
 
@@ -201,6 +203,8 @@ namespace MetalRaptors
             RenderSettings.ambientSkyColor = p.ambientSky;
             RenderSettings.ambientEquatorColor = p.ambientEquator;
             RenderSettings.ambientGroundColor = p.ambientGround;
+
+            if (p.night) NightLightingController.Launch(cam, TerrainKind.Dolomites);
         }
 
         static void BuildSkybox(Camera cam, Palette p)
@@ -229,6 +233,7 @@ namespace MetalRaptors
             sky.SetFloat("_StarIntensity", p.starIntensity);
             sky.SetFloat("_StarScale", 80f);
             sky.SetFloat("_Exposure", 1f);
+            sky.SetFloat("_NightSkyMix", p.night ? 0f : 1f);
             sky.SetVector("_SunDirection", cam.ViewportPointToRay(
                 new Vector3(p.discViewportX, p.discViewportY, 1f)).direction);
 

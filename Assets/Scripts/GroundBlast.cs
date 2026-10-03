@@ -15,6 +15,13 @@ namespace MetalRaptors
         const float FlashEndFactor = 0.2f;
         const float FlashGlow = 3f;
 
+        const float NightFlashIntensity = 2.5f;
+        const float NightFlashDuration = 0.35f;
+        const float NightFlashPerSize = 1.2f;
+        const float NightFlashMin = 40f, NightFlashMax = 220f;
+        const int NightFlashPriority = 50;
+        static readonly Color NightFlashColor = new Color(1f, 0.541f, 0.239f);
+
         const float ClodLifeMin = 1.1f, ClodLifeMax = 2.1f;
         const float ClodRiseMin = 60f, ClodRiseMax = 145f;
         const float ClodSpread = 0.45f;
@@ -64,6 +71,10 @@ namespace MetalRaptors
         {
             var root = new GameObject("Ground Blast");
             root.transform.position = position;
+
+            NightLights.Flash(position, NightFlashColor, NightFlashIntensity,
+                Mathf.Clamp(size * NightFlashPerSize, NightFlashMin, NightFlashMax),
+                NightFlashDuration, NightFlashPriority);
 
             var blast = root.AddComponent<GroundBlast>();
             blast.BuildFlash(size);
@@ -149,6 +160,7 @@ namespace MetalRaptors
 
                 var renderer = go.GetComponent<Renderer>();
                 UIFactory.MakeTransparent(renderer.sharedMaterial);
+                NightReceivers.SetResponse(renderer.sharedMaterial, NightReceivers.SmokeResponse);
                 renderer.shadowCastingMode = ShadowCastingMode.Off;
                 go.transform.SetParent(transform, true);
 
@@ -248,7 +260,7 @@ namespace MetalRaptors
         {
             if (_clodMaterial != null) return _clodMaterial;
 
-            var shader = Shader.Find("Universal Render Pipeline/Lit");
+            var shader = NightReceivers.Lit;
             if (shader == null) return null;
 
             _clodMaterial = new Material(shader) { name = "Blast Clod" };

@@ -48,6 +48,8 @@ Shader "Custom/GradientSkybox"
         // where it reaches full density. Defaults hug the horizon, i.e. the old flat field.
         _StarHorizon   ("Star Rise Height", Range(0, 1)) = 0.05
         _StarZenith    ("Star Full Height", Range(0, 2)) = 0.10
+
+        _NightSkyMix   ("Night Sky Mix", Range(0, 1)) = 1
     }
 
     SubShader
@@ -60,8 +62,11 @@ Shader "Custom/GradientSkybox"
             CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
+            #pragma target 3.0
+            #pragma multi_compile_fragment _ _NIGHT_LIGHTING
             #include "UnityCG.cginc"
             #include "../GradientSky.hlsl"
+            #include "../NightLighting.hlsl"
 
             struct appdata { float4 vertex : POSITION; };
             struct v2f
@@ -78,6 +83,7 @@ Shader "Custom/GradientSkybox"
             float  _DiscRadius, _DiscEdge, _MariaIntensity;
             float  _StarIntensity, _StarScale;
             float  _StarHorizon, _StarZenith;
+            float  _NightSkyMix;
 
             v2f vert (appdata v)
             {
@@ -121,6 +127,13 @@ Shader "Custom/GradientSkybox"
                 s.discEdge       = _DiscEdge;
                 s.mariaIntensity = _MariaIntensity;
                 s.bodyFill       = 1.0;
+
+            #if defined(_NIGHT_LIGHTING)
+                float skyMix = _NightBlend * _NightSkyMix;
+                s.top     = lerp(s.top, _NightSkyTop, skyMix);
+                s.horizon = lerp(s.horizon, _NightSkyHorizon, skyMix);
+                s.bottom  = lerp(s.bottom, _NightSkyHorizon, skyMix);
+            #endif
 
                 float above, discMask, halo;
                 float3 col = MRSkyColor(d, s, above, discMask, halo);

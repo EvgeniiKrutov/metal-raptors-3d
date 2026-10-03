@@ -52,13 +52,14 @@ Shader "Hidden/MetalRaptors/BillboardWavingDoublePass"
             #pragma multi_compile_fragment _ LIGHTMAP_BICUBIC_SAMPLING
             #pragma multi_compile_fragment _ REFLECTION_PROBE_ROTATION
             #pragma multi_compile_fragment _ DEBUG_DISPLAY
+            #pragma multi_compile_fragment _ _NIGHT_LIGHTING
 
             //--------------------------------------
             // GPU Instancing
             #pragma multi_compile_instancing
 
             #pragma vertex WavingGrassBillboardVert
-            #pragma fragment LitPassFragmentGrass
+            #pragma fragment NightLitPassFragmentGrass
             #define _ALPHATEST_ON
 
             #if USE_DYNAMIC_BRANCH_FOG_KEYWORD && SHADER_API_VULKAN && SHADER_API_MOBILE
@@ -67,6 +68,7 @@ Shader "Hidden/MetalRaptors/BillboardWavingDoublePass"
 
             #include "MRGrassBillboardInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/Terrain/WavingGrassPasses.hlsl"
+            #include "../NightGrassPass.hlsl"
             ENDHLSL
         }
 

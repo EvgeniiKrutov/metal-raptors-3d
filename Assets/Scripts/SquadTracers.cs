@@ -100,7 +100,7 @@ namespace MetalRaptors
         {
             if (_material != null) return _material;
 
-            var shader = Shader.Find("Universal Render Pipeline/Lit");
+            var shader = NightReceivers.Lit;
             if (shader == null) return null;
 
             _material = new Material(shader) { name = "Tracer" };

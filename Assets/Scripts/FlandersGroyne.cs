@@ -81,6 +81,8 @@ namespace MetalRaptors
 
             var view = Object.Instantiate(_prefab, root.transform, false);
             view.name = "flanders_groyne";
+            NightReceivers.Adopt(view);
+            NightLights.MarkCaster(view);
 
             Transform piles = PlaneFactory.FindDeep(view.transform, PilesNode);
             if (piles == null) return;

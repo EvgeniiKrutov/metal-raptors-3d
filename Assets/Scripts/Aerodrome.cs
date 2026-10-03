@@ -119,6 +119,10 @@ namespace MetalRaptors
 
             var view = Instantiate(_prefab, root.transform, false);
             view.name = "stow_maries";
+            NightReceivers.Adopt(view);
+            NightLights.MarkCaster(view);
+            Transform ground = PlaneFactory.FindDeep(view.transform, GroundNode);
+            if (ground != null) NightLights.MarkCaster(ground.gameObject, false);
 
             foreach (Renderer renderer in view.GetComponentsInChildren<Renderer>())
             {

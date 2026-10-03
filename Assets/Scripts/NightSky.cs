@@ -6,15 +6,14 @@ namespace MetalRaptors
 {
     public static class NightSky
     {
-        public static readonly Color HazeColor = new Color(0.16f, 0.13f, 0.25f);
+        public static readonly Color HazeColor = new Color(0.201f, 0.137f, 0.411f);
         public static readonly Color CloudColor = new Color(0.40f, 0.42f, 0.58f);
-        static readonly Color ZenithColor = new Color(0.03f, 0.03f, 0.08f);
-        static readonly Color MoonColor = new Color(0.85f, 0.90f, 1.00f);
+        static readonly Color ZenithColor = new Color(0.045f, 0.033f, 0.151f);
+        static readonly Color MoonColor = new Color(0.650f, 0.594f, 1.000f);
         static readonly Color MoonLightColor = new Color(0.60f, 0.68f, 0.90f);
         static readonly Color AmbientSkyColor = new Color(0.21f, 0.21f, 0.39f);
         static readonly Color AmbientEquatorColor = new Color(0.23f, 0.21f, 0.35f);
         static readonly Color AmbientGroundColor = new Color(0.12f, 0.10f, 0.17f);
-        static readonly Color ColorFilter = new Color(0.65f, 0.56f, 0.85f);
 
         const float MoonViewportX = 0.74f;
         const float MoonHorizonLift = 0.30f;
@@ -22,10 +21,13 @@ namespace MetalRaptors
         const float StarRiseHeight = 0.12f;
         const float StarFullHeight = 0.62f;
 
-        const float FirelightBoost = 1.3f;
+        const float FirelightBoost = 2.05f;
 
-        static readonly Color RayColor = new Color(0.72f, 0.80f, 1.00f);
-        const float RayIntensity = 0.30f;
+        const float MoonIntensity = 6.9f;
+        const float MoonHaloIntensity = 0.61f;
+
+        static readonly Color RayColor = new Color(0.549f, 0.526f, 1.000f);
+        const float RayIntensity = 0.83f;
         const float RayDensity = 0.75f;
         const float RayFalloff = 1.5f;
 
@@ -37,12 +39,14 @@ namespace MetalRaptors
             BuildSkybox(cam);
             TuneMoonLight();
             BuildPostFx(cam);
-            Firelight.Grade(ColorFilter, FirelightBoost);
+            Firelight.Grade(Color.white, FirelightBoost);
 
             RenderSettings.ambientMode = AmbientMode.Trilight;
             RenderSettings.ambientSkyColor = AmbientSkyColor;
             RenderSettings.ambientEquatorColor = AmbientEquatorColor;
             RenderSettings.ambientGroundColor = AmbientGroundColor;
+
+            NightLightingController.Launch(cam, TerrainKind.Verdun);
         }
 
         static void BuildSkybox(Camera cam)
@@ -62,17 +66,18 @@ namespace MetalRaptors
             sky.SetColor("_BottomColor", HazeColor);
             sky.SetFloat("_HorizonFalloff", 2.2f);
             sky.SetColor("_SunColor", MoonColor);
-            sky.SetFloat("_SunIntensity", 2.5f);
+            sky.SetFloat("_SunIntensity", MoonIntensity);
             sky.SetFloat("_DiscRadius", 1.8f);
             sky.SetFloat("_DiscEdge", 0.12f);
             sky.SetFloat("_MariaIntensity", 0.25f);
             sky.SetFloat("_HaloFalloff", 8f);
-            sky.SetFloat("_HaloIntensity", 0.22f);
+            sky.SetFloat("_HaloIntensity", MoonHaloIntensity);
             sky.SetFloat("_StarIntensity", 1.6f);
             sky.SetFloat("_StarScale", 80f);
             sky.SetFloat("_StarHorizon", StarRiseHeight);
             sky.SetFloat("_StarZenith", StarFullHeight);
             sky.SetFloat("_Exposure", 1f);
+            sky.SetFloat("_NightSkyMix", 0f);
 
             RenderSettings.skybox = sky;
             cam.clearFlags = CameraClearFlags.Skybox;
@@ -109,19 +114,8 @@ namespace MetalRaptors
 
             GraphicsOptions.TrackBloom(bloom);
 
-            var whiteBalance = profile.Add<WhiteBalance>();
-            whiteBalance.temperature.Override(-22f);
-
             var grade = profile.Add<ColorAdjustments>();
-            grade.postExposure.Override(2f);
-            grade.colorFilter.Override(ColorFilter);
-            grade.saturation.Override(-12f);
             grade.contrast.Override(4f);
-
-            var splitToning = profile.Add<SplitToning>();
-            splitToning.shadows.Override(new Color(0.38f, 0.24f, 0.58f));
-            splitToning.highlights.Override(new Color(0.62f, 0.72f, 1.00f));
-            splitToning.balance.Override(10f);
 
             var vignette = profile.Add<Vignette>();
             vignette.intensity.Override(0.27f);

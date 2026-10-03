@@ -148,6 +148,7 @@ namespace MetalRaptors
 
             var renderer = go.GetComponent<Renderer>();
             UIFactory.MakeTransparent(renderer.sharedMaterial);
+            NightReceivers.SetResponse(renderer.sharedMaterial, NightReceivers.SmokeResponse);
             renderer.shadowCastingMode = ShadowCastingMode.Off;
 
             go.transform.SetParent(transform, false);

@@ -53,6 +53,8 @@ namespace MetalRaptors
 
             var model = Instantiate(prefab, template.transform, false);
             model.name = "ww1_puw_bomb";
+            NightReceivers.Adopt(model);
+            NightLights.MarkCaster(model);
             model.transform.localRotation = Quaternion.Euler(ModelEuler);
             _size = Fit(model.transform, Length).size;
 

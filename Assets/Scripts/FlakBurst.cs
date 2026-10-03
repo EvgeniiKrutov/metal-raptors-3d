@@ -14,6 +14,13 @@ namespace MetalRaptors
         const float CoreEndFactor = 0.35f;
         const float CoreGlow = 4f;
 
+        const float NightFlashIntensity = 2f;
+        const float NightFlashDuration = 0.3f;
+        const float NightFlashPerSize = 1.6f;
+        const float NightFlashMin = 30f, NightFlashMax = 160f;
+        const int NightFlashPriority = 45;
+        static readonly Color NightFlashColor = new Color(1f, 0.541f, 0.239f);
+
         const float LifeMin = 6f, LifeMax = 10f;
         const float LifeJitter = 0.12f;
 
@@ -73,6 +80,10 @@ namespace MetalRaptors
         {
             var root = new GameObject("Flak Burst");
             root.transform.position = position;
+
+            NightLights.Flash(position, NightFlashColor, NightFlashIntensity,
+                Mathf.Clamp(size * NightFlashPerSize, NightFlashMin, NightFlashMax),
+                NightFlashDuration, NightFlashPriority);
 
             var burst = root.AddComponent<FlakBurst>();
             burst.BuildCore(size);
@@ -242,13 +253,14 @@ namespace MetalRaptors
 
         static Material SmokeMaterial(Color color)
         {
-            if (_lit == null) _lit = Shader.Find("Universal Render Pipeline/Lit");
+            if (_lit == null) _lit = NightReceivers.Lit;
             if (_lit == null) return null;
 
             var mat = new Material(_lit) { name = "Flak Smoke" };
             mat.SetColor(BaseColorId, color);
             mat.SetFloat("_Smoothness", 0f);
             UIFactory.MakeTransparent(mat);
+            NightReceivers.SetResponse(mat, NightReceivers.SmokeResponse);
             return mat;
         }
 
