@@ -63,10 +63,5 @@ MonoBehaviour:
   diveAcceleration: 90
   speedDrag: 0.9
   maxSpeedMultiplier: 1.6
-  diveSpeedMultiplier: 1.5
-  diveCooldown: 10
-  diveTriggerHeight: 180
-  diveClimbSeconds: 3
-  diveRunSeconds: 6
   cubeScale: 30
   color: {r: 0.62, g: 0.14, b: 0.12, a: 1}

@@ -185,24 +185,6 @@ namespace MetalRaptors
         [Tooltip("Hard cap on speed as a multiple of flySpeed.")]
         public float maxSpeedMultiplier = 1.6f;
 
-        [Tooltip("Speed floor while the diving pass is running, as a multiple of flySpeed. " +
-                 "Capped by maxSpeedMultiplier; the dive-energy model may still push above it.")]
-        public float diveSpeedMultiplier = 1.5f;
-
-        [Header("Fighter: diving pass")]
-        [Tooltip("Seconds before another diving pass, counted from the moment it ends.")]
-        public float diveCooldown = 10f;
-
-        [Tooltip("The player counts as low, and the pass is run, once they are within this many " +
-                 "metres of the ground. Above it the fighter flies the ordinary attack cycle.")]
-        public float diveTriggerHeight = 180f;
-
-        [Tooltip("Maximum seconds spent climbing to the top corner; this is the telegraph.")]
-        public float diveClimbSeconds = 3f;
-
-        [Tooltip("Maximum seconds of the diagonal run before it pulls out.")]
-        public float diveRunSeconds = 6f;
-
         [Header("Body (legacy)")]
         [Tooltip("Unused: the enemy is now the Albatros D.III model, sized to the player's plane. " +
                  "Kept only so the existing asset still deserializes cleanly.")]
