@@ -43,6 +43,16 @@ namespace MetalRaptors
         const float GroyneAngleMin = 40f, GroyneAngleMax = 52f;
         const float GroyneDrop = 6f;
 
+        const float BunkerNearGap = 2f;
+        const int BunkerDepthBands = 3;
+        const float BunkerFrontGap = 12f;
+        const float BunkerGroyneGap = 30f;
+        const float BunkerJitter = 0.06f;
+        const float BunkerYawMin = 40f, BunkerYawMax = 60f;
+        const float BunkerPadMargin = 3f, BunkerPadFalloff = 18f;
+        const float BunkerSink = 0.6f;
+        const float MaxBunkerReach = 160f;
+
         const int AlphaRes = 128;
         const int RowsPerStep = 16;
 
@@ -56,6 +66,7 @@ namespace MetalRaptors
 
         float _p1, _p2, _p3, _p4, _p5, _p6, _d1, _d2, _m1, _m2, _m3, _m4;
         float _groyneSide;
+        float _bunkerSpacing;
 
         TerrainLayer _groundLayer, _sandLayer;
         Material _wallMat;
@@ -70,8 +81,18 @@ namespace MetalRaptors
             public float x0, lean, halfWidth, rise;
         }
 
+        struct BunkerSpec
+        {
+            public int model;
+            public Vector3 origin;
+            public Quaternion rotation;
+            public float x, z, halfX, halfZ, reach, padY;
+        }
+
         readonly List<CraterSpec> _craters = new List<CraterSpec>();
         readonly List<DykeSpec> _dykes = new List<DykeSpec>();
+        readonly List<BunkerSpec> _bunkers = new List<BunkerSpec>();
+        readonly Dictionary<int, BunkerSpec> _bunkerCells = new Dictionary<int, BunkerSpec>();
         float[] _shoreCentre, _shoreHalf;
 
         protected override float HeightScale => Scale;
@@ -96,6 +117,11 @@ namespace MetalRaptors
 
             _wallMat = TerrainSurfaces.FlatMaterial(WallColor);
 
+            float beach = (ShoreZ - ShoreWidth - BunkerFrontGap + BunkerNearGap) * 0.5f
+                          - (playPlaneZ - cameraDistance);
+            _bunkerSpacing = 2f * beach * LevelCamera.ReferenceAspect
+                             * Mathf.Tan(LevelCamera.BaseFieldOfView * 0.5f * Mathf.Deg2Rad);
+
             CoastSky.ApplyFog(daytime, cameraDistance, playPlaneZ);
         }
 
@@ -104,6 +130,7 @@ namespace MetalRaptors
             float x0 = index * ChunkLength;
             CratersForRange(x0 - MaxCraterReach, x0 + ChunkLength + MaxCraterReach, _craters);
             DykesForRange(x0 - MaxDykeReach, x0 + ChunkLength + MaxDykeReach, _dykes);
+            BunkersForRange(x0 - MaxBunkerReach, x0 + ChunkLength + MaxBunkerReach, _bunkers);
             CacheShore(index);
             yield return null;
 
@@ -122,6 +149,12 @@ namespace MetalRaptors
             foreach (var d in _dykes)
             {
                 StampDyke(metres, index, d);
+                yield return null;
+            }
+
+            foreach (var b in _bunkers)
+            {
+                StampBunkerPad(metres, index, b);
                 yield return null;
             }
         }
@@ -166,6 +199,7 @@ namespace MetalRaptors
                 _wallMat, new Vector3(x0 + ChunkLength / 2f, 0f, 0f), owned);
 
             AddGroynes(index, root);
+            AddBunkers(index, root);
         }
 
         void AddGroynes(int index, Transform root)
@@ -178,8 +212,8 @@ namespace MetalRaptors
 
             for (int cell = c0; cell <= c1; cell++)
             {
-                var rng = new System.Random(Hash(_seed, cell, 17));
-                float x = (cell + Range(rng, GroyneXMin, GroyneXMax)) * GroyneCellSize;
+                var rng = GroyneRng(cell);
+                float x = GroyneX(cell, rng);
                 if (x < x0 || x >= x0 + ChunkLength) continue;
 
                 float z = ShoreCentre(x) - ShoreHalf(x) - Range(rng, GroyneInsetMin, GroyneInsetMax);
@@ -191,6 +225,153 @@ namespace MetalRaptors
 
                 FlandersGroyne.Place(root, land, land + run + Vector3.down * GroyneDrop, BaseHeight);
             }
+        }
+
+        System.Random GroyneRng(int cell) => new System.Random(Hash(_seed, cell, 17));
+
+        float GroyneX(int cell, System.Random rng) =>
+            (cell + Range(rng, GroyneXMin, GroyneXMax)) * GroyneCellSize;
+
+        void AddBunkers(int index, Transform root)
+        {
+            float x0 = index * ChunkLength;
+            BunkersForRange(x0, x0 + ChunkLength, _bunkers);
+
+            foreach (var b in _bunkers)
+                if (b.x >= x0 && b.x < x0 + ChunkLength)
+                    FlandersBunker.Place(root, b.model, b.origin, b.rotation);
+        }
+
+        void BunkersForRange(float xMin, float xMax, List<BunkerSpec> list)
+        {
+            list.Clear();
+            int c0 = Mathf.FloorToInt(xMin / _bunkerSpacing);
+            int c1 = Mathf.FloorToInt(xMax / _bunkerSpacing);
+
+            for (int cell = c0; cell <= c1; cell++)
+                if (Bunker(cell, out var spec)) list.Add(spec);
+        }
+
+        public override bool Occupied(float worldX, float z, float margin)
+        {
+            int cell = Mathf.FloorToInt(worldX / _bunkerSpacing);
+
+            for (int c = cell - 1; c <= cell + 1; c++)
+            {
+                if (!Bunker(c, out var b)) continue;
+
+                Vector3 local = Quaternion.Inverse(b.rotation) * new Vector3(worldX - b.x, 0f, z - b.z);
+                if (Mathf.Abs(local.x) <= b.halfX + margin && Mathf.Abs(local.z) <= b.halfZ + margin)
+                    return true;
+            }
+
+            return false;
+        }
+
+        bool Bunker(int cell, out BunkerSpec spec)
+        {
+            if (_bunkerCells.TryGetValue(cell, out spec)) return true;
+            if (!TryBunker(cell, out spec)) return false;
+
+            _bunkerCells[cell] = spec;
+            return true;
+        }
+
+        bool TryBunker(int cell, out BunkerSpec spec)
+        {
+            spec = default;
+            int model = BunkerModel(cell);
+            if (!FlandersBunker.Has(model)) return false;
+
+            var rng = new System.Random(Hash(_seed, cell, 23));
+            float yaw = Range(rng, BunkerYawMin, BunkerYawMax) * (rng.NextDouble() < 0.5 ? -1f : 1f);
+            var rotation = Quaternion.Euler(0f, yaw, 0f);
+
+            Bounds box = FlandersBunker.Footprint(model);
+            float halfX = box.extents.x + BunkerPadMargin;
+            float halfZ = box.extents.z + BunkerPadMargin;
+            float sin = Mathf.Abs(Mathf.Sin(yaw * Mathf.Deg2Rad));
+            float cos = Mathf.Abs(Mathf.Cos(yaw * Mathf.Deg2Rad));
+            float spanX = cos * box.extents.x + sin * box.extents.z;
+            float spanZ = sin * box.extents.x + cos * box.extents.z;
+
+            float x = (cell + 0.5f + Range(rng, -BunkerJitter, BunkerJitter)) * _bunkerSpacing;
+            x = ClearOfGroynes(x, spanX + BunkerGroyneGap);
+
+            float centre = ShoreCentre(x);
+            float front = centre - ShoreHalf(x) - BunkerFrontGap - spanZ;
+            float back = BunkerNearGap + spanZ;
+            float depth = (DepthBand(cell) + (float)rng.NextDouble()) / BunkerDepthBands;
+            float z = back < front ? Mathf.Lerp(back, front, depth) : front;
+
+            float padY = BaseHeight(x, z);
+            Vector3 offset = rotation * new Vector3(box.center.x, 0f, box.center.z);
+
+            spec = new BunkerSpec
+            {
+                model = model,
+                rotation = rotation,
+                origin = new Vector3(x, padY - BunkerSink, z) - offset,
+                x = x,
+                z = z,
+                halfX = halfX,
+                halfZ = halfZ,
+                reach = Mathf.Sqrt(halfX * halfX + halfZ * halfZ) + BunkerPadFalloff,
+                padY = padY,
+            };
+            return true;
+        }
+
+        int BunkerModel(int cell)
+        {
+            int count = FlandersBunker.Models;
+            int step = cell >= 0 ? 1 : -1;
+            int model = (int)((uint)Hash(_seed, 0, 29) % count);
+
+            for (int c = step; c != cell + step; c += step)
+                model = (model + 1 + (int)((uint)Hash(_seed, c, 31) % (count - 1))) % count;
+
+            return model;
+        }
+
+        int DepthBand(int cell)
+        {
+            int block = Mathf.FloorToInt((float)cell / BunkerDepthBands);
+            var rng = new System.Random(Hash(_seed, block, 37));
+            var bands = new int[BunkerDepthBands];
+            for (int i = 0; i < bands.Length; i++) bands[i] = i;
+
+            for (int i = bands.Length - 1; i > 0; i--)
+            {
+                int j = rng.Next(i + 1);
+                (bands[i], bands[j]) = (bands[j], bands[i]);
+            }
+
+            return bands[cell - block * BunkerDepthBands];
+        }
+
+        float ClearOfGroynes(float x, float clear)
+        {
+            int g = Mathf.FloorToInt(x / GroyneCellSize);
+            float best = x, bestShift = float.MaxValue;
+            float left = GroyneX(g - 2, GroyneRng(g - 2));
+
+            for (int cell = g - 1; cell <= g + 2; cell++)
+            {
+                float right = GroyneX(cell, GroyneRng(cell));
+                float from = left + clear, to = right - clear;
+                left = right;
+                if (from > to) continue;
+
+                float spot = Mathf.Clamp(x, from, to);
+                float shift = Mathf.Abs(spot - x);
+                if (shift >= bestShift) continue;
+
+                bestShift = shift;
+                best = spot;
+            }
+
+            return best;
         }
 
         void CacheShore(int chunkIndex)
@@ -277,6 +458,34 @@ namespace MetalRaptors
             }
         }
 
+        static void StampBunkerPad(float[,] heights, int chunkIndex, BunkerSpec b)
+        {
+            float chunkX0 = chunkIndex * ChunkLength;
+            if (b.x + b.reach < chunkX0 || b.x - b.reach > chunkX0 + ChunkLength) return;
+
+            int ixMin = Mathf.Max(0, Mathf.FloorToInt((b.x - b.reach - chunkX0) / XStep));
+            int ixMax = Mathf.Min(Res - 1, Mathf.CeilToInt((b.x + b.reach - chunkX0) / XStep));
+            int izMin = Mathf.Max(0, Mathf.FloorToInt((b.z - b.reach) / ZStep));
+            int izMax = Mathf.Min(Res - 1, Mathf.CeilToInt((b.z + b.reach) / ZStep));
+            Quaternion back = Quaternion.Inverse(b.rotation);
+
+            for (int iz = izMin; iz <= izMax; iz++)
+            {
+                float dz = Depth * iz / (Res - 1) - b.z;
+
+                for (int ix = ixMin; ix <= ixMax; ix++)
+                {
+                    Vector3 local = back * new Vector3(WorldX(chunkIndex, ix) - b.x, 0f, dz);
+                    float outX = Mathf.Max(0f, Mathf.Abs(local.x) - b.halfX);
+                    float outZ = Mathf.Max(0f, Mathf.Abs(local.z) - b.halfZ);
+                    float weight = Mathf.SmoothStep(1f, 0f,
+                        Mathf.Sqrt(outX * outX + outZ * outZ) / BunkerPadFalloff);
+                    if (weight <= 0f) continue;
+                    heights[iz, ix] = Mathf.Lerp(heights[iz, ix], b.padY, weight);
+                }
+            }
+        }
+
         void StampDyke(float[,] heights, int chunkIndex, DykeSpec d)
         {
             float chunkX0 = chunkIndex * ChunkLength;
@@ -320,7 +529,7 @@ namespace MetalRaptors
                 {
                     float radius = Range(rng, 10f, 26f);
                     float depth = radius * Range(rng, 0.30f, 0.45f);
-                    list.Add(new CraterSpec
+                    var crater = new CraterSpec
                     {
                         x = (cell + (float)rng.NextDouble()) * CraterCellSize,
                         z = Range(rng, CraterZMin, CraterZMax),
@@ -329,7 +538,10 @@ namespace MetalRaptors
                         rim = depth * 0.28f,
                         rimSigma = radius * 0.40f,
                         influence = radius * 1.7f,
-                    });
+                    };
+
+                    if (!Occupied(crater.x, crater.z, crater.influence + BunkerPadFalloff))
+                        list.Add(crater);
                 }
             }
         }

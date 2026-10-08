@@ -51,6 +51,7 @@ namespace MetalRaptors
         BattlefieldProps _props;
         BattlefieldRubble _rubble;
         System.Func<float, float, bool> _inCrater;
+        System.Func<float, float, float, bool> _occupied;
 
         public static Battlefield Current { get; private set; }
 
@@ -114,12 +115,13 @@ namespace MetalRaptors
         }
 
         public static Battlefield BeginCoast(Camera cam, float halfViewWidth, int seed,
-            float seaLevel, float waterFromZ)
+            float seaLevel, float waterFromZ, System.Func<float, float, float, bool> occupied = null)
         {
             var field = Create(cam, halfViewWidth, seed,
                 float.NegativeInfinity, float.PositiveInfinity, null);
             if (field == null) return null;
 
+            field._occupied = occupied;
             field._seaLevel = seaLevel;
             field._waterFromZ = waterFromZ;
             field._smokeZMin = CoastSmokeZMin;
@@ -176,6 +178,9 @@ namespace MetalRaptors
         }
 
         public bool InCrater(float x, float z) => _inCrater != null && _inCrater(x, z);
+
+        public bool Occupied(float x, float z, float margin) =>
+            _occupied != null && _occupied(x, z, margin);
 
         public bool Dry(float z, float y) => z < _waterFromZ || y >= _seaLevel + DryClearance;
 

@@ -177,7 +177,7 @@ namespace MetalRaptors
             {
                 _sea = SeaSurface.Begin(_cam, _level.daytime);
                 ScatterRubble(Battlefield.BeginCoast(_cam, _halfViewWidth, _level.seed,
-                    SeaSurface.Level, SeaSurface.NearEdge));
+                    SeaSurface.Level, SeaSurface.NearEdge, _terrain.Occupied));
             }
             else if (Alpine)
             {

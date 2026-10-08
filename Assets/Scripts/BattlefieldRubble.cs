@@ -126,6 +126,7 @@ namespace MetalRaptors
             if (z - radius < ZMin || z > _field.PeopleZMax) return false;
             if (!_field.InBand(x - margin) || !_field.InBand(x + margin)) return false;
             if (_field.OnRoad(z, margin)) return false;
+            if (_field.Occupied(x, z, margin)) return false;
 
             return _field.Props == null || !_field.Props.Blocks(x, z, margin, out _);
         }

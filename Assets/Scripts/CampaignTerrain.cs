@@ -69,6 +69,8 @@ namespace MetalRaptors
 
         public virtual bool InCrater(float worldX, float z) => false;
 
+        public virtual bool Occupied(float worldX, float z, float margin) => false;
+
         public static CampaignTerrain Begin(TerrainKind kind, int seed, Daytime daytime,
             Weather weather, float cameraDistance, float playPlaneZ, float startCamX,
             CampaignLandOptions options = null)
