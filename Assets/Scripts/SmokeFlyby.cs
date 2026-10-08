@@ -82,7 +82,8 @@ namespace MetalRaptors
         public bool Covered => _time >= VeilEnd;
 
         public static SmokeFlyby Begin(PlaneModelConfig plane, Vector3 camPos, float halfViewWidth,
-            float halfViewHeight, float cameraDistance, float playPlaneZ, float speed)
+            float halfViewHeight, float cameraDistance, float playPlaneZ, float speed,
+            string skin = null)
         {
             var flyby = new GameObject("Smoke Flyby").AddComponent<SmokeFlyby>();
 
@@ -96,7 +97,7 @@ namespace MetalRaptors
             flyby.Follow(camPos);
             flyby.BuildVeil();
             flyby.PlanFill();
-            for (int i = 0; i < Lanes.Length; i++) flyby.AddFlyer(plane, i);
+            for (int i = 0; i < Lanes.Length; i++) flyby.AddFlyer(plane, skin, i);
             return flyby;
         }
 
@@ -128,13 +129,14 @@ namespace MetalRaptors
             }
         }
 
-        void AddFlyer(PlaneModelConfig plane, int index)
+        void AddFlyer(PlaneModelConfig plane, string skin, int index)
         {
             var root = new GameObject($"Smoking {plane.resourceName}").transform;
             root.SetParent(transform, false);
             root.localRotation = Quaternion.Euler(0f, 0f, 180f);
 
-            PlaneFactory.BuildPlaneModel(root, plane, mirrored: true, skin: PlaneSkins.Default(plane));
+            PlaneFactory.BuildPlaneModel(root, plane, mirrored: true,
+                skin: PlaneSkins.Enemy(plane, skin));
             foreach (Collider collider in root.GetComponentsInChildren<Collider>())
                 collider.enabled = false;
 

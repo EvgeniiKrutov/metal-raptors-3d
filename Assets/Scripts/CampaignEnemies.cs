@@ -29,6 +29,7 @@ namespace MetalRaptors
         readonly Rigidbody _player;
         readonly float _groundY;
         readonly float _worldTop;
+        readonly string _skin;
 
         float _minX;
         float _maxX;
@@ -62,6 +63,7 @@ namespace MetalRaptors
             _fighter = EnemyConfigs.Load(EnemyRole.Fighter);
 
             if (level == null) return;
+            _skin = level.enemySkin;
             EnemyConfigs.Scale(_scout, level.enemyHealthScale, level.enemyRotationScale);
             EnemyConfigs.Scale(_fighter, level.enemyHealthScale, level.enemyRotationScale);
         }
@@ -257,7 +259,7 @@ namespace MetalRaptors
             var go = new GameObject("Enemy");
             go.transform.position = position;
             Transform model = PlaneFactory.BuildPlaneModel(go.transform, plane, mirrored: true,
-                skin: skin ?? PlaneSkins.Default(plane));
+                skin: skin ?? PlaneSkins.Enemy(plane, _skin));
             if (!Mathf.Approximately(ModelScale, 1f)) model.localScale *= ModelScale;
 
             bool gunned = plane.gunLift > 0f;

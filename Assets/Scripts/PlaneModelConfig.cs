@@ -192,6 +192,7 @@ namespace MetalRaptors
             heightMeters   = 2.4f,
             propPivotNode  = "propeller",
             propBladesNode = "prop_blade_1",
+            skins          = PlaneSkins.FokkerEindecker,
             stats = new PlaneStats
             {
                 maxSpeed      = 210f,

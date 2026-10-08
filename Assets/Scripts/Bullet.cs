@@ -79,6 +79,7 @@ namespace MetalRaptors
 
             IDamageable nearest = null;
             float best = float.MaxValue;
+            Vector3 point = _rb.position;
 
             for (int i = 0; i < count; i++)
             {
@@ -90,9 +91,10 @@ namespace MetalRaptors
 
                 best = Sweep[i].distance;
                 nearest = plane;
+                point = Sweep[i].distance > 0f ? Sweep[i].point : _rb.position;
             }
 
-            if (nearest != null) Hit(nearest);
+            if (nearest != null) Hit(nearest, point, step / reach);
         }
 
         void Update()
@@ -113,7 +115,7 @@ namespace MetalRaptors
 
         void OnCollisionEnter(Collision collision)
         {
-            if (!_spent) Hit(null);
+            if (!_spent) Spend();
         }
 
         bool Hostile(IDamageable target)
@@ -126,10 +128,16 @@ namespace MetalRaptors
             return player != null && !player.Evading;
         }
 
-        void Hit(IDamageable target)
+        void Hit(IDamageable target, Vector3 point, Vector3 travel)
+        {
+            Sparks.Hit(point, travel);
+            target.TakeDamage(_damage);
+            Spend();
+        }
+
+        void Spend()
         {
             _spent = true;
-            target?.TakeDamage(_damage);
             Destroy(gameObject);
         }
     }

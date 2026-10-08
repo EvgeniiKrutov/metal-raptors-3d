@@ -790,7 +790,8 @@ namespace MetalRaptors
             RaiseBars();
 
             _flyby = SmokeFlyby.Begin(PlaneModels.Albatros, _camBasePos, _halfViewWidth,
-                _halfViewHeight, CameraDistance, PlayPlaneZ, DuelPlane.CruiseSpeed);
+                _halfViewHeight, CameraDistance, PlayPlaneZ, DuelPlane.CruiseSpeed,
+                _level.enemySkin);
             if (_sound != null) _sound.FadeOut(SmokeFlyby.Seconds);
 
             StartCoroutine(SmokeOut());

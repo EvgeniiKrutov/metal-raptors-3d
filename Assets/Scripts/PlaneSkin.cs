@@ -47,6 +47,19 @@ namespace MetalRaptors
         public static readonly PlaneSkin[] AlbatrosD3 =
         {
             new PlaneSkin { id = "plywood", label = "plywood", texture = "skins/albatros_d3/plywood" },
+            new PlaneSkin
+            {
+                id = "raven", label = "raven", texture = "skins/albatros_d3/raven", locked = true,
+            },
+        };
+
+        public static readonly PlaneSkin[] FokkerEindecker =
+        {
+            new PlaneSkin { id = "sand", label = "sand", texture = "skins/fokker_eindecker/sand" },
+            new PlaneSkin
+            {
+                id = "raven", label = "raven", texture = "skins/fokker_eindecker/raven", locked = true,
+            },
         };
 
         public static PlaneSkin[] Of(PlaneModelConfig plane) =>
@@ -60,6 +73,9 @@ namespace MetalRaptors
 
         public static PlaneSkin Companion(PlaneModelConfig plane, string id = null) =>
             ById(plane, id) ?? ById(plane, CompanionId) ?? Default(plane);
+
+        public static PlaneSkin Enemy(PlaneModelConfig plane, string id) =>
+            ById(plane, id) ?? Default(plane);
 
         public static PlaneSkin Default(PlaneModelConfig plane)
         {

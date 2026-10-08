@@ -244,7 +244,7 @@ namespace MetalRaptors
         void SpawnBackFoe(BackPair pair, Vector3 at, PlayerConfig playerFlight)
         {
             pair.foe = DuelPlane.Spawn("Background Foe", _foePlane, playerFlight, at, Mathf.PI,
-                mirrored: true, PlaneSkins.Default(_foePlane));
+                mirrored: true, PlaneSkins.Enemy(_foePlane, _level.enemySkin));
             if (pair.foe != null) pair.foe.SetGround(_groundY);
         }
 
@@ -721,7 +721,7 @@ namespace MetalRaptors
             var entry = new Vector3(_camX + _halfView + FoeEntryMargin, y, _playZ + Depth);
 
             _foe = DuelPlane.Spawn("Background Foe", _foePlane, _flight, entry,
-                Mathf.PI, mirrored: true, PlaneSkins.Default(_foePlane));
+                Mathf.PI, mirrored: true, PlaneSkins.Enemy(_foePlane, _level.enemySkin));
             if (_foe == null) return;
 
             _foe.SetBounds(_camX - _halfView * BandBehind, _camX + _halfView * BandAhead,

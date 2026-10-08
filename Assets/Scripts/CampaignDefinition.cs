@@ -40,6 +40,7 @@ namespace MetalRaptors
         public float people = 1.5f;
         public float enemyHealthScale = 1f;
         public float enemyRotationScale = 1f;
+        public string enemySkin;
         public int supplyDrops;
         public float supplyHealthFraction = 0.3f;
         public float supplyHeal = 55f;
@@ -250,6 +251,7 @@ namespace MetalRaptors
             flak = 1.2f,
             enemyHealthScale = 0.75f,
             enemyRotationScale = 1.00f,
+            enemySkin = "raven",
             supplyDrops = 2,
             companionFoe = PlaneModels.Eindecker,
             companionPilots = new[] { "roussel", "crane", "marchand" },
