@@ -43,14 +43,14 @@ namespace MetalRaptors
         const float CaretWidth = 12f;
         const float CaretHeight = 26f;
         const float CaretDrop = 2f;
-        const float CaretBlinkSec = 0.5f;
+        public const float CaretBlinkSec = 0.5f;
 
         const float CharsPerSecond = 55f;
         const float LoreSpeedFactor = 2.2f;
         const float LineGapSec = 0.35f;
         const float RuleGapSec = 0.5f;
         const float PromptDelaySec = 2f;
-        const float PromptFadeSec = 0.35f;
+        public const float PromptFadeSec = 0.35f;
 
         const string HiddenOpen = "<color=#00000000>";
         const string HiddenClose = "</color>";
@@ -96,6 +96,7 @@ namespace MetalRaptors
 
         GameObject _hud;
         Action _onDismissed;
+        Func<bool> _ready;
         Image _rule;
         CanvasGroup _prompt;
         Image _caret;
@@ -112,16 +113,17 @@ namespace MetalRaptors
         bool _printed;
 
         public static void Open(string caption, string title, string dateline, string lore,
-            GameObject hud, Action onDismissed = null) =>
-            Open("Level Briefing", LevelPage, caption, title, dateline, lore, hud, onDismissed);
+            GameObject hud, Action onDismissed = null, Func<bool> ready = null) =>
+            Open("Level Briefing", LevelPage, caption, title, dateline, lore, hud, onDismissed,
+                ready);
 
         public static void OpenJournal(string title, string dateline, string text,
             Action onDismissed = null) =>
             Open("Journal Page", JournalPage, string.Empty, title, dateline, text, null,
-                onDismissed);
+                onDismissed, null);
 
         static void Open(string name, Page page, string caption, string title, string dateline,
-            string lore, GameObject hud, Action onDismissed)
+            string lore, GameObject hud, Action onDismissed, Func<bool> ready)
         {
             if (IsOpen || string.IsNullOrEmpty(title))
             {
@@ -135,6 +137,7 @@ namespace MetalRaptors
             var briefing = canvas.gameObject.AddComponent<LevelBriefing>();
             Current = briefing;
             briefing._onDismissed = onDismissed;
+            briefing._ready = ready;
             briefing.Build(canvas, page, caption, title, dateline, lore, hud);
         }
 
@@ -167,7 +170,8 @@ namespace MetalRaptors
             Text body = BuildLore(root, lore, colors.Fg, page.BodyTop, out float loreBottom);
             Print(body, lore, LoreSpeedFactor, 0f);
 
-            BuildPrompt(root, PromptRow(loreBottom), colors.Muted, colors.Accent);
+            _prompt = BuildPrompt(root, PromptRow(loreBottom), colors.Muted, colors.Accent,
+                out _caret);
         }
 
         void Print(Text text, string content, float speed, float gapAfter)
@@ -237,7 +241,8 @@ namespace MetalRaptors
             return text;
         }
 
-        void BuildPrompt(Transform parent, float y, Color color, Color caretColor)
+        public static CanvasGroup BuildPrompt(Transform parent, float y, Color color,
+            Color caretColor, out Image caret)
         {
             var row = new GameObject("Prompt", typeof(RectTransform), typeof(CanvasGroup));
             row.transform.SetParent(parent, false);
@@ -249,24 +254,25 @@ namespace MetalRaptors
             rowRt.sizeDelta = Vector2.zero;
             rowRt.anchoredPosition = Vector2.zero;
 
-            _prompt = row.GetComponent<CanvasGroup>();
-            _prompt.alpha = 0f;
-            _prompt.blocksRaycasts = false;
-            _prompt.interactable = false;
+            var prompt = row.GetComponent<CanvasGroup>();
+            prompt.alpha = 0f;
+            prompt.blocksRaycasts = false;
+            prompt.interactable = false;
 
             Text text = Centered(row.transform, Prompt, PromptSize, y, color, UIFactory.MediumFont);
 
             var go = new GameObject("Caret", typeof(Image));
             go.transform.SetParent(row.transform, false);
 
-            _caret = go.GetComponent<Image>();
-            _caret.color = caretColor;
-            _caret.raycastTarget = false;
+            caret = go.GetComponent<Image>();
+            caret.color = caretColor;
+            caret.raycastTarget = false;
 
-            var rt = _caret.rectTransform;
+            var rt = caret.rectTransform;
             rt.sizeDelta = new Vector2(CaretWidth, CaretHeight);
             rt.anchoredPosition = new Vector2(
                 text.preferredWidth * 0.5f + CaretGap + CaretWidth * 0.5f, y - CaretDrop);
+            return prompt;
         }
 
         void Update()
@@ -280,6 +286,8 @@ namespace MetalRaptors
                 else Advance(deltaTime);
                 return;
             }
+
+            if (_ready != null && !_ready()) return;
 
             FadeInPrompt(deltaTime);
             Blink(deltaTime);

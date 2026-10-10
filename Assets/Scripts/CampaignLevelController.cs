@@ -52,6 +52,8 @@ namespace MetalRaptors
         const float GarrisonFromX = 0.06f, GarrisonSpanX = 0.70f;
         const float GarrisonNearZ = 100f, GarrisonFarZ = 620f;
 
+        const float MinLoadSec = 3f;
+
         const float DitchSplashSize = 75f;
         const float SinkSpeed = 26f;
         const float SinkDriftKeep = 0.15f;
@@ -93,6 +95,10 @@ namespace MetalRaptors
         CinematicBars _bars;
         bool _formation;
         bool _handedOff;
+        bool _loading = true;
+        bool _launched;
+        bool _settled;
+        float _revealAt;
 
         float _halfViewHeight;
         float _halfViewWidth;
@@ -138,8 +144,12 @@ namespace MetalRaptors
         float ApronEndX =>
             _level.aerodrome && Aerodrome.Ready && AerodromeFits ? AerodromeX + Aerodrome.Width : 0f;
 
+        void Awake() => ScreenFade.BeginLoading();
+
         void Start()
         {
+            _launched = CampaignRun.TakeLaunch();
+            _revealAt = Time.realtimeSinceStartup + (_launched ? MinLoadSec : 0f);
             _levelNumber = CampaignRun.Level;
             _level = CustomBattle.Requested
                 ? CampaignLevels.Custom(CustomBattle.Map, CustomBattle.Daytime, CustomBattle.Shape)
@@ -157,6 +167,8 @@ namespace MetalRaptors
                 return;
             }
 
+            Time.timeScale = 0f;
+
             var config = Resources.Load<PlayerConfig>("PlayerConfig");
             if (config == null) config = ScriptableObject.CreateInstance<PlayerConfig>();
 
@@ -171,6 +183,7 @@ namespace MetalRaptors
                 _resume != null ? _resume.camera.x : StartX, BuildLand());
             BuildAerodrome();
             SpawnPlayer(config);
+            _cubeTr.gameObject.SetActive(false);
             SetupCamera();
 
             if (Coast)
@@ -205,16 +218,43 @@ namespace MetalRaptors
             PlaneScrapes.DisablePlanePlaneCollisions();
             PlaneScrapes.SetGroundCollisions(true);
             BuildHud();
+            ShowBriefing(config);
+            StartCoroutine(Load(config));
+        }
+
+        bool ReadyToReveal => _settled && Time.realtimeSinceStartup >= _revealAt;
+
+        IEnumerator Load(PlayerConfig config)
+        {
+            yield return null;
+            yield return new WaitForEndOfFrame();
+            Physics.SyncTransforms();
+            _settled = true;
+
+            if (HasBriefing) yield break;
+
+            while (!ReadyToReveal) yield return null;
+            if (_launched) yield return ScreenFade.AwaitContinue();
+
+            BeginPlay(config);
+        }
+
+        void BeginPlay(PlayerConfig config)
+        {
+            Time.timeScale = 1f;
             BeginSupply();
-            _sound = SoundSystem.Begin(_cube, null, silent: HasBriefing);
+            _sound = SoundSystem.Begin(_cube, null);
             if (_resume == null) BeginIntro();
+            _cubeTr.gameObject.SetActive(true);
+            _loading = false;
             BeginCompanion(config);
-            ShowBriefing();
             if (_resume != null) Resume();
 
             if (CustomBattle.Requested) DevSpawn.Register(this);
-            if (career && !string.IsNullOrEmpty(_level.arenaScript))
+            if (!CustomBattle.Requested && !string.IsNullOrEmpty(_level.arenaScript))
                 DevSkip.Offer(SkipCaption, SkipToArena);
+
+            ScreenFade.EndLoading();
         }
 
         void OnDestroy()
@@ -390,17 +430,13 @@ namespace MetalRaptors
                 CameraDistance, _resume != null ? _resume.companionFoe : null, _resume == null);
         }
 
-        void ShowBriefing()
+        void ShowBriefing(PlayerConfig config)
         {
             if (!HasBriefing) return;
 
             LevelBriefing.Open($"LEVEL {_levelNumber}", _level.title, _level.dateline, _level.lore,
-                _hud, ArmSound);
-        }
-
-        void ArmSound()
-        {
-            if (_sound != null) _sound.Arm();
+                _hud, () => BeginPlay(config), () => ReadyToReveal);
+            ScreenFade.EndLoading();
         }
 
         void BeginScript()
@@ -578,7 +614,7 @@ namespace MetalRaptors
 
         void LateUpdate()
         {
-            if (_cubeTr == null) return;
+            if (_loading || _cubeTr == null) return;
 
             if (_camShake > 0f)
                 _camShake = Mathf.Max(0f, _camShake - Time.unscaledDeltaTime / CamShakeDuration);

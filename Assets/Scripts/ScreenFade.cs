@@ -12,9 +12,11 @@ namespace MetalRaptors
 
         const float MaxStep = 0.05f;
         const int SortingOrder = 1000;
+        const float PromptBottom = 70f;
 
         static ScreenFade _rig;
         static bool _busy;
+        static bool _loading;
 
         public static bool IsBusy => _busy;
 
@@ -53,6 +55,44 @@ namespace MetalRaptors
             Rig().Begin(atBlack, scene, outSec, holdSec, inSec);
         }
 
+        public static void BeginLoading()
+        {
+            _loading = true;
+
+            ScreenFade rig = Rig();
+            rig._sheet.raycastTarget = true;
+            rig.SetAlpha(1f);
+            if (_busy) return;
+
+            _busy = true;
+            rig.StartCoroutine(rig.Reveal(FadeSec));
+        }
+
+        public static void EndLoading() => _loading = false;
+
+        public static IEnumerator AwaitContinue()
+        {
+            MenuPalette colors = MenuTheme.Colors;
+            CanvasGroup prompt = LevelBriefing.BuildPrompt(Rig().transform, 0f, colors.Muted,
+                colors.Accent, out Image caret);
+
+            var rt = (RectTransform)prompt.transform;
+            rt.anchorMin = new Vector2(0.5f, 0f);
+            rt.anchorMax = new Vector2(0.5f, 0f);
+            rt.anchoredPosition = new Vector2(0f, PromptBottom);
+
+            for (float age = 0f; ; age += Time.unscaledDeltaTime)
+            {
+                prompt.alpha = Mathf.Clamp01(age / LevelBriefing.PromptFadeSec);
+                caret.enabled = Mathf.Repeat(age, 2f * LevelBriefing.CaretBlinkSec)
+                                < LevelBriefing.CaretBlinkSec;
+                yield return null;
+                if (MenuInput.ReadAnyKey()) break;
+            }
+
+            Destroy(prompt.gameObject);
+        }
+
         void Begin(Action atBlack, string scene, float outSec, float holdSec, float inSec)
         {
             _busy = true;
@@ -66,14 +106,18 @@ namespace MetalRaptors
             yield return Ramp(0f, 1f, outSec);
 
             atBlack?.Invoke();
+            if (scene != null) SceneManager.LoadScene(scene);
 
-            if (scene != null)
-            {
-                SceneManager.LoadScene(scene);
-                yield return null;
-            }
+            yield return null;
 
             for (float t = 0f; t < holdSec; t += Time.unscaledDeltaTime) yield return null;
+
+            yield return Reveal(inSec);
+        }
+
+        IEnumerator Reveal(float inSec)
+        {
+            while (_loading) yield return null;
 
             yield return Ramp(1f, 0f, inSec);
 
@@ -112,6 +156,7 @@ namespace MetalRaptors
             if (_rig != this) return;
             _rig = null;
             _busy = false;
+            _loading = false;
         }
     }
 }

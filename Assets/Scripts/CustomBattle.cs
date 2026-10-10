@@ -56,6 +56,7 @@ namespace MetalRaptors
             Map = map;
             Daytime = daytime;
             Shape = shape;
+            CampaignRun.RequestLaunch();
         }
 
         public static void Clear() => Requested = false;

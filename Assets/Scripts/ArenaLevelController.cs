@@ -155,17 +155,30 @@ namespace MetalRaptors
             _maxX = _camPos.x + _halfW - SideMargin;
 
             SpawnPlayer(config);
+            _cubeTr.gameObject.SetActive(false);
             PlaneScrapes.DisablePlanePlaneCollisions();
             BuildHud();
 
-            _sound = SoundSystem.Begin(_cube, null);
             _enemies = new CampaignEnemies(_cube.GetComponent<Rigidbody>(),
                 _floorY - EnemyFloorDrop, _camPos.y + _halfH, _level);
             _enemies.ModelScale = PlaneScale;
-            _sound.Track(_enemies.Live, boss: true);
 
             if (HasBossMusic) MusicPlayer.Instance.Prewarm(_level.bossMusic);
+            StartCoroutine(Load());
+        }
+
+        IEnumerator Load()
+        {
+            yield return null;
+            yield return new WaitForEndOfFrame();
+            Physics.SyncTransforms();
+
+            _cubeTr.gameObject.SetActive(true);
+            _sound = SoundSystem.Begin(_cube, null);
+            _sound.Track(_enemies.Live, boss: true);
             StartCoroutine(FlyIn());
+
+            ScreenFade.EndLoading();
         }
 
         void OnDestroy()

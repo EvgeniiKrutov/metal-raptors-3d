@@ -233,6 +233,7 @@ namespace MetalRaptors
             tGo.transform.SetParent(root.transform);
             tGo.transform.position = new Vector3(x0, TerrainY, 0f);
             ProceduralTerrain.AttachCollider(tGo, data);
+            Physics.SyncTransforms();
 
             var terrain = tGo.GetComponent<Terrain>();
             terrain.materialTemplate = _terrainMat;

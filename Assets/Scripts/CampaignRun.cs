@@ -9,7 +9,22 @@ namespace MetalRaptors
 
         public static int Level { get; private set; } = FirstLevel;
 
-        public static void Request(int level) => Level = Mathf.Clamp(level, FirstLevel, LastLevel);
+        static bool _launch;
+
+        public static void Request(int level)
+        {
+            Level = Mathf.Clamp(level, FirstLevel, LastLevel);
+            RequestLaunch();
+        }
+
+        public static void RequestLaunch() => _launch = true;
+
+        public static bool TakeLaunch()
+        {
+            bool wanted = _launch;
+            _launch = false;
+            return wanted;
+        }
     }
 
     public static class CampaignProgress

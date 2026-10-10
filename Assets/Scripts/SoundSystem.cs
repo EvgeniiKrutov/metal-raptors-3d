@@ -349,8 +349,7 @@ namespace MetalRaptors
         Ramp _fadeGain;
         Ramp _duck;
 
-        public static SoundSystem Begin(CubeController player, IReadOnlyList<EnemyController> enemies,
-            bool silent = false)
+        public static SoundSystem Begin(CubeController player, IReadOnlyList<EnemyController> enemies)
         {
             var go = new GameObject("SoundSystem");
             var system = go.AddComponent<SoundSystem>();
@@ -361,7 +360,7 @@ namespace MetalRaptors
             system._fadeGain.Jump(1f);
             system._duck.Jump(1f);
 
-            if (!silent) system.Arm();
+            system.Arm();
             return system;
         }
 

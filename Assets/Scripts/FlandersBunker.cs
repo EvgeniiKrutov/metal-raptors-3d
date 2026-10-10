@@ -5,14 +5,17 @@ namespace MetalRaptors
     public static class FlandersBunker
     {
         public const string ModelResource = "objects/bunkers/bunker_";
-        public const int Models = 3;
+        public const int Models = 6;
 
+        const string GunNode = "gun_mesh";
         const float Shrink = 0.77f;
         const float MuzzleHeight = 2.9f;
+        const float BarrelRadius = 0.2f;
         const float ProbeY = -9000f;
 
         static readonly GameObject[] Prefabs = new GameObject[Models];
         static readonly Bounds[] Boxes = new Bounds[Models];
+        static readonly Vector3[] Muzzles = new Vector3[Models];
         static bool _measured;
         static bool _any;
 
@@ -49,8 +52,14 @@ namespace MetalRaptors
                 for (int r = 1; r < renderers.Length; r++) box.Encapsulate(renderers[r].bounds);
                 box.center -= origin;
 
+                float muzzleY = MuzzleHeight;
+                Transform gun = PlaneFactory.FindDeep(view.transform, GunNode);
+                if (gun != null && gun.TryGetComponent(out Renderer barrel))
+                    muzzleY = barrel.bounds.max.y - origin.y - BarrelRadius;
+
                 Prefabs[i] = prefab;
                 Boxes[i] = box;
+                Muzzles[i] = new Vector3(0f, muzzleY, box.max.z);
                 _any = true;
             }
 
@@ -85,7 +94,7 @@ namespace MetalRaptors
             box.center = Boxes[model].center;
             box.size = Boxes[model].size;
 
-            root.AddComponent<BunkerGun>().Aim(new Vector3(0f, MuzzleHeight, Boxes[model].max.z));
+            root.AddComponent<BunkerGun>().Aim(Muzzles[model]);
         }
     }
 }
