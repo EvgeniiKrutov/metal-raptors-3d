@@ -34,6 +34,7 @@ namespace MetalRaptors
         const float RoadOverlap = 60f;
         const float BandOverhang = 1100f;
         const float WorldLeft = 0f;
+        const float BeachPeopleShare = 0.4f;
 
         const float AirfieldBurnSec = 3f;
         const int AirfieldBlasts = 14;
@@ -190,7 +191,9 @@ namespace MetalRaptors
             {
                 _sea = SeaSurface.Begin(_cam, _level.daytime);
                 ScatterRubble(Battlefield.BeginCoast(_cam, _halfViewWidth, _level.seed,
-                    SeaSurface.Level, SeaSurface.NearEdge, _terrain.Occupied));
+                    SeaSurface.Level, SeaSurface.NearEdge, _terrain.Occupied,
+                    FlandersTerrain.BeachZMax, _level.daytime != Daytime.Night,
+                    _level.people * BeachPeopleShare));
             }
             else if (Alpine)
             {
@@ -380,6 +383,8 @@ namespace MetalRaptors
                 PlayPlaneZ, _level.flak);
             _skyZeppelin = SkyZeppelin.Begin(_cam, _halfViewWidth, _halfViewHeight,
                 PlayPlaneZ, CameraDistance, _level.zeppelins);
+            Seagulls.Begin(_cam, _halfViewWidth, PlayPlaneZ, CameraDistance,
+                Coast && _level.daytime != Daytime.Night);
 
             if (_skyZeppelin != null && Bounded) _skyZeppelin.SetLeftEdge(WorldLeft);
 

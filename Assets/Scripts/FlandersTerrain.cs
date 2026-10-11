@@ -7,6 +7,7 @@ namespace MetalRaptors
     public class FlandersTerrain : CampaignTerrain
     {
         public const float SeaLevel = SeaSurface.Level;
+        public const float BeachZMax = ShoreZ + ShoreZJitter;
 
         const float BaseY = -115f;
         const float Scale = 205f;
@@ -42,6 +43,7 @@ namespace MetalRaptors
         const float GroyneInsetMin = 4f, GroyneInsetMax = 14f;
         const float GroyneAngleMin = 40f, GroyneAngleMax = 52f;
         const float GroyneDrop = 6f;
+        const float GroyneHalfWidth = 5f;
 
         const float BunkerNearGap = 2f;
         const int BunkerDepthBands = 3;
@@ -81,6 +83,11 @@ namespace MetalRaptors
             public float x0, lean, halfWidth, rise;
         }
 
+        struct GroyneSpec
+        {
+            public Vector3 land, run;
+        }
+
         struct BunkerSpec
         {
             public int model;
@@ -93,6 +100,7 @@ namespace MetalRaptors
         readonly List<DykeSpec> _dykes = new List<DykeSpec>();
         readonly List<BunkerSpec> _bunkers = new List<BunkerSpec>();
         readonly Dictionary<int, BunkerSpec> _bunkerCells = new Dictionary<int, BunkerSpec>();
+        readonly Dictionary<int, GroyneSpec> _groyneCells = new Dictionary<int, GroyneSpec>();
         float[] _shoreCentre, _shoreHalf;
 
         protected override float HeightScale => Scale;
@@ -212,19 +220,51 @@ namespace MetalRaptors
 
             for (int cell = c0; cell <= c1; cell++)
             {
-                var rng = GroyneRng(cell);
-                float x = GroyneX(cell, rng);
-                if (x < x0 || x >= x0 + ChunkLength) continue;
+                var groyne = Groyne(cell);
+                if (groyne.land.x < x0 || groyne.land.x >= x0 + ChunkLength) continue;
 
-                float z = ShoreCentre(x) - ShoreHalf(x) - Range(rng, GroyneInsetMin, GroyneInsetMax);
-                float angle = Range(rng, GroyneAngleMin, GroyneAngleMax) * Mathf.Deg2Rad;
-                Vector3 run = new Vector3(_groyneSide * Mathf.Sin(angle), 0f, Mathf.Cos(angle))
-                              * FlandersGroyne.Length;
-
-                var land = new Vector3(x, BaseHeight(x, z), z);
-
-                FlandersGroyne.Place(root, land, land + run + Vector3.down * GroyneDrop, BaseHeight);
+                FlandersGroyne.Place(root, groyne.land,
+                    groyne.land + groyne.run + Vector3.down * GroyneDrop, BaseHeight);
             }
+        }
+
+        GroyneSpec Groyne(int cell)
+        {
+            if (_groyneCells.TryGetValue(cell, out var spec)) return spec;
+
+            var rng = GroyneRng(cell);
+            float x = GroyneX(cell, rng);
+            float z = ShoreCentre(x) - ShoreHalf(x) - Range(rng, GroyneInsetMin, GroyneInsetMax);
+            float angle = Range(rng, GroyneAngleMin, GroyneAngleMax) * Mathf.Deg2Rad;
+
+            spec = new GroyneSpec
+            {
+                land = new Vector3(x, BaseHeight(x, z), z),
+                run = new Vector3(_groyneSide * Mathf.Sin(angle), 0f, Mathf.Cos(angle))
+                      * FlandersGroyne.Length,
+            };
+            _groyneCells[cell] = spec;
+            return spec;
+        }
+
+        bool NearGroyne(float worldX, float z, float margin)
+        {
+            if (!FlandersGroyne.Measure()) return false;
+
+            float clear = GroyneHalfWidth + margin;
+            int reach = Mathf.CeilToInt((FlandersGroyne.Length + clear) / GroyneCellSize);
+            int cell = Mathf.FloorToInt(worldX / GroyneCellSize);
+
+            for (int c = cell - reach; c <= cell + reach; c++)
+            {
+                var groyne = Groyne(c);
+                var run = new Vector2(groyne.run.x, groyne.run.z);
+                var point = new Vector2(worldX - groyne.land.x, z - groyne.land.z);
+                float t = Mathf.Clamp01(Vector2.Dot(point, run) / run.sqrMagnitude);
+                if ((point - run * t).sqrMagnitude <= clear * clear) return true;
+            }
+
+            return false;
         }
 
         System.Random GroyneRng(int cell) => new System.Random(Hash(_seed, cell, 17));
@@ -265,7 +305,7 @@ namespace MetalRaptors
                     return true;
             }
 
-            return false;
+            return NearGroyne(worldX, z, margin);
         }
 
         bool Bunker(int cell, out BunkerSpec spec)

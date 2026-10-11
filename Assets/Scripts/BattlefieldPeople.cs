@@ -44,6 +44,11 @@ namespace MetalRaptors
         const float GroupPropClearance = 34f;
         const float PropTurnRate = 300f;
 
+        const float WaterClearance = 3f;
+        const float FootingMargin = 3f, GroupFootingMargin = 16f;
+        const int FootingTries = 4;
+        const float BlockedTurn = 45f;
+
         const float FireRange = 340f;
         const float FireIntervalMin = 0.9f, FireIntervalMax = 2.8f;
         const float FireHoldRetry = 0.2f;
@@ -125,7 +130,7 @@ namespace MetalRaptors
 
         float BandMinX => _field.BandMinX;
         float BandMaxX => _field.BandMaxX;
-        float ZMax => _field.PeopleZMax;
+        float ZMax => _field.WalkZMax;
         float Density => Mathf.Max(0.1f, _field.PeopleDensity);
         float Spacing => GroupSpacing / Density;
 
@@ -244,12 +249,21 @@ namespace MetalRaptors
                 : Random.Range(right, BandMaxX);
         }
 
-        Group SpawnGroup(float x) =>
-            SpawnGroup(x, Random.Range(ZMin + ZEdgeMargin, ZMax - ZEdgeMargin), PickFaction());
+        Group SpawnGroup(float x)
+        {
+            int faction = PickFaction();
+            for (int i = 0; i < FootingTries; i++)
+            {
+                var group = SpawnGroup(x, Random.Range(ZMin + ZEdgeMargin, ZMax - ZEdgeMargin), faction);
+                if (group != null) return group;
+            }
+            return null;
+        }
 
         Group SpawnGroup(float x, float z, int faction)
         {
             if (!_field.SampleGround(x, z, out float groundY)) return null;
+            if (Blocked(x, z, GroupFootingMargin)) return null;
             if (_field.Props != null
                 && _field.Props.Blocks(x, z, GroupPropClearance, out _)) return null;
 
@@ -274,8 +288,17 @@ namespace MetalRaptors
             for (int i = 0; i < count; i++)
             {
                 var tr = BuildFigure(root.transform, group.faction, Random.Range(0, SkinColors.Length));
-                float fx = x + Random.Range(-SpawnSpreadX, SpawnSpreadX);
-                float fz = Mathf.Clamp(z + Random.Range(-SpawnSpreadZ, SpawnSpreadZ), ZMin, ZMax);
+                float fx = x, fz = z;
+                for (int t = 0; t < FootingTries; t++)
+                {
+                    float tx = x + Random.Range(-SpawnSpreadX, SpawnSpreadX);
+                    float tz = Mathf.Clamp(z + Random.Range(-SpawnSpreadZ, SpawnSpreadZ), ZMin, ZMax);
+                    if (Blocked(tx, tz, FootingMargin)) continue;
+
+                    fx = tx;
+                    fz = tz;
+                    break;
+                }
 
                 if (!_field.SampleGround(fx, fz, out float fy)) fy = groundY;
                 tr.position = new Vector3(fx, fy, fz);
@@ -334,9 +357,8 @@ namespace MetalRaptors
             {
                 group.headingDeg += Wander(group.noisePhase) * dt;
                 Deflect(group.x, group.z, ref group.headingDeg, GroupPropClearance, dt);
-                float rad = group.headingDeg * Mathf.Deg2Rad;
-                group.x += Mathf.Cos(rad) * GroupDriftSpeed * dt;
-                group.z += Mathf.Sin(rad) * GroupDriftSpeed * dt;
+                Step(ref group.x, ref group.z, ref group.headingDeg,
+                    GroupDriftSpeed * dt, GroupFootingMargin);
                 Confine(group, ref group.x, ref group.z, ref group.headingDeg);
             }
 
@@ -374,10 +396,8 @@ namespace MetalRaptors
                 }
 
                 Deflect(figure.x, figure.z, ref figure.headingDeg, PropClearance, dt);
-
-                float rad = figure.headingDeg * Mathf.Deg2Rad;
-                figure.x += Mathf.Cos(rad) * figure.speed * dt;
-                figure.z += Mathf.Sin(rad) * figure.speed * dt;
+                Step(ref figure.x, ref figure.z, ref figure.headingDeg,
+                    figure.speed * dt, FootingMargin);
                 Confine(group, ref figure.x, ref figure.z, ref figure.headingDeg);
             }
 
@@ -467,6 +487,25 @@ namespace MetalRaptors
 
             float away = Mathf.Atan2(z - obstacle.y, x - obstacle.x) * Mathf.Rad2Deg;
             headingDeg = Mathf.MoveTowardsAngle(headingDeg, away, PropTurnRate * dt);
+        }
+
+        bool Blocked(float x, float z, float margin) =>
+            _field.Occupied(x, z, margin) || _field.Wet(x, z, WaterClearance);
+
+        void Step(ref float x, ref float z, ref float headingDeg, float distance, float margin)
+        {
+            float rad = headingDeg * Mathf.Deg2Rad;
+            float nx = x + Mathf.Cos(rad) * distance;
+            float nz = z + Mathf.Sin(rad) * distance;
+
+            if (Blocked(nx, nz, margin))
+            {
+                headingDeg += 180f + Random.Range(-BlockedTurn, BlockedTurn);
+                return;
+            }
+
+            x = nx;
+            z = nz;
         }
 
         void Confine(Group group, ref float x, ref float z, ref float headingDeg)

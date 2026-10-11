@@ -37,6 +37,7 @@ namespace MetalRaptors
         float _waterFromZ = float.PositiveInfinity;
         float _smokeZMin = SmokeZMin, _smokeZMax = SmokeZMax;
         float _peopleZMax = PeopleZMaxDefault;
+        float _beachZMax = float.PositiveInfinity;
         float _peopleDensity = 1f;
         float _landDepth = ProceduralTerrain.Depth;
         float _roadZ, _roadHalfWidth;
@@ -71,6 +72,7 @@ namespace MetalRaptors
         public BattlefieldProps Props => _props;
         public BattlefieldPeople People => _people;
         public float PeopleZMax => _peopleZMax;
+        public float WalkZMax => Mathf.Min(_peopleZMax, _beachZMax);
         public float PeopleDensity => _peopleDensity;
 
         // The road's corridor, for anything that has to keep off it. The ribbon runs the whole
@@ -115,7 +117,8 @@ namespace MetalRaptors
         }
 
         public static Battlefield BeginCoast(Camera cam, float halfViewWidth, int seed,
-            float seaLevel, float waterFromZ, System.Func<float, float, float, bool> occupied = null)
+            float seaLevel, float waterFromZ, System.Func<float, float, float, bool> occupied,
+            float beachZMax, bool people, float peopleDensity)
         {
             var field = Create(cam, halfViewWidth, seed,
                 float.NegativeInfinity, float.PositiveInfinity, null);
@@ -128,7 +131,9 @@ namespace MetalRaptors
             field._smokeZMax = CoastSmokeZMax;
             field._seaTimer = Random.Range(0f, SeaBlastIntervalMax);
             field._placeProps = false;
-            field._placePeople = false;
+            field._placePeople = people;
+            field._peopleDensity = peopleDensity;
+            field._beachZMax = beachZMax;
             field.Populate();
             return field;
         }
@@ -183,6 +188,9 @@ namespace MetalRaptors
             _occupied != null && _occupied(x, z, margin);
 
         public bool Dry(float z, float y) => z < _waterFromZ || y >= _seaLevel + DryClearance;
+
+        public bool Wet(float x, float z, float clearance) =>
+            z >= _waterFromZ && SampleGround(x, z, out float y) && y < _seaLevel + clearance;
 
         public void KillPeopleWithin(Vector3 centre, float radius)
         {
