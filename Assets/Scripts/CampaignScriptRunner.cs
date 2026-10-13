@@ -35,6 +35,11 @@ namespace MetalRaptors
         float WarnDanger(ScreenEdge edge, float seconds);
     }
 
+    public interface IRaidHost
+    {
+        void BeginRaid();
+    }
+
     public class CampaignScriptRunner : MonoBehaviour
     {
         const float HoldMin = 0.8f;
@@ -190,6 +195,12 @@ namespace MetalRaptors
 
                     case CampaignOp.Arena:
                         if (Running) _host.EnterArena();
+                        yield break;
+
+                    case CampaignOp.Raid:
+                        if (!Running) yield break;
+                        if (_host is IRaidHost raidHost) raidHost.BeginRaid();
+                        else _host.CompleteLevel();
                         yield break;
 
                     case CampaignOp.Finish:

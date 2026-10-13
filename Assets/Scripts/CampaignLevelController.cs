@@ -5,7 +5,8 @@ using UnityEngine.Rendering.Universal;
 
 namespace MetalRaptors
 {
-    public class CampaignLevelController : MonoBehaviour, ICampaignScriptHost, IDevSpawnHost
+    public class CampaignLevelController : MonoBehaviour, ICampaignScriptHost, IRaidHost,
+        IDevSpawnHost
     {
         const float WorldTop = 650f;
         const float CubeHalf = 15f;
@@ -48,6 +49,10 @@ namespace MetalRaptors
         const float ArenaHoldSec = 0.4f;
         const float ArenaInSec = 1.2f;
         const string SkipCaption = "SKIP TO BOSS ARENA";
+
+        const float RaidSoundFadeSec = 1.5f;
+        const float RaidFadeSec = 2.5f;
+        const string RaidSkipCaption = "SKIP TO BOMBING";
 
         const int GarrisonGroups = 3;
         const float GarrisonFromX = 0.06f, GarrisonSpanX = 0.70f;
@@ -94,6 +99,7 @@ namespace MetalRaptors
         LevelIntro _intro;
         SmokeFlyby _flyby;
         CinematicBars _bars;
+        ZeppelinRaid _raid;
         bool _formation;
         bool _handedOff;
         bool _loading = true;
@@ -264,6 +270,7 @@ namespace MetalRaptors
         {
             DevSpawn.Unregister(this);
             DevSkip.Withdraw(SkipToArena);
+            DevSkip.Withdraw(SkipToRaid);
             if (!_handedOff) CampaignCheckpoint.InCareer = false;
         }
 
@@ -456,6 +463,8 @@ namespace MetalRaptors
             EnsureEnemies();
             _dialogue = new DialogueBar(_hud.transform);
             _runner = CampaignScriptRunner.Begin(gameObject, script, this, _dialogue, _resume);
+
+            if (script.Has(CampaignOp.Raid)) DevSkip.Offer(RaidSkipCaption, SkipToRaid);
         }
 
         void EnsureEnemies()
@@ -623,7 +632,8 @@ namespace MetalRaptors
 
             if (_camShake > 0f)
                 _camShake = Mathf.Max(0f, _camShake - Time.unscaledDeltaTime / CamShakeDuration);
-            if (_cam != null && !_camHold) PositionCamera(instant: false);
+            if (_raid != null) FrameRaid();
+            else if (_cam != null && !_camHold) PositionCamera(instant: false);
             if (_flyby != null) _flyby.Tick(_camBasePos, Time.deltaTime);
 
             if (_cube != null && !IntroActive && !_outro)
@@ -692,6 +702,17 @@ namespace MetalRaptors
                 _camBasePos = new Vector3(x, Mathf.Lerp(_camBasePos.y, targetY, t), CamZ);
             }
 
+            PlaceCamera();
+        }
+
+        void FrameRaid()
+        {
+            _camBasePos = _raid.CameraPosition;
+            if (_cam != null) PlaceCamera();
+        }
+
+        void PlaceCamera()
+        {
             Vector3 pos = _camBasePos;
             if (_camShake > 0f)
             {
@@ -900,6 +921,71 @@ namespace MetalRaptors
 
             if (_sound != null) _sound.FadeOut(OutroFadeSec);
             ScreenFade.Swap(ShowGroundScene, OutroFadeSec);
+        }
+
+        public void BeginRaid()
+        {
+            if (_gameOver || _cube == null || _hud == null) return;
+
+            AerodromeBlaze blaze = Aerodrome.Current != null ? Aerodrome.Current.Kindle() : null;
+            if (_zeppelin == null || blaze == null)
+            {
+                CompleteLevel();
+                return;
+            }
+
+            _gameOver = true;
+            _outro = true;
+            _camHold = true;
+            DevSkip.Withdraw(SkipToRaid);
+
+            StopWeapons();
+            if (_enemies != null) _enemies.StandDown();
+            if (_convoy != null) _convoy.StandDown();
+            if (_supply != null) _supply.StandDown();
+            if (_wing != null) _wing.StandDown();
+            if (_dialogue != null) _dialogue.Hide();
+            _cube.ClearWalls();
+            _cube.FlyLevel();
+            RaiseBars();
+            if (_sound != null) _sound.FadeOut(RaidSoundFadeSec);
+
+            if (!CustomBattle.Requested) CampaignProgress.Complete(_levelNumber);
+            CampaignCheckpoint.Clear();
+
+            _raid = ZeppelinRaid.Begin(new RaidStage
+            {
+                cam = _cam,
+                camera = _camBasePos,
+                distance = CameraDistance,
+                halfViewWidth = _halfViewWidth,
+                halfViewHeight = _halfViewHeight,
+                minX = Bounded ? CamMinX : float.MinValue,
+                maxX = Bounded ? CamMaxX : float.MaxValue,
+                floorY = CamFloorY,
+                ceilY = Mathf.Max(CamFloorY, WorldTop - _halfViewHeight),
+                fieldMinX = WorldLeft,
+                fieldMaxX = ApronEndX,
+                playZ = PlayPlaneZ,
+                groundY = _airfield != null ? _airfield.GroundY : ProceduralTerrain.BaseLevel,
+                zeppelin = _zeppelin,
+                blaze = blaze,
+                shake = amount => _camShake = Mathf.Max(_camShake, amount),
+                finished = EndRaid,
+            });
+        }
+
+        void EndRaid() => ScreenFade.Swap(ShowGroundScene, RaidFadeSec);
+
+        void SkipToRaid()
+        {
+            if (_gameOver || _playerFalling || _cube == null) return;
+
+            if (_zeppelin == null && !SpawnZeppelin()) return;
+            if (_runner != null) _runner.Stop();
+
+            _zeppelin.Arrive();
+            BeginRaid();
         }
 
         bool PlaneGone => _cubeTr == null

@@ -22,9 +22,6 @@
     { "op": "supply", "count": 2 },
     { "op": "zeppelin", "seconds": 45 },
 
-    { "op": "say", "speaker": "wing", "line": "l3_line6" },
-    { "op": "say", "speaker": "you", "line": "l3_line7", "seconds": 4 },
-
-    { "op": "finish" }
+    { "op": "raid" }
   ]
 }

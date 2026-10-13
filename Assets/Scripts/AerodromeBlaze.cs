@@ -28,23 +28,45 @@ namespace MetalRaptors
             public Vector3[] points;
             public float radius;
             public float delay;
+            public Bounds footprint;
+            public bool lit;
         }
 
         int _seed;
+        readonly List<Target> _targets = new List<Target>();
+
+        public int Count => _targets.Count;
+
+        public Bounds Footprint(int index) => _targets[index].footprint;
 
         public static AerodromeBlaze Begin(List<Bounds> buildings, List<Bounds> aircraft, int seed)
+        {
+            AerodromeBlaze blaze = Prepare(buildings, aircraft, seed);
+            blaze.StartCoroutine(blaze.Spread());
+            return blaze;
+        }
+
+        public static AerodromeBlaze Prepare(List<Bounds> buildings, List<Bounds> aircraft,
+            int seed)
         {
             var blaze = new GameObject("Aerodrome Blaze").AddComponent<AerodromeBlaze>();
             blaze._seed = seed;
 
             var rng = new System.Random(seed ^ 0x0B1A);
-            var targets = new List<Target>();
-            foreach (Bounds building in buildings) targets.Add(OnRoof(building, rng));
-            foreach (Bounds plane in aircraft) targets.Add(OnAirframe(plane, rng));
-            targets.Sort((a, b) => a.delay.CompareTo(b.delay));
-
-            blaze.StartCoroutine(blaze.Spread(targets));
+            foreach (Bounds building in buildings) blaze._targets.Add(OnRoof(building, rng));
+            foreach (Bounds plane in aircraft) blaze._targets.Add(OnAirframe(plane, rng));
+            blaze._targets.Sort((a, b) => a.delay.CompareTo(b.delay));
             return blaze;
+        }
+
+        public void Ignite(int index)
+        {
+            if (index < 0 || index >= _targets.Count || _targets[index].lit) return;
+
+            Target target = _targets[index];
+            target.lit = true;
+            _targets[index] = target;
+            Ignite(target);
         }
 
         static Target OnRoof(Bounds bounds, System.Random rng)
@@ -70,6 +92,7 @@ namespace MetalRaptors
                 points = points,
                 radius = Mathf.Clamp(bounds.size.y * RoofRadiusFactor, RoofRadiusMin, RoofRadiusMax),
                 delay = Range(rng, 0f, SpreadSec),
+                footprint = bounds,
             };
         }
 
@@ -82,20 +105,22 @@ namespace MetalRaptors
             },
             radius = AirframeRadius,
             delay = Range(rng, 0f, SpreadSec),
+            footprint = bounds,
         };
 
-        IEnumerator Spread(List<Target> targets)
+        IEnumerator Spread()
         {
             float elapsed = 0f;
-            foreach (Target target in targets)
+            for (int i = 0; i < _targets.Count; i++)
             {
-                if (target.delay > elapsed)
+                float delay = _targets[i].delay;
+                if (delay > elapsed)
                 {
-                    yield return new WaitForSeconds(target.delay - elapsed);
-                    elapsed = target.delay;
+                    yield return new WaitForSeconds(delay - elapsed);
+                    elapsed = delay;
                 }
 
-                Ignite(target);
+                Ignite(i);
             }
         }
 

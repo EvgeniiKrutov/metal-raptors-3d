@@ -7,7 +7,7 @@ namespace MetalRaptors
     public enum CampaignOp
     {
         Wait, Say, Wave, Spawn, WaitClear, Supply, Foe, Zeppelin, Onslaught, Formation, Warn,
-        Danger, Arena, Boss, Duel, Finish
+        Danger, Arena, Boss, Duel, Raid, Finish
     }
 
     public class CampaignStep
@@ -48,6 +48,13 @@ namespace MetalRaptors
             Steps = steps;
             foreach (CampaignStep step in steps)
                 if (step.op == CampaignOp.Supply) { HasSupply = true; break; }
+        }
+
+        public bool Has(CampaignOp op)
+        {
+            foreach (CampaignStep step in Steps)
+                if (step.op == op) return true;
+            return false;
         }
 
         public static CampaignScript Load(string name)
@@ -138,6 +145,7 @@ namespace MetalRaptors
                 case "arena": return new CampaignStep { op = CampaignOp.Arena };
                 case "boss": return ParseBoss(step, origin, index);
                 case "duel": return new CampaignStep { op = CampaignOp.Duel };
+                case "raid": return new CampaignStep { op = CampaignOp.Raid };
                 case "finish": return new CampaignStep { op = CampaignOp.Finish };
                 default:
                     Debug.LogError($"CampaignScript {origin}[{index}]: unknown op '{op}'.");

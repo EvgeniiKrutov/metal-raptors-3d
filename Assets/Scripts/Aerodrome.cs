@@ -159,6 +159,14 @@ namespace MetalRaptors
             _blaze = null;
         }
 
+        public AerodromeBlaze Kindle()
+        {
+            if (_blaze == null)
+                _blaze = AerodromeBlaze.Prepare(Footprints(SolidGroups), Footprints(AircraftGroups),
+                    _seed);
+            return _blaze;
+        }
+
         List<Bounds> Footprints(string[] groups)
         {
             var footprints = new List<Bounds>();

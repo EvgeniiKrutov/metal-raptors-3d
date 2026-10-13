@@ -47,6 +47,10 @@ namespace MetalRaptors
         const float SmokeScale = 1.2f;
         const float FireSize = 100f;
 
+        const float BayFrom = 0.3f, BayTo = -0.3f;
+        const float BayDepth = 0.85f;
+        const float DriftEaseSec = 2.5f;
+
         static readonly Vector2[] Muzzles =
         {
             new Vector2(-0.1804f, -0.0872f),
@@ -130,6 +134,9 @@ namespace MetalRaptors
         bool _smoking;
         bool _burning;
 
+        float _glideFrom, _glideTo, _glideSec, _glideAge;
+        float _drift, _driftTarget;
+
         float Radius => _size.x * EnvelopeRadius;
 
         public static EnemyZeppelin Spawn(float viewRightX, float hoverX, float y, float z,
@@ -188,6 +195,41 @@ namespace MetalRaptors
         }
 
         public void StandDown() => _standDown = true;
+
+        public void Raid()
+        {
+            _standDown = true;
+            Hanging = true;
+            if (_bar == null) return;
+
+            _bar.Destroy();
+            _bar = null;
+        }
+
+        public void Arrive()
+        {
+            Vector3 pos = transform.position;
+            pos.x = _hoverX;
+            transform.position = pos;
+            Hanging = true;
+        }
+
+        public void Glide(float x, float seconds)
+        {
+            _glideFrom = transform.position.x;
+            _glideTo = x;
+            _glideSec = Mathf.Max(0.01f, seconds);
+            _glideAge = 0f;
+        }
+
+        public void DriftAway(float speed)
+        {
+            _glideSec = 0f;
+            _driftTarget = speed;
+        }
+
+        public Vector3 BayPoint(float along) => transform.position + new Vector3(
+            Mathf.Lerp(BayFrom, BayTo, along) * _size.x, -Radius * BayDepth, 0f);
 
         public ZeppelinSnapshot Capture() => new ZeppelinSnapshot
         {
@@ -323,6 +365,19 @@ namespace MetalRaptors
         void Drift(float dt)
         {
             Vector3 pos = transform.position;
+
+            if (_glideSec > 0f)
+            {
+                _glideAge = Mathf.Min(_glideAge + dt, _glideSec);
+                pos.x = Mathf.Lerp(_glideFrom, _glideTo,
+                    Mathf.SmoothStep(0f, 1f, _glideAge / _glideSec));
+            }
+
+            if (_driftTarget > 0f)
+            {
+                _drift = Mathf.MoveTowards(_drift, _driftTarget, _driftTarget * dt / DriftEaseSec);
+                pos.x -= _drift * dt;
+            }
 
             if (!Hanging)
             {

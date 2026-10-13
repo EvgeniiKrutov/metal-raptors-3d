@@ -42,11 +42,30 @@ namespace MetalRaptors
 
         public static GameObject BuildTemplate()
         {
+            GameObject template = BuildBody();
+            if (template.GetComponent<Collider>() == null)
+                template.AddComponent<BoxCollider>().size = _size;
+            return Seal(template);
+        }
+
+        public static GameObject BuildProp()
+        {
+            GameObject prop = BuildBody();
+            foreach (Collider col in prop.GetComponentsInChildren<Collider>())
+                DestroyImmediate(col);
+
+            prop.SetActive(false);
+            prop.name = "BombProp";
+            return prop;
+        }
+
+        static GameObject BuildBody()
+        {
             var prefab = Resources.Load<GameObject>(ModelResource);
             if (prefab == null)
             {
                 Debug.LogError($"Bomb: {ModelResource} not found in Resources.");
-                return Seal(BuildFallbackTemplate());
+                return BuildFallbackTemplate();
             }
 
             var template = new GameObject("BombTemplate");
@@ -64,8 +83,7 @@ namespace MetalRaptors
             foreach (Collider col in model.GetComponentsInChildren<Collider>())
                 Destroy(col);
 
-            template.AddComponent<BoxCollider>().size = _size;
-            return Seal(template);
+            return template;
         }
 
         static GameObject Seal(GameObject template)
