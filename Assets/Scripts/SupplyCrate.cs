@@ -15,7 +15,8 @@ namespace MetalRaptors
         const float SwayHz = 0.4f;
         const float SwayTiltDeg = 12f;
 
-        const float LeadFraction = 0.72f;
+        public const float LeadFraction = 0.72f;
+
         const float SpawnLiftFactor = 1.3f;
         const float CatchRadius = 42f;
         const float HangFraction = 0.74f;
@@ -50,14 +51,14 @@ namespace MetalRaptors
         Vector3 BoxCentre => transform.TransformPoint(_boxLocal);
 
         public static SupplyCrate Spawn(Vector3 camPos, float halfWidth, float halfHeight,
-            float z, float floorY, Transform player, System.Action onCaught)
+            float z, float floorY, float side, Transform player, System.Action onCaught)
         {
             var go = new GameObject("Supply Crate");
 
             var crate = go.AddComponent<SupplyCrate>();
             crate._player = player;
             crate._onCaught = onCaught;
-            crate._worldX = camPos.x + halfWidth * LeadFraction;
+            crate._worldX = camPos.x + side * halfWidth * LeadFraction;
             crate._floorY = floorY;
             crate._phase = Random.Range(0f, Mathf.PI * 2f);
 
@@ -172,7 +173,7 @@ namespace MetalRaptors
                 return;
             }
 
-            if (box.x < camX - halfWidth - OnScreenSize) Destroy(gameObject);
+            if (Mathf.Abs(box.x - camX) > halfWidth + OnScreenSize) Destroy(gameObject);
         }
 
         bool Caught(Vector3 box)
@@ -199,7 +200,7 @@ namespace MetalRaptors
             Destroy(gameObject);
         }
 
-        static void PlayChime(Vector3 position)
+        public static void PlayChime(Vector3 position)
         {
             AudioClip clip = Chime();
             if (clip == null) return;

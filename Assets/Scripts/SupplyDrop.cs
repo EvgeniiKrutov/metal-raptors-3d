@@ -1,9 +1,12 @@
+using System;
 using UnityEngine;
 
 namespace MetalRaptors
 {
     public class SupplyDrop : MonoBehaviour
     {
+        const float MinRoomFraction = 0.3f;
+
         CubeController _plane;
         Transform _model;
         SupplyCrate _crate;
@@ -15,9 +18,13 @@ namespace MetalRaptors
         int _left;
         int _armed;
         bool _scripted;
+        bool _bothWays;
+        Func<float> _warn;
+        bool _incoming;
+        float _incomingLeft;
 
         public static SupplyDrop Begin(GameObject owner, CampaignDefinition level,
-            CubeController plane, Transform model, float z, float floorY)
+            CubeController plane, Transform model, float z, float floorY, Func<float> warn)
         {
             if (level == null || plane == null || level.supplyDrops <= 0) return null;
 
@@ -29,12 +36,16 @@ namespace MetalRaptors
             drop._fraction = Mathf.Clamp01(level.supplyHealthFraction);
             drop._heal = level.supplyHeal;
             drop._left = level.supplyDrops;
+            drop._bothWays = level.worldWidth > 0f;
+            drop._warn = warn;
             return drop;
         }
 
-        public int Left => _left + (_crate != null ? 1 : 0);
+        bool Pending => _crate != null || _incoming;
 
-        public int Armed => _armed + (_crate != null ? 1 : 0);
+        public int Left => _left + (Pending ? 1 : 0);
+
+        public int Armed => _armed + (Pending ? 1 : 0);
 
         public void Restore(int left, int armed)
         {
@@ -57,6 +68,7 @@ namespace MetalRaptors
         public void StandDown()
         {
             _left = 0;
+            _incoming = false;
             if (_crate != null) Destroy(_crate.gameObject);
             _crate = null;
         }
@@ -69,14 +81,36 @@ namespace MetalRaptors
                 return;
             }
 
+            if (_incoming)
+            {
+                _incomingLeft -= Time.deltaTime;
+                if (_incomingLeft > 0f || cinematic || _plane == null) return;
+
+                _incoming = false;
+                _crate = SupplyCrate.Spawn(camPos, halfWidth, halfHeight, _z, _floorY,
+                    Side(camPos.x, halfWidth), _plane.transform, Collect);
+                return;
+            }
+
             if (_left <= 0 || (_scripted && _armed <= 0) || cinematic || _plane == null) return;
             if (_plane.CurrentHealth <= 0f) return;
             if (_plane.CurrentHealth > _plane.MaxHealth * _fraction) return;
+            if (EnemyWarning.Alarming) return;
 
             _left--;
             if (_scripted) _armed--;
-            _crate = SupplyCrate.Spawn(camPos, halfWidth, halfHeight, _z, _floorY,
-                _plane.transform, Collect);
+            _incoming = true;
+            _incomingLeft = _warn != null ? _warn() : 0f;
+        }
+
+        float Side(float camX, float halfWidth)
+        {
+            if (!_bothWays) return 1f;
+
+            float nose = Mathf.Cos(_plane.Heading) >= 0f ? 1f : -1f;
+            float drop = camX + nose * halfWidth * SupplyCrate.LeadFraction;
+            float room = (drop - _plane.transform.position.x) * nose;
+            return room >= halfWidth * MinRoomFraction ? nose : -nose;
         }
 
         void Collect()

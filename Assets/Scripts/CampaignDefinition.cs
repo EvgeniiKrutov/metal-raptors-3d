@@ -35,6 +35,7 @@ namespace MetalRaptors
         public bool companion;
         public int backCompanions;
         public bool supportCompanion;
+        public bool companionForms = true;
         public bool zeppelins;
         public float flak = 1f;
         public float people = 1.5f;
@@ -221,6 +222,7 @@ namespace MetalRaptors
             worldWidth = 2000f,
             aerodrome = true,
             companion = true,
+            companionForms = false,
             zeppelins = true,
             flak = 0.9f,
             enemyHealthScale = 0.65f,

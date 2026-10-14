@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -7,9 +8,21 @@ namespace MetalRaptors
     {
         const float AppearSec = 0.3f;
         const float HoldSec = 1.8f;
+        const float SupplyHoldSec = 0.7f;
         const float FadeSec = 0.5f;
 
         public const float Seconds = AppearSec + HoldSec + FadeSec;
+
+        public const string ZeppelinText = "ZEPPELIN INCOMING";
+
+        const string SupplyText = "SUPPLY CRATE INCOMING";
+
+        const string SirenPath = "Sounds/enemy_siren";
+        const float SirenVolume = 0.099f;
+        const float WailSec = Seconds / 2f;
+        const float RiseSec = 0.3f;
+        const float FallFromSec = 0.95f;
+        const float FallSec = 0.3f;
 
         const float PulseHz = 2.2f;
         const float PulseFloor = 0.40f;
@@ -23,26 +36,75 @@ namespace MetalRaptors
         const float RiseFrom = 24f;
         const float ScaleFrom = 0.94f;
 
-        static readonly Color Plate = new Color(0.16f, 0.02f, 0.02f, 0.55f);
-        static readonly Color Border = new Color(0.93f, 0.17f, 0.13f);
-        static readonly Color Label = new Color(1f, 0.32f, 0.26f);
+        readonly struct Look
+        {
+            public readonly Color Plate;
+            public readonly Color Border;
+            public readonly Color Label;
+            public readonly float Hold;
+            public readonly bool Alarm;
+
+            public Look(Color plate, Color border, Color label, float hold, bool alarm)
+            {
+                Plate = plate;
+                Border = border;
+                Label = label;
+                Hold = hold;
+                Alarm = alarm;
+            }
+        }
+
+        static readonly Look AlarmLook = new Look(new Color(0.16f, 0.02f, 0.02f, 0.55f),
+            new Color(0.93f, 0.17f, 0.13f), new Color(1f, 0.32f, 0.26f), HoldSec, true);
+
+        static readonly Look SupplyLook = new Look(new Color(0.02f, 0.14f, 0.04f, 0.55f),
+            new Color(0.22f, 0.82f, 0.34f), new Color(0.42f, 0.95f, 0.5f), SupplyHoldSec, false);
 
         static readonly string[] Numbers =
             { "NO", "ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT" };
 
+        static readonly List<EnemyWarning> Alarms = new List<EnemyWarning>();
+
+        static EnemyWarning _supply;
+
+        Look _look;
         CanvasGroup _group;
         RectTransform _rt;
         Text _label;
         Image[] _border;
+        AudioSource _siren;
+        bool _sirenHeld;
         float _life;
 
-        public static EnemyWarning Show(Transform parent, int planes)
+        static AudioClip _sirenClip;
+
+        public static bool Alarming => Alarms.Count > 0;
+
+        public float Duration => AppearSec + _look.Hold + FadeSec;
+
+        public static EnemyWarning Show(Transform parent, string text)
         {
-            var go = new GameObject("Enemy Warning", typeof(Image), typeof(CanvasGroup));
+            if (_supply != null) Destroy(_supply.gameObject);
+
+            EnemyWarning warning = Create(parent, "Enemy Warning", text, AlarmLook);
+            Alarms.Add(warning);
+            return warning;
+        }
+
+        public static EnemyWarning ShowSupply(Transform parent)
+        {
+            _supply = Create(parent, "Supply Warning", SupplyText, SupplyLook);
+            return _supply;
+        }
+
+        static EnemyWarning Create(Transform parent, string name, string text, Look look)
+        {
+            var go = new GameObject(name, typeof(Image), typeof(CanvasGroup));
             go.transform.SetParent(parent, false);
 
             var warning = go.AddComponent<EnemyWarning>();
-            warning.Build(TextFor(planes));
+            warning._look = look;
+            warning.Build(text);
             return warning;
         }
 
@@ -62,7 +124,7 @@ namespace MetalRaptors
             _group.interactable = false;
 
             var plate = GetComponent<Image>();
-            plate.color = Plate;
+            plate.color = _look.Plate;
             plate.raycastTarget = false;
 
             _rt = plate.rectTransform;
@@ -80,7 +142,29 @@ namespace MetalRaptors
             };
 
             _rt.sizeDelta = new Vector2(_label.preferredWidth + PadSide * 2f, RowHeight);
+            if (_look.Alarm) BuildSiren();
             Apply();
+        }
+
+        void BuildSiren()
+        {
+            if (_sirenClip == null) _sirenClip = Resources.Load<AudioClip>(SirenPath);
+            if (_sirenClip == null) return;
+
+            _siren = gameObject.AddComponent<AudioSource>();
+            _siren.playOnAwake = false;
+            _siren.loop = false;
+            _siren.spatialBlend = 0f;
+            _siren.clip = _sirenClip;
+        }
+
+        void Start()
+        {
+            if (!_look.Alarm) SupplyCrate.PlayChime(transform.position);
+            if (_siren == null) return;
+
+            _siren.volume = SirenVolume * AudioOptions.Scene;
+            _siren.Play();
         }
 
         void BuildLabel(string text)
@@ -93,7 +177,7 @@ namespace MetalRaptors
             _label.text = text;
             _label.fontSize = LabelSize;
             _label.alignment = TextAnchor.MiddleCenter;
-            _label.color = Label;
+            _label.color = _look.Label;
             _label.raycastTarget = false;
             _label.horizontalOverflow = HorizontalWrapMode.Overflow;
             _label.verticalOverflow = VerticalWrapMode.Overflow;
@@ -111,7 +195,7 @@ namespace MetalRaptors
             go.transform.SetParent(transform, false);
 
             var image = go.GetComponent<Image>();
-            image.color = Border;
+            image.color = _look.Border;
             image.raycastTarget = false;
 
             var rt = image.rectTransform;
@@ -125,26 +209,47 @@ namespace MetalRaptors
 
         void Update()
         {
+            HoldSiren(Time.timeScale <= 0f);
             _life += Time.deltaTime;
             Apply();
 
-            if (_life >= Seconds) Destroy(gameObject);
+            if (_life >= Duration) Destroy(gameObject);
+        }
+
+        void OnDestroy() => Alarms.Remove(this);
+
+        void HoldSiren(bool hold)
+        {
+            if (_siren == null || hold == _sirenHeld) return;
+
+            _sirenHeld = hold;
+            if (hold) _siren.Pause();
+            else _siren.UnPause();
         }
 
         void Apply()
         {
             float appear = Mathf.Clamp01(_life / AppearSec);
-            float fade = Mathf.Clamp01((_life - AppearSec - HoldSec) / FadeSec);
+            float fade = Mathf.Clamp01((_life - AppearSec - _look.Hold) / FadeSec);
             float ease = 1f - (1f - appear) * (1f - appear);
 
             _group.alpha = ease * (1f - fade);
             _rt.anchoredPosition = new Vector2(0f, RowY - RiseFrom * (1f - ease));
             _rt.localScale = Vector3.one * Mathf.Lerp(ScaleFrom, 1f, ease);
 
-            float pulse = 0.5f + 0.5f * Mathf.Cos(_life * PulseHz * 2f * Mathf.PI);
-            _label.color = Fade(Label, Mathf.Lerp(PulseFloor, 1f, pulse));
-            Color border = Fade(Border, Mathf.Lerp(BorderPulseFloor, 1f, pulse));
+            float pulse = _look.Alarm
+                ? Wail(_life)
+                : 0.5f + 0.5f * Mathf.Cos(_life * PulseHz * 2f * Mathf.PI);
+            _label.color = Fade(_look.Label, Mathf.Lerp(PulseFloor, 1f, pulse));
+            Color border = Fade(_look.Border, Mathf.Lerp(BorderPulseFloor, 1f, pulse));
             foreach (Image edge in _border) edge.color = border;
+        }
+
+        static float Wail(float t)
+        {
+            float u = Mathf.Repeat(Mathf.Max(0f, t), WailSec);
+            if (u < RiseSec) return Mathf.SmoothStep(0f, 1f, u / RiseSec);
+            return 1f - Mathf.SmoothStep(0f, 1f, (u - FallFromSec) / FallSec);
         }
 
         static Color Fade(Color color, float alpha) =>

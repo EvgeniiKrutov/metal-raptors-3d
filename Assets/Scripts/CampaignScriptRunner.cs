@@ -15,6 +15,7 @@ namespace MetalRaptors
         void ArmSupply(int crates);
         void SetCompanionFoe(PlaneModelConfig plane);
         bool SpawnZeppelin();
+        float WarnZeppelin();
         bool ZeppelinHanging { get; }
         void GatherFormation();
         bool FormationReady { get; }
@@ -158,6 +159,7 @@ namespace MetalRaptors
                         break;
 
                     case CampaignOp.Zeppelin:
+                        yield return Wait(_host.WarnZeppelin());
                         if (_host.SpawnZeppelin()) yield return Zeppelin(step, index);
                         break;
 

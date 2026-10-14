@@ -97,10 +97,11 @@ namespace MetalRaptors
 
             if (kind == GameMenuKind.Pause) _panel.AddNav("resume", Close);
 
-            _panel.AddNav(CampaignCheckpoint.Available ? "load last checkpoint" : "restart", Restart);
+            bool career = CampaignCheckpoint.InCareer && kind != GameMenuKind.Completed;
+            _panel.AddNav(career || CampaignCheckpoint.Available ? "load last checkpoint" : "restart",
+                Restart);
 
-            if (CampaignCheckpoint.InCareer && kind != GameMenuKind.Completed)
-                _restartLevelItem = _panel.AddNav("restart level", RestartLevel);
+            if (career) _restartLevelItem = _panel.AddNav("restart level", RestartLevel);
 
             if (kind == GameMenuKind.Completed)
             {

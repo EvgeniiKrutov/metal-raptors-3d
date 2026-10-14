@@ -7,14 +7,14 @@
     { "op": "supply", "count": 2 },
     { "op": "onslaught", "seconds": 90, "air": false },
 
-    { "op": "wait", "seconds": 1.5 },
+    { "op": "wait", "seconds": 2 },
     { "op": "say", "speaker": "wing", "line": "l3_line4" },
     { "op": "say", "speaker": "hq", "line": "l3_line5" },
 
     { "op": "supply", "count": 2 },
     { "op": "onslaught", "seconds": 120, "air": true },
 
-    { "op": "wait", "seconds": 1.5 },
+    { "op": "wait", "seconds": 2 },
     { "op": "say", "speaker": "hq", "line": "l3_line8" },
     { "op": "say", "speaker": "wing", "line": "l3_line9" },
     { "op": "say", "speaker": "you", "line": "l3_line10" },

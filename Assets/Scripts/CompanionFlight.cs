@@ -95,6 +95,8 @@ namespace MetalRaptors
         float _bumpTime = -999f;
         bool _regrouping;
         float _regroupTime;
+        bool _parade;
+        float _paradeTime;
 
         float _camX;
         float _camY;
@@ -134,8 +136,9 @@ namespace MetalRaptors
 
             flight._support = level.supportCompanion;
             flight._flyIn = flyIn;
+            flight._parade = flight._support && !flyIn;
 
-            Vector3 slot = flyIn ? flight.Slot(0) : flight.Station;
+            Vector3 slot = flight.Slot(0);
             Vector3 station = player.position + slot;
             station.z = playZ;
             flight._companion = DuelPlane.Spawn("Companion", level.companionPlane, playerFlight,
@@ -193,10 +196,9 @@ namespace MetalRaptors
         void AddBackPair(int index, PlayerConfig playerFlight)
         {
             Vector3 slot = Slot(index + 1);
-            Vector3 at = _flyIn
-                ? _player.position + slot
-                : _player.position
-                  + new Vector3(-BackSpread * index, StationAbove + BackRise * index, Depth);
+            Vector3 at = _player.position + (_flyIn ? slot
+                : _parade ? slot + new Vector3(0f, 0f, Depth)
+                : new Vector3(-BackSpread * index, StationAbove + BackRise * index, Depth));
 
             var pair = new BackPair
             {
@@ -208,8 +210,9 @@ namespace MetalRaptors
             pair.friend.SetGround(_groundY);
             _backs.Add(pair);
 
-            if (_flyIn)
+            if (_flyIn || _parade)
             {
+                pair.formed = true;
                 pair.friend.SetEscort(_player, slot);
                 pair.friend.SetEscortBounds(EscortFloorY, EscortCeilingY);
                 pair.friend.SetRole(DuelRole.Escort, null);
@@ -421,8 +424,26 @@ namespace MetalRaptors
             }
         }
 
-        public bool Formed => _standDown || _companion == null
-            || _phase == Phase.Escort || _phase == Phase.Peel || _phase == Phase.Duel;
+        public bool Formed
+        {
+            get
+            {
+                if (_standDown || _companion == null) return true;
+                if (_phase != Phase.Escort && _phase != Phase.Peel && _phase != Phase.Duel)
+                    return false;
+                return !_parade || BacksFormed;
+            }
+        }
+
+        bool BacksFormed
+        {
+            get
+            {
+                foreach (BackPair pair in _backs)
+                    if (pair.friend != null && !pair.formed) return false;
+                return true;
+            }
+        }
 
         public bool Regrouped
         {
@@ -434,10 +455,7 @@ namespace MetalRaptors
                 if (_regroupTime < CloseSeconds) return false;
                 if (!_support && _phase != Phase.Escort) return false;
                 if (!_companion.AtStation) return false;
-
-                foreach (BackPair pair in _backs)
-                    if (pair.friend != null && !pair.formed) return false;
-                return true;
+                return BacksFormed;
             }
         }
 
@@ -459,35 +477,73 @@ namespace MetalRaptors
 
             for (int i = 0; i < _backs.Count; i++)
             {
-                BackPair pair = _backs[i];
-                if (pair.foe != null)
-                {
-                    pair.foe.Kill();
-                    pair.wreck = pair.foe;
-                    pair.foe = null;
-                }
-
-                if (pair.friend == null) continue;
-
-                pair.peeling = false;
-                pair.crossing = false;
-                pair.formed = false;
-                pair.friend.SetEscort(_player, Slot(i + 1));
-                pair.friend.SetEscortBounds(EscortFloorY, EscortCeilingY);
-                pair.friend.SetRole(DuelRole.Form, null);
-                pair.friend.SetDepth(_playZ, CloseSeconds);
+                Gather(_backs[i], i);
+                if (_backs[i].friend != null) _backs[i].friend.SetDepth(_playZ, CloseSeconds);
             }
         }
+
+        void Parade()
+        {
+            _parade = true;
+            _paradeTime = 0f;
+
+            BeginAlign();
+            for (int i = 0; i < _backs.Count; i++) Gather(_backs[i], i);
+        }
+
+        void Gather(BackPair pair, int index)
+        {
+            DropBackFoe(pair);
+            if (pair.friend == null) return;
+
+            pair.peeling = false;
+            pair.crossing = false;
+            pair.formed = false;
+            pair.friend.SetEscort(_player, Slot(index + 1));
+            pair.friend.SetEscortBounds(EscortFloorY, EscortCeilingY);
+            pair.friend.SetRole(DuelRole.Form, null);
+        }
+
+        void DropBackFoe(BackPair pair)
+        {
+            if (pair.foe == null) return;
+
+            if (InView(pair.foe.transform.position))
+            {
+                pair.foe.Kill();
+                pair.wreck = pair.foe;
+            }
+            else
+            {
+                Object.Destroy(pair.foe.gameObject);
+            }
+            pair.foe = null;
+        }
+
+        bool InView(Vector3 pos) =>
+            Mathf.Abs(pos.x - _camX) <= _halfView && Mathf.Abs(pos.y - _camY) <= _halfHeight;
 
         void TickRegroup(float dt)
         {
             _regroupTime += dt;
-            if (_regroupTime < CloseSeconds) return;
+            if (_regroupTime >= CloseSeconds) SettleBacks(_regroupTime);
+        }
 
+        void TickParade(float dt)
+        {
+            _paradeTime += dt;
+            SettleBacks(_paradeTime);
+        }
+
+        void SettleBacks(float elapsed)
+        {
             foreach (BackPair pair in _backs)
             {
                 if (pair.friend == null || pair.formed) continue;
-                if (!pair.friend.AtStation && _regroupTime < FormLimit) continue;
+                if (!pair.friend.AtStation && elapsed < FormLimit) continue;
+
+                pair.friend.FlipUpright();
+                if (pair.friend.Rolling && elapsed < FormLimit) continue;
 
                 pair.formed = true;
                 pair.friend.SetRole(DuelRole.Escort, null);
@@ -500,18 +556,26 @@ namespace MetalRaptors
             _cinematic = value;
             if (_standDown || _companion == null) return;
 
-            if (!value && _flyIn) BreakFormation();
+            if (!value && (_flyIn || _parade)) BreakFormation();
 
             if (_support)
             {
                 _companion.SetMark(null);
+                if (value && !_flyIn && _level.companionForms)
+                {
+                    Parade();
+                    return;
+                }
+
+                _phase = Phase.Escort;
                 _companion.SetRole(value ? DuelRole.Escort : DuelRole.Support, null);
                 return;
             }
 
             if (value)
             {
-                if (_phase == Phase.Peel || _phase == Phase.Duel) BeginAlign();
+                if (_level.companionForms && (_phase == Phase.Peel || _phase == Phase.Duel))
+                    BeginAlign();
             }
             else if (_phase != Phase.Peel && _phase != Phase.Duel)
             {
@@ -559,8 +623,9 @@ namespace MetalRaptors
 
             TickBack(dt);
             if (_regrouping) TickRegroup(dt);
+            if (_parade) TickParade(dt);
 
-            if (_support)
+            if (_support && _phase == Phase.Escort)
             {
                 AimSupport();
                 return;
@@ -589,7 +654,10 @@ namespace MetalRaptors
 
                 case Phase.Form:
                     _phaseTimer -= dt;
-                    if (_companion.AtStation || _phaseTimer <= 0f) BeginClose();
+                    if (!_companion.AtStation && _phaseTimer > 0f) return;
+
+                    if (_support) Formate();
+                    else BeginClose();
                     return;
 
                 case Phase.Close:
@@ -649,6 +717,7 @@ namespace MetalRaptors
         {
             _flyIn = false;
             _regrouping = false;
+            _parade = false;
             _companion.SetEscort(_player, Station);
             PeelBacks();
         }
@@ -692,7 +761,7 @@ namespace MetalRaptors
             _phase = Phase.Form;
             _phaseTimer = FormLimit;
 
-            _companion.SetEscort(_player, Station);
+            _companion.SetEscort(_player, Slot(0));
             _companion.SetRole(DuelRole.Form, null);
         }
 
@@ -708,7 +777,7 @@ namespace MetalRaptors
         {
             _phase = Phase.Escort;
 
-            _companion.SetEscort(_player, Station);
+            _companion.SetEscort(_player, Slot(0));
             _companion.SetRole(DuelRole.Escort, null);
         }
 

@@ -363,7 +363,7 @@ namespace MetalRaptors
         {
             if (_gameOver || _hud == null || planes <= 0) return 0f;
 
-            EnemyWarning warning = EnemyWarning.Show(_hud.transform, planes);
+            EnemyWarning warning = EnemyWarning.Show(_hud.transform, EnemyWarning.TextFor(planes));
             if (_curtain != null) _curtain.Adopt(warning.gameObject);
             return EnemyWarning.Seconds;
         }
@@ -390,6 +390,8 @@ namespace MetalRaptors
         public void SetCompanionFoe(PlaneModelConfig plane) { }
 
         public bool SpawnZeppelin() => false;
+
+        public float WarnZeppelin() => 0f;
 
         public void GatherFormation() { }
 

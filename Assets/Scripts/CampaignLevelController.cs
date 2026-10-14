@@ -431,7 +431,7 @@ namespace MetalRaptors
         void BeginSupply()
         {
             _supply = SupplyDrop.Begin(gameObject, _level, _cube, _playerModel,
-                PlayPlaneZ, AiGroundY);
+                PlayPlaneZ, AiGroundY, WarnSupply);
         }
 
         void BeginCompanion(PlayerConfig config)
@@ -805,11 +805,32 @@ namespace MetalRaptors
 
         public float WarnIncoming(int planes)
         {
-            if (_gameOver || _hud == null || planes <= 0) return 0f;
+            if (planes <= 0) return 0f;
+            return Warn(EnemyWarning.TextFor(planes));
+        }
 
-            EnemyWarning warning = EnemyWarning.Show(_hud.transform, planes);
+        public float WarnZeppelin()
+        {
+            if (_zeppelin != null || _airfield == null || _cube == null) return 0f;
+            return Warn(EnemyWarning.ZeppelinText);
+        }
+
+        float Warn(string text)
+        {
+            if (_gameOver || _hud == null) return 0f;
+            return Present(EnemyWarning.Show(_hud.transform, text));
+        }
+
+        float WarnSupply()
+        {
+            if (_gameOver || _hud == null) return 0f;
+            return Present(EnemyWarning.ShowSupply(_hud.transform));
+        }
+
+        float Present(EnemyWarning warning)
+        {
             if (_curtain != null && !_formation) _curtain.Adopt(warning.gameObject);
-            return EnemyWarning.Seconds;
+            return warning.Duration;
         }
 
         public void GatherFormation()
