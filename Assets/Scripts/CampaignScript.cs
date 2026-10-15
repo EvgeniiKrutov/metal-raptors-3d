@@ -7,7 +7,7 @@ namespace MetalRaptors
     public enum CampaignOp
     {
         Wait, Say, Wave, Spawn, WaitClear, Supply, Foe, Zeppelin, Onslaught, Formation, Warn,
-        Danger, Arena, Boss, Duel, Raid, Finish
+        Danger, Arena, Boss, Duel, Raid, Unlock, Finish
     }
 
     public class CampaignStep
@@ -24,6 +24,7 @@ namespace MetalRaptors
         public string skin;
         public float scale;
         public ScreenEdge edge;
+        public PlaneAbility ability;
     }
 
     public class CampaignScript
@@ -146,6 +147,7 @@ namespace MetalRaptors
                 case "boss": return ParseBoss(step, origin, index);
                 case "duel": return new CampaignStep { op = CampaignOp.Duel };
                 case "raid": return new CampaignStep { op = CampaignOp.Raid };
+                case "unlock": return ParseUnlock(step, origin, index);
                 case "finish": return new CampaignStep { op = CampaignOp.Finish };
                 default:
                     Debug.LogError($"CampaignScript {origin}[{index}]: unknown op '{op}'.");
@@ -166,6 +168,24 @@ namespace MetalRaptors
                     Debug.LogError($"CampaignScript {origin}[{index}]: unknown side '{side}'.");
                     return ScreenEdge.Left;
             }
+        }
+
+        static CampaignStep ParseUnlock(Dictionary<string, object> step, string origin, int index)
+        {
+            string id = Text(step, "ability");
+            PlaneAbility ability;
+
+            switch (id.ToLowerInvariant())
+            {
+                case "bomb": ability = PlaneAbility.Bomb; break;
+                case "boost": ability = PlaneAbility.Boost; break;
+                case "roll": ability = PlaneAbility.Roll; break;
+                default:
+                    Debug.LogError($"CampaignScript {origin}[{index}]: unknown ability '{id}'.");
+                    return null;
+            }
+
+            return new CampaignStep { op = CampaignOp.Unlock, ability = ability };
         }
 
         static CampaignStep ParseSay(Dictionary<string, object> step, string origin, int index)

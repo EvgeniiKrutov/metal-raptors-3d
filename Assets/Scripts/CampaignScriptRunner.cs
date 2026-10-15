@@ -41,6 +41,11 @@ namespace MetalRaptors
         void BeginRaid();
     }
 
+    public interface IAbilityHost
+    {
+        void Unlock(PlaneAbility ability);
+    }
+
     public class CampaignScriptRunner : MonoBehaviour
     {
         const float HoldMin = 0.8f;
@@ -78,10 +83,22 @@ namespace MetalRaptors
                 runner._warnedFirst = resume.warnedFirst;
                 runner._warnedPair = resume.warnedPair;
                 runner._resumed = true;
+                runner.ReplayUnlocks();
             }
 
             runner.StartCoroutine(runner.Run());
             return runner;
+        }
+
+        void ReplayUnlocks()
+        {
+            if (!(_host is IAbilityHost abilityHost)) return;
+
+            for (int i = 0; i < _start; i++)
+            {
+                CampaignStep step = _script.Steps[i];
+                if (step.op == CampaignOp.Unlock) abilityHost.Unlock(step.ability);
+            }
         }
 
         static int FirstSay(CampaignScript script)
@@ -198,6 +215,10 @@ namespace MetalRaptors
                     case CampaignOp.Arena:
                         if (Running) _host.EnterArena();
                         yield break;
+
+                    case CampaignOp.Unlock:
+                        if (_host is IAbilityHost abilityHost) abilityHost.Unlock(step.ability);
+                        break;
 
                     case CampaignOp.Raid:
                         if (!Running) yield break;

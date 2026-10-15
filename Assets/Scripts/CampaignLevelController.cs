@@ -6,7 +6,7 @@ using UnityEngine.Rendering.Universal;
 namespace MetalRaptors
 {
     public class CampaignLevelController : MonoBehaviour, ICampaignScriptHost, IRaidHost,
-        IDevSpawnHost
+        IAbilityHost, IDevSpawnHost
     {
         const float WorldTop = 650f;
         const float CubeHalf = 15f;
@@ -75,6 +75,7 @@ namespace MetalRaptors
         PlaneBoost _boost;
         PlaneBarrelRoll _roll;
         PlaneSearchlight _searchlight;
+        PlaneAbility _abilities;
         Transform _cubeTr;
         Camera _cam;
         CampaignTerrain _terrain;
@@ -535,6 +536,9 @@ namespace MetalRaptors
 
             _searchlight = PlaneSearchlight.Mount(go,
                 PlaneFactory.NoseLocal(go, model, planeModel), _level.daytime);
+
+            _abilities = _level.abilities;
+            LockAbilities();
 
             if (_resume == null) return;
 
@@ -1169,7 +1173,8 @@ namespace MetalRaptors
             _hud = canvas.gameObject;
 
             _hudView = new LevelHud(canvas.transform, Bounded ? HudObjectiveBounded : HudObjective,
-                _cube, _shooter, _bomber, _boost, _roll, _searchlight, _airfield, TryPause);
+                _cube, _shooter, _bomber, _boost, _roll, _searchlight, _airfield, TryPause,
+                abilities: _abilities);
 
             _curtain = HudCurtain.Attach(_hud);
             _curtain.Set(false);
@@ -1178,6 +1183,20 @@ namespace MetalRaptors
         void UpdateHud()
         {
             if (_hudView != null) _hudView.Tick();
+        }
+
+        public void Unlock(PlaneAbility ability)
+        {
+            _abilities |= ability;
+            LockAbilities();
+            if (_hudView != null) _hudView.Unlock(ability, _curtain);
+        }
+
+        void LockAbilities()
+        {
+            if (_bomber != null) _bomber.Locked = (_abilities & PlaneAbility.Bomb) == 0;
+            if (_boost != null) _boost.Locked = (_abilities & PlaneAbility.Boost) == 0;
+            if (_roll != null) _roll.Locked = (_abilities & PlaneAbility.Roll) == 0;
         }
     }
 }

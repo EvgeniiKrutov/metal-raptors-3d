@@ -31,6 +31,7 @@
     { "op": "say", "speaker": "lasalle", "line": "l1_line20" },
     { "op": "say", "speaker": "roussel", "line": "l1_line21" },
 
+    { "op": "unlock", "ability": "boost" },
     { "op": "wave", "enemies": [ { "plane": "eindecker", "count": 1 } ] },
     { "op": "wait", "seconds": 4 },
     { "op": "wave", "enemies": [ { "plane": "eindecker", "count": 1 } ] },

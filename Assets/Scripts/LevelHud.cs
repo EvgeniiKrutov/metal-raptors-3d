@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -7,8 +8,10 @@ namespace MetalRaptors
     {
         const string AirfieldCaption = "AIRFIELD";
 
-        const string KeyHint = "A / D to steer  •  F to fire  •  H to bomb  •  R to boost  •  "
-                               + "B to roll  •  ";
+        const string KeyHint = "A / D to steer  •  F to fire  •  ";
+        const string BombHint = "H to bomb  •  ";
+        const string BoostHint = "R to boost  •  ";
+        const string RollHint = "B to roll  •  ";
 
         const string ArenaKeyHint = "W A S D to fly  •  F to fire  •  B to roll  •  ";
 
@@ -29,6 +32,14 @@ namespace MetalRaptors
         readonly CooldownSquare _rollSquare;
         readonly CooldownSquare _fireSquare;
         readonly CooldownSquare _lightSquare;
+        readonly List<CooldownSquare> _column = new List<CooldownSquare>();
+        readonly List<PlaneAbility> _needs = new List<PlaneAbility>();
+        readonly float _columnX;
+        readonly float _columnTop;
+
+        readonly Text _hint;
+        readonly string _objective;
+        PlaneAbility _abilities;
 
         readonly TouchStick _stick;
         readonly HeadingArrow _arrow;
@@ -40,10 +51,12 @@ namespace MetalRaptors
         public LevelHud(Transform parent, string objective, CubeController plane,
             PlaneShooter shooter, PlaneBomber bomber, PlaneBoost boost, PlaneBarrelRoll roll,
             PlaneSearchlight searchlight, Airfield airfield, System.Action onPause,
-            bool arena = false)
+            bool arena = false, PlaneAbility abilities = PlaneAbility.All)
         {
             _plane = plane;
             _arena = arena;
+            _abilities = abilities;
+            _objective = objective;
             _airfield = airfield;
             _shooter = shooter;
             _bomber = bomber;
@@ -70,17 +83,26 @@ namespace MetalRaptors
                 y += HudTheme.BarHeight + HudTheme.BarToColumn;
             }
 
+            _columnX = x;
+            _columnTop = y;
+
             if (!arena)
             {
-                _bombSquare = Square(parent, x, ref y, HudTheme.Label("H", "BOMB"), RequestBomb);
-                _boostSquare = Square(parent, x, ref y, HudTheme.Label("R", "BOOST"), RequestBoost);
+                _bombSquare = Square(parent, HudTheme.Label("H", "BOMB"), RequestBomb,
+                    PlaneAbility.Bomb);
+                _boostSquare = Square(parent, HudTheme.Label("R", "BOOST"), RequestBoost,
+                    PlaneAbility.Boost);
             }
             if (!arena || _roll != null)
-                _rollSquare = Square(parent, x, ref y, HudTheme.Label("B", "ROLL"), RequestRoll);
+                _rollSquare = Square(parent, HudTheme.Label("B", "ROLL"), RequestRoll,
+                    PlaneAbility.Roll);
             if (HudTheme.IsTouch)
-                _fireSquare = Square(parent, x, ref y, "FIRE", null, holdable: true);
+                _fireSquare = Square(parent, "FIRE", null, PlaneAbility.None, holdable: true);
             if (_searchlight != null)
-                _lightSquare = Square(parent, x, ref y, HudTheme.Label("T", "LIGHT"), ToggleLight);
+                _lightSquare = Square(parent, HudTheme.Label("T", "LIGHT"), ToggleLight,
+                    PlaneAbility.None);
+
+            Layout();
 
             if (HudTheme.IsTouch && _plane != null)
             {
@@ -93,10 +115,9 @@ namespace MetalRaptors
                 new CooldownSquare(parent, new Vector2(-HudTheme.ColumnRight, -HudTheme.ColumnTop),
                     "P", onPause, fromRight: true);
 
-            Text hint = UIFactory.CreateText(parent,
-                HudTheme.IsTouch ? objective : (arena ? ArenaKeyHint : KeyHint) + objective,
-                HudTheme.HintSize, Vector2.zero, Vector2.zero);
-            var rt = hint.rectTransform;
+            _hint = UIFactory.CreateText(parent, HintText(), HudTheme.HintSize, Vector2.zero,
+                Vector2.zero);
+            var rt = _hint.rectTransform;
             rt.anchorMin = new Vector2(0f, 0f);
             rt.anchorMax = new Vector2(1f, 0f);
             rt.pivot = new Vector2(0.5f, 0f);
@@ -106,12 +127,59 @@ namespace MetalRaptors
             Tick();
         }
 
-        CooldownSquare Square(Transform parent, float x, ref float y, string label,
-            System.Action onPress, bool holdable = false)
+        CooldownSquare Square(Transform parent, string label, System.Action onPress,
+            PlaneAbility needs, bool holdable = false)
         {
-            var square = new CooldownSquare(parent, new Vector2(x, -y), label, onPress, holdable);
-            y += HudTheme.SquarePitch;
+            var square = new CooldownSquare(parent, Vector2.zero, label, onPress, holdable);
+            square.Root.SetActive(Has(needs));
+            _column.Add(square);
+            _needs.Add(needs);
             return square;
+        }
+
+        bool Has(PlaneAbility needs) => (_abilities & needs) == needs;
+
+        void Layout()
+        {
+            float y = _columnTop;
+            for (int i = 0; i < _column.Count; i++)
+            {
+                if (!Has(_needs[i])) continue;
+
+                _column[i].Place(new Vector2(_columnX, -y));
+                y += HudTheme.SquarePitch;
+            }
+        }
+
+        string HintText()
+        {
+            if (HudTheme.IsTouch) return _objective;
+            if (_arena) return ArenaKeyHint + _objective;
+
+            string keys = KeyHint;
+            if (Has(PlaneAbility.Bomb)) keys += BombHint;
+            if (Has(PlaneAbility.Boost)) keys += BoostHint;
+            if (Has(PlaneAbility.Roll)) keys += RollHint;
+            return keys + _objective;
+        }
+
+        public void Unlock(PlaneAbility ability, HudCurtain curtain)
+        {
+            PlaneAbility fresh = ability & ~_abilities;
+            if (fresh == PlaneAbility.None) return;
+
+            _abilities |= fresh;
+
+            for (int i = 0; i < _column.Count; i++)
+            {
+                if ((_needs[i] & fresh) == PlaneAbility.None) continue;
+
+                if (curtain != null) curtain.Reveal(_column[i].Root);
+                else _column[i].Root.SetActive(true);
+            }
+
+            Layout();
+            _hint.text = HintText();
         }
 
         public void Tick()

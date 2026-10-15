@@ -4,6 +4,7 @@
     { "op": "say", "speaker": "wing", "line": "l3_line2" },
     { "op": "say", "speaker": "you", "line": "l3_line3" },
 
+    { "op": "unlock", "ability": "bomb" },
     { "op": "supply", "count": 2 },
     { "op": "onslaught", "seconds": 90, "air": false },
 

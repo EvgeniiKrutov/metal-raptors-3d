@@ -18,6 +18,14 @@ namespace MetalRaptors
             _hidden.Add(child);
         }
 
+        public void Reveal(GameObject child)
+        {
+            if (child == null) return;
+
+            if (_open) child.SetActive(true);
+            else if (!_hidden.Contains(child)) _hidden.Add(child);
+        }
+
         public void Set(bool visible)
         {
             if (visible == _open) return;

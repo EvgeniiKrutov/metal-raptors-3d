@@ -2,6 +2,16 @@ using UnityEngine;
 
 namespace MetalRaptors
 {
+    [System.Flags]
+    public enum PlaneAbility
+    {
+        None = 0,
+        Bomb = 1,
+        Boost = 2,
+        Roll = 4,
+        All = Bomb | Boost | Roll,
+    }
+
     public readonly struct CampaignOutroLine
     {
         public readonly string Speaker;
@@ -22,6 +32,7 @@ namespace MetalRaptors
         public Weather weather;
         public CloudsPart clouds;
         public string script;
+        public PlaneAbility abilities = PlaneAbility.All;
         public string arenaScript;
         public CampaignOutroLine[] arenaLines;
         public string bossMusic;
@@ -171,6 +182,7 @@ namespace MetalRaptors
             weather = Weather.Calm,
             clouds = new CloudsPart(),
             script = "level1",
+            abilities = PlaneAbility.None,
             companion = true,
             zeppelins = true,
             flak = 1.0f,
@@ -194,6 +206,7 @@ namespace MetalRaptors
             weather = Weather.Calm,
             clouds = new CloudsPart(),
             script = "level2",
+            abilities = PlaneAbility.Boost,
             companion = true,
             backCompanions = 2,
             supportCompanion = true,
@@ -219,6 +232,7 @@ namespace MetalRaptors
             weather = Weather.Calm,
             clouds = new CloudsPart(),
             script = "level3",
+            abilities = PlaneAbility.Boost | PlaneAbility.Roll,
             worldWidth = 2000f,
             aerodrome = true,
             companion = true,
@@ -244,6 +258,7 @@ namespace MetalRaptors
             weather = Weather.Calm,
             clouds = new CloudsPart(),
             script = "level4",
+            abilities = PlaneAbility.Boost | PlaneAbility.Roll,
             arenaScript = "level4_arena",
             arenaLines = Arena4,
             bossMusic = "black-tide",

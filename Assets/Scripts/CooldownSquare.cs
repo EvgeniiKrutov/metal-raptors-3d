@@ -11,8 +11,11 @@ namespace MetalRaptors
         readonly Image _arc;
         readonly Text _label;
         readonly HudPressRelay _relay;
+        readonly RectTransform _rect;
 
         public bool Held => _relay != null && _relay.Held;
+
+        public GameObject Root => _rect.gameObject;
 
         public CooldownSquare(Transform parent, Vector2 corner, string label, Action onPress = null,
             bool holdable = false, bool fromRight = false)
@@ -37,6 +40,7 @@ namespace MetalRaptors
             rt.pivot = new Vector2(side, 1f);
             rt.sizeDelta = new Vector2(size, size);
             rt.anchoredPosition = corner;
+            _rect = rt;
 
             _wedge = Stretch(go.transform, "Wedge");
             _wedge.rectTransform.offsetMin = new Vector2(inset, inset);
@@ -60,6 +64,8 @@ namespace MetalRaptors
 
             Set(0f, true);
         }
+
+        public void Place(Vector2 corner) => _rect.anchoredPosition = corner;
 
         public void Set(float charge, bool ready)
         {

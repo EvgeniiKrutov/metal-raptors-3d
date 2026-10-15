@@ -11,7 +11,9 @@ namespace MetalRaptors
                 ? 1f
                 : 1f - Mathf.Clamp01(_cooldown / Mathf.Max(0.01f, _config.boostCooldown));
 
-        public bool IsReady => enabled && _cooldown <= 0f && !CinematicBars.AnyShowing;
+        public bool Locked { get; set; }
+
+        public bool IsReady => enabled && !Locked && _cooldown <= 0f && !CinematicBars.AnyShowing;
 
         public bool IsRunning => _running > 0f;
 
