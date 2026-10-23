@@ -95,7 +95,7 @@ namespace MetalRaptors
                 return false;
             }
 
-            _scale = PlaneModels.Sopwith.OnScreenSize / span;
+            _scale = PlaneModels.Sopwith.OnScreenSize * PlaneModelConfig.LevelScale / span;
             _modelMin = whole.min - origin;
             _size = whole.size * _scale;
             _towerLeft = (towerMinX - whole.min.x) * _scale;

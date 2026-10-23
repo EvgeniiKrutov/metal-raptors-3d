@@ -99,6 +99,7 @@ namespace MetalRaptors
         float _bank;
 
         ISolid _solid;
+        float _solidRadius = PlaneScrapes.HitboxRadius;
 
         public void Initialize(PlayerConfig config, float startHeadingRad, float minX, float maxX,
             float ceilingY, float edgeMargin, bool hardWalls = false)
@@ -300,7 +301,7 @@ namespace MetalRaptors
             if (_hardWalls && pos.x <= _wallMinX && vel.x < 0f) vel.x = 0f;
             if (_hardWalls && pos.x >= _wallMaxX && vel.x > 0f) vel.x = 0f;
             bool clamped = _solid != null
-                           && _solid.Repel(ref pos, ref vel, PlaneScrapes.HitboxRadius);
+                           && _solid.Repel(ref pos, ref vel, _solidRadius);
             _rb.linearVelocity = vel;
 
             if (pos.y > _ceilingY) { pos.y = _ceilingY; clamped = true; }
@@ -377,9 +378,15 @@ namespace MetalRaptors
             return hit;
         }
 
-        public void SetSolid(ISolid solid) => _solid = solid;
+        public void SetSolid(ISolid solid, float radius = PlaneScrapes.HitboxRadius)
+        {
+            _solid = solid;
+            _solidRadius = radius;
+        }
 
         public void SetLeftWall(float x) => _wallMinX = Mathf.Max(_wallMinX, x);
+
+        public void SetCeiling(float y) => _ceilingY = y;
 
         public void SetWalls(float minX, float maxX)
         {

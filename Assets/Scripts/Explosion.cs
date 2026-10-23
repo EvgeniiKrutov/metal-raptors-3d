@@ -42,7 +42,10 @@ namespace MetalRaptors
         Blob[] _blobs;
         float _age;
 
-        public static void Spawn(Vector3 position, float size)
+        public static void Spawn(Vector3 position, float size) =>
+            Spawn(position, size, SoundVolume * AudioOptions.Scene);
+
+        public static void Spawn(Vector3 position, float size, float volume)
         {
             var root = new GameObject("Explosion");
             root.transform.position = position;
@@ -84,7 +87,7 @@ namespace MetalRaptors
                 };
             }
 
-            PlaySound(position);
+            Boom(position, volume);
         }
 
         void Update()
@@ -145,7 +148,7 @@ namespace MetalRaptors
             return EmissionStrength * (1f - Mathf.Clamp01((t - YellowAt) / (EmissionOffAt - YellowAt)));
         }
 
-        static void PlaySound(Vector3 position)
+        static void Boom(Vector3 position, float volume)
         {
             var clip = Resources.Load<AudioClip>($"Sounds/explosion_{Random.Range(1, 4)}");
             if (clip == null) return;
@@ -155,7 +158,7 @@ namespace MetalRaptors
             var audio = go.AddComponent<AudioSource>();
             audio.playOnAwake = false;
             audio.spatialBlend = 0f;
-            audio.PlayOneShot(clip, SoundVolume * AudioOptions.Scene);
+            audio.PlayOneShot(clip, volume);
             Destroy(go, clip.length + 0.1f);
         }
     }

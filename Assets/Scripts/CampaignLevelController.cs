@@ -9,7 +9,8 @@ namespace MetalRaptors
         IAbilityHost, IDevSpawnHost
     {
         const float WorldTop = 650f;
-        const float CubeHalf = 15f;
+        const float CubeHalf = 15f * PlaneModelConfig.LevelScale;
+        const float ScrapeRadius = PlaneScrapes.HitboxRadius * PlaneModelConfig.LevelScale;
         const float CameraDistance = 420f;
         const float PlayPlaneZ = 100f;
         const float CamZ = PlayPlaneZ - CameraDistance;
@@ -393,6 +394,9 @@ namespace MetalRaptors
                 PlayPlaneZ, CameraDistance, _level.zeppelins);
             Seagulls.Begin(_cam, _halfViewWidth, PlayPlaneZ, CameraDistance,
                 Coast && _level.daytime != Daytime.Night);
+            ThornycroftBoats.Begin(_cam, _halfViewWidth, PlayPlaneZ, CameraDistance, Coast);
+            S150Boats.Begin(_cam, _cubeTr, _halfViewWidth, PlayPlaneZ, CameraDistance, Coast);
+            LordCliveShips.Begin(_cam, _halfViewWidth, PlayPlaneZ, CameraDistance, Coast);
 
             if (_skyZeppelin != null && Bounded) _skyZeppelin.SetLeftEdge(WorldLeft);
 
@@ -474,6 +478,8 @@ namespace MetalRaptors
             {
                 _enemies = new CampaignEnemies(_cube.GetComponent<Rigidbody>(), AiGroundY,
                     WorldTop, _level);
+                _enemies.ModelScale = PlaneModelConfig.LevelScale;
+                _enemies.LiftClearance = true;
                 if (_sound != null) _sound.Track(_enemies.Live);
             }
 
@@ -504,6 +510,7 @@ namespace MetalRaptors
             var planeModel = GameManager.CurrentPlane;
             var model = PlaneFactory.BuildPlaneModel(go.transform, planeModel,
                 skin: GameManager.CurrentSkin);
+            model.localScale *= PlaneModelConfig.LevelScale;
             _playerModel = model;
 
             PlayerConfig flight = PlaneLoadout.Build(config, planeModel);
@@ -613,7 +620,7 @@ namespace MetalRaptors
         {
             if (_gameOver) return;
             PlaneScrapes.Check(_cube, _cubeTr, _enemies != null ? _enemies.Live : null,
-                _convoy != null ? _convoy.Live : null);
+                _convoy != null ? _convoy.Live : null, ScrapeRadius);
             if (_wing != null && _wing.CheckBump(_cubeTr)) OnCompanionBump();
         }
 
@@ -778,7 +785,7 @@ namespace MetalRaptors
             if (_zeppelin == null) return false;
 
             _zeppelin.Sighted += RetireSkyZeppelins;
-            _cube.SetSolid(_zeppelin);
+            _cube.SetSolid(_zeppelin, ScrapeRadius);
             return true;
         }
 

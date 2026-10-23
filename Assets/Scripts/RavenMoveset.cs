@@ -24,6 +24,9 @@ namespace MetalRaptors
         public System.Action<float> pin;
         public System.Func<Vector2> ahead;
         public System.Action<bool> cinematic;
+        public System.Action<float> roof;
+        public System.Action enraged;
+        public System.Action shake;
     }
 
     public class RavenMoveset : MonoBehaviour
@@ -57,6 +60,7 @@ namespace MetalRaptors
         const float OvertakePassGap = 40f;
 
         const float StallSec = 2f;
+        const float RagedStallFactor = 0.7f;
 
         const float SmokeStartSpeed = 224f;
         const float SmokeTopSpeed = 392f;
@@ -78,6 +82,7 @@ namespace MetalRaptors
         const float RagePitchSec = 1.5f;
         const float RagePitch = 1.25f;
         const float RageShowSec = 1.5f;
+        const float RageBoomVolume = 1f;
 
         const float WallEdgePad = 6f;
         const float WallPinGap = 10f;
@@ -89,11 +94,36 @@ namespace MetalRaptors
         const float WallBulletSpeed = 400f;
         const float WallDamage = 8f;
 
-        enum Move { Trail, Smoke, Wall }
+        const float SweepCycleSec = 6f;
+        const int SweepCycles = 2;
+        const float SweepHangSec = 0.5f;
+
+        const float BlastFirstSec = 0.3f;
+        const float BlastEverySec = 1.3f;
+        const float BlastWarnSec = 1f;
+        const float BlastRadius = 45f;
+        const float BlastReach = 60f;
+        const float BlastDamage = 20f;
+
+        const float RunSpacing = 2f;
+        const float RunTrackSec = 5.5f;
+        const float RunTopSpeed = 260f;
+        const float RunAccel = 400f;
+        const float RunResponse = 1.6f;
+        const float RunRoofGap = 6f;
+        const float RunDropSec = 1f;
+        const float RunDropLead = 0.25f;
+        const float RunBombGravity = 150f;
+        const float RunBombScale = 1.4f;
+        const float RunBombCarry = 0.4f;
+        const float RunBombDamage = 25f;
+        const float RunBombReach = 21f;
+
+        enum Move { Trail, Smoke, Wall, Bombs }
 
         static readonly Move[] PhaseOne = { Move.Trail, Move.Smoke, Move.Wall };
 
-        static readonly Move[] PhaseTwo = { Move.Trail, Move.Smoke, Move.Wall };
+        static readonly Move[] PhaseTwo = { Move.Trail, Move.Smoke, Move.Wall, Move.Bombs };
 
         readonly List<Move> _bag = new List<Move>();
         Move? _last;
@@ -103,8 +133,12 @@ namespace MetalRaptors
         EnemyController _boss;
         EnemyController _upper;
         EnemyController _lower;
+        EnemyController _lead;
+        EnemyController _tail;
         BossStage _stage;
         SmokeRibbon _smoke;
+        GameObject _bombProp;
+        readonly List<GameObject> _hazards = new List<GameObject>();
 
         Vector2 _pos;
         float _heading;
@@ -126,19 +160,50 @@ namespace MetalRaptors
         {
             StopAllCoroutines();
             Unpin();
+            Roof(float.PositiveInfinity);
             FadeSmoke();
+            ClearHazards();
             Throttle(false);
             Cinematic(false);
 
             if (_upper != null) _upper.EndScript();
             if (_lower != null) _lower.EndScript();
+            if (_lead != null) _lead.EndScript();
+            if (_tail != null) _tail.EndScript();
             _upper = null;
             _lower = null;
+            _lead = null;
+            _tail = null;
 
             if (_boss == null) return;
             _boss.Featured = false;
             _boss.Sputter(false);
             _boss.EndScript();
+        }
+
+        public void SkipToRage()
+        {
+            if (_raged || !Live) return;
+
+            StopAllCoroutines();
+            Unpin();
+            Roof(float.PositiveInfinity);
+            FadeSmoke();
+            ClearHazards();
+            Throttle(false);
+            Dismiss(ref _upper);
+            Dismiss(ref _lower);
+            Dismiss(ref _lead);
+            Dismiss(ref _tail);
+
+            _boss.Sputter(false);
+            _boss.Restore(_boss.Heading, _boss.MaxHealth * RageHealth);
+            StartCoroutine(Enrage());
+        }
+
+        void OnDestroy()
+        {
+            if (_bombProp != null) Destroy(_bombProp);
         }
 
         bool Live => _boss != null && _boss.IsAlive && (_stage.over == null || !_stage.over());
@@ -161,7 +226,17 @@ namespace MetalRaptors
             _boss.Exposed = true;
             _boss.HealthFloor = _boss.MaxHealth * RageHealth;
             yield return Leave();
+            yield return Loop();
+        }
 
+        IEnumerator Enrage()
+        {
+            yield return Rage();
+            yield return Loop();
+        }
+
+        IEnumerator Loop()
+        {
             while (Live)
             {
                 if (!_raged && Wounded) yield return Rage();
@@ -178,6 +253,10 @@ namespace MetalRaptors
 
                     case Move.Smoke:
                         yield return Smoke();
+                        break;
+
+                    case Move.Bombs:
+                        yield return Bombs();
                         break;
 
                     default:
@@ -270,6 +349,27 @@ namespace MetalRaptors
         }
 
         void Pin(float x) => _stage.pin?.Invoke(x);
+
+        void Roof(float y) => _stage.roof?.Invoke(y);
+
+        void Dismiss(ref EnemyController plane)
+        {
+            if (plane != null) _stage.enemies.Dismiss(plane);
+            plane = null;
+        }
+
+        void Hazard(Component thing)
+        {
+            _hazards.RemoveAll(h => h == null);
+            if (thing != null) _hazards.Add(thing.gameObject);
+        }
+
+        void ClearHazards()
+        {
+            for (int i = 0; i < _hazards.Count; i++)
+                if (_hazards[i] != null) Destroy(_hazards[i]);
+            _hazards.Clear();
+        }
 
         void Unpin() => _stage.pin?.Invoke(float.NegativeInfinity);
 
@@ -377,7 +477,7 @@ namespace MetalRaptors
             _boss.Sputter(true);
             if (_stage.sound != null) _stage.sound.PlayStutter();
 
-            yield return Pause(StallSec);
+            yield return Pause(_raged ? StallSec * RagedStallFactor : StallSec);
 
             _boss.Sputter(false);
             _speed = 0f;
@@ -402,6 +502,7 @@ namespace MetalRaptors
                 SmokeBrake, true);
 
             float target = Random.value < 0.5f ? high : low;
+            float blast = BlastFirstSec;
 
             for (float t = 0f; t < SmokeWeaveSec && Live; t += Time.deltaTime)
             {
@@ -411,6 +512,7 @@ namespace MetalRaptors
                 Follow(target, SmokeClimb, dt);
                 _heading = Mathf.Atan2(_climb, Mathf.Max(1f, _stage.scrollSpeed));
                 PlaceSmoking();
+                if (_raged && Ready(ref blast, BlastEverySec, dt)) Blast();
                 yield return null;
             }
 
@@ -479,8 +581,9 @@ namespace MetalRaptors
             {
                 _boss.EnginePitch = RagePitch;
                 _boss.HealthFloor = 0f;
-                Explosion.Spawn(_boss.transform.position, _boss.ModelSize);
+                Explosion.Spawn(_boss.NosePoint, _boss.ModelSize, RageBoomVolume * AudioOptions.Sfx);
                 _boss.Blaze();
+                _stage.enraged?.Invoke();
                 yield return Hover(RageShowSec);
             }
 
@@ -491,6 +594,18 @@ namespace MetalRaptors
             _boss.Exposed = true;
             _speed = 0f;
             yield return Leave();
+        }
+
+        void Blast()
+        {
+            if (_stage.player == null) return;
+
+            Vector2 at = Player + Random.insideUnitCircle * BlastReach;
+            at.x = Mathf.Clamp(at.x, Left + BlastRadius, Right - BlastRadius);
+            at.y = Mathf.Clamp(at.y, _stage.floorY, _stage.ceilingY);
+
+            Hazard(SkyBlast.Arm(new Vector3(at.x, at.y, _stage.player.position.z), BlastRadius,
+                BlastWarnSec, _stage.player, BlastDamage, _stage.shake));
         }
 
         void PlaceSmoking()
@@ -555,6 +670,34 @@ namespace MetalRaptors
                 yield return null;
             }
 
+            if (_raged)
+            {
+                float highest = _upper != null
+                    ? top + _upper.BodyLow - WallSeam - _boss.BodyHigh
+                    : top - _boss.BodyHigh;
+                float lowest = _lower != null
+                    ? bottom + _lower.BodyHigh + WallSeam - _boss.BodyLow
+                    : bottom - _boss.BodyLow;
+                float up = Mathf.Max(0f, highest - center);
+                float down = Mathf.Max(0f, center - lowest);
+                float span = SweepCycleSec * SweepCycles;
+
+                for (float t = 0f; t < span && Live; t += Time.deltaTime)
+                {
+                    float s = Mathf.Sin(2f * Mathf.PI * t / SweepCycleSec);
+                    PlaceWall(holdX, top, center + s * (s > 0f ? up : down), bottom);
+                    if (Ready(ref fire, WallFireSec, Time.deltaTime)) FireWall();
+                    yield return null;
+                }
+
+                for (float t = 0f; t < SweepHangSec && Live; t += Time.deltaTime)
+                {
+                    PlaceWall(holdX, top, center, bottom);
+                    if (Ready(ref fire, WallFireSec, Time.deltaTime)) FireWall();
+                    yield return null;
+                }
+            }
+
             for (float t = 0f; t < WallSqueezeSec && Live; t += Time.deltaTime)
             {
                 float k = Mathf.SmoothStep(0f, 1f, t / WallSqueezeSec);
@@ -579,10 +722,8 @@ namespace MetalRaptors
             }
             Throttle(false);
 
-            _stage.enemies.Dismiss(_upper);
-            _stage.enemies.Dismiss(_lower);
-            _upper = null;
-            _lower = null;
+            Dismiss(ref _upper);
+            Dismiss(ref _lower);
             _boss.Exposed = true;
         }
 
@@ -603,6 +744,110 @@ namespace MetalRaptors
             _boss.Fire(WallBulletSpeed, WallDamage);
             if (_upper != null) _upper.Fire(WallBulletSpeed, WallDamage);
             if (_lower != null) _lower.Fire(WallBulletSpeed, WallDamage);
+        }
+
+        IEnumerator Bombs()
+        {
+            float top = _stage.ceilingY;
+
+            Warn(ScreenEdge.Left, () => ViewY(top));
+
+            float startX = Left - Offscreen;
+            _lead = _stage.enemies.SpawnEscort(_stage.escort, new Vector2(startX, top));
+            _tail = _stage.enemies.SpawnEscort(_stage.escort, new Vector2(startX, top));
+            Arrive(new Vector2(startX, top), 0f);
+            _boss.Exposed = false;
+
+            float length = Mathf.Max(Length(_boss), Mathf.Max(Length(_lead), Length(_tail)));
+            float pitch = length * (1f + RunSpacing);
+            float low = Mathf.Min(_boss.BodyLow, Mathf.Min(Low(_lead), Low(_tail)));
+            float roof = Mathf.Min(top + low - PlaneScrapes.HitboxRadius,
+                top - 2f * PlaneScrapes.HitboxRadius) - RunRoofGap;
+
+            float x = startX - pitch;
+            PlaceRun(x, top, pitch);
+
+            for (float t = 0f; t < WarnSec && Live; t += Time.deltaTime)
+            {
+                Roof(Mathf.Lerp(top, roof, Mathf.SmoothStep(0f, 1f, t / WarnSec)));
+                yield return null;
+            }
+            Roof(roof);
+            if (!Live) yield break;
+
+            float drift = RunTopSpeed;
+            float dropLead = RunDropLead;
+            float dropBoss = RunDropLead + RunDropSec / 3f;
+            float dropTail = RunDropLead + RunDropSec * 2f / 3f;
+
+            for (float t = 0f; t < RunTrackSec && Live; )
+            {
+                float dt = Time.deltaTime;
+                float want = x < Left
+                    ? RunTopSpeed
+                    : Mathf.Clamp((Player.x - x) * RunResponse, -RunTopSpeed, RunTopSpeed);
+                drift = Mathf.MoveTowards(drift, want, RunAccel * dt);
+                x += drift * dt;
+                if (x > Left) t += dt;
+
+                PlaceRun(x, top, pitch);
+                DropBombs(x, top, pitch, drift, dt, ref dropLead, ref dropBoss, ref dropTail);
+                yield return null;
+            }
+
+            Throttle(true);
+            while (Live && x - pitch < Right + Offscreen)
+            {
+                float dt = Time.deltaTime;
+                drift = Mathf.MoveTowards(drift, LeaveSpeed, LeaveAccel * dt);
+                x += drift * dt;
+
+                PlaceRun(x, top, pitch);
+                DropBombs(x, top, pitch, drift, dt, ref dropLead, ref dropBoss, ref dropTail);
+                yield return null;
+            }
+            Throttle(false);
+            if (!Live) yield break;
+
+            Roof(float.PositiveInfinity);
+            Dismiss(ref _lead);
+            Dismiss(ref _tail);
+            _speed = 0f;
+            _boss.Exposed = true;
+        }
+
+        static float Length(EnemyController plane) =>
+            plane != null ? plane.BodyBack + plane.BodyFront : 0f;
+
+        static float Low(EnemyController plane) => plane != null ? plane.BodyLow : 0f;
+
+        void PlaceRun(float x, float y, float pitch)
+        {
+            _pos = new Vector2(x, y);
+            Place();
+            if (_lead != null) _lead.ScriptTo(new Vector2(x + pitch, y), 0f);
+            if (_tail != null) _tail.ScriptTo(new Vector2(x - pitch, y), 0f);
+        }
+
+        void DropBombs(float x, float y, float pitch, float drift, float dt, ref float lead,
+            ref float boss, ref float tail)
+        {
+            DropFrom(_lead, x + pitch, y, drift, dt, ref lead);
+            DropFrom(_boss, x, y, drift, dt, ref boss);
+            DropFrom(_tail, x - pitch, y, drift, dt, ref tail);
+        }
+
+        void DropFrom(EnemyController plane, float x, float y, float drift, float dt,
+            ref float timer)
+        {
+            if (plane == null || x < Left || x > Right) return;
+            if (!Ready(ref timer, RunDropSec, dt)) return;
+
+            if (_bombProp == null) _bombProp = Bomb.BuildProp();
+            var from = new Vector3(x, y + plane.BodyLow, plane.transform.position.z);
+            Hazard(SkyBomb.Drop(_bombProp, from, new Vector2(drift * RunBombCarry, 0f),
+                RunBombGravity, RunBombScale, Bottom - Offscreen, _stage.player, RunBombDamage,
+                RunBombReach, _stage.shake));
         }
     }
 }

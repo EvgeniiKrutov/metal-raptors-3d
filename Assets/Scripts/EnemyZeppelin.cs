@@ -96,7 +96,8 @@ namespace MetalRaptors
 
         static readonly Plane[] Frustum = new Plane[6];
 
-        public static float Length => SkyZeppelin.ApparentLength * BackgroundScale;
+        public static float Length =>
+            SkyZeppelin.ApparentLength * BackgroundScale * PlaneModelConfig.LevelScale;
 
         public event Action Sighted;
 

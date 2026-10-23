@@ -24,6 +24,8 @@ namespace MetalRaptors
 
         public static Vector2 Wind { get; set; }
 
+        public Vector3 Mount { get; set; }
+
         Color _color = SmokeColor;
         bool _armed;
         bool _burning;
@@ -96,7 +98,7 @@ namespace MetalRaptors
         void EmitPuff()
         {
             Vector3 back = -transform.right;
-            Vector3 spawn = transform.position;
+            Vector3 spawn = transform.TransformPoint(Mount);
 
             float sizeFactor = _burning ? BurnSizeFactor : StartSizeFactor;
             float scale = _size * sizeFactor * Random.Range(1f - StartSizeJitter, 1f + StartSizeJitter);

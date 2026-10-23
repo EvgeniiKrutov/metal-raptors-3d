@@ -213,7 +213,10 @@ namespace MetalRaptors
             _mesh.bounds = _bounds;
         }
 
-        static float Swell(float z) => Mathf.Lerp(CalmFactor, 1f,
+        public static float HeightAt(float x, float z, float time) =>
+            Level + WaveAt(x, z, time) * Swell(z);
+
+        public static float Swell(float z) => Mathf.Lerp(CalmFactor, 1f,
             Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(CalmZ, SwellZ, z)));
 
         static float WaveAt(float x, float z, float time)

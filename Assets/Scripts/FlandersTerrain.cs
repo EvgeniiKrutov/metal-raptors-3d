@@ -55,6 +55,30 @@ namespace MetalRaptors
         const float BunkerSink = 0.6f;
         const float MaxBunkerReach = 160f;
 
+        const float BoatScreens = 2f;
+        const float BoatSpotMin = 0.12f, BoatSpotMax = 0.88f;
+        const float BoatSoloChance = 0.6f;
+        const int BoatGroupMin = 2, BoatGroupMax = 4;
+        const float BoatWreckChance = 0.5f;
+        const float BoatWaterChance = 0.25f;
+        const float BoatDepthBias = 0.55f;
+        const float BoatSize = 1.584f;
+        const float BoatSizeJitter = 0.1f;
+        const float BoatCapsizeChance = 0.2f;
+        const float BoatListMax = 30f, BoatCapsizedListMax = 10f;
+        const float BoatSinkMin = 0.04f, BoatSinkMax = 0.12f;
+        const float BoatSubmergeMin = 0.3f, BoatSubmergeMax = 0.6f;
+        const float BoatShadeMin = 0.85f, BoatShadeMax = 1.15f;
+        const float BoatBleachMax = 0.3f;
+        const float BoatDryRise = 3f;
+        const float BoatGap = 0.5f * PlaneModelConfig.UnitsPerMeter;
+        const float BoatReach = 3f * PlaneModelConfig.UnitsPerMeter;
+        const float BoatFixedGap = 6f;
+        const float BoatAnchorShift = GroyneCellSize * 0.5f;
+        const float BoatSearchBack = 40f;
+        const int BoatSearchSteps = 24;
+        const int BoatTries = 8;
+
         const int AlphaRes = 128;
         const int RowsPerStep = 16;
 
@@ -69,6 +93,7 @@ namespace MetalRaptors
         float _p1, _p2, _p3, _p4, _p5, _p6, _d1, _d2, _m1, _m2, _m3, _m4;
         float _groyneSide;
         float _bunkerSpacing;
+        float _boatSpacing;
 
         TerrainLayer _groundLayer, _sandLayer;
         Material _wallMat;
@@ -96,11 +121,22 @@ namespace MetalRaptors
             public float x, z, halfX, halfZ, reach, padY;
         }
 
+        struct BoatSpec
+        {
+            public int model;
+            public bool capsized;
+            public float x, z, scale, roll, sink, submerge, shade, bleach;
+            public Vector3 forward, offset;
+            public float boxX, boxZ, halfX, halfZ;
+        }
+
         readonly List<CraterSpec> _craters = new List<CraterSpec>();
         readonly List<DykeSpec> _dykes = new List<DykeSpec>();
         readonly List<BunkerSpec> _bunkers = new List<BunkerSpec>();
         readonly Dictionary<int, BunkerSpec> _bunkerCells = new Dictionary<int, BunkerSpec>();
         readonly Dictionary<int, GroyneSpec> _groyneCells = new Dictionary<int, GroyneSpec>();
+        readonly Dictionary<int, BoatSpec[]> _boatCells = new Dictionary<int, BoatSpec[]>();
+        readonly List<BoatSpec> _boatScratch = new List<BoatSpec>();
         float[] _shoreCentre, _shoreHalf;
 
         protected override float HeightScale => Scale;
@@ -129,6 +165,7 @@ namespace MetalRaptors
                           - (playPlaneZ - cameraDistance);
             _bunkerSpacing = 2f * beach * LevelCamera.ReferenceAspect
                              * Mathf.Tan(LevelCamera.BaseFieldOfView * 0.5f * Mathf.Deg2Rad);
+            _boatSpacing = BoatScreens * _bunkerSpacing;
 
             CoastSky.ApplyFog(daytime, cameraDistance, playPlaneZ);
         }
@@ -208,6 +245,7 @@ namespace MetalRaptors
 
             AddGroynes(index, root);
             AddBunkers(index, root);
+            AddBoats(index, root);
         }
 
         void AddGroynes(int index, Transform root)
@@ -292,7 +330,10 @@ namespace MetalRaptors
                 if (Bunker(cell, out var spec)) list.Add(spec);
         }
 
-        public override bool Occupied(float worldX, float z, float margin)
+        public override bool Occupied(float worldX, float z, float margin) =>
+            Fixed(worldX, z, margin) || NearBoat(worldX, z, margin);
+
+        bool Fixed(float worldX, float z, float margin)
         {
             int cell = Mathf.FloorToInt(worldX / _bunkerSpacing);
 
@@ -412,6 +453,215 @@ namespace MetalRaptors
             }
 
             return best;
+        }
+
+        void AddBoats(int index, Transform root)
+        {
+            if (!FlandersBoat.Measure()) return;
+
+            var terrain = root.GetComponentInChildren<Terrain>();
+            if (terrain == null) return;
+
+            float x0 = index * ChunkLength;
+            int c0 = Mathf.FloorToInt(x0 / _boatSpacing) - 1;
+            int c1 = Mathf.FloorToInt((x0 + ChunkLength) / _boatSpacing) + 1;
+
+            for (int cell = c0; cell <= c1; cell++)
+                foreach (var boat in Boats(cell))
+                    if (boat.x >= x0 && boat.x < x0 + ChunkLength)
+                        PlaceBoat(root, terrain, boat);
+        }
+
+        void PlaceBoat(Transform root, Terrain terrain, BoatSpec boat)
+        {
+            Bounds hull = FlandersBoat.Hull(boat.model);
+            float length = hull.extents.z * boat.scale;
+            float beam = hull.extents.x * boat.scale;
+            Vector3 f = boat.forward;
+            var r = new Vector3(f.z, 0f, -f.x);
+
+            float centre = Ground(terrain, boat.x, boat.z);
+            float bow = Ground(terrain, boat.x + f.x * length, boat.z + f.z * length);
+            float stern = Ground(terrain, boat.x - f.x * length, boat.z - f.z * length);
+            float right = Ground(terrain, boat.x + r.x * beam, boat.z + r.z * beam);
+            float left = Ground(terrain, boat.x - r.x * beam, boat.z - r.z * beam);
+
+            Vector3 along = f * (2f * length) + Vector3.up * (bow - stern);
+            Vector3 across = r * (2f * beam) + Vector3.up * (right - left);
+            Quaternion frame = Quaternion.LookRotation(along, Vector3.Cross(along, across));
+            float y = Mathf.Min(centre, Mathf.Min((bow + stern) * 0.5f, (right + left) * 0.5f));
+
+            FlandersBoat.Place(root, boat.model, new Vector3(boat.x, y, boat.z), frame, boat.scale,
+                boat.roll, boat.capsized, boat.sink, boat.shade, boat.bleach);
+        }
+
+        float Ground(Terrain terrain, float x, float z)
+        {
+            if (SampleHeight(x, z, out float y)) return y;
+            return terrain.SampleHeight(new Vector3(x, 0f, z)) + terrain.transform.position.y;
+        }
+
+        bool NearBoat(float worldX, float z, float margin)
+        {
+            if (_boatSpacing <= 0f) return false;
+            int cell = Mathf.FloorToInt(worldX / _boatSpacing);
+
+            for (int c = cell - 1; c <= cell + 1; c++)
+                foreach (var boat in Boats(c))
+                {
+                    float dx = worldX - boat.boxX, dz = z - boat.boxZ;
+                    float along = dx * boat.forward.x + dz * boat.forward.z;
+                    float across = dx * boat.forward.z - dz * boat.forward.x;
+                    if (Mathf.Abs(across) <= boat.halfX + margin && Mathf.Abs(along) <= boat.halfZ + margin)
+                        return true;
+                }
+
+            return false;
+        }
+
+        BoatSpec[] Boats(int cell)
+        {
+            if (_boatCells.TryGetValue(cell, out var boats)) return boats;
+
+            boats = FlandersBoat.Measure() ? RollSpot(cell) : System.Array.Empty<BoatSpec>();
+            _boatCells[cell] = boats;
+            return boats;
+        }
+
+        BoatSpec[] RollSpot(int cell)
+        {
+            var rng = new System.Random(Hash(_seed, cell, 41));
+            bool water = rng.NextDouble() < BoatWaterChance;
+            int count = rng.NextDouble() < BoatSoloChance ? 1 : rng.Next(BoatGroupMin, BoatGroupMax + 1);
+            float depth = Mathf.Pow((float)rng.NextDouble(), BoatDepthBias);
+            float anchorX = (cell + Range(rng, BoatSpotMin, BoatSpotMax)) * _boatSpacing;
+
+            _boatScratch.Clear();
+            for (int i = 0; i < count; i++)
+            {
+                var boat = RollBoat(rng);
+                if (!FlandersBoat.Has(boat.model)) continue;
+
+                for (int attempt = 0; attempt < BoatTries; attempt++)
+                {
+                    float x = anchorX, z = 0f;
+                    bool anchor = _boatScratch.Count == 0;
+                    if (anchor && attempt > 0)
+                        x += Range(rng, -BoatAnchorShift, BoatAnchorShift);
+                    else if (!anchor)
+                    {
+                        var parent = _boatScratch[rng.Next(_boatScratch.Count)];
+                        float angle = (float)rng.NextDouble() * 2f * Mathf.PI;
+                        float distance = Range(rng, parent.halfX + boat.halfX + BoatGap,
+                            parent.halfZ + boat.halfZ + BoatReach);
+                        x = parent.x + (water ? Mathf.Sign(Mathf.Cos(angle)) : Mathf.Cos(angle)) * distance;
+                        z = parent.z + Mathf.Sin(angle) * distance;
+                    }
+
+                    if (!Settle(ref boat, x, z, water, anchor, depth)) continue;
+                    float reach = Mathf.Sqrt(boat.halfX * boat.halfX + boat.halfZ * boat.halfZ);
+                    if (Fixed(boat.boxX, boat.boxZ, reach + BoatFixedGap)) continue;
+                    if (Crowded(boat)) continue;
+
+                    _boatScratch.Add(boat);
+                    break;
+                }
+            }
+
+            return _boatScratch.ToArray();
+        }
+
+        static BoatSpec RollBoat(System.Random rng)
+        {
+            int model = rng.NextDouble() < BoatWreckChance ? FlandersBoat.Wreck : FlandersBoat.Intact;
+            float yaw = (float)rng.NextDouble() * 360f * Mathf.Deg2Rad;
+            float scale = PlaneModelConfig.UnitsPerMeter * BoatSize
+                          * (1f + Range(rng, -BoatSizeJitter, BoatSizeJitter));
+            bool capsized = rng.NextDouble() < BoatCapsizeChance;
+            float list = capsized ? BoatCapsizedListMax : BoatListMax;
+
+            var boat = new BoatSpec
+            {
+                model = model,
+                capsized = capsized,
+                scale = scale,
+                roll = Range(rng, -list, list),
+                sink = Range(rng, BoatSinkMin, BoatSinkMax),
+                submerge = Range(rng, BoatSubmergeMin, BoatSubmergeMax),
+                shade = Range(rng, BoatShadeMin, BoatShadeMax),
+                bleach = Range(rng, 0f, BoatBleachMax),
+                forward = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw)),
+            };
+            if (!FlandersBoat.Has(model)) return boat;
+
+            Bounds box = FlandersBoat.Footprint(model);
+            var right = new Vector3(boat.forward.z, 0f, -boat.forward.x);
+            boat.halfX = box.extents.x * scale;
+            boat.halfZ = box.extents.z * scale;
+            boat.offset = (right * box.center.x + boat.forward * box.center.z) * scale;
+            return boat;
+        }
+
+        bool Settle(ref BoatSpec boat, float x, float z, bool water, bool anchor, float depth)
+        {
+            if (water)
+            {
+                float height = FlandersBoat.Hull(boat.model).size.y * boat.scale;
+                z = ZAtHeight(x, SeaLevel - height * (boat.submerge - boat.sink));
+            }
+            else
+            {
+                float extent = Mathf.Abs(boat.forward.z) * boat.halfZ
+                               + Mathf.Abs(boat.forward.x) * boat.halfX;
+                float front = BunkerNearGap + extent - boat.offset.z;
+                float back = ZAtHeight(x, SeaLevel + BoatDryRise) - extent - boat.offset.z;
+                if (back < front) return false;
+                z = anchor ? Mathf.Lerp(front, back, depth) : Mathf.Clamp(z, front, back);
+            }
+
+            boat.x = x;
+            boat.z = z;
+            boat.boxX = x + boat.offset.x;
+            boat.boxZ = z + boat.offset.z;
+            return true;
+        }
+
+        bool Crowded(BoatSpec boat)
+        {
+            foreach (var other in _boatScratch)
+                if (Overlap(boat, other)) return true;
+            return false;
+        }
+
+        static bool Overlap(BoatSpec a, BoatSpec b)
+        {
+            var delta = new Vector2(b.boxX - a.boxX, b.boxZ - a.boxZ);
+            return !Apart(a, b, delta, new Vector2(a.forward.x, a.forward.z))
+                   && !Apart(a, b, delta, new Vector2(a.forward.z, -a.forward.x))
+                   && !Apart(a, b, delta, new Vector2(b.forward.x, b.forward.z))
+                   && !Apart(a, b, delta, new Vector2(b.forward.z, -b.forward.x));
+        }
+
+        static bool Apart(BoatSpec a, BoatSpec b, Vector2 delta, Vector2 axis) =>
+            Mathf.Abs(Vector2.Dot(delta, axis)) > Span(a, axis) + Span(b, axis) + BoatGap;
+
+        static float Span(BoatSpec boat, Vector2 axis) =>
+            boat.halfZ * Mathf.Abs(axis.x * boat.forward.x + axis.y * boat.forward.z)
+            + boat.halfX * Mathf.Abs(axis.x * boat.forward.z - axis.y * boat.forward.x);
+
+        float ZAtHeight(float x, float height)
+        {
+            float centre = ShoreCentre(x);
+            float lo = centre - ShoreHalf(x) - BoatSearchBack, hi = centre + ShelfRun;
+
+            for (int i = 0; i < BoatSearchSteps; i++)
+            {
+                float mid = (lo + hi) * 0.5f;
+                if (BaseHeight(x, mid) > height) lo = mid;
+                else hi = mid;
+            }
+
+            return (lo + hi) * 0.5f;
         }
 
         void CacheShore(int chunkIndex)

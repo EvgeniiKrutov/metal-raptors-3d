@@ -9,6 +9,8 @@ namespace MetalRaptors
 
         public const float UnitsPerMeter = 66f / 8.5f;
 
+        public const float LevelScale = 1.2f;
+
         public string resourceName;
 
         public string scriptId;

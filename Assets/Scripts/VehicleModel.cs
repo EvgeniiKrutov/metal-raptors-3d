@@ -8,6 +8,8 @@ namespace MetalRaptors
         const float ProbeY = -9000f;
         const float Epsilon = 0.0001f;
 
+        const float Scale = PlaneModelConfig.UnitsPerMeter * PlaneModelConfig.LevelScale;
+
         static readonly Quaternion RoadYaw = Quaternion.Euler(0f, -90f, 0f);
 
         readonly string _resource;
@@ -51,7 +53,7 @@ namespace MetalRaptors
                 return false;
             }
 
-            float scale = PlaneModelConfig.UnitsPerMeter;
+            float scale = Scale;
             _size = new Vector3(box.size.z, box.size.y, box.size.x) * scale;
             _yawedMin = new Vector3(-box.max.z, box.min.y, box.min.x) * scale;
             return true;
@@ -64,7 +66,7 @@ namespace MetalRaptors
             var holder = new GameObject("model");
             holder.transform.SetParent(root, false);
             holder.transform.localRotation = RoadYaw;
-            holder.transform.localScale = Vector3.one * PlaneModelConfig.UnitsPerMeter;
+            holder.transform.localScale = Vector3.one * Scale;
             holder.transform.localPosition =
                 new Vector3(-_size.x * 0.5f, 0f, -_size.z * 0.5f) - _yawedMin;
 

@@ -21,22 +21,23 @@ namespace MetalRaptors
         }
 
         public static void Check(CubeController player, Transform playerTr,
-            IReadOnlyList<EnemyController> enemies, IReadOnlyList<GroundVehicle> vehicles)
+            IReadOnlyList<EnemyController> enemies, IReadOnlyList<GroundVehicle> vehicles,
+            float radius = HitboxRadius)
         {
             if (player == null || playerTr == null
                 || player.CurrentHealth <= 0f || player.Evading) return;
 
             Vector3 playerPos = playerTr.position;
-            CheckPlanes(player, playerPos, enemies);
-            CheckVehicles(player, playerPos, vehicles);
+            CheckPlanes(player, playerPos, enemies, radius);
+            CheckVehicles(player, playerPos, vehicles, radius);
         }
 
         static void CheckPlanes(CubeController player, Vector3 playerPos,
-            IReadOnlyList<EnemyController> enemies)
+            IReadOnlyList<EnemyController> enemies, float radius)
         {
             if (enemies == null) return;
 
-            float reach = HitboxRadius * 2f;
+            float reach = radius * 2f;
             float reachSq = reach * reach;
 
             for (int i = 0; i < enemies.Count; i++)
@@ -53,14 +54,14 @@ namespace MetalRaptors
         }
 
         static void CheckVehicles(CubeController player, Vector3 playerPos,
-            IReadOnlyList<GroundVehicle> vehicles)
+            IReadOnlyList<GroundVehicle> vehicles, float radius)
         {
             if (vehicles == null) return;
 
             for (int i = 0; i < vehicles.Count; i++)
             {
                 GroundVehicle vehicle = vehicles[i];
-                if (vehicle == null || !vehicle.Touches(playerPos, HitboxRadius)) continue;
+                if (vehicle == null || !vehicle.Touches(playerPos, radius)) continue;
 
                 player.Scrape();
                 vehicle.Scrape();

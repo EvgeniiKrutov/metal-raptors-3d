@@ -186,12 +186,13 @@ namespace MetalRaptors
 
             var go = new GameObject(name);
             go.transform.position = position;
-            PlaneFactory.BuildPlaneModel(go.transform, plane, mirrored, skin);
+            PlaneFactory.BuildPlaneModel(go.transform, plane, mirrored, skin).localScale *=
+                PlaneModelConfig.LevelScale;
 
             foreach (Collider col in go.GetComponentsInChildren<Collider>()) Destroy(col);
 
             var duel = go.AddComponent<DuelPlane>();
-            duel._size = plane.OnScreenSize;
+            duel._size = plane.OnScreenSize * PlaneModelConfig.LevelScale;
             duel._leadSpeed = Mathf.Max(1f, flight.flySpeed);
             duel._turnRate = flight.rotationSpeed * Mathf.Deg2Rad;
             duel._turnResponse = flight.turnResponsiveness / Mathf.Max(0.0001f, flight.mass);

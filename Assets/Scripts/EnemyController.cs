@@ -290,6 +290,8 @@ namespace MetalRaptors
 
         public void MountNose(Vector3 local) => _noseLocal = local;
 
+        public Vector3 NosePoint => transform.TransformPoint(_noseLocal ?? Vector3.zero);
+
         public void MountGun(Vector3 local)
         {
             _gunLocal = local;
@@ -308,7 +310,10 @@ namespace MetalRaptors
 
             Blazing = true;
             if (_fire == null) _fire = PlaneFire.Ignite(gameObject, ModelSize * BlazeScale, _noseLocal);
-            if (_smoke != null) _smoke.Arm(ModelSize);
+            if (_smoke == null) return;
+
+            if (_noseLocal.HasValue) _smoke.Mount = _noseLocal.Value;
+            _smoke.Arm(ModelSize);
         }
 
         public void Sputter(bool on)

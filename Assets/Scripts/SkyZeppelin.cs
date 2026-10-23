@@ -126,7 +126,7 @@ namespace MetalRaptors
                       + Random.Range(DepthBehindDuelMin, DepthBehindDuelMax);
             float grade = (z - eye.z) / _cameraDistance;
 
-            float length = ApparentLength * grade
+            float length = ApparentLength * PlaneModelConfig.LevelScale * grade
                            * Random.Range(1f - LengthJitter, 1f + LengthJitter);
             float halfWindow = _halfViewWidth * grade;
 

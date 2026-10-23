@@ -36,6 +36,8 @@ namespace MetalRaptors
         readonly List<PlaneAbility> _needs = new List<PlaneAbility>();
         readonly float _columnX;
         readonly float _columnTop;
+        readonly float _bossDrop;
+        bool _bossShown;
 
         readonly Text _hint;
         readonly string _objective;
@@ -72,9 +74,11 @@ namespace MetalRaptors
 
             if (arena)
             {
+                float above = y;
                 y += HudTheme.BarHeight * BossGap;
                 BossSlot = new Vector2(x, -y);
                 y += HudTheme.BarHeight + HudTheme.BarToColumn;
+                _bossDrop = y - above;
             }
 
             if (_airfield != null)
@@ -139,9 +143,17 @@ namespace MetalRaptors
 
         bool Has(PlaneAbility needs) => (_abilities & needs) == needs;
 
+        public void ShowBossSlot()
+        {
+            if (_bossShown) return;
+
+            _bossShown = true;
+            Layout();
+        }
+
         void Layout()
         {
-            float y = _columnTop;
+            float y = _columnTop - (_bossShown ? 0f : _bossDrop);
             for (int i = 0; i < _column.Count; i++)
             {
                 if (!Has(_needs[i])) continue;

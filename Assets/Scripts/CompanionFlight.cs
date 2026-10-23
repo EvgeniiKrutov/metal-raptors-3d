@@ -49,7 +49,7 @@ namespace MetalRaptors
         const float SupportStationAhead = 40f;
         const float SupportStationAbove = 60f;
 
-        const float BumpReach = PlaneScrapes.HitboxRadius * 2f;
+        const float BumpReach = PlaneScrapes.HitboxRadius * PlaneModelConfig.LevelScale * 2f;
         const float BumpCooldown = 0.5f;
         const float BumpDepthBand = 40f;
 
@@ -73,6 +73,7 @@ namespace MetalRaptors
         readonly float _playZ;
         readonly float _groundY;
         readonly float _worldTop;
+        readonly float _lift;
         readonly float _depthScale;
 
         DuelPlane _companion;
@@ -121,8 +122,10 @@ namespace MetalRaptors
             _groundY = groundY;
             _worldTop = worldTop;
             _depthScale = cameraDistance > 1f ? (cameraDistance + Depth) / cameraDistance : 1f;
-            _floorY = groundY + DuelFloorMargin;
-            _ceilingY = worldTop - DuelCeilingMargin;
+            _lift = Mathf.Max(Span(level.companionPlane), Span(_foePlane)) * 0.5f
+                    * (PlaneModelConfig.LevelScale - 1f);
+            _floorY = groundY + DuelFloorMargin + _lift;
+            _ceilingY = worldTop - DuelCeilingMargin - _lift;
         }
 
         public static CompanionFlight Begin(CampaignDefinition level, PlayerConfig playerFlight,
@@ -303,9 +306,11 @@ namespace MetalRaptors
             ? new Vector3(SupportStationAhead, SupportStationAbove, 0f)
             : Slot(0);
 
-        float EscortFloorY => _groundY + EscortFloorMargin;
+        float EscortFloorY => _groundY + EscortFloorMargin + _lift;
 
-        float EscortCeilingY => _worldTop - EscortCeilingMargin;
+        float EscortCeilingY => _worldTop - EscortCeilingMargin - _lift;
+
+        static float Span(PlaneModelConfig plane) => plane != null ? plane.OnScreenSize : 0f;
 
         float StationX => _camX + _halfView * StationLead;
 
@@ -381,8 +386,9 @@ namespace MetalRaptors
             float minX = _camX - _halfView * BandBehind;
             float maxX = _camX + _halfView * BandAhead;
 
-            _floorY = Mathf.Max(_groundY + DuelFloorMargin, _camY - _halfHeight * BandVertical);
-            _ceilingY = Mathf.Min(_worldTop - DuelCeilingMargin,
+            _floorY = Mathf.Max(_groundY + DuelFloorMargin + _lift,
+                _camY - _halfHeight * BandVertical);
+            _ceilingY = Mathf.Min(_worldTop - DuelCeilingMargin - _lift,
                 _camY + _halfHeight * BandVertical);
             if (_floorY > _ceilingY) _floorY = _ceilingY = (_floorY + _ceilingY) * 0.5f;
 

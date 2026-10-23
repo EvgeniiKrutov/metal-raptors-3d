@@ -8,7 +8,7 @@ namespace MetalRaptors
         public const int Models = 6;
 
         const string GunNode = "gun_mesh";
-        const float Shrink = 0.77f;
+        const float Shrink = 0.932f;
         const float MuzzleHeight = 2.9f;
         const float BarrelRadius = 0.2f;
         const float ProbeY = -9000f;

@@ -136,7 +136,7 @@ namespace MetalRaptors
             root.localRotation = Quaternion.Euler(0f, 0f, 180f);
 
             PlaneFactory.BuildPlaneModel(root, plane, mirrored: true,
-                skin: PlaneSkins.Enemy(plane, skin));
+                skin: PlaneSkins.Enemy(plane, skin)).localScale *= PlaneModelConfig.LevelScale;
             foreach (Collider collider in root.GetComponentsInChildren<Collider>())
                 collider.enabled = false;
 
