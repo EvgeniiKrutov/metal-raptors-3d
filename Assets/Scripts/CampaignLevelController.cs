@@ -6,11 +6,12 @@ using UnityEngine.Rendering.Universal;
 namespace MetalRaptors
 {
     public class CampaignLevelController : MonoBehaviour, ICampaignScriptHost, IRaidHost,
-        IAbilityHost, IDevSpawnHost
+        IAbilityHost, IDevSpawnHost, IDangerHost
     {
         const float WorldTop = 650f;
-        const float CubeHalf = 15f * PlaneModelConfig.LevelScale;
-        const float ScrapeRadius = PlaneScrapes.HitboxRadius * PlaneModelConfig.LevelScale;
+        float HitboxScale => PlaneModelConfig.LevelScale * PlayerPlane.hitboxScale;
+        float CubeHalf => 15f * HitboxScale;
+        float ScrapeRadius => PlaneScrapes.HitboxRadius * HitboxScale;
         const float CameraDistance = 420f;
         const float PlayPlaneZ = 100f;
         const float CamZ = PlayPlaneZ - CameraDistance;
@@ -20,6 +21,10 @@ namespace MetalRaptors
         const float FallCamResponse = 3.3f;
         const float CamShakeMagnitude = 7f;
         const float CamShakeDuration = 0.3f;
+        const float BoostZoom = 0.05f;
+        const float BoostZoomResponse = 5f;
+        const float BoostRumble = 2.5f;
+        const float BoostRumbleRate = 14f;
         const float ScrapeShakeCooldown = 1.2f;
 
         const float AlignLookahead = 240f;
@@ -61,6 +66,16 @@ namespace MetalRaptors
 
         const float MinLoadSec = 3f;
 
+        const float GunnerLead = 0.2f;
+        const float GunnerCamLift = 0.35f;
+        const float PursuitLow = 0.8f;
+        const float PursuitHigh = 0.82f;
+        const float PursuitFloor = 40f;
+        const float PursuitCeiling = 60f;
+        const float EntryLow = 0.45f;
+        const float EntryHigh = 0.55f;
+        const string HudObjectiveGunner = "rear gun  •  keep them off our tail";
+
         const float DitchSplashSize = 75f;
         const float SinkSpeed = 26f;
         const float SinkDriftKeep = 0.15f;
@@ -74,8 +89,12 @@ namespace MetalRaptors
         PlaneShooter _shooter;
         PlaneBomber _bomber;
         PlaneBoost _boost;
+        BoostRush _rush;
         PlaneBarrelRoll _roll;
         PlaneSearchlight _searchlight;
+        RearGun _rearGun;
+        GunnerAutopilot _autopilot;
+        float? _entryY;
         PlaneAbility _abilities;
         Transform _cubeTr;
         Camera _cam;
@@ -113,6 +132,8 @@ namespace MetalRaptors
         float _halfViewWidth;
         Vector3 _camBasePos;
         float _camShake;
+        float _baseFov;
+        float _boostZoom;
         float _lastScrapeShake = -999f;
         bool _gameOver;
         bool _playerFalling;
@@ -136,6 +157,11 @@ namespace MetalRaptors
         bool Coast => _level.terrain == TerrainKind.Flanders;
 
         bool Alpine => _level.terrain == TerrainKind.Dolomites;
+
+        bool Gunner => _level.gunner;
+
+        PlaneModelConfig PlayerPlane =>
+            _level != null && _level.plane != null ? _level.plane : GameManager.CurrentPlane;
 
         bool Bounded => _level.worldWidth > 0f;
 
@@ -194,6 +220,7 @@ namespace MetalRaptors
             SpawnPlayer(config);
             _cubeTr.gameObject.SetActive(false);
             SetupCamera();
+            BeginGunner();
 
             if (Coast)
             {
@@ -254,7 +281,9 @@ namespace MetalRaptors
         {
             Time.timeScale = 1f;
             BeginSupply();
+            if (_autopilot != null) _autopilot.Track(_supply);
             _sound = SoundSystem.Begin(_cube, null);
+            if (_rush != null) _rush.Sound = _sound;
             if (_resume == null) BeginIntro();
             _cubeTr.gameObject.SetActive(true);
             _loading = false;
@@ -480,6 +509,7 @@ namespace MetalRaptors
                     WorldTop, _level);
                 _enemies.ModelScale = PlaneModelConfig.LevelScale;
                 _enemies.LiftClearance = true;
+                if (Gunner) ArmPursuit();
                 if (_sound != null) _sound.Track(_enemies.Live);
             }
 
@@ -507,9 +537,9 @@ namespace MetalRaptors
                 ? new Vector3(_resume.playerPosition.x, _resume.playerPosition.y, PlayPlaneZ)
                 : new Vector3(StartX, SpawnY + CompanionFlight.EntryLift(_level), PlayPlaneZ);
 
-            var planeModel = GameManager.CurrentPlane;
+            var planeModel = PlayerPlane;
             var model = PlaneFactory.BuildPlaneModel(go.transform, planeModel,
-                skin: GameManager.CurrentSkin);
+                skin: _level.plane != null ? PlaneSkins.Default(planeModel) : GameManager.CurrentSkin);
             model.localScale *= PlaneModelConfig.LevelScale;
             _playerModel = model;
 
@@ -525,6 +555,10 @@ namespace MetalRaptors
             _cube.Initialize(flight, 0f, float.MinValue, float.MaxValue,
                 WorldTop - CubeHalf, 0f, hardWalls: true);
 
+            Vector3 nose = PlaneFactory.NoseLocal(go, model, planeModel);
+            Vector3? engine = PlaneFactory.EngineLocal(go, model, planeModel);
+            _cube.MountEngine(engine);
+
             var muzzle = PlaneFactory.MountMuzzle(go, model, planeModel, out var flashPoint);
             var hitbox = go.GetComponentInChildren<Collider>();
 
@@ -532,17 +566,20 @@ namespace MetalRaptors
             _shooter.Initialize(flight, muzzle, flashPoint, hitbox);
 
             _bomber = go.AddComponent<PlaneBomber>();
-            _bomber.Initialize(flight, hitbox);
+            _bomber.Initialize(flight, hitbox,
+                planeModel.bombLift * planeModel.LengthUnits * PlaneModelConfig.LevelScale);
             _bomber.OnDetonated += OnBombDetonated;
 
             _boost = go.AddComponent<PlaneBoost>();
-            _boost.Initialize(flight, _cube, model);
+            _boost.Initialize(flight, _cube, model, planeModel);
+
+            _rush = BoostRush.Mount(go, _boost, _cube, planeModel.LengthUnits * PlaneModelConfig.LevelScale,
+                nose, engine, _level.daytime == Daytime.Night);
 
             _roll = go.AddComponent<PlaneBarrelRoll>();
-            _roll.Initialize(flight, _cube, model);
+            _roll.Initialize(flight, _cube, model, planeModel: planeModel);
 
-            _searchlight = PlaneSearchlight.Mount(go,
-                PlaneFactory.NoseLocal(go, model, planeModel), _level.daytime);
+            _searchlight = PlaneSearchlight.Mount(go, nose, _level.daytime);
 
             _abilities = _level.abilities;
             LockAbilities();
@@ -553,6 +590,77 @@ namespace MetalRaptors
             _bomber.Cooldown = _resume.bombCooldown;
             _boost.Cooldown = _resume.boostCooldown;
             _roll.Cooldown = _resume.rollCooldown;
+        }
+
+        void BeginGunner()
+        {
+            if (!Gunner || _cube == null) return;
+
+            if (_resume == null)
+            {
+                Vector3 pos = _cubeTr.position;
+                _cubeTr.position = new Vector3(pos.x, GunnerCamY, pos.z);
+            }
+
+            _rearGun = RearGun.Mount(_cubeTr.gameObject, _playerModel, PlayerPlane);
+            _shooter.MountTurret(_rearGun, RearGun.ShotPitch);
+            _autopilot = GunnerAutopilot.Begin(_cube, GunnerCamY, _halfViewHeight);
+        }
+
+        void ArmPursuit()
+        {
+            float camY = GunnerCamY;
+            _enemies.Pursuit = true;
+            _enemies.PursuitMinY = Mathf.Max(
+                Mathf.Max(AiGroundY, ProceduralTerrain.MaxHeight) + PursuitFloor,
+                camY - _halfViewHeight * PursuitLow);
+            _enemies.PursuitMaxY = Mathf.Min(WorldTop - PursuitCeiling,
+                camY + _halfViewHeight * PursuitHigh);
+        }
+
+        float GunnerCamY
+        {
+            get
+            {
+                float minCamY = CamFloorY;
+                float maxCamY = WorldTop - _halfViewHeight;
+                if (minCamY > maxCamY) return WorldTop * 0.5f;
+                return Mathf.Lerp(minCamY, maxCamY, GunnerCamLift);
+            }
+        }
+
+        float PeekEntryY()
+        {
+            if (!_entryY.HasValue)
+            {
+                float camY = GunnerCamY;
+                _entryY = Random.Range(camY - _halfViewHeight * EntryLow,
+                    camY + _halfViewHeight * EntryHigh);
+            }
+            return _entryY.Value;
+        }
+
+        float TakeEntryY()
+        {
+            float y = PeekEntryY();
+            _entryY = null;
+            return y;
+        }
+
+        public float WarnDanger(ScreenEdge edge, float seconds)
+        {
+            if (_gameOver || _hud == null) return 0f;
+
+            DangerSign sign = DangerSign.Show(_hud.transform, edge, seconds, () => DangerAlong(edge));
+            if (_curtain != null) _curtain.Adopt(sign.gameObject);
+            return sign.Seconds;
+        }
+
+        float DangerAlong(ScreenEdge edge)
+        {
+            if (!Gunner || (edge != ScreenEdge.Left && edge != ScreenEdge.Right)) return 0.5f;
+
+            return (PeekEntryY() - (_camBasePos.y - _halfViewHeight)) / (2f * _halfViewHeight);
         }
 
         void SetupCamera()
@@ -584,6 +692,7 @@ namespace MetalRaptors
             _cam.farClipPlane = 2600f;
 
             LevelCamera.Frame(_cam, CameraDistance, out _halfViewWidth, out _halfViewHeight);
+            _baseFov = _cam.fieldOfView;
             CutsceneBlur.Focus(CameraDistance);
 
             PositionCamera(instant: true);
@@ -643,6 +752,8 @@ namespace MetalRaptors
 
             if (_camShake > 0f)
                 _camShake = Mathf.Max(0f, _camShake - Time.unscaledDeltaTime / CamShakeDuration);
+            if (_rush != null) _rush.Hidden = Cinematic;
+            ApplyBoostZoom();
             if (_raid != null) FrameRaid();
             else if (_cam != null && !_camHold) PositionCamera(instant: false);
             if (_flyby != null) _flyby.Tick(_camBasePos, Time.deltaTime);
@@ -655,6 +766,8 @@ namespace MetalRaptors
 
             if (_cube != null) _cube.SetCinematic(Cinematic);
             if (_curtain != null) _curtain.Set(!Cinematic);
+            if (_rearGun != null)
+                _rearGun.Ready = !Cinematic && !_gameOver && !_playerFalling && _shooter.IsReady;
 
             if (_terrain != null) _terrain.UpdateStreaming(_camBasePos.x);
             if (_ceilingBar != null)
@@ -694,13 +807,16 @@ namespace MetalRaptors
             float minCamY = CamFloorY;
             float maxCamY = WorldTop - _halfViewHeight;
             if (minCamY > maxCamY) minCamY = maxCamY = WorldTop * 0.5f;
-            float targetY = Mathf.Clamp(cubePos.y, minCamY, maxCamY);
+            float targetY = Gunner && !_playerFalling
+                ? GunnerCamY
+                : Mathf.Clamp(cubePos.y, minCamY, maxCamY);
+            float targetX = Gunner ? cubePos.x - _halfViewWidth * GunnerLead : cubePos.x;
 
             if (instant)
             {
                 float x = Bounded
-                    ? Mathf.Clamp(cubePos.x, CamMinX, CamMaxX)
-                    : Mathf.Max(StartX, cubePos.x);
+                    ? Mathf.Clamp(targetX, CamMinX, CamMaxX)
+                    : Mathf.Max(StartX, targetX);
                 _camBasePos = new Vector3(x, targetY, CamZ);
             }
             else
@@ -708,12 +824,22 @@ namespace MetalRaptors
                 float response = _playerFalling ? FallCamResponse : CamResponse;
                 float t = 1f - Mathf.Exp(-response * Time.deltaTime);
                 float x = Bounded
-                    ? Mathf.Lerp(_camBasePos.x, Mathf.Clamp(cubePos.x, CamMinX, CamMaxX), t)
-                    : Mathf.Max(_camBasePos.x, Mathf.Lerp(_camBasePos.x, cubePos.x, t));
+                    ? Mathf.Lerp(_camBasePos.x, Mathf.Clamp(targetX, CamMinX, CamMaxX), t)
+                    : Mathf.Max(_camBasePos.x, Mathf.Lerp(_camBasePos.x, targetX, t));
                 _camBasePos = new Vector3(x, Mathf.Lerp(_camBasePos.y, targetY, t), CamZ);
             }
 
             PlaceCamera();
+        }
+
+        void ApplyBoostZoom()
+        {
+            if (_cam == null || _baseFov <= 0f) return;
+
+            float target = _rush != null ? Mathf.SmoothStep(0f, 1f, _rush.Level) : 0f;
+            _boostZoom = Mathf.Lerp(_boostZoom, target, 1f - Mathf.Exp(-BoostZoomResponse * Time.deltaTime));
+            float half = Mathf.Tan(_baseFov * 0.5f * Mathf.Deg2Rad) * (1f + BoostZoom * _boostZoom);
+            _cam.fieldOfView = 2f * Mathf.Atan(half) * Mathf.Rad2Deg;
         }
 
         void FrameRaid()
@@ -725,6 +851,13 @@ namespace MetalRaptors
         void PlaceCamera()
         {
             Vector3 pos = _camBasePos;
+            float rumble = _rush != null ? _rush.Level * BoostRumble : 0f;
+            if (rumble > 0f)
+            {
+                float t = Time.time * BoostRumbleRate;
+                pos += new Vector3(Mathf.PerlinNoise(t, 0.3f) * 2f - 1f,
+                    Mathf.PerlinNoise(0.7f, t) * 2f - 1f, 0f) * rumble;
+            }
             if (_camShake > 0f)
             {
                 Vector2 j = Random.insideUnitCircle * (CamShakeMagnitude * _camShake);
@@ -739,7 +872,9 @@ namespace MetalRaptors
 
             if (_enemies != null)
             {
-                if (spread)
+                if (Gunner)
+                    _enemies.SpawnBehind(groups, _camBasePos.x, _halfViewWidth, TakeEntryY());
+                else if (spread)
                     _enemies.SpawnSpread(groups, _camBasePos, _halfViewWidth, _halfViewHeight);
                 else
                     _enemies.Spawn(groups, _camBasePos.x, _halfViewWidth);
@@ -925,6 +1060,7 @@ namespace MetalRaptors
             if (_zeppelin != null) _zeppelin.StandDown();
             if (_supply != null) _supply.StandDown();
             if (_dialogue != null) _dialogue.Hide();
+            if (_autopilot != null) _autopilot.Release();
             if (_cube != null)
             {
                 _cube.ClearWalls();
@@ -1179,9 +1315,11 @@ namespace MetalRaptors
             var canvas = UIFactory.CreateCanvas("Campaign HUD");
             _hud = canvas.gameObject;
 
-            _hudView = new LevelHud(canvas.transform, Bounded ? HudObjectiveBounded : HudObjective,
+            string objective = Gunner ? HudObjectiveGunner
+                : Bounded ? HudObjectiveBounded : HudObjective;
+            _hudView = new LevelHud(canvas.transform, objective,
                 _cube, _shooter, _bomber, _boost, _roll, _searchlight, _airfield, TryPause,
-                abilities: _abilities);
+                abilities: _abilities, gun: _rearGun);
 
             _curtain = HudCurtain.Attach(_hud);
             _curtain.Set(false);

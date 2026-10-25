@@ -254,6 +254,7 @@ namespace MetalRaptors
             _cube.Initialize(flight, 0f, float.MinValue, float.MaxValue, _ceilingY, 0f,
                 hardWalls: true);
             _cube.SetControlled(false);
+            _cube.MountEngine(PlaneFactory.EngineLocal(go, model, planeModel));
 
             var muzzle = PlaneFactory.MountMuzzle(go, model, planeModel, out var flashPoint);
             var hitbox = go.GetComponentInChildren<Collider>();
@@ -323,7 +324,8 @@ namespace MetalRaptors
         void FixedUpdate()
         {
             if (_gameOver || _cube == null || _bossEntry) return;
-            PlaneScrapes.Check(_cube, _cubeTr, _enemies != null ? _enemies.Live : null, null);
+            PlaneScrapes.Check(_cube, _cubeTr, _enemies != null ? _enemies.Live : null, null,
+                PlaneScrapes.HitboxRadius * GameManager.CurrentPlane.hitboxScale);
         }
 
         void LateUpdate()

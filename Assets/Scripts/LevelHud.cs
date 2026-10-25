@@ -15,6 +15,8 @@ namespace MetalRaptors
 
         const string ArenaKeyHint = "W A S D to fly  •  F to fire  •  B to roll  •  ";
 
+        const string GunnerKeyHint = "W / S to aim  •  F to fire  •  ";
+
         const float BossGap = 0.35f;
 
         readonly CubeController _plane;
@@ -23,6 +25,7 @@ namespace MetalRaptors
         readonly PlaneBoost _boost;
         readonly PlaneBarrelRoll _roll;
         readonly PlaneSearchlight _searchlight;
+        readonly RearGun _gun;
 
         readonly HealthBar _health;
         readonly HealthBar _airfieldBar;
@@ -53,9 +56,10 @@ namespace MetalRaptors
         public LevelHud(Transform parent, string objective, CubeController plane,
             PlaneShooter shooter, PlaneBomber bomber, PlaneBoost boost, PlaneBarrelRoll roll,
             PlaneSearchlight searchlight, Airfield airfield, System.Action onPause,
-            bool arena = false, PlaneAbility abilities = PlaneAbility.All)
+            bool arena = false, PlaneAbility abilities = PlaneAbility.All, RearGun gun = null)
         {
             _plane = plane;
+            _gun = gun;
             _arena = arena;
             _abilities = abilities;
             _objective = objective;
@@ -110,9 +114,10 @@ namespace MetalRaptors
 
             if (HudTheme.IsTouch && _plane != null)
             {
-                if (!arena) _plane.EnableHeadingSteering();
+                bool flying = !arena && gun == null;
+                if (flying) _plane.EnableHeadingSteering();
                 _stick = TouchStick.Create(parent);
-                if (!arena) _arrow = new HeadingArrow(parent);
+                if (flying) _arrow = new HeadingArrow(parent);
             }
 
             if (HudTheme.IsTouch && onPause != null)
@@ -166,6 +171,7 @@ namespace MetalRaptors
         string HintText()
         {
             if (HudTheme.IsTouch) return _objective;
+            if (_gun != null) return GunnerKeyHint + _objective;
             if (_arena) return ArenaKeyHint + _objective;
 
             string keys = KeyHint;
@@ -224,6 +230,12 @@ namespace MetalRaptors
 
             bool steerable = _plane.Steerable && !GameMenu.IsOpen;
             _stick.SetVisible(steerable);
+
+            if (_gun != null)
+            {
+                _gun.SetAimInput(steerable ? _stick.Pull.y : 0f);
+                return;
+            }
 
             if (_arena)
             {

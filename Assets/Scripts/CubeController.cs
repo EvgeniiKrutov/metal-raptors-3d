@@ -61,6 +61,7 @@ namespace MetalRaptors
         ShakeEffect _shake;
         SmokeTrail _smoke;
         PlaneFire _fire;
+        Vector3? _engine;
         readonly PlaneRoll _roll = new PlaneRoll(false);
 
         float _heading;
@@ -98,6 +99,10 @@ namespace MetalRaptors
         Vector2 _hoverInput;
         float _bank;
 
+        Vector2 _windDrift;
+        float _windPitch;
+        float _windRoll;
+
         ISolid _solid;
         float _solidRadius = PlaneScrapes.HitboxRadius;
 
@@ -131,6 +136,12 @@ namespace MetalRaptors
 
             ApplyRotation();
             _active = true;
+        }
+
+        public void MountEngine(Vector3? local)
+        {
+            _engine = local;
+            if (local.HasValue && _smoke != null) _smoke.Mount = local.Value;
         }
 
         public bool BeginBarrelRoll(float rateDeg, float grace)
@@ -189,6 +200,15 @@ namespace MetalRaptors
         }
 
         public void SetHoverInput(Vector2 input) => _hoverInput = Vector2.ClampMagnitude(input, 1f);
+
+        public void SetWind(Vector2 drift, float pitchDeg, float rollDeg)
+        {
+            if (_falling || !_active) return;
+
+            _windDrift = drift;
+            _windPitch = pitchDeg;
+            _windRoll = rollDeg;
+        }
 
         public bool Steerable => _active && _controlled && !_falling;
 
@@ -293,7 +313,8 @@ namespace MetalRaptors
             ApplyRotation();
 
             _speed = CruiseSpeed;
-            Vector3 vel = new Vector3(Mathf.Cos(_heading), Mathf.Sin(_heading), 0f) * _speed;
+            Vector3 vel = new Vector3(Mathf.Cos(_heading), Mathf.Sin(_heading), 0f) * _speed
+                          + new Vector3(_windDrift.x, _windDrift.y, 0f);
 
             Vector3 pos = _rb.position;
 
@@ -416,8 +437,9 @@ namespace MetalRaptors
 
         void ApplyRotation()
         {
-            float roll = _roll.Angle + _barrelAngle + _bank + (_fall != null ? _fall.Roll : 0f);
-            transform.rotation = Quaternion.Euler(0f, 0f, _heading * Mathf.Rad2Deg)
+            float roll = _roll.Angle + _barrelAngle + _bank + _windRoll
+                         + (_fall != null ? _fall.Roll : 0f);
+            transform.rotation = Quaternion.Euler(0f, 0f, _heading * Mathf.Rad2Deg + _windPitch)
                                * Quaternion.Euler(roll, 0f, 0f);
         }
 
@@ -470,13 +492,16 @@ namespace MetalRaptors
         void BeginFall()
         {
             _falling = true;
+            _windDrift = Vector2.zero;
+            _windPitch = 0f;
+            _windRoll = 0f;
             _barrelLeft = 0f;
             _barrelAngle = 0f;
             _evadeGrace = 0f;
             OnShotDown?.Invoke();
 
             if (_smoke != null) _smoke.Ignite(ExplosionSize);
-            _fire = PlaneFire.Ignite(gameObject, ExplosionSize);
+            _fire = PlaneFire.Ignite(gameObject, ExplosionSize, _engine);
 
             _fall = PlaneFall.Begin(_rb, _heading, Mathf.Max(_speed, CruiseSpeed));
         }

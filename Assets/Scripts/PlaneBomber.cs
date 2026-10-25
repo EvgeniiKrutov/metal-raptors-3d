@@ -29,11 +29,13 @@ namespace MetalRaptors
         Rigidbody _rb;
         GameObject _template;
         float _cooldown;
+        float _lift;
 
-        public void Initialize(PlayerConfig config, Collider planeCollider)
+        public void Initialize(PlayerConfig config, Collider planeCollider, float lift = 0f)
         {
             _config = config;
             _planeCollider = planeCollider;
+            _lift = lift;
             _rb = GetComponent<Rigidbody>();
             _template = Bomb.BuildTemplate();
 
@@ -64,7 +66,7 @@ namespace MetalRaptors
 
         void Release()
         {
-            Vector3 position = transform.position - transform.up * BellyClearance;
+            Vector3 position = transform.position - transform.up * (BellyClearance - _lift);
 
             var go = Instantiate(_template, position, Quaternion.identity);
             go.name = "Bomb";

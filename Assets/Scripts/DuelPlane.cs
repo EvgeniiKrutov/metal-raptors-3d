@@ -148,6 +148,8 @@ namespace MetalRaptors
 
         SmokeTrail _smoke;
         PlaneFire _fire;
+        Vector3? _gun;
+        Vector3? _engine;
         AudioSource _audio;
         AudioClip _shotClip;
 
@@ -186,8 +188,8 @@ namespace MetalRaptors
 
             var go = new GameObject(name);
             go.transform.position = position;
-            PlaneFactory.BuildPlaneModel(go.transform, plane, mirrored, skin).localScale *=
-                PlaneModelConfig.LevelScale;
+            Transform model = PlaneFactory.BuildPlaneModel(go.transform, plane, mirrored, skin);
+            model.localScale *= PlaneModelConfig.LevelScale;
 
             foreach (Collider col in go.GetComponentsInChildren<Collider>()) Destroy(col);
 
@@ -207,6 +209,9 @@ namespace MetalRaptors
             duel._shotSpacing = Mathf.Max(0.01f, flight.fireRate);
             duel._restTimer = Random.Range(RestMin, RestMax);
             duel._smoke = go.AddComponent<SmokeTrail>();
+            if (PlaneFactory.GunMuzzleLocal(go, model, plane, out Vector3 gun)) duel._gun = gun;
+            duel._engine = PlaneFactory.EngineLocal(go, model, plane);
+            if (duel._engine.HasValue) duel._smoke.Mount = duel._engine.Value;
 
             duel._shotClip = Resources.Load<AudioClip>(ShotClip);
             duel._audio = go.AddComponent<AudioSource>();
@@ -336,7 +341,7 @@ namespace MetalRaptors
 
             Explosion.Spawn(transform.position, _size);
             if (_smoke != null) _smoke.Ignite(_size);
-            _fire = PlaneFire.Ignite(gameObject, _size);
+            _fire = PlaneFire.Ignite(gameObject, _size, _engine);
         }
 
         void Update()
@@ -800,7 +805,7 @@ namespace MetalRaptors
         void ShootRound()
         {
             Vector3 dir = new Vector3(Mathf.Cos(_heading), Mathf.Sin(_heading), 0f);
-            Vector3 muzzle = transform.position + dir * (_size * 0.5f + MuzzleClearance);
+            Vector3 muzzle = Muzzle(dir);
 
             GameObject go = Instantiate(_round, muzzle,
                 Quaternion.Euler(0f, 0f, _heading * Mathf.Rad2Deg - 90f));
@@ -825,12 +830,16 @@ namespace MetalRaptors
         void Shoot()
         {
             Vector3 dir = new Vector3(Mathf.Cos(_heading), Mathf.Sin(_heading), 0f);
-            Vector3 muzzle = transform.position + dir * (_size * 0.5f + MuzzleClearance);
+            Vector3 muzzle = Muzzle(dir);
 
             Tracer.Spawn(muzzle, dir, TracerSpeed);
             MuzzleFlash.Spawn(muzzle, dir, _size);
             if (_shotClip != null && _audio != null) _audio.PlayOneShot(_shotClip, ShotVolume * AudioOptions.Scene);
         }
+
+        Vector3 Muzzle(Vector3 dir) => _gun.HasValue
+            ? transform.TransformPoint(_gun.Value)
+            : transform.position + dir * (_size * 0.5f + MuzzleClearance);
 
         void OnDestroy()
         {

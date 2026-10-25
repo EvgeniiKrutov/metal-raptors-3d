@@ -21,14 +21,15 @@ namespace MetalRaptors
 
         readonly HashSet<object> _sources = new HashSet<object>();
 
-        public static WingStreaks Mount(GameObject body, Transform model, Color? tint = null)
+        public static WingStreaks Mount(GameObject body, Transform model, Color? tint = null,
+            PlaneModelConfig plane = null)
         {
             Color colour = tint ?? Color.white;
 
             var existing = body.GetComponentInChildren<WingStreaks>(true);
             if (existing != null && existing._tint == colour) return existing;
 
-            PlaneFactory.WingTipsLocal(body, model, out Vector3 near, out Vector3 far);
+            PlaneFactory.WingTipsLocal(body, model, out Vector3 near, out Vector3 far, plane);
 
             var go = new GameObject("Wing Streaks");
             go.transform.SetParent(body.transform, false);

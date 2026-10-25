@@ -31,12 +31,12 @@ namespace MetalRaptors
         bool _wasRolling;
 
         public void Initialize(PlayerConfig config, CubeController plane, Transform model,
-            float spinScale = 1f, bool streaks = true)
+            float spinScale = 1f, bool streaks = true, PlaneModelConfig planeModel = null)
         {
             _config = config;
             _plane = plane;
             _spinScale = Mathf.Max(0.01f, spinScale);
-            if (streaks) _trails = WingStreaks.Mount(gameObject, model);
+            if (streaks) _trails = WingStreaks.Mount(gameObject, model, null, planeModel);
         }
 
         public void Stop()

@@ -15,6 +15,7 @@ namespace MetalRaptors
         float _floorY;
         float _fraction;
         float _heal;
+        float _lead;
         int _left;
         int _armed;
         bool _scripted;
@@ -35,6 +36,7 @@ namespace MetalRaptors
             drop._floorY = floorY;
             drop._fraction = Mathf.Clamp01(level.supplyHealthFraction);
             drop._heal = level.supplyHeal;
+            drop._lead = level.supplyLead;
             drop._left = level.supplyDrops;
             drop._bothWays = level.worldWidth > 0f;
             drop._warn = warn;
@@ -42,6 +44,10 @@ namespace MetalRaptors
         }
 
         bool Pending => _crate != null || _incoming;
+
+        public bool Incoming => _incoming;
+
+        public SupplyCrate Crate => _crate;
 
         public int Left => _left + (Pending ? 1 : 0);
 
@@ -88,7 +94,7 @@ namespace MetalRaptors
 
                 _incoming = false;
                 _crate = SupplyCrate.Spawn(camPos, halfWidth, halfHeight, _z, _floorY,
-                    Side(camPos.x, halfWidth), _plane.transform, Collect);
+                    Side(camPos.x, halfWidth), _lead, _plane.transform, Collect);
                 return;
             }
 

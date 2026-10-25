@@ -9,6 +9,7 @@ namespace MetalRaptors
         const float ThrottleVolume = 0.2f;
         const float StutterVolume = 0.3f;
         const float WindVolume = 0.35f;
+        const float WindSwellGain = 1.2f;
         const float EnemyIdleVolume = 0.3f;
         const float EnemyThrottleVolume = 0.3f;
         const float BossShare = 0.7f;
@@ -341,6 +342,8 @@ namespace MetalRaptors
         AudioSource _wind;
         AudioSource _stutter;
 
+        public float WindSwell { get; set; }
+
         bool _armed;
         bool _gameOver;
         bool _paused;
@@ -516,7 +519,8 @@ namespace MetalRaptors
         void ApplyAmbient()
         {
             if (_wind != null && !_windStopped)
-                _wind.volume = WindVolume * Gain * AudioOptions.Scene;
+                _wind.volume = Mathf.Min(1f, WindVolume * (1f + WindSwellGain * WindSwell))
+                               * Gain * AudioOptions.Scene;
         }
 
         void StopWind()

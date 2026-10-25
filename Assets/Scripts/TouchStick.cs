@@ -18,6 +18,8 @@ namespace MetalRaptors
 
         public float Angle { get; private set; }
 
+        public Vector2 Pull { get; private set; }
+
         public static TouchStick Create(Transform parent)
         {
             var go = new GameObject("Touch Stick", typeof(Image), typeof(TouchStick));
@@ -99,6 +101,7 @@ namespace MetalRaptors
         {
             _pointer = -1;
             _offset = Vector2.zero;
+            Pull = Vector2.zero;
             Steering = false;
         }
 
@@ -111,6 +114,9 @@ namespace MetalRaptors
             float radius = HudTheme.StickClampRadius;
             Vector2 pull = local - _centre;
             _offset = pull.magnitude > radius ? pull.normalized * radius : pull;
+
+            Vector2 reach = radius > 0f ? _offset / radius : Vector2.zero;
+            Pull = reach.magnitude > HudTheme.StickDeadzone ? reach : Vector2.zero;
 
             if (radius > 0f && _offset.magnitude / radius > HudTheme.StickDeadzone)
             {

@@ -106,6 +106,10 @@ namespace MetalRaptors
 
         public bool Featured { get; set; }
 
+        public bool Pursuing { get; set; }
+
+        public bool StandingDown => _standDown;
+
         public float EnginePitch { get; set; } = 1f;
 
         public float HealthFloor { get; set; }
@@ -464,6 +468,7 @@ namespace MetalRaptors
             if (_scripted)
             {
                 _rb.MovePosition(_scriptPos);
+                if (Pursuing && !_standDown && !_falling) PursueFire(Time.fixedDeltaTime);
                 return;
             }
 
@@ -521,6 +526,14 @@ namespace MetalRaptors
 
             if (!_standDown && _state != AiState.Return && _state != AiState.Recover)
                 UpdateFiring();
+        }
+
+        void PursueFire(float dt)
+        {
+            _fireCooldown -= dt;
+            _onCamera = IsOnCamera(transform.position);
+            _appeared |= _onCamera;
+            if (_onCamera) UpdateFiring();
         }
 
         void TickFall(float dt)

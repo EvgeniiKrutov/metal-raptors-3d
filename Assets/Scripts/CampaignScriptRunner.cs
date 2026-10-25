@@ -190,6 +190,8 @@ namespace MetalRaptors
                         break;
 
                     case CampaignOp.Warn:
+                        _warnedFirst = true;
+                        if (step.count >= PairSize) _warnedPair = true;
                         yield return Wait(_host.WarnIncoming(step.count));
                         break;
 

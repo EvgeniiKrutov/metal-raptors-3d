@@ -17,6 +17,8 @@ namespace MetalRaptors
         const float SpreadSideLow = 0.75f, SpreadSideHigh = 0.85f;
         const float SpreadAheadGap = 120f;
 
+        const float BehindSpacing = 70f;
+
         enum SpawnEdge { Right, Top }
 
         static readonly SpawnEdge[] Edges = { SpawnEdge.Right, SpawnEdge.Top };
@@ -39,6 +41,12 @@ namespace MetalRaptors
         public float ModelScale { get; set; } = 1f;
 
         public bool LiftClearance { get; set; }
+
+        public bool Pursuit { get; set; }
+
+        public float PursuitMinY { get; set; }
+
+        public float PursuitMaxY { get; set; }
 
         public int AliveCount => _live.Count;
 
@@ -109,6 +117,31 @@ namespace MetalRaptors
                         group.plane);
                     SpawnOne(group.plane, SpawnPoint(camX, halfViewWidth, index, config,
                         CeilingFor(group.plane)), config);
+                }
+            }
+        }
+
+        public void SpawnBehind(EnemyGroup[] groups, float camX, float halfViewWidth, float entryY)
+        {
+            if (groups == null) return;
+
+            SetWindow(camX, halfViewWidth);
+
+            float z = _player != null ? _player.position.z : 0f;
+            int index = 0;
+            foreach (EnemyGroup group in groups)
+            {
+                if (group.kind != EnemyKind.Plane) continue;
+
+                for (int i = 0; i < group.count; i++, index++)
+                {
+                    float side = index % 2 == 0 ? 1f : -1f;
+                    float y = entryY + side * BehindSpacing * ((index + 1) / 2);
+                    if (Pursuit) y = Mathf.Clamp(y, PursuitMinY, PursuitMaxY);
+
+                    var at = new Vector3(camX - halfViewWidth - SpawnAhead - index * SpawnStagger,
+                        y, z);
+                    SpawnOne(group.plane, at);
                 }
             }
         }
@@ -308,6 +341,7 @@ namespace MetalRaptors
             enemy.OnDestroyed += OnDestroyed;
             _live.Add(enemy);
             _planes[enemy] = plane;
+            if (Pursuit) EnemyPursuit.Begin(enemy, _player, PursuitMinY, PursuitMaxY);
             return enemy;
         }
 

@@ -10,7 +10,7 @@ namespace MetalRaptors
         const string ModelResource = "objects/supply_crate";
         const string BoxNode = "Crate";
 
-        const float FallSpeed = 80f;
+        public const float FallSpeed = 80f;
         const float SwayAmplitude = 22f;
         const float SwayHz = 0.4f;
         const float SwayTiltDeg = 12f;
@@ -47,18 +47,21 @@ namespace MetalRaptors
         float _worldX;
         float _floorY;
         float _phase;
+        bool _entered;
 
         Vector3 BoxCentre => transform.TransformPoint(_boxLocal);
 
+        public Vector3 Box => BoxCentre;
+
         public static SupplyCrate Spawn(Vector3 camPos, float halfWidth, float halfHeight,
-            float z, float floorY, float side, Transform player, System.Action onCaught)
+            float z, float floorY, float side, float lead, Transform player, System.Action onCaught)
         {
             var go = new GameObject("Supply Crate");
 
             var crate = go.AddComponent<SupplyCrate>();
             crate._player = player;
             crate._onCaught = onCaught;
-            crate._worldX = camPos.x + side * halfWidth * LeadFraction;
+            crate._worldX = camPos.x + side * halfWidth * lead;
             crate._floorY = floorY;
             crate._phase = Random.Range(0f, Mathf.PI * 2f);
 
@@ -173,7 +176,9 @@ namespace MetalRaptors
                 return;
             }
 
-            if (Mathf.Abs(box.x - camX) > halfWidth + OnScreenSize) Destroy(gameObject);
+            bool outside = Mathf.Abs(box.x - camX) > halfWidth + OnScreenSize;
+            if (!outside) _entered = true;
+            else if (_entered) Destroy(gameObject);
         }
 
         bool Caught(Vector3 box)

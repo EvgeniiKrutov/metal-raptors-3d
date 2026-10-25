@@ -146,6 +146,7 @@ namespace MetalRaptors
             _cube.OnScraped += OnPlayerScraped;
 
             _cube.Initialize(flight, 0f, MinX, MaxX, WorldTop - CubeHalf, EdgeMargin);
+            _cube.MountEngine(PlaneFactory.EngineLocal(go, plane, planeModel));
 
             SetupGuns(flight, go, plane, planeModel);
 
@@ -162,14 +163,14 @@ namespace MetalRaptors
             _shooter.Initialize(flight, muzzle, flashPoint, hitbox);
 
             _bomber = body.AddComponent<PlaneBomber>();
-            _bomber.Initialize(flight, hitbox);
+            _bomber.Initialize(flight, hitbox, plane.bombLift * plane.LengthUnits);
             _bomber.OnDetonated += OnBombDetonated;
 
             _boost = body.AddComponent<PlaneBoost>();
-            _boost.Initialize(flight, _cube, model);
+            _boost.Initialize(flight, _cube, model, plane);
 
             _roll = body.AddComponent<PlaneBarrelRoll>();
-            _roll.Initialize(flight, _cube, model);
+            _roll.Initialize(flight, _cube, model, planeModel: plane);
         }
 
         void SpawnEnemies()

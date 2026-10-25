@@ -33,6 +33,8 @@ namespace MetalRaptors
         public CloudsPart clouds;
         public string script;
         public PlaneAbility abilities = PlaneAbility.All;
+        public PlaneModelConfig plane;
+        public bool gunner;
         public string arenaScript;
         public CampaignOutroLine[] arenaLines;
         public string bossMusic;
@@ -56,6 +58,7 @@ namespace MetalRaptors
         public int supplyDrops;
         public float supplyHealthFraction = 0.3f;
         public float supplyHeal = 55f;
+        public float supplyLead = SupplyCrate.LeadFraction;
         public PlaneModelConfig companionPlane = PlaneModels.Sopwith;
         public PlaneModelConfig companionFoe = PlaneModels.Albatros;
         public string[] companionPilots;
@@ -163,6 +166,15 @@ namespace MetalRaptors
             new CampaignOutroLine("crane", "l4_after3"),
             new CampaignOutroLine("roussel", "l4_after4"),
             new CampaignOutroLine("you", "l4_after5"),
+        };
+
+        static CampaignOutroLine[] Outro5 => new[]
+        {
+            new CampaignOutroLine("marchand", "l5_after1"),
+            new CampaignOutroLine("you", "l5_after2"),
+            new CampaignOutroLine("marchand", "l5_after3"),
+            new CampaignOutroLine("you", "l5_after4"),
+            new CampaignOutroLine("marchand", "l5_after5"),
         };
 
         static CampaignOutroLine[] OutroLorem(int level) => new[]
@@ -287,14 +299,18 @@ namespace MetalRaptors
             weather = Weather.Calm,
             clouds = new CloudsPart(),
             script = "level5",
+            abilities = PlaneAbility.None,
+            plane = PlaneModels.AircoDh4,
+            gunner = true,
             flak = 1.25f,
             enemyHealthScale = 0.78f,
             enemyRotationScale = 1.02f,
-            supplyDrops = 1,
+            supplyDrops = 2,
+            supplyLead = 1.37f,
             title = "FACING BACKWARDS",
             dateline = "21 June 1917 — the Flanders coast — midday",
             lore = Lore1,
-            outro = OutroLorem(5),
+            outro = Outro5,
             journal = JournalLorem,
         };
 

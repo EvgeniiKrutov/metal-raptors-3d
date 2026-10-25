@@ -43,6 +43,10 @@ namespace MetalRaptors
 
         public float heightMeters;
 
+        public bool fitWingspan;
+
+        public float pivotFromNose;
+
         public float LengthUnits => lengthMeters * UnitsPerMeter;
 
         public float OnScreenSize => wingspanMeters * UnitsPerMeter;
@@ -56,6 +60,22 @@ namespace MetalRaptors
         public bool straightenProp;
 
         public float gunLift;
+
+        public string gunNode;
+
+        public float bombLift;
+
+        public string engineNode;
+
+        public string wingNode;
+
+        public string rearGunNode;
+
+        public string hitboxNode;
+
+        public float hitboxScale = 1f;
+
+        public float hitboxFloor;
 
         public PlaneSkin[] skins;
 
@@ -89,6 +109,13 @@ namespace MetalRaptors
             "Front an aeroplane that could aim itself was enough. Immelmann and Boelcke learned " +
             "the trade in it.";
 
+        const string AircoStory =
+            "Geoffrey de Havilland's two-seat day bomber, and on a 375 hp Rolls-Royce Eagle fast " +
+            "enough to outrun most of the scouts sent up to catch it. A Vickers for the pilot and a " +
+            "Lewis on a ring for the gunner gave it teeth both ways — but the main fuel tank sat " +
+            "between the two cockpits, and the Americans who built it by the thousand called it " +
+            "the Flaming Coffin.";
+
         public static readonly PlaneModelConfig Sopwith = new PlaneModelConfig
         {
             resourceName   = "sopwith_camel",
@@ -99,11 +126,20 @@ namespace MetalRaptors
             description    = SopwithStory,
             standUpEuler   = new Vector3(90f, -90f, 0f),
             rollWheelsDown = true,
+            pitchTrimDeg   = 10f,
             lengthMeters   = 5.72f,
             wingspanMeters = 8.5f,
             heightMeters   = 2.59f,
-            propPivotNode  = "propPivot",
-            propBladesNode = "propBlades",
+            fitWingspan    = true,
+            pivotFromNose  = 0.43f,
+            propPivotNode  = "Propeller",
+            propBladesNode = "prop_mesh",
+            gunNode        = "guns_mesh",
+            bombLift       = 0.15f,
+            engineNode     = "cowling",
+            wingNode       = "upper_wing",
+            hitboxNode     = "fuselage_shell",
+            hitboxFloor    = 0.4f,
             skins          = PlaneSkins.SopwithCamel,
             stats = new PlaneStats
             {
@@ -130,6 +166,7 @@ namespace MetalRaptors
             lengthMeters   = 5.77f,
             wingspanMeters = 7.19f,
             heightMeters   = 2.95f,
+            fitWingspan    = true,
             propPivotNode  = "propPivot",
             propBladesNode = "propBlades",
             straightenProp = true,
@@ -192,6 +229,7 @@ namespace MetalRaptors
             lengthMeters   = 7.2f,
             wingspanMeters = 9.52f,
             heightMeters   = 2.4f,
+            fitWingspan    = true,
             propPivotNode  = "propeller",
             propBladesNode = "prop_blade_1",
             skins          = PlaneSkins.FokkerEindecker,
@@ -206,7 +244,39 @@ namespace MetalRaptors
             },
         };
 
-        public static readonly PlaneModelConfig[] All = { Sopwith, Fokker, Albatros, Eindecker };
+        public static readonly PlaneModelConfig AircoDh4 = new PlaneModelConfig
+        {
+            resourceName   = "airco_dh4",
+            folder         = PlaneModelConfig.WorldWar1,
+            displayName    = "Airco DH.4",
+            country        = "Great Britain",
+            type           = PlaneTypes.Bomber,
+            description    = AircoStory,
+            standUpEuler   = new Vector3(90f, -90f, 0f),
+            rollWheelsDown = true,
+            pitchTrimDeg   = 10f,
+            lengthMeters   = 9.35f,
+            wingspanMeters = 12.92f,
+            heightMeters   = 3.35f,
+            propPivotNode  = "propeller",
+            propBladesNode = "prop_blade_mesh",
+            rearGunNode    = "back_guns_mesh",
+            hitboxNode     = "fuselage",
+            hitboxScale    = 1.5f,
+            skins          = PlaneSkins.AircoDh4,
+            stats = new PlaneStats
+            {
+                maxSpeed      = 300f,
+                rotationSpeed = 90f,
+                mass          = 3.4f,
+                fireRate      = 6.5f,
+                damage        = 10f,
+                health        = 260f,
+            },
+        };
+
+        public static readonly PlaneModelConfig[] All =
+            { Sopwith, Fokker, Albatros, Eindecker, AircoDh4 };
 
         public static PlaneModelConfig EnemyFor(EnemyRole role) =>
             role == EnemyRole.Scout ? Eindecker : Albatros;

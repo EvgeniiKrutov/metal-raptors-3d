@@ -1,27 +1,40 @@
 {
   "steps": [
-    { "op": "say", "speaker": "hq", "line": "l5_line1" },
+    { "op": "say", "speaker": "marchand", "line": "l5_line1" },
     { "op": "say", "speaker": "you", "line": "l5_line2" },
-    { "op": "say", "speaker": "hq", "line": "l5_line3" },
+    { "op": "say", "speaker": "marchand", "line": "l5_line3" },
+    { "op": "say", "speaker": "you", "line": "l5_line4" },
 
-    { "op": "wait", "seconds": 3 },
-
-    { "op": "wave", "enemies": [ { "plane": "albatros", "count": 2 } ] },
-    { "op": "wait", "seconds": 4 },
-    { "op": "wave", "enemies": [ { "plane": "albatros", "count": 2 } ] },
-
-    { "op": "wait", "seconds": 1.5 },
-    { "op": "say", "speaker": "hq", "line": "l5_line4" },
-    { "op": "say", "speaker": "you", "line": "l5_line5" },
-
-    { "op": "wave", "enemies": [ { "plane": "fokker", "count": 2 } ] },
-    { "op": "wait", "seconds": 4 },
-    { "op": "wave", "enemies": [ { "plane": "albatros", "count": 3 } ] },
+    { "op": "wait", "seconds": 2.5 },
+    { "op": "warn", "planes": 1 },
+    { "op": "danger", "side": "left", "seconds": 2 },
+    { "op": "wave", "enemies": [ { "plane": "albatros", "count": 1 } ] },
 
     { "op": "wait", "seconds": 1.5 },
-    { "op": "say", "speaker": "hq", "line": "l5_line6" },
-    { "op": "say", "speaker": "you", "line": "l5_line7", "seconds": 4 },
+    { "op": "say", "speaker": "marchand", "line": "l5_line5" },
+    { "op": "say", "speaker": "you", "line": "l5_line6" },
+    { "op": "say", "speaker": "marchand", "line": "l5_line7" },
+    { "op": "say", "speaker": "you", "line": "l5_line8" },
 
+    { "op": "supply", "count": 1 },
+    { "op": "wait", "seconds": 2.5 },
+    { "op": "warn", "planes": 1 },
+    { "op": "danger", "side": "left", "seconds": 2 },
+    { "op": "wave", "enemies": [ { "plane": "albatros", "count": 1 } ] },
+
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "say", "speaker": "marchand", "line": "l5_line9" },
+    { "op": "say", "speaker": "you", "line": "l5_line10" },
+    { "op": "say", "speaker": "marchand", "line": "l5_line11" },
+    { "op": "say", "speaker": "you", "line": "l5_line12" },
+
+    { "op": "supply", "count": 1 },
+    { "op": "wait", "seconds": 2.5 },
+    { "op": "warn", "planes": 1 },
+    { "op": "danger", "side": "left", "seconds": 2 },
+    { "op": "wave", "enemies": [ { "plane": "albatros", "count": 1 } ] },
+
+    { "op": "wait", "seconds": 1.5 },
     { "op": "finish" }
   ]
 }

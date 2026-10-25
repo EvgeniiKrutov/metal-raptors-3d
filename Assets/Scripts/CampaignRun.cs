@@ -29,7 +29,7 @@ namespace MetalRaptors
 
     public static class CampaignProgress
     {
-        public const int AlwaysUnlocked = 4;
+        public const int AlwaysUnlocked = 5;
 
         public static int HighestCompleted =>
             GameManager.Instance != null ? GameManager.Instance.CampaignLevelsCompleted : 0;

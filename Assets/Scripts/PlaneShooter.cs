@@ -7,12 +7,14 @@ namespace MetalRaptors
     {
         const float ShotVolume = 0.36f;
         const float AimMemory = 0.25f;
+        const float TurretFlashScale = 0.45f;
 
         PlayerConfig _config;
         Transform _muzzle;
         Transform _flashPoint;
         Collider _planeCollider;
         float _bodyRadius;
+        RearGun _turret;
 
         GameObject _bulletTemplate;
         AudioSource _audio;
@@ -55,6 +57,12 @@ namespace MetalRaptors
 
         public void SetHeld(bool held) => _held = held;
 
+        public void MountTurret(RearGun turret, float pitch)
+        {
+            _turret = turret;
+            if (_audio != null) _audio.pitch = pitch;
+        }
+
         void Update()
         {
             _aimHold = Mathf.Max(0f, _aimHold - Time.deltaTime);
@@ -75,6 +83,12 @@ namespace MetalRaptors
 
         void Fire()
         {
+            if (_turret != null)
+            {
+                FireTurret();
+                return;
+            }
+
             Vector3 dir = transform.right;
 
             var go = Instantiate(_bulletTemplate, _muzzle.position,
@@ -85,6 +99,22 @@ namespace MetalRaptors
                 _planeCollider, fromEnemy: false);
 
             MuzzleFlash.Spawn(_flashPoint.position, dir, _bodyRadius);
+            if (_shotClip != null) _audio.PlayOneShot(_shotClip, ShotVolume * AudioOptions.Scene);
+        }
+
+        void FireTurret()
+        {
+            Vector3 dir = _turret.Direction;
+            Vector3 from = _turret.Muzzle;
+            float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+
+            var go = Instantiate(_bulletTemplate, from, Quaternion.Euler(0f, 0f, angle - 90f));
+            go.name = "Bullet";
+            go.SetActive(true);
+            go.GetComponent<Bullet>().Launch(dir, _config.bulletSpeed, _config.damage,
+                _planeCollider, fromEnemy: false);
+
+            MuzzleFlash.Spawn(from, dir, _bodyRadius * TurretFlashScale);
             if (_shotClip != null) _audio.PlayOneShot(_shotClip, ShotVolume * AudioOptions.Scene);
         }
 

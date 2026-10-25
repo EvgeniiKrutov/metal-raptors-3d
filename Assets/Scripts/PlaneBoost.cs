@@ -29,11 +29,12 @@ namespace MetalRaptors
         float _running;
         float _cooldown;
 
-        public void Initialize(PlayerConfig config, CubeController plane, Transform model)
+        public void Initialize(PlayerConfig config, CubeController plane, Transform model,
+            PlaneModelConfig planeModel = null)
         {
             _config = config;
             _plane = plane;
-            _trails = WingStreaks.Mount(gameObject, model);
+            _trails = WingStreaks.Mount(gameObject, model, null, planeModel);
         }
 
         public void Stop()
