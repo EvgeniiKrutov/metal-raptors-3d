@@ -1,0 +1,227 @@
+{
+  "output": "../../Builds/Screenshots/verdun_victory.png",
+  "width": 1920,
+  "height": 1080,
+  "supersample": 2,
+  "terrain": "Verdun",
+  "seed": 1917,
+  "daytime": "Morning",
+  "settle": 3,
+  "warmup": 3,
+  "fogStart": 260,
+  "fogEnd": 640,
+  "ambientBlasts": false,
+  "ambientFlak": false,
+  "ambientZeppelins": false,
+  "ambientPeople": false,
+  "ambientClouds": true,
+  "camera": {
+    "x": -150,
+    "z": 60,
+    "height": 120,
+    "yaw": -6,
+    "pitch": -8,
+    "roll": 3,
+    "fov": 38
+  },
+  "focus": {
+    "distance": 165,
+    "focalLength": 70,
+    "aperture": 2.8
+  },
+  "planes": [
+    {
+      "model": "sopwith_camel",
+      "skin": "green",
+      "screen": [
+        0.38,
+        0.48
+      ],
+      "distance": 165,
+      "course": 150,
+      "climb": 6,
+      "bank": 35,
+      "turn": 20,
+      "speed": 180
+    },
+    {
+      "model": "albatros",
+      "skin": "plywood",
+      "screen": [
+        0.78,
+        0.42
+      ],
+      "distance": 330,
+      "course": 85,
+      "climb": -38,
+      "bank": 40,
+      "pitchRate": -25,
+      "rollRate": 50,
+      "speed": 170,
+      "burning": true,
+      "hitAge": 0.35,
+      "debris": 12
+    },
+    {
+      "model": "albatros",
+      "skin": "plywood",
+      "screen": [
+        0.12,
+        0.84
+      ],
+      "distance": 420,
+      "course": -100,
+      "climb": 12,
+      "bank": -40,
+      "turn": -20
+    },
+    {
+      "model": "fokker_eindecker",
+      "skin": "sand",
+      "screen": [
+        0.89,
+        0.74
+      ],
+      "distance": 440,
+      "course": 120,
+      "climb": -10,
+      "bank": 45,
+      "turn": 25
+    },
+    {
+      "model": "sopwith_camel",
+      "skin": "dark_blue",
+      "screen": [
+        0.64,
+        0.9
+      ],
+      "distance": 370,
+      "course": 120,
+      "climb": -8,
+      "bank": 45,
+      "turn": 25,
+      "fire": true,
+      "target": 3,
+      "fireFor": 0.9,
+      "fireInterval": 0.13
+    }
+  ],
+  "squads": [
+    {
+      "screenX": 0.6,
+      "distance": 300,
+      "count": 6,
+      "spread": 18,
+      "faction": 0,
+      "fire": true,
+      "target": 3
+    },
+    {
+      "screenX": 0.28,
+      "distance": 340,
+      "count": 6,
+      "spread": 18,
+      "faction": 1,
+      "fire": true,
+      "target": 0
+    }
+  ],
+  "props": [
+    {
+      "model": "burned_houses/house_3",
+      "kind": "house",
+      "screenX": 0.7,
+      "distance": 380,
+      "yaw": 210
+    },
+    {
+      "model": "trees/dead_tree_02",
+      "kind": "tree",
+      "screenX": 0.18,
+      "distance": 270,
+      "yaw": 0
+    },
+    {
+      "model": "trees/gnarled_tree_01",
+      "kind": "tree",
+      "screenX": 0.5,
+      "distance": 310,
+      "yaw": 90
+    },
+    {
+      "model": "trees/dead_tree_03",
+      "kind": "tree",
+      "screenX": 0.9,
+      "distance": 290,
+      "yaw": 210
+    },
+    {
+      "model": "machines/tank_ww1",
+      "kind": "tank",
+      "screenX": 0.42,
+      "distance": 400,
+      "yaw": 100,
+      "sink": 2.2,
+      "burning": true
+    }
+  ],
+  "groundBlasts": [
+    {
+      "screen": [
+        0.72
+      ],
+      "distance": 480,
+      "size": 55,
+      "age": 0.6
+    },
+    {
+      "screen": [
+        0.25
+      ],
+      "distance": 520,
+      "size": 50,
+      "age": 1.2
+    }
+  ],
+  "flak": [
+    {
+      "screen": [
+        0.3,
+        0.92
+      ],
+      "distance": 420,
+      "size": 30,
+      "age": 1.1
+    },
+    {
+      "screen": [
+        0.5,
+        0.95
+      ],
+      "distance": 440,
+      "size": 30,
+      "age": 0.2
+    },
+    {
+      "screen": [
+        0.8,
+        0.6
+      ],
+      "distance": 460,
+      "size": 28,
+      "age": 1.9
+    }
+  ],
+  "smoke": [
+    {
+      "screenX": 0.04,
+      "distance": 520,
+      "scale": 1.0
+    },
+    {
+      "screenX": 0.97,
+      "distance": 540,
+      "scale": 1.0
+    }
+  ]
+}

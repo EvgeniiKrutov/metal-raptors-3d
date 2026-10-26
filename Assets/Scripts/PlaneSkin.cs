@@ -27,6 +27,19 @@ namespace MetalRaptors
         public static readonly PlaneSkin[] SopwithCamel =
         {
             new PlaneSkin { id = "green", label = "green", texture = "skins/sopwith_camel/green" },
+            new PlaneSkin
+            {
+                id = "dark_blue", label = "dark blue", texture = "skins/sopwith_camel/dark_blue",
+            },
+            new PlaneSkin { id = "red", label = "red", texture = "skins/sopwith_camel/red" },
+            new PlaneSkin
+            {
+                id = "mahogany", label = "mahogany", texture = "skins/sopwith_camel/mahogany",
+            },
+            new PlaneSkin
+            {
+                id = "white", label = "white", texture = "skins/sopwith_camel/white", locked = true,
+            },
         };
 
         public static readonly PlaneSkin[] FokkerDr1 =

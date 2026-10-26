@@ -27,7 +27,7 @@ namespace MetalRaptors
         public static readonly CampaignSpeaker[] All =
         {
             Player,
-            new CampaignSpeaker("roussel", "ROUSSEL", false, "white"),
+            new CampaignSpeaker("roussel", "ROUSSEL", false, "mahogany"),
             new CampaignSpeaker("marchand", "MARCHAND", false, "dark_blue"),
             new CampaignSpeaker("crane", "CRANE", false, "red"),
             new CampaignSpeaker("lasalle", "LASALLE", false),

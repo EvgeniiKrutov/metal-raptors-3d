@@ -1,0 +1,256 @@
+{
+  "output": "../../Builds/Screenshots/verdun_trenches.png",
+  "width": 1920,
+  "height": 1080,
+  "supersample": 2,
+  "terrain": "Verdun",
+  "seed": 1917,
+  "daytime": "Morning",
+  "settle": 3,
+  "warmup": 3,
+  "fogStart": 200,
+  "fogEnd": 640,
+  "ambientBlasts": false,
+  "ambientFlak": false,
+  "ambientZeppelins": false,
+  "ambientPeople": false,
+  "ambientClouds": true,
+  "camera": {
+    "x": 0,
+    "z": 45,
+    "height": 18,
+    "yaw": 12,
+    "pitch": 9,
+    "roll": 0,
+    "fov": 42
+  },
+  "focus": {
+    "distance": 150,
+    "focalLength": 60,
+    "aperture": 2.2
+  },
+  "planes": [
+    {
+      "model": "sopwith_camel",
+      "skin": "green",
+      "screen": [
+        0.3,
+        0.68
+      ],
+      "distance": 150,
+      "course": 100,
+      "climb": -8,
+      "bank": 40,
+      "turn": 25,
+      "speed": 180,
+      "fire": true,
+      "target": 1,
+      "fireFor": 0.9
+    },
+    {
+      "model": "albatros",
+      "skin": "plywood",
+      "screen": [
+        0.68,
+        0.5
+      ],
+      "distance": 260,
+      "course": 95,
+      "climb": -35,
+      "bank": 110,
+      "pitchRate": -25,
+      "rollRate": 50,
+      "speed": 170,
+      "burning": true,
+      "hitAge": 0.3,
+      "debris": 14
+    },
+    {
+      "model": "albatros",
+      "skin": "plywood",
+      "screen": [
+        0.86,
+        0.8
+      ],
+      "distance": 380,
+      "course": 230,
+      "climb": 15,
+      "bank": -50,
+      "turn": -30
+    },
+    {
+      "model": "fokker_eindecker",
+      "skin": "sand",
+      "screen": [
+        0.56,
+        0.88
+      ],
+      "distance": 440,
+      "course": -60,
+      "climb": 20,
+      "bank": -45,
+      "turn": -20
+    },
+    {
+      "model": "sopwith_camel",
+      "skin": "dark_blue",
+      "screen": [
+        0.66,
+        0.83
+      ],
+      "distance": 420,
+      "course": -58,
+      "climb": 18,
+      "bank": -40,
+      "turn": -20,
+      "fire": true,
+      "target": 3,
+      "fireFor": 0.5
+    }
+  ],
+  "squads": [
+    {
+      "screenX": 0.62,
+      "distance": 170,
+      "count": 6,
+      "spread": 14,
+      "faction": 0,
+      "fire": true,
+      "target": 2
+    },
+    {
+      "screenX": 0.2,
+      "distance": 190,
+      "count": 5,
+      "spread": 16,
+      "faction": 0,
+      "fire": true,
+      "target": 3
+    }
+  ],
+  "props": [
+    {
+      "model": "trees/dead_tree_02",
+      "kind": "tree",
+      "screenX": 0.06,
+      "distance": 115,
+      "yaw": 30,
+      "scale": 1.3
+    },
+    {
+      "model": "trees/dead_tree_03",
+      "kind": "tree",
+      "screenX": 0.52,
+      "distance": 230,
+      "yaw": 120
+    },
+    {
+      "model": "trees/gnarled_tree_02",
+      "kind": "tree",
+      "screenX": 0.96,
+      "distance": 150,
+      "yaw": 200
+    },
+    {
+      "model": "trees/bent_tree_01",
+      "kind": "tree",
+      "screenX": 0.32,
+      "distance": 330,
+      "yaw": 60
+    },
+    {
+      "model": "burned_houses/house_2",
+      "kind": "house",
+      "screenX": 0.86,
+      "distance": 280,
+      "yaw": 200
+    },
+    {
+      "model": "machines/tank_ww1",
+      "kind": "tank",
+      "screenX": 0.4,
+      "distance": 320,
+      "yaw": 70,
+      "sink": 2.2,
+      "burning": true
+    },
+    {
+      "model": "rubble/crates/crate_2",
+      "kind": "rubble",
+      "screenX": 0.9,
+      "distance": 36,
+      "yaw": 20
+    },
+    {
+      "model": "rubble/barrels/barrel_1",
+      "kind": "rubble",
+      "screenX": 0.82,
+      "distance": 40,
+      "yaw": 0
+    }
+  ],
+  "groundBlasts": [
+    {
+      "screen": [
+        0.72
+      ],
+      "distance": 300,
+      "size": 70,
+      "age": 0.35
+    },
+    {
+      "screen": [
+        0.18
+      ],
+      "distance": 450,
+      "size": 60,
+      "age": 0.9
+    }
+  ],
+  "flak": [
+    {
+      "screen": [
+        0.42,
+        0.93
+      ],
+      "distance": 400,
+      "size": 30,
+      "age": 1.2
+    },
+    {
+      "screen": [
+        0.14,
+        0.72
+      ],
+      "distance": 420,
+      "size": 32,
+      "age": 0.15
+    },
+    {
+      "screen": [
+        0.96,
+        0.62
+      ],
+      "distance": 420,
+      "size": 28,
+      "age": 1.6
+    },
+    {
+      "screen": [
+        0.27,
+        0.9
+      ],
+      "distance": 440,
+      "size": 26,
+      "age": 2.2
+    }
+  ],
+  "smoke": [
+    {
+      "screenX": 0.92,
+      "distance": 540,
+      "scale": 0.9
+    }
+  ],
+  "clearNear": 110
+}

@@ -210,6 +210,8 @@ namespace MetalRaptors
             duel._restTimer = Random.Range(RestMin, RestMax);
             duel._smoke = go.AddComponent<SmokeTrail>();
             if (PlaneFactory.GunMuzzleLocal(go, model, plane, out Vector3 gun)) duel._gun = gun;
+            else if (plane.gunLift > 0f)
+                duel._gun = PlaneFactory.GunLocal(go, model, plane, PlaneModelConfig.LevelScale, mirrored);
             duel._engine = PlaneFactory.EngineLocal(go, model, plane);
             if (duel._engine.HasValue) duel._smoke.Mount = duel._engine.Value;
 

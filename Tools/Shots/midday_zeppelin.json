@@ -1,0 +1,204 @@
+{
+  "output": "../../Builds/Screenshots/midday_zeppelin.png",
+  "width": 1920,
+  "height": 1080,
+  "supersample": 2,
+  "terrain": "Verdun",
+  "seed": 1918,
+  "daytime": "Midday",
+  "settle": 3,
+  "warmup": 3,
+  "fogStart": 300,
+  "fogEnd": 650,
+  "ambientBlasts": false,
+  "ambientFlak": false,
+  "ambientZeppelins": false,
+  "ambientPeople": false,
+  "ambientClouds": true,
+  "clearNear": 160,
+  "camera": {
+    "x": 600,
+    "z": 60,
+    "height": 26,
+    "yaw": 15,
+    "pitch": 9,
+    "roll": 0,
+    "fov": 30
+  },
+  "focus": {
+    "distance": 330,
+    "focalLength": 100,
+    "aperture": 2.8
+  },
+  "planes": [
+    {
+      "model": "sopwith_camel",
+      "skin": "green",
+      "screen": [
+        0.46,
+        0.58
+      ],
+      "distance": 330,
+      "course": 75,
+      "climb": 16,
+      "bank": 72,
+      "turn": 45,
+      "speed": 190
+    },
+    {
+      "model": "albatros",
+      "skin": "plywood",
+      "screen": [
+        0.22,
+        0.48
+      ],
+      "distance": 300,
+      "course": 65,
+      "climb": 10,
+      "bank": 38,
+      "turn": 30,
+      "speed": 185,
+      "fire": true,
+      "target": 0,
+      "fireFor": 1.0,
+      "aimLag": 0.3,
+      "fireInterval": 0.13
+    },
+    {
+      "model": "sopwith_camel",
+      "skin": "mahogany",
+      "screen": [
+        0.7,
+        0.84
+      ],
+      "distance": 380,
+      "course": -105,
+      "climb": -25,
+      "bank": -25,
+      "speed": 200,
+      "fire": true,
+      "target": 1,
+      "fireFor": 0.9,
+      "fireInterval": 0.13
+    },
+    {
+      "model": "albatros",
+      "skin": "plywood",
+      "screen": [
+        0.9,
+        0.65
+      ],
+      "distance": 440,
+      "course": -105,
+      "climb": -15,
+      "bank": -35,
+      "turn": -15,
+      "fire": true,
+      "target": 2,
+      "aimLag": 0.2,
+      "fireInterval": 0.13,
+      "fireFor": 0.9
+    },
+    {
+      "model": "fokker_eindecker",
+      "skin": "sand",
+      "screen": [
+        0.64,
+        0.42
+      ],
+      "distance": 440,
+      "course": 60,
+      "climb": 30,
+      "bank": 20,
+      "turn": 0,
+      "fire": true,
+      "target": 2,
+      "fireFor": 0.9,
+      "aimLag": 0.25,
+      "fireInterval": 0.13
+    }
+  ],
+  "zeppelins": [
+    {
+      "screen": [
+        0.5,
+        0.78
+      ],
+      "distance": 540,
+      "course": 100,
+      "length": 400,
+      "speed": 12
+    }
+  ],
+  "squads": [
+    {
+      "screenX": 0.48,
+      "distance": 370,
+      "count": 6,
+      "spread": 14,
+      "faction": 0,
+      "fire": true,
+      "target": 1
+    },
+    {
+      "screenX": 0.74,
+      "distance": 410,
+      "count": 6,
+      "spread": 14,
+      "faction": 1,
+      "fire": true,
+      "target": 0
+    }
+  ],
+  "props": [
+    {
+      "model": "trees/dead_tree_03",
+      "kind": "tree",
+      "screenX": 0.08,
+      "distance": 210,
+      "yaw": 20
+    },
+    {
+      "model": "trees/gnarled_tree_03",
+      "kind": "tree",
+      "screenX": 0.56,
+      "distance": 280,
+      "yaw": 140
+    },
+    {
+      "model": "burned_houses/house_2",
+      "kind": "house",
+      "screenX": 0.9,
+      "distance": 330,
+      "yaw": 200
+    }
+  ],
+  "groundBlasts": [
+    {
+      "screen": [
+        0.48
+      ],
+      "distance": 420,
+      "size": 55,
+      "age": 0.4
+    }
+  ],
+  "flak": [
+    {
+      "screen": [
+        0.3,
+        0.9
+      ],
+      "distance": 440,
+      "size": 26,
+      "age": 0.9
+    }
+  ],
+  "smoke": [
+    {
+      "screenX": 0.16,
+      "distance": 520,
+      "scale": 0.9
+    }
+  ]
+}

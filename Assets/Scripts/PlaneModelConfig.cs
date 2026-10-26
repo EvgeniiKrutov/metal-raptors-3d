@@ -61,6 +61,8 @@ namespace MetalRaptors
 
         public float gunLift;
 
+        public float gunSetback;
+
         public string gunNode;
 
         public float bombLift;
@@ -170,7 +172,8 @@ namespace MetalRaptors
             propPivotNode  = "propPivot",
             propBladesNode = "propBlades",
             straightenProp = true,
-            gunLift        = 0.059f,
+            gunLift        = 0.066f,
+            gunSetback     = 0.127f,
             skins          = PlaneSkins.FokkerDr1,
             stats = new PlaneStats
             {
@@ -200,7 +203,8 @@ namespace MetalRaptors
             garageZoom     = 1.1f,
             propPivotNode  = "propAssembly",
             propBladesNode = "prop",
-            gunLift        = 0.077f,
+            gunLift        = 0.080f,
+            gunSetback     = 0.142f,
             skins          = PlaneSkins.AlbatrosD3,
             stats = new PlaneStats
             {
@@ -232,6 +236,8 @@ namespace MetalRaptors
             fitWingspan    = true,
             propPivotNode  = "propeller",
             propBladesNode = "prop_blade_1",
+            gunLift        = 0.057f,
+            gunSetback     = 0.141f,
             skins          = PlaneSkins.FokkerEindecker,
             stats = new PlaneStats
             {
@@ -260,6 +266,7 @@ namespace MetalRaptors
             heightMeters   = 3.35f,
             propPivotNode  = "propeller",
             propBladesNode = "prop_blade_mesh",
+            gunNode        = "front_guns_mesh",
             rearGunNode    = "back_guns_mesh",
             hitboxNode     = "fuselage",
             hitboxScale    = 1.5f,

@@ -10,6 +10,8 @@ namespace MetalRaptors
 
         const float ModelPitchDeg = -10f;
 
+        const float MuzzleClearance = 2f;
+
         const float FallbackCubeScale = 30f;
 
         static readonly int[] BoxTriangles =
@@ -124,15 +126,15 @@ namespace MetalRaptors
             float scale, bool mirrored)
         {
             Vector3 nose = NoseLocal(body, model, plane);
-            float lift = plane.gunLift * plane.LengthUnits * scale;
+            float length = plane.LengthUnits * scale;
+            float lift = plane.gunLift * length;
             nose.y += mirrored ? -lift : lift;
+            if (plane.gunSetback > 0f) nose.x -= MuzzleClearance + plane.gunSetback * length;
             return nose;
         }
 
         public static Vector3 NoseLocal(GameObject body, Transform model, PlaneModelConfig plane)
         {
-            const float MuzzleClearance = 2f;
-
             Transform prop = FindDeep(model, plane.propBladesNode) ?? FindDeep(model, plane.propPivotNode) ?? model;
             var renderers = prop.GetComponentsInChildren<Renderer>();
             Bounds bounds = renderers.Length > 0

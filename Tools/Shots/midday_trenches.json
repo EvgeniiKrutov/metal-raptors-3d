@@ -1,0 +1,264 @@
+{
+  "output": "../../Builds/Screenshots/midday_trenches.png",
+  "width": 1920,
+  "height": 1080,
+  "supersample": 2,
+  "terrain": "Verdun",
+  "seed": 1918,
+  "daytime": "Midday",
+  "settle": 3,
+  "warmup": 3,
+  "fogStart": 300,
+  "fogEnd": 650,
+  "ambientBlasts": false,
+  "ambientFlak": false,
+  "ambientZeppelins": false,
+  "ambientPeople": false,
+  "ambientClouds": true,
+  "clearNear": 220,
+  "camera": {
+    "x": 300,
+    "z": 50,
+    "height": 18,
+    "yaw": -8,
+    "pitch": 11,
+    "roll": 0,
+    "fov": 44
+  },
+  "focus": {
+    "distance": 170,
+    "focalLength": 60,
+    "aperture": 2.4
+  },
+  "planes": [
+    {
+      "model": "sopwith_camel",
+      "skin": "green",
+      "screen": [
+        0.47,
+        0.6
+      ],
+      "distance": 225,
+      "course": 70,
+      "climb": 18,
+      "bank": 75,
+      "turn": 45,
+      "speed": 190
+    },
+    {
+      "model": "albatros",
+      "skin": "plywood",
+      "screen": [
+        0.21,
+        0.48
+      ],
+      "distance": 170,
+      "course": 60,
+      "climb": 12,
+      "bank": 40,
+      "turn": 30,
+      "speed": 185,
+      "fire": true,
+      "target": 0,
+      "fireFor": 1.0,
+      "aimLag": 0.3,
+      "fireInterval": 0.13
+    },
+    {
+      "model": "sopwith_camel",
+      "skin": "mahogany",
+      "screen": [
+        0.14,
+        0.82
+      ],
+      "distance": 270,
+      "course": 100,
+      "climb": -35,
+      "bank": 20,
+      "speed": 200,
+      "fire": true,
+      "target": 1,
+      "fireFor": 0.9,
+      "fireInterval": 0.13
+    },
+    {
+      "model": "albatros",
+      "skin": "plywood",
+      "screen": [
+        0.6,
+        0.94
+      ],
+      "distance": 370,
+      "course": -80,
+      "climb": -5,
+      "bank": -30,
+      "turn": -10,
+      "fire": true,
+      "target": 2,
+      "aimLag": 0.2,
+      "fireInterval": 0.13,
+      "fireFor": 0.9
+    },
+    {
+      "model": "fokker_eindecker",
+      "skin": "sand",
+      "screen": [
+        0.77,
+        0.8
+      ],
+      "distance": 360,
+      "course": -85,
+      "climb": -8,
+      "bank": -40,
+      "turn": -15,
+      "fire": true,
+      "target": 2,
+      "fireFor": 0.9,
+      "aimLag": 0.25,
+      "fireInterval": 0.13
+    }
+  ],
+  "zeppelins": [
+    {
+      "screen": [
+        0.8,
+        0.8
+      ],
+      "distance": 520,
+      "course": 110,
+      "length": 420,
+      "speed": 12
+    }
+  ],
+  "squads": [
+    {
+      "screenX": 0.24,
+      "distance": 170,
+      "count": 6,
+      "spread": 14,
+      "faction": 0,
+      "fire": true,
+      "target": 1
+    },
+    {
+      "screenX": 0.74,
+      "distance": 230,
+      "count": 6,
+      "spread": 14,
+      "faction": 1,
+      "fire": true,
+      "target": 0
+    }
+  ],
+  "props": [
+    {
+      "model": "trees/dead_tree_01",
+      "kind": "tree",
+      "screenX": 0.95,
+      "distance": 110,
+      "yaw": 40,
+      "scale": 1.3
+    },
+    {
+      "model": "trees/gnarled_tree_04",
+      "kind": "tree",
+      "screenX": 0.46,
+      "distance": 250,
+      "yaw": 120
+    },
+    {
+      "model": "trees/dead_tree_04",
+      "kind": "tree",
+      "screenX": 0.05,
+      "distance": 190,
+      "yaw": 200
+    },
+    {
+      "model": "trees/bent_tree_03",
+      "kind": "tree",
+      "screenX": 0.62,
+      "distance": 340,
+      "yaw": 60
+    },
+    {
+      "model": "burned_houses/house_0",
+      "kind": "house",
+      "screenX": 0.88,
+      "distance": 300,
+      "yaw": 170
+    },
+    {
+      "model": "machines/tank_ww1",
+      "kind": "tank",
+      "screenX": 0.34,
+      "distance": 330,
+      "yaw": 250,
+      "sink": 2.2,
+      "burning": true
+    },
+    {
+      "model": "rubble/sandbags/sandbag_1",
+      "kind": "rubble",
+      "screenX": 0.2,
+      "distance": 150,
+      "yaw": 10
+    },
+    {
+      "model": "rubble/sandbags/sandbag_3",
+      "kind": "rubble",
+      "screenX": 0.28,
+      "distance": 155,
+      "yaw": 70
+    }
+  ],
+  "groundBlasts": [
+    {
+      "screen": [
+        0.55
+      ],
+      "distance": 380,
+      "size": 60,
+      "age": 0.4
+    },
+    {
+      "screen": [
+        0.9
+      ],
+      "distance": 460,
+      "size": 55,
+      "age": 1.2
+    }
+  ],
+  "flak": [
+    {
+      "screen": [
+        0.3,
+        0.76
+      ],
+      "distance": 420,
+      "size": 28,
+      "age": 1.0
+    },
+    {
+      "screen": [
+        0.58,
+        0.7
+      ],
+      "distance": 440,
+      "size": 26,
+      "age": 0.2
+    }
+  ],
+  "smoke": [
+    {
+      "screenX": 0.08,
+      "distance": 520,
+      "scale": 0.9
+    },
+    {
+      "screenX": 0.62,
+      "distance": 560,
+      "scale": 0.9
+    }
+  ]
+}
