@@ -14,7 +14,7 @@ namespace MetalRaptors
         };
 
         [Tooltip("Spin speed in degrees per second about the plane's nose axis.")]
-        public float degreesPerSecond = 720f;
+        public float degreesPerSecond = 2160f;
 
         [Tooltip("The plane body the spin axis is read from; PlaneFactory wires it at build time.")]
         public Transform axisSpace;

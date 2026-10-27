@@ -199,6 +199,7 @@ namespace MetalRaptors
         Vector3 _gunLocal;
         bool _gunMounted;
         Vector3? _noseLocal;
+        Vector3? _engineLocal;
         float _bodyLow;
         float _bodyHigh;
         float _bodyBack;
@@ -296,6 +297,14 @@ namespace MetalRaptors
 
         public Vector3 NosePoint => transform.TransformPoint(_noseLocal ?? Vector3.zero);
 
+        public void MountEngine(Vector3? local)
+        {
+            _engineLocal = local;
+            if (local.HasValue && _smoke != null) _smoke.Mount = local.Value;
+        }
+
+        Vector3? FireLocal => _engineLocal ?? _noseLocal;
+
         public void MountGun(Vector3 local)
         {
             _gunLocal = local;
@@ -313,10 +322,10 @@ namespace MetalRaptors
             if (_dead || _falling || Blazing) return;
 
             Blazing = true;
-            if (_fire == null) _fire = PlaneFire.Ignite(gameObject, ModelSize * BlazeScale, _noseLocal);
+            if (_fire == null) _fire = PlaneFire.Ignite(gameObject, ModelSize * BlazeScale, FireLocal);
             if (_smoke == null) return;
 
-            if (_noseLocal.HasValue) _smoke.Mount = _noseLocal.Value;
+            if (FireLocal.HasValue) _smoke.Mount = FireLocal.Value;
             _smoke.Arm(ModelSize);
         }
 
@@ -333,6 +342,7 @@ namespace MetalRaptors
             {
                 _sputter = gameObject.AddComponent<SmokeTrail>();
                 _sputter.Tint(SputterColor);
+                if (_engineLocal.HasValue) _sputter.Mount = _engineLocal.Value;
             }
             _sputter.Arm(ModelSize);
         }
@@ -1715,7 +1725,7 @@ namespace MetalRaptors
 
             if (_sputter != null) _sputter.Settle();
             if (_smoke != null) _smoke.Ignite(ModelSize);
-            if (_fire == null) _fire = PlaneFire.Ignite(gameObject, ModelSize);
+            if (_fire == null) _fire = PlaneFire.Ignite(gameObject, ModelSize, _engineLocal);
 
             _fall = PlaneFall.Begin(_rb, _heading, _config.flySpeed);
             if (_bar != null) Destroy(_bar.gameObject);

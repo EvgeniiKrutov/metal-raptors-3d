@@ -326,18 +326,22 @@ namespace MetalRaptors
                 skin: skin ?? PlaneSkins.Enemy(plane, _skin));
             if (!Mathf.Approximately(ModelScale, 1f)) model.localScale *= ModelScale;
 
-            bool gunned = plane.gunLift > 0f;
-            Vector3 gun = gunned
-                ? PlaneFactory.GunLocal(go, model, plane, ModelScale, mirrored: true)
-                : Vector3.zero;
+            bool gunned = PlaneFactory.GunMuzzleLocal(go, model, plane, out Vector3 gun);
+            if (!gunned && plane.gunLift > 0f)
+            {
+                gunned = true;
+                gun = PlaneFactory.GunLocal(go, model, plane, ModelScale, mirrored: true);
+            }
 
             Vector3 nose = PlaneFactory.NoseLocal(go, model, plane);
+            Vector3? engine = PlaneFactory.EngineLocal(go, model, plane);
 
             var enemy = go.AddComponent<EnemyController>();
             enemy.Initialize(config, _player, _minX, _maxX, _groundY, CeilingFor(plane),
                 EdgeMargin);
             if (gunned) enemy.MountGun(gun);
             enemy.MountNose(nose);
+            enemy.MountEngine(engine);
             enemy.OnDestroyed += OnDestroyed;
             _live.Add(enemy);
             _planes[enemy] = plane;

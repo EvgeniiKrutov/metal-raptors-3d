@@ -47,6 +47,8 @@ namespace MetalRaptors
 
         public float pivotFromNose;
 
+        public float pivotHeight;
+
         public float LengthUnits => lengthMeters * UnitsPerMeter;
 
         public float OnScreenSize => wingspanMeters * UnitsPerMeter;
@@ -165,15 +167,21 @@ namespace MetalRaptors
             description    = FokkerStory,
             standUpEuler   = new Vector3(90f, -90f, 0f),
             rollWheelsDown = true,
+            pitchTrimDeg   = 10f,
             lengthMeters   = 5.77f,
             wingspanMeters = 7.19f,
             heightMeters   = 2.95f,
             fitWingspan    = true,
-            propPivotNode  = "propPivot",
-            propBladesNode = "propBlades",
-            straightenProp = true,
-            gunLift        = 0.066f,
-            gunSetback     = 0.127f,
+            pivotFromNose  = 0.41f,
+            propPivotNode  = "Propeller",
+            propBladesNode = "prop_mesh",
+            gunNode        = "guns_mesh",
+            gunLift        = 0.093f,
+            gunSetback     = 0.121f,
+            engineNode     = "cowling_shell",
+            wingNode       = "upper_wing",
+            hitboxNode     = "fuselage_shell",
+            hitboxFloor    = 0.34f,
             skins          = PlaneSkins.FokkerDr1,
             stats = new PlaneStats
             {
@@ -231,13 +239,20 @@ namespace MetalRaptors
             rollWheelsDown = true,
             pitchTrimDeg   = 10f,
             lengthMeters   = 7.2f,
-            wingspanMeters = 9.52f,
-            heightMeters   = 2.4f,
+            wingspanMeters = 9.54f,
+            heightMeters   = 2.8f,
             fitWingspan    = true,
-            propPivotNode  = "propeller",
-            propBladesNode = "prop_blade_1",
-            gunLift        = 0.057f,
-            gunSetback     = 0.141f,
+            pivotFromNose  = 0.51f,
+            pivotHeight    = 0.58f,
+            propPivotNode  = "Propeller",
+            propBladesNode = "prop_mesh",
+            gunNode        = "gun_mesh",
+            gunLift        = 0.083f,
+            gunSetback     = 0.038f,
+            engineNode     = "cowling_shell",
+            wingNode       = "Wings",
+            hitboxNode     = "fuselage_box",
+            hitboxFloor    = 0.42f,
             skins          = PlaneSkins.FokkerEindecker,
             stats = new PlaneStats
             {

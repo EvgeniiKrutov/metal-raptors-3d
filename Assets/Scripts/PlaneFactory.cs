@@ -53,6 +53,7 @@ namespace MetalRaptors
                 FitSpan(model.transform, Quaternion.Inverse(standUp) * Vector3.forward,
                     plane.OnScreenSize);
             ShiftPivot(model.transform, lengthAxis, plane.pivotFromNose);
+            ShiftPivot(model.transform, -ModelUp(plane), plane.pivotHeight);
 
             foreach (var r in model.GetComponentsInChildren<Renderer>())
                 r.shadowCastingMode = ShadowCastingMode.On;
@@ -172,14 +173,21 @@ namespace MetalRaptors
             return renderers.Length > 0;
         }
 
-        static void ShiftPivot(Transform model, Vector3 lengthAxis, float fromNose)
+        static void ShiftPivot(Transform model, Vector3 axis, float fromEnd)
         {
-            if (fromNose <= 0f || !ModelBounds(model, out Bounds bounds)) return;
+            if (fromEnd <= 0f || !ModelBounds(model, out Bounds bounds)) return;
 
-            float length = ExtentAlong(bounds, lengthAxis);
-            float nose = Vector3.Dot(bounds.center, lengthAxis) + length * 0.5f;
-            Vector3 shift = lengthAxis * (length * fromNose - nose);
+            float length = ExtentAlong(bounds, axis);
+            float end = Vector3.Dot(bounds.center, axis) + length * 0.5f;
+            Vector3 shift = axis * (length * fromEnd - end);
             foreach (Transform child in model) child.localPosition += shift;
+        }
+
+        static Vector3 ModelUp(PlaneModelConfig plane)
+        {
+            Quaternion standUp = (plane.rollWheelsDown ? Quaternion.Euler(180f, 0f, 0f) : Quaternion.identity)
+                               * Quaternion.Euler(plane.standUpEuler);
+            return Quaternion.Inverse(standUp) * Vector3.up;
         }
 
         static void NormalizeLength(Transform model, Vector3 lengthAxis, float targetLength)
@@ -318,10 +326,7 @@ namespace MetalRaptors
         static void RaiseFloor(List<Vector3> corners, Transform model, Transform host,
             PlaneModelConfig plane)
         {
-            Quaternion standUp = (plane.rollWheelsDown ? Quaternion.Euler(180f, 0f, 0f) : Quaternion.identity)
-                               * Quaternion.Euler(plane.standUpEuler);
-            Vector3 modelUp = Quaternion.Inverse(standUp) * Vector3.up;
-            Vector3 up = host.InverseTransformDirection(model.TransformDirection(modelUp)).normalized;
+            Vector3 up = host.InverseTransformDirection(model.TransformDirection(ModelUp(plane))).normalized;
 
             float low = float.MaxValue, high = float.MinValue;
             foreach (Vector3 corner in corners)

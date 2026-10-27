@@ -31,7 +31,7 @@ namespace MetalRaptors
         const float SpinUpSeconds = 0.45f;
         const float SpinHoldSeconds = 1f;
         const float SpinDownSeconds = 1.6f;
-        const float SpinPeakDegreesPerSecond = 1100f;
+        const float SpinPeakDegreesPerSecond = 3300f;
 
         const string LockedLabel = "LOCKED";
         const float LockedPadX = 22f;

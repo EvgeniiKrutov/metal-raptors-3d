@@ -30,6 +30,7 @@ namespace MetalRaptors
         const float BoltSpread = 0.012f;
         const float GunSpacing = 1.4f;
         const float CamelGunSpacing = 0.8f;
+        const float TriplaneGunSpacing = 0.9f;
         const float GunFlashScale = 0.3f;
         const float CaptureFlashScale = 0.45f;
 
@@ -310,7 +311,8 @@ namespace MetalRaptors
                 flyer.gun = PlaneFactory.GunLocal(go, model, config, PlaneModelConfig.LevelScale, false);
             else flyer.gun = PlaneFactory.NoseLocal(go, model, config);
             flyer.gunSpacing = config == PlaneModels.Eindecker ? 0f
-                : config == PlaneModels.Sopwith ? CamelGunSpacing : GunSpacing;
+                : config == PlaneModels.Sopwith ? CamelGunSpacing
+                : config == PlaneModels.Fokker ? TriplaneGunSpacing : GunSpacing;
 
             Vector3? engine = PlaneFactory.EngineLocal(go, model, config);
             if (spec.burning || spec.smoking)
