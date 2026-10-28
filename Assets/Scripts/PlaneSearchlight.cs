@@ -7,9 +7,9 @@ namespace MetalRaptors
     {
         const float RangeOfView = 0.6f;
         const float Intensity = 3f;
-        const float InnerAngle = 14f;
-        const float OuterAngle = 34f;
-        const float Falloff = 1.6f;
+        public const float InnerAngle = 14f;
+        public const float OuterAngle = 34f;
+        public const float Falloff = 1.6f;
         const float SourceInsideFraction = 0.3f;
         const float MinSourceRadius = 4f;
         const int Priority = 100;

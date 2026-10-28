@@ -531,6 +531,9 @@ namespace MetalRaptors
 
             foreach (Transform fire in _fires)
                 if (fire != null) PlaneFire.Ignite(fire.gameObject, FireSize);
+
+            foreach (Searchlight lamp in GetComponentsInChildren<Searchlight>())
+                lamp.Fail();
         }
 
         void PlaceBar()

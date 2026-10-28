@@ -21,6 +21,9 @@ namespace MetalRaptors
         public bool ambientZeppelins;
         public bool ambientPeople = true;
         public bool ambientClouds = true;
+        public bool aerodrome;
+        public bool aerodromeFires;
+        public bool darkHangars;
         public float clearNear;
         public ShotCamera camera = new ShotCamera();
         public ShotFocus focus = new ShotFocus();
@@ -32,6 +35,10 @@ namespace MetalRaptors
         public ShotBurst[] explosions = new ShotBurst[0];
         public ShotSmoke[] smoke = new ShotSmoke[0];
         public ShotZeppelin[] zeppelins = new ShotZeppelin[0];
+        public ShotCrater[] craters = new ShotCrater[0];
+        public ShotCloud[] clouds = new ShotCloud[0];
+        public ShotMistSpec mist = new ShotMistSpec();
+        public ShotFill planeFill = new ShotFill();
     }
 
     [Serializable]
@@ -78,6 +85,9 @@ namespace MetalRaptors
         public float aimLag;
         public float fireInterval;
         public float flashScale;
+        public float overshoot;
+        public bool sharpProp;
+        public bool boost;
     }
 
     [Serializable]
@@ -90,6 +100,10 @@ namespace MetalRaptors
         public int faction;
         public bool fire;
         public int target;
+        public bool atSquad;
+        public int cover;
+        public float coverScale;
+        public bool unarmed;
     }
 
     [Serializable]
@@ -102,7 +116,10 @@ namespace MetalRaptors
         public float yaw;
         public float scale;
         public float sink;
+        public float pitch;
+        public float tilt;
         public bool burning;
+        public float smokeScale;
     }
 
     [Serializable]
@@ -132,5 +149,46 @@ namespace MetalRaptors
         public float distance;
         public float scale;
         public bool dense;
+    }
+
+    [Serializable]
+    public class ShotCrater
+    {
+        public float screenX;
+        public float distance;
+        public float radius;
+        public float depth;
+    }
+
+    [Serializable]
+    public class ShotCloud
+    {
+        public float[] screen;
+        public float distance;
+        public float width;
+        public float alpha;
+    }
+
+    [Serializable]
+    public class ShotFill
+    {
+        public float intensity;
+        public float yaw;
+        public float pitch;
+        public float[] color;
+    }
+
+    [Serializable]
+    public class ShotMistSpec
+    {
+        public float strength;
+        public float top;
+        public float clear;
+        public float near;
+        public float far;
+        public float nearShare;
+        public float patchSize;
+        public float patchiness;
+        public float whiten;
     }
 }

@@ -59,6 +59,19 @@ namespace MetalRaptors
         {
             _art.sprite = sprite;
             _art.enabled = sprite != null;
+
+            RectTransform rt = _title.rectTransform;
+            rt.sizeDelta = new Vector2(-2f * TitleInset(sprite), rt.sizeDelta.y);
+        }
+
+        float TitleInset(Sprite sprite)
+        {
+            if (sprite == null || sprite.rect.height <= 0f) return MenuTheme.CardPad;
+
+            float width = Size - 2f * MenuTheme.CardPad;
+            float height = Size - MenuTheme.CardPad - ArtBottom;
+            float shown = Mathf.Min(width, height * sprite.rect.width / sprite.rect.height);
+            return MenuTheme.CardPad + (width - shown) * 0.5f;
         }
 
         public void SetStatus(string status)

@@ -54,6 +54,51 @@ namespace MetalRaptors
         public float NoiseMix = -1f;
         public float GateAmount;
         public float GateHold = 0.16f;
+
+        public float Breath;
+        public float Drive;
+        public MusicLfo Vibrato;
+        public MusicLfo Tremolo;
+        public MusicBend Bend;
+        public MusicFm Fm;
+        public MusicPluck Pluck;
+        public MusicSync Sync;
+        public float[] Partials;
+    }
+
+    public class MusicLfo
+    {
+        public float Rate = 5f;
+        public float Depth;
+        public float Delay;
+    }
+
+    public class MusicBend
+    {
+        public float Cents;
+        public float Time = 0.08f;
+    }
+
+    public class MusicFm
+    {
+        public float Ratio = 1f;
+        public float Index = 2f;
+        public float Sustain;
+        public float Decay = 0.3f;
+        public float Attack;
+    }
+
+    public class MusicPluck
+    {
+        public float Decay = 1.5f;
+        public float Tone = 0.5f;
+    }
+
+    public class MusicSync
+    {
+        public float Ratio = 2f;
+        public float Env;
+        public float Decay = 0.2f;
     }
 
     public class MusicAdsr
@@ -71,6 +116,7 @@ namespace MetalRaptors
         public float Env;
         public float Decay = 0.2f;
         public float Keytrack;
+        public string Type = "lowpass";
     }
 
     public class MusicFx
@@ -107,6 +153,7 @@ namespace MetalRaptors
     public class MusicNote
     {
         public float Frequency;
+        public float[] Chord;
         public float Beats;
         public float Velocity = 1f;
     }
@@ -246,7 +293,52 @@ namespace MetalRaptors
                 NoiseMix = GetFloat(track, "noiseMix", -1f),
                 GateAmount = GetFloat(track, "gatedReverb", 0f),
                 GateHold = GetFloat(track, "gateHold", 0.16f),
+                Breath = GetFloat(track, "breath", 0f),
+                Drive = GetFloat(track, "drive", 0f),
+                Vibrato = BuildLfo(GetObject(track, "vibrato") as Dictionary<string, object>),
+                Tremolo = BuildLfo(GetObject(track, "tremolo") as Dictionary<string, object>),
+                Partials = BuildPartials(track),
             };
+
+            if (GetObject(track, "bend") is Dictionary<string, object> bend)
+            {
+                result.Bend = new MusicBend
+                {
+                    Cents = GetFloat(bend, "cents", 0f),
+                    Time = GetFloat(bend, "time", 0.08f),
+                };
+            }
+
+            if (GetObject(track, "fm") is Dictionary<string, object> fm)
+            {
+                result.Fm = new MusicFm
+                {
+                    Ratio = GetFloat(fm, "ratio", 1f),
+                    Index = GetFloat(fm, "index", 2f),
+                    Sustain = GetFloat(fm, "sustain", 0f),
+                    Decay = GetFloat(fm, "decay", 0.3f),
+                    Attack = GetFloat(fm, "attack", 0f),
+                };
+            }
+
+            if (GetObject(track, "pluck") is Dictionary<string, object> pluck)
+            {
+                result.Pluck = new MusicPluck
+                {
+                    Decay = GetFloat(pluck, "decay", 1.5f),
+                    Tone = GetFloat(pluck, "tone", 0.5f),
+                };
+            }
+
+            if (GetObject(track, "sync") is Dictionary<string, object> sync)
+            {
+                result.Sync = new MusicSync
+                {
+                    Ratio = GetFloat(sync, "ratio", 2f),
+                    Env = GetFloat(sync, "env", 0f),
+                    Decay = GetFloat(sync, "decay", 0.2f),
+                };
+            }
 
             if (GetObject(track, "send") is Dictionary<string, object> send)
             {
@@ -274,10 +366,37 @@ namespace MetalRaptors
                     Env = GetFloat(filter, "env", 0f),
                     Decay = GetFloat(filter, "decay", 0.2f),
                     Keytrack = GetFloat(filter, "keytrack", 0f),
+                    Type = GetString(filter, "type", "lowpass"),
                 };
             }
 
             return result;
+        }
+
+        static MusicLfo BuildLfo(Dictionary<string, object> lfo)
+        {
+            if (lfo == null) return null;
+            return new MusicLfo
+            {
+                Rate = GetFloat(lfo, "rate", 5f),
+                Depth = GetFloat(lfo, "depth", 0f),
+                Delay = GetFloat(lfo, "delay", 0f),
+            };
+        }
+
+        static float[] BuildPartials(Dictionary<string, object> track)
+        {
+            if (!track.TryGetValue("partials", out var value) || !(value is List<object> list)) return null;
+
+            var partials = new List<float>(list.Count * 2);
+            foreach (var entry in list)
+            {
+                if (!(entry is List<object> pair) || pair.Count < 2) continue;
+                if (!(pair[0] is double ratio) || !(pair[1] is double amp)) continue;
+                partials.Add((float)ratio);
+                partials.Add((float)amp);
+            }
+            return partials.Count > 0 ? partials.ToArray() : null;
         }
 
         static List<MusicNote> BuildNotes(List<object> tuples)
@@ -286,12 +405,24 @@ namespace MetalRaptors
             foreach (var value in tuples)
             {
                 if (!(value is List<object> tuple) || tuple.Count < 2) continue;
-                notes.Add(new MusicNote
+                var note = new MusicNote
                 {
-                    Frequency = PitchToFrequency(tuple[0]),
                     Beats = tuple[1] is double beats ? (float)beats : 0f,
                     Velocity = tuple.Count > 2 && tuple[2] is double velocity ? (float)velocity : 1f,
-                });
+                };
+
+                if (tuple[0] is List<object> chord)
+                {
+                    note.Chord = new float[chord.Count];
+                    for (int i = 0; i < chord.Count; i++) note.Chord[i] = PitchToFrequency(chord[i]);
+                    note.Frequency = note.Chord.Length > 0 ? note.Chord[0] : 0f;
+                }
+                else
+                {
+                    note.Frequency = PitchToFrequency(tuple[0]);
+                }
+
+                notes.Add(note);
             }
             return notes;
         }

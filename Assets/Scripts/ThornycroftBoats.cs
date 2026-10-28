@@ -21,6 +21,16 @@ namespace MetalRaptors
         const float PivotAft = 0.3f;
         const float Trim = 3.5f;
 
+        const float LampForward = 0.85f;
+        const float LampHeight = 3.7f;
+        const float LampDip = 2.5f;
+        const float LampReach = 0.7f;
+        const float LampSource = 1f;
+        const float LampGlowSize = 0.9f;
+        const float LampSoft = 2f;
+        const float LampIntensity = 0.55f;
+        const float LampGlow = 1.6f;
+
         const float PitchSlowMin = 0.5f, PitchSlowMax = 0.9f, PitchSlowSecMin = 1.6f, PitchSlowSecMax = 2.4f;
         const float PitchFastMin = 0.2f, PitchFastMax = 0.4f, PitchFastSecMin = 0.6f, PitchFastSecMax = 0.9f;
         const float RollMin = 1f, RollMax = 1.8f, RollSecMin = 2.6f, RollSecMax = 3.6f;
@@ -198,6 +208,7 @@ namespace MetalRaptors
 
             NightReceivers.Adopt(view, 1f, 1f);
             NightLights.MarkCaster(view);
+            MountLamp(motion, window);
 
             var boat = new Boat
             {
@@ -216,6 +227,23 @@ namespace MetalRaptors
             Animate(boat, time);
             boat.wake.Follow(root.position, time);
             _boats.Add(boat);
+        }
+
+        void MountLamp(Transform motion, float window)
+        {
+            var spot = new Vector3(_pivot + LampForward * _scale, (LampHeight - Draft) * _scale, 0f);
+            Searchlight lamp = Searchlight.Mount(motion, spot);
+            if (lamp == null) return;
+
+            float dip = LampDip * Mathf.Deg2Rad;
+            lamp.aim = new Vector3(Mathf.Cos(dip), -Mathf.Sin(dip), 0f);
+            lamp.sweep = 0f;
+            lamp.length = window * LampReach;
+            lamp.sourceRadius = LampSource * _scale;
+            lamp.glowSize = LampGlowSize * _scale;
+            lamp.soft = LampSoft * _scale;
+            lamp.intensity = LampIntensity;
+            lamp.glowIntensity = LampGlow;
         }
 
         void Animate(Boat boat, float time)

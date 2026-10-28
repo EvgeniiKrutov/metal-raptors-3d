@@ -11,6 +11,24 @@ namespace MetalRaptors
         const int CoeffInterval = 32;
         const int NoiseSeed = 8087;
         const float RefHz = 261.6256f;
+        const double TwoPi = 2.0 * Math.PI;
+        const double CentsToLog = 0.000577622650466621;
+        const double VibratoRamp = 0.25;
+        const float PluckLevel = 0.6f;
+
+        const int WaveSine = 0;
+        const int WaveSquare = 1;
+        const int WavePulse = 2;
+        const int WaveTriangle = 3;
+        const int WaveSaw = 4;
+        const int WaveFm = 5;
+        const int WaveSync = 6;
+        const int WaveAdditive = 7;
+        const int WavePluck = 8;
+
+        const int FilterLow = 0;
+        const int FilterBand = 1;
+        const int FilterHigh = 2;
 
         class Ctx
         {
@@ -24,12 +42,16 @@ namespace MetalRaptors
             public float[] Noise;
             public float[] ScratchL = new float[0];
             public float[] ScratchR = new float[0];
+            public float[] ScratchVoice = new float[0];
+            public double[] ScratchHz = new double[0];
 
             public void EnsureScratch(int count)
             {
                 if (ScratchL.Length >= count) return;
                 ScratchL = new float[count];
                 ScratchR = new float[count];
+                ScratchVoice = new float[count];
+                ScratchHz = new double[count];
             }
         }
 
@@ -81,6 +103,8 @@ namespace MetalRaptors
                             {
                                 if (!string.IsNullOrEmpty(track.Drum))
                                     RenderDrum(ctx, track, level, noteTime);
+                                else if (note.Chord != null)
+                                    RenderChord(ctx, track, note.Chord, level, noteTime, slot);
                                 else if (note.Frequency > 0f)
                                     RenderVoiceGroup(ctx, track, note.Frequency, prevHz, level, noteTime, slot);
                             }
@@ -169,7 +193,8 @@ namespace MetalRaptors
             float voiceLevel = 1f / (float)Math.Sqrt(voices);
             bool glide = track.Glide > 0f && previous > 0f;
             int wave = WaveId(track.Wave);
-            float pulseWidth = track.PulseWidth;
+            double[] pitch = PitchCurve(ctx, track, frequency, glide ? previous : 0f, count);
+            var voice = ctx.ScratchVoice;
 
             for (int v = 0; v < voices; v++)
             {
@@ -179,35 +204,30 @@ namespace MetalRaptors
                 float angle = (pan + 1f) * (float)Math.PI * 0.25f;
                 float gainL = (float)Math.Cos(angle) * voiceLevel;
                 float gainR = (float)Math.Sin(angle) * voiceLevel;
-
                 double detune = Math.Pow(2.0, cents / 1200.0);
-                double phase = (v * 0.1373) % 1.0;
+
+                if (wave == WavePluck) Pluck(ctx, track.Pluck, frequency * detune, v, voice, count);
+                else Oscillate(ctx, track, wave, pitch, detune, v, voice, count);
 
                 for (int i = 0; i < count; i++)
                 {
-                    double t = i / (double)ctx.Rate;
-                    double hz = frequency;
-                    if (glide && t < track.Glide)
-                    {
-                        double k = t / track.Glide;
-                        hz = previous * Math.Pow(frequency / previous, k);
-                    }
-                    float s = Shape(wave, pulseWidth, phase);
-                    left[i] += s * gainL;
-                    right[i] += s * gainR;
-                    phase += hz * detune / ctx.Rate;
-                    if (phase >= 1.0) phase -= 1.0;
+                    left[i] += voice[i] * gainL;
+                    right[i] += voice[i] * gainR;
                 }
             }
 
+            if (track.Drive > 0f) ApplyDrive(track.Drive, left, right, count);
             if (track.Filter != null) ApplyNoteFilter(ctx, track.Filter, frequency, left, right, count);
 
             float duckAmount = track.Duck;
+            var tremolo = track.Tremolo;
             for (int i = 0; i < count; i++)
             {
                 float t = i / (float)ctx.Rate;
                 float env = Envelope(adsr, t, (float)hold);
                 if (env <= 0f) continue;
+                if (tremolo != null)
+                    env *= 1f - tremolo.Depth * (0.5f + 0.5f * (float)Math.Sin(TwoPi * tremolo.Rate * t));
 
                 int idx = Index(start + i, ctx.Frames, ctx.Wrap);
                 if (idx < 0) break;
@@ -225,6 +245,184 @@ namespace MetalRaptors
             }
         }
 
+        static void RenderChord(Ctx ctx, MusicTrack track, float[] chord, float level,
+            double startSec, double slotSec)
+        {
+            foreach (float hz in chord)
+            {
+                if (hz > 0f) RenderVoiceGroup(ctx, track, hz, 0f, level, startSec, slotSec);
+            }
+        }
+
+        static double[] PitchCurve(Ctx ctx, MusicTrack track, float frequency, float previous, int count)
+        {
+            var hz = ctx.ScratchHz;
+            var bend = track.Bend;
+            var vibrato = track.Vibrato;
+            double glide = previous > 0f ? track.Glide : 0.0;
+
+            for (int i = 0; i < count; i++)
+            {
+                double t = i / (double)ctx.Rate;
+                double value = t < glide ? previous * Math.Pow(frequency / previous, t / glide) : frequency;
+                double cents = 0.0;
+                if (bend != null && t < bend.Time)
+                {
+                    double k = 1.0 - t / bend.Time;
+                    cents += bend.Cents * k * k;
+                }
+                if (vibrato != null && t > vibrato.Delay)
+                {
+                    double ramp = Math.Min(1.0, (t - vibrato.Delay) / VibratoRamp);
+                    cents += vibrato.Depth * ramp * Math.Sin(TwoPi * vibrato.Rate * t);
+                }
+                hz[i] = cents == 0.0 ? value : value * Math.Exp(cents * CentsToLog);
+            }
+            return hz;
+        }
+
+        static void Oscillate(Ctx ctx, MusicTrack track, int wave, double[] pitch, double detune, int v,
+            float[] output, int count)
+        {
+            double phase = (v * 0.1373) % 1.0;
+            double cycles = phase;
+            double second = 0.0;
+            float pulseWidth = track.PulseWidth;
+
+            var fm = track.Fm ?? new MusicFm();
+            double fmSwing = fm.Index - fm.Sustain;
+            double fmFall = Math.Exp(-1.0 / (Math.Max(fm.Decay, 0.001f) * ctx.Rate));
+            double fmAttack = fm.Attack * ctx.Rate;
+
+            var sync = track.Sync ?? new MusicSync();
+            double syncSweep = sync.Env;
+            double syncFall = Math.Exp(-1.0 / (Math.Max(sync.Decay, 0.001f) * ctx.Rate));
+
+            var partials = track.Partials;
+            float partialNorm = PartialNorm(partials);
+            float breath = track.Breath;
+            int noise = (v * 7919 + (int)(pitch[0] * 7.0)) % ctx.Noise.Length;
+
+            for (int i = 0; i < count; i++)
+            {
+                double dt = pitch[i] * detune / ctx.Rate;
+                float s;
+                switch (wave)
+                {
+                    case WaveFm:
+                    {
+                        double index = fm.Sustain + fmSwing;
+                        if (i < fmAttack) index *= i / fmAttack;
+                        s = (float)Math.Sin(TwoPi * phase + index * Math.Sin(TwoPi * second));
+                        second += dt * fm.Ratio;
+                        second -= Math.Floor(second);
+                        fmSwing *= fmFall;
+                        break;
+                    }
+                    case WaveSync:
+                    {
+                        s = (float)(Math.Sin(TwoPi * second) * (1.0 - phase));
+                        second += dt * (sync.Ratio + syncSweep);
+                        second -= Math.Floor(second);
+                        syncSweep *= syncFall;
+                        break;
+                    }
+                    case WaveAdditive:
+                        s = Additive(partials, cycles) * partialNorm;
+                        cycles += dt;
+                        break;
+                    default:
+                        s = Shape(wave, pulseWidth, phase, dt);
+                        break;
+                }
+
+                if (breath > 0f) s += breath * ctx.Noise[(noise + i) % ctx.Noise.Length];
+                output[i] = s;
+
+                phase += dt;
+                if (phase >= 1.0)
+                {
+                    phase -= 1.0;
+                    if (wave == WaveSync) second = phase * (sync.Ratio + syncSweep);
+                }
+            }
+        }
+
+        static float Additive(float[] partials, double cycles)
+        {
+            if (partials == null) return (float)Math.Sin(TwoPi * (cycles - Math.Floor(cycles)));
+
+            double sum = 0.0;
+            for (int p = 0; p + 1 < partials.Length; p += 2)
+            {
+                double x = cycles * partials[p];
+                sum += partials[p + 1] * Math.Sin(TwoPi * (x - Math.Floor(x)));
+            }
+            return (float)sum;
+        }
+
+        static float PartialNorm(float[] partials)
+        {
+            if (partials == null) return 1f;
+
+            double power = 0.0;
+            for (int p = 1; p < partials.Length; p += 2) power += partials[p] * partials[p];
+            return power > 0.0 ? (float)(1.0 / Math.Sqrt(power)) : 1f;
+        }
+
+        static void Pluck(Ctx ctx, MusicPluck pluck, double hz, int v, float[] output, int count)
+        {
+            hz = Math.Max(hz, 20.0);
+            float tone = Clamp(pluck?.Tone ?? 0.5f, 0f, 1f);
+            float decay = Math.Max(pluck?.Decay ?? 1.5f, 0.05f);
+            double stretch = 0.5 * (1.0 - tone);
+            double period = ctx.Rate / hz;
+            double delay = Math.Max(2.0, period - stretch);
+            double loss = Math.Pow(10.0, -3.0 / (decay * hz));
+            int burst = Math.Min(count, (int)Math.Ceiling(delay) + 2);
+            float smooth = 0.12f + 0.8f * tone;
+            int offset = (v * 4507 + (int)(hz * 13.0)) % ctx.Noise.Length;
+
+            float low = 0f;
+            double mean = 0.0;
+            for (int i = 0; i < burst; i++)
+            {
+                low += smooth * (ctx.Noise[(offset + i) % ctx.Noise.Length] - low);
+                output[i] = low;
+                mean += low;
+            }
+            mean /= Math.Max(burst, 1);
+
+            double power = 0.0;
+            for (int i = 0; i < burst; i++)
+            {
+                output[i] -= (float)mean;
+                power += output[i] * output[i];
+            }
+            float gain = power > 0.0 ? PluckLevel / (float)Math.Sqrt(power / Math.Max(burst, 1)) : 0f;
+            for (int i = 0; i < burst; i++) output[i] *= gain;
+
+            for (int i = burst; i < count; i++)
+            {
+                double at = i - delay;
+                int i0 = (int)at;
+                double f = at - i0;
+                double a = output[i0] + (output[i0 + 1] - output[i0]) * f;
+                double b = output[i0 - 1] + (output[i0] - output[i0 - 1]) * f;
+                output[i] = (float)(loss * ((1.0 - stretch) * a + stretch * b));
+            }
+        }
+
+        static void ApplyDrive(float drive, float[] left, float[] right, int count)
+        {
+            float norm = 1f / (float)Math.Tanh(drive);
+            for (int i = 0; i < count; i++)
+            {
+                left[i] = (float)Math.Tanh(left[i] * drive) * norm;
+                right[i] = (float)Math.Tanh(right[i] * drive) * norm;
+            }
+        }
+
         static void ApplyNoteFilter(Ctx ctx, MusicFilter filter, float frequency,
             float[] left, float[] right, int count)
         {
@@ -233,6 +431,7 @@ namespace MetalRaptors
             float decay = Math.Max(filter.Decay, 0.001f);
             float k = 2f - 1.98f * Clamp(filter.Resonance, 0f, 1f);
             float nyquist = ctx.Rate * 0.45f;
+            int mode = FilterMode(filter.Type);
 
             double l1 = 0, l2 = 0, r1 = 0, r2 = 0;
             float a1 = 0, a2 = 0, a3 = 0;
@@ -249,19 +448,41 @@ namespace MetalRaptors
                     a3 = g * a2;
                 }
 
-                double v3 = left[i] - l2;
+                double x = left[i];
+                double v3 = x - l2;
                 double v1 = a1 * l1 + a2 * v3;
                 double v2 = l2 + a2 * l1 + a3 * v3;
                 l1 = 2 * v1 - l1;
                 l2 = 2 * v2 - l2;
-                left[i] = (float)v2;
+                left[i] = FilterOut(mode, x, v1, v2, k);
 
-                v3 = right[i] - r2;
+                x = right[i];
+                v3 = x - r2;
                 v1 = a1 * r1 + a2 * v3;
                 v2 = r2 + a2 * r1 + a3 * v3;
                 r1 = 2 * v1 - r1;
                 r2 = 2 * v2 - r2;
-                right[i] = (float)v2;
+                right[i] = FilterOut(mode, x, v1, v2, k);
+            }
+        }
+
+        static float FilterOut(int mode, double input, double band, double low, float k)
+        {
+            switch (mode)
+            {
+                case FilterBand: return (float)band;
+                case FilterHigh: return (float)(input - k * band - low);
+                default: return (float)low;
+            }
+        }
+
+        static int FilterMode(string type)
+        {
+            switch (type)
+            {
+                case "bandpass": return FilterBand;
+                case "highpass": return FilterHigh;
+                default: return FilterLow;
             }
         }
 
@@ -272,7 +493,116 @@ namespace MetalRaptors
                 case "kick": RenderKick(ctx, track, level, startSec); break;
                 case "snare": RenderSnare(ctx, track, level, startSec); break;
                 case "clap": RenderClap(ctx, track, level, startSec); break;
+                case "rim": RenderRim(ctx, track, level, startSec); break;
+                case "metal": RenderMetal(ctx, track, level, startSec); break;
+                case "brush": RenderBrush(ctx, track, level, startSec); break;
                 default: RenderHat(ctx, track, level, startSec); break;
+            }
+        }
+
+        static void RenderRim(Ctx ctx, MusicTrack track, float level, double startSec)
+        {
+            float tune = track.Tune >= 0f ? track.Tune : 1700f;
+            float decay = track.Decay >= 0f ? track.Decay : 0.03f;
+            int start = (int)Math.Round(startSec * ctx.Rate);
+            int count = (int)((decay * 5f + 0.01f) * ctx.Rate);
+            int offset = (int)(startSec * 419.0) % ctx.Noise.Length;
+            PanGains(track.Pan, UnityCentre, out float gainL, out float gainR);
+            double phase = 0;
+            float hp = 0, prev = 0;
+
+            for (int i = 0; i < count; i++)
+            {
+                int idx = Index(start + i, ctx.Frames, ctx.Wrap);
+                if (idx < 0) break;
+
+                float t = i / (float)ctx.Rate;
+                float raw = ctx.Noise[(offset + i) % ctx.Noise.Length];
+                hp = 0.7f * (hp + raw - prev);
+                prev = raw;
+
+                float body = (float)Math.Sin(phase * TwoPi) * (float)Math.Exp(-t / decay)
+                             + hp * 0.8f * (float)Math.Exp(-t / 0.004f);
+                float outSample = Drive(body * 1.3f) * level;
+                ctx.Dry[idx * 2] += outSample * gainL;
+                ctx.Dry[idx * 2 + 1] += outSample * gainR;
+                if (track.ReverbSend > 0f) ctx.ReverbSend[idx] += outSample * track.ReverbSend;
+                if (track.DelaySend > 0f) ctx.DelaySend[idx] += outSample * track.DelaySend;
+
+                phase += tune / (double)ctx.Rate;
+                if (phase >= 1.0) phase -= 1.0;
+            }
+        }
+
+        static readonly double[] MetalRatios = { 1.0, 1.4836, 1.7392, 2.2873 };
+
+        static void RenderMetal(Ctx ctx, MusicTrack track, float level, double startSec)
+        {
+            float tune = track.Tune >= 0f ? track.Tune : 560f;
+            float decay = track.Decay >= 0f ? track.Decay : 0.22f;
+            int start = (int)Math.Round(startSec * ctx.Rate);
+            int count = (int)((decay * 4f + 0.02f) * ctx.Rate);
+            PanGains(track.Pan, UnityCentre, out float gainL, out float gainR);
+            var phases = new double[MetalRatios.Length];
+            float hp = 0, prev = 0;
+
+            for (int i = 0; i < count; i++)
+            {
+                int idx = Index(start + i, ctx.Frames, ctx.Wrap);
+                if (idx < 0) break;
+
+                float t = i / (float)ctx.Rate;
+                double sum = 0;
+                for (int p = 0; p < phases.Length; p++)
+                {
+                    double dt = tune * MetalRatios[p] / ctx.Rate;
+                    sum += Shape(WaveSquare, 0.5f, phases[p], dt);
+                    phases[p] += dt;
+                    if (phases[p] >= 1.0) phases[p] -= 1.0;
+                }
+
+                float raw = (float)(sum * 0.25);
+                hp = 0.9f * (hp + raw - prev);
+                prev = raw;
+
+                float amp = (float)Math.Exp(-t / decay) * (0.55f + 0.45f * (float)Math.Exp(-t / 0.015f))
+                            * (1f - (float)Math.Exp(-t / 0.0008f));
+                float outSample = hp * amp * level;
+                ctx.Dry[idx * 2] += outSample * gainL;
+                ctx.Dry[idx * 2 + 1] += outSample * gainR;
+                if (track.ReverbSend > 0f) ctx.ReverbSend[idx] += outSample * track.ReverbSend;
+                if (track.DelaySend > 0f) ctx.DelaySend[idx] += outSample * track.DelaySend;
+            }
+        }
+
+        static void RenderBrush(Ctx ctx, MusicTrack track, float level, double startSec)
+        {
+            float attack = Math.Max(track.Attack >= 0f ? track.Attack : 0.012f, 0.001f);
+            float decay = track.Decay >= 0f ? track.Decay : 0.12f;
+            float tone = track.Tune >= 0f ? track.Tune : 5000f;
+            int start = (int)Math.Round(startSec * ctx.Rate);
+            int count = (int)((attack + decay * 4f) * ctx.Rate);
+            int offset = (int)(startSec * 733.0) % ctx.Noise.Length;
+            float smooth = 1f - (float)Math.Exp(-TwoPi * tone / ctx.Rate);
+            PanGains(track.Pan, HalfPowerCentre, out float gainL, out float gainR);
+            float low = 0, hp = 0, prev = 0;
+
+            for (int i = 0; i < count; i++)
+            {
+                int idx = Index(start + i, ctx.Frames, ctx.Wrap);
+                if (idx < 0) break;
+
+                float t = i / (float)ctx.Rate;
+                low += smooth * (ctx.Noise[(offset + i) % ctx.Noise.Length] - low);
+                hp = 0.96f * (hp + low - prev);
+                prev = low;
+
+                float env = t < attack ? t / attack : (float)Math.Exp(-(t - attack) / decay);
+                float outSample = hp * env * level;
+                ctx.Dry[idx * 2] += outSample * gainL;
+                ctx.Dry[idx * 2 + 1] += outSample * gainR;
+                if (track.ReverbSend > 0f) ctx.ReverbSend[idx] += outSample * track.ReverbSend;
+                if (track.DelaySend > 0f) ctx.DelaySend[idx] += outSample * track.DelaySend;
             }
         }
 
@@ -565,25 +895,53 @@ namespace MetalRaptors
         {
             switch (wave)
             {
-                case "square": return 1;
-                case "pulse": return 2;
-                case "triangle": return 3;
-                case "sawtooth": return 4;
-                default: return 0;
+                case "square": return WaveSquare;
+                case "pulse": return WavePulse;
+                case "triangle": return WaveTriangle;
+                case "sawtooth": return WaveSaw;
+                case "fm": return WaveFm;
+                case "sync": return WaveSync;
+                case "additive": return WaveAdditive;
+                case "pluck": return WavePluck;
+                default: return WaveSine;
             }
         }
 
-        static float Shape(int wave, float pulseWidth, double phase)
+        static float Shape(int wave, float pulseWidth, double phase, double dt)
         {
             switch (wave)
             {
-                case 1: return phase < 0.5 ? 1f : -1f;
-                case 2: return phase < pulseWidth ? 1f : -1f;
-                case 3: return phase < 0.5 ? (float)(4.0 * phase - 1.0) : (float)(3.0 - 4.0 * phase);
-                case 4: return (float)(2.0 * phase - 1.0);
-                default: return (float)Math.Sin(phase * 2.0 * Math.PI);
+                case WaveSquare:
+                    return (float)((phase < 0.5 ? 1.0 : -1.0) + Blep(phase, dt) - Blep(Unit(phase + 0.5), dt));
+                case WavePulse:
+                    return (float)((phase < pulseWidth ? 1.0 : -1.0) + Blep(phase, dt)
+                                   - Blep(Unit(phase + 1.0 - pulseWidth), dt));
+                case WaveTriangle:
+                    return phase < 0.5 ? (float)(4.0 * phase - 1.0) : (float)(3.0 - 4.0 * phase);
+                case WaveSaw:
+                    return (float)(2.0 * phase - 1.0 - Blep(phase, dt));
+                default:
+                    return (float)Math.Sin(phase * TwoPi);
             }
         }
+
+        static double Blep(double t, double dt)
+        {
+            if (dt <= 0.0) return 0.0;
+            if (t < dt)
+            {
+                t /= dt;
+                return t + t - t * t - 1.0;
+            }
+            if (t > 1.0 - dt)
+            {
+                t = (t - 1.0) / dt;
+                return t * t + t + t + 1.0;
+            }
+            return 0.0;
+        }
+
+        static double Unit(double x) => x - Math.Floor(x);
 
         const double UnityCentre = 1.4142135623730951;
         const double HalfPowerCentre = 1.0;

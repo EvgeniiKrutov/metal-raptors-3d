@@ -29,6 +29,17 @@ namespace MetalRaptors
 
         static readonly Quaternion NoseWest = Quaternion.Euler(-90f, -90f, 0f);
 
+        const float HullMetres = 158f;
+        const float HullMiddleMetres = -0.27f;
+        static readonly Vector2[] GondolaLamps = { new Vector2(-30f, -14.6f), new Vector2(22f, -13.6f) };
+        const float LampSweep = 22f;
+        const float LampPeriodMin = 8f, LampPeriodMax = 12f;
+        const float LampSourceMetres = 3f;
+        const float LampGlowMetres = 2.4f;
+        const float LampSoftMetres = 10f;
+        const float LampIntensity = 0.45f;
+        const float LampGlow = 1.6f;
+
         static readonly string[] PropPivots =
         {
             "outrigger_forward_port_prop", "outrigger_forward_starboard_prop",
@@ -184,7 +195,34 @@ namespace MetalRaptors
 
             Fit(model.transform, length);
             StartPropellers(model.transform, root);
+            MountSearchlights(model.transform, root);
             return model.transform;
+        }
+
+        static void MountSearchlights(Transform model, Transform root)
+        {
+            if (!Measure(model, out Bounds bounds)) return;
+
+            float metre = bounds.size.x / HullMetres;
+            Vector3 middle = root.InverseTransformPoint(bounds.center);
+
+            foreach (Vector2 spot in GondolaLamps)
+            {
+                Vector3 local = middle + new Vector3(spot.x, spot.y - HullMiddleMetres, 0f) * metre;
+                Searchlight lamp = Searchlight.Mount(root, local);
+                if (lamp == null) return;
+
+                lamp.aim = Vector3.down;
+                lamp.sweepAxis = Vector3.forward;
+                lamp.sweep = LampSweep;
+                lamp.period = Random.Range(LampPeriodMin, LampPeriodMax);
+                lamp.reachY = ProceduralTerrain.BaseLevel;
+                lamp.sourceRadius = LampSourceMetres * metre;
+                lamp.glowSize = LampGlowMetres * metre;
+                lamp.soft = LampSoftMetres * metre;
+                lamp.intensity = LampIntensity;
+                lamp.glowIntensity = LampGlow;
+            }
         }
 
         static void Fit(Transform model, float length)

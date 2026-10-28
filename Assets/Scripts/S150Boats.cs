@@ -21,6 +21,17 @@ namespace MetalRaptors
         const float Heading = 180f;
         const float Draft = 2.2f;
         const float PivotAft = 0.1f;
+
+        const float LampForward = 6f;
+        const float LampHeight = 7.3f;
+        const float LampSweep = 40f;
+        const float LampPeriod = 10f;
+        const float LampReach = 1.3f;
+        const float LampSource = 1.5f;
+        const float LampGlowSize = 1.2f;
+        const float LampSoft = 3f;
+        const float LampIntensity = 0.45f;
+        const float LampGlow = 1.6f;
         const float Trim = 1f;
         const float BowWave = 0.42f;
 
@@ -292,6 +303,7 @@ namespace MetalRaptors
 
             NightReceivers.Adopt(view, 1f, 1f);
             NightLights.MarkCaster(view);
+            MountLamp(motion, window);
 
             var boat = new Boat
             {
@@ -311,6 +323,24 @@ namespace MetalRaptors
             Animate(boat, time);
             boat.wake.Follow(root.position, time);
             _boats.Add(boat);
+        }
+
+        void MountLamp(Transform motion, float window)
+        {
+            var spot = new Vector3(_pivot + LampForward * _scale, (LampHeight - Draft) * _scale, 0f);
+            Searchlight lamp = Searchlight.Mount(motion, spot);
+            if (lamp == null) return;
+
+            lamp.aim = Vector3.up;
+            lamp.sweepAxis = Vector3.forward;
+            lamp.sweep = LampSweep;
+            lamp.period = LampPeriod;
+            lamp.length = window * LampReach;
+            lamp.sourceRadius = LampSource * _scale;
+            lamp.glowSize = LampGlowSize * _scale;
+            lamp.soft = LampSoft * _scale;
+            lamp.intensity = LampIntensity;
+            lamp.glowIntensity = LampGlow;
         }
 
         static List<Gun> Arm(Transform view, Transform root)

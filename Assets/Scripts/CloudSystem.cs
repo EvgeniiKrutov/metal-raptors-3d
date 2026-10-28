@@ -84,7 +84,7 @@ namespace MetalRaptors
             return sys;
         }
 
-        static Color TintFor(Daytime daytime)
+        internal static Color TintFor(Daytime daytime)
         {
             switch (daytime)
             {
@@ -95,7 +95,7 @@ namespace MetalRaptors
             }
         }
 
-        static Color GlowFor(Daytime daytime)
+        internal static Color GlowFor(Daytime daytime)
         {
             Color haze;
             switch (daytime)

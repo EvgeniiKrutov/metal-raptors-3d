@@ -19,7 +19,7 @@ namespace MetalRaptors
 
     public static class MusicTracks
     {
-        public const string DefaultId = "flak-parade";
+        public const string DefaultId = "raptor-march";
 
         const string Folder = "Music";
         const string CoverFolder = "ui/music/";
