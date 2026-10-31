@@ -56,19 +56,39 @@ namespace MetalRaptors
         }
 
         public static float[] Render(MusicConfig config, int from, int to, int rate,
-            Dictionary<string, double> durations, bool wrap, out double lengthSec)
+            Dictionary<string, double> durations, bool wrap, out double lengthSec) =>
+            Render(config, Sections(-1, from, to), 0, rate, durations, wrap, !wrap, out lengthSec);
+
+        public static float[] RenderPart(MusicConfig config, int preroll, int from, int to, int rate,
+            Dictionary<string, double> durations, out double lengthSec) =>
+            Render(config, Sections(preroll, from, to), preroll >= 0 ? 1 : 0, rate, durations, false, false,
+                out lengthSec);
+
+        static List<int> Sections(int preroll, int from, int to)
         {
-            double bodySec = 0;
-            for (int i = from; i < to; i++)
+            var sections = new List<int>();
+            if (preroll >= 0) sections.Add(preroll);
+            for (int i = from; i < to; i++) sections.Add(i);
+            return sections;
+        }
+
+        static float[] Render(MusicConfig config, List<int> sections, int lead, int rate,
+            Dictionary<string, double> durations, bool wrap, bool tail, out double lengthSec)
+        {
+            double leadSec = 0, bodySec = 0;
+            for (int k = 0; k < sections.Count; k++)
             {
-                if (durations.TryGetValue(config.Sequence[i], out double duration)) bodySec += duration;
+                if (!durations.TryGetValue(config.Sequence[sections[k]], out double duration)) continue;
+                if (k < lead) leadSec += duration;
+                else bodySec += duration;
             }
 
-            int body = (int)Math.Round(bodySec * rate);
+            int skip = (int)Math.Round(leadSec * rate);
+            int body = (int)Math.Round((leadSec + bodySec) * rate) - skip;
             lengthSec = body / (double)rate;
             if (body <= 0) return null;
 
-            int frames = wrap ? body : body + (int)(TailSec * rate);
+            int frames = skip + body + (tail ? (int)(TailSec * rate) : 0);
             var ctx = new Ctx
             {
                 Rate = rate,
@@ -79,13 +99,13 @@ namespace MetalRaptors
                 ReverbSend = new float[frames],
                 Noise = BuildNoise(rate),
             };
-            ctx.Duck = BuildDuck(config, from, to, rate, durations, frames, wrap);
+            ctx.Duck = BuildDuck(config, sections, rate, durations, frames, wrap);
 
             double secPerBeat = 60.0 / config.Tempo;
             double time = 0;
             var previous = new Dictionary<string, float>();
 
-            for (int i = from; i < to; i++)
+            foreach (int i in sections)
             {
                 string patternName = config.Sequence[i];
                 if (config.Patterns.TryGetValue(patternName, out var pattern))
@@ -120,11 +140,15 @@ namespace MetalRaptors
             if (config.Fx?.Delay != null) ApplyDelay(ctx, config.Fx.Delay, secPerBeat);
             if (config.Fx?.Reverb != null) ApplyReverb(ctx, config.Fx.Reverb);
 
-            for (int i = 0; i < ctx.Dry.Length; i++) ctx.Dry[i] = SoftClip(ctx.Dry[i]);
-            return ctx.Dry;
+            for (int i = skip * 2; i < ctx.Dry.Length; i++) ctx.Dry[i] = SoftClip(ctx.Dry[i]);
+            if (skip == 0) return ctx.Dry;
+
+            var part = new float[(frames - skip) * 2];
+            Array.Copy(ctx.Dry, skip * 2, part, 0, part.Length);
+            return part;
         }
 
-        static float[] BuildDuck(MusicConfig config, int from, int to, int rate,
+        static float[] BuildDuck(MusicConfig config, List<int> sections, int rate,
             Dictionary<string, double> durations, int frames, bool wrap)
         {
             var duck = new float[frames];
@@ -139,7 +163,7 @@ namespace MetalRaptors
             float release = Math.Max(chain.Release, 0.01f);
             int span = (int)((attack + release) * rate);
 
-            for (int i = from; i < to; i++)
+            foreach (int i in sections)
             {
                 string patternName = config.Sequence[i];
                 if (config.Patterns.TryGetValue(patternName, out var pattern) &&
@@ -536,6 +560,13 @@ namespace MetalRaptors
 
         static readonly double[] MetalRatios = { 1.0, 1.4836, 1.7392, 2.2873 };
 
+        static float ToneCoeff(Ctx ctx, MusicTrack track)
+        {
+            if (track.Filter == null) return 1f;
+            float cutoff = Clamp(track.Filter.Cutoff, 30f, ctx.Rate * 0.45f);
+            return 1f - (float)Math.Exp(-2.0 * Math.PI * cutoff / ctx.Rate);
+        }
+
         static void RenderMetal(Ctx ctx, MusicTrack track, float level, double startSec)
         {
             float tune = track.Tune >= 0f ? track.Tune : 560f;
@@ -545,6 +576,7 @@ namespace MetalRaptors
             PanGains(track.Pan, UnityCentre, out float gainL, out float gainR);
             var phases = new double[MetalRatios.Length];
             float hp = 0, prev = 0;
+            float tone = ToneCoeff(ctx, track), lp1 = 0, lp2 = 0;
 
             for (int i = 0; i < count; i++)
             {
@@ -564,10 +596,12 @@ namespace MetalRaptors
                 float raw = (float)(sum * 0.25);
                 hp = 0.9f * (hp + raw - prev);
                 prev = raw;
+                lp1 += tone * (hp - lp1);
+                lp2 += tone * (lp1 - lp2);
 
                 float amp = (float)Math.Exp(-t / decay) * (0.55f + 0.45f * (float)Math.Exp(-t / 0.015f))
                             * (1f - (float)Math.Exp(-t / 0.0008f));
-                float outSample = hp * amp * level;
+                float outSample = lp2 * amp * level;
                 ctx.Dry[idx * 2] += outSample * gainL;
                 ctx.Dry[idx * 2 + 1] += outSample * gainR;
                 if (track.ReverbSend > 0f) ctx.ReverbSend[idx] += outSample * track.ReverbSend;
@@ -697,6 +731,7 @@ namespace MetalRaptors
 
             PanGains(track.Pan, HalfPowerCentre, out float gainL, out float gainR);
             float hp = 0, prev = 0;
+            float tone = ToneCoeff(ctx, track), lp1 = 0, lp2 = 0;
 
             for (int i = 0; i < count; i++)
             {
@@ -707,8 +742,10 @@ namespace MetalRaptors
                 float raw = ctx.Noise[(offset + i) % ctx.Noise.Length];
                 hp = 0.93f * (hp + raw - prev);
                 prev = raw;
+                lp1 += tone * (hp - lp1);
+                lp2 += tone * (lp1 - lp2);
 
-                float outSample = hp * (float)Math.Exp(-t / decay) * level;
+                float outSample = lp2 * (float)Math.Exp(-t / decay) * level;
                 ctx.Dry[idx * 2] += outSample * gainL;
                 ctx.Dry[idx * 2 + 1] += outSample * gainR;
                 if (track.ReverbSend > 0f) ctx.ReverbSend[idx] += outSample * track.ReverbSend;

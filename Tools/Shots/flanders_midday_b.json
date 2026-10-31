@@ -1,0 +1,292 @@
+{
+  "width": 1920,
+  "height": 1080,
+  "supersample": 2,
+  "terrain": "Flanders",
+  "seed": 1918,
+  "daytime": "Midday",
+  "settle": 3,
+  "warmup": 3,
+  "fogStart": 350,
+  "fogEnd": 2400,
+  "ambientBlasts": false,
+  "ambientFlak": false,
+  "ambientZeppelins": false,
+  "ambientPeople": false,
+  "ambientClouds": false,
+  "ambientGulls": false,
+  "clearCoast": 600,
+  "clearGroynes": true,
+  "clearNear": 150,
+  "camera": {
+    "x": 0,
+    "z": 40,
+    "height": 30,
+    "yaw": 0,
+    "pitch": 5,
+    "roll": 0,
+    "fov": 40
+  },
+  "output": "../../Builds/Screenshots/flanders_midday_b.png",
+  "planes": [
+    {
+      "model": "airco_dh4",
+      "skin": "green",
+      "screen": [
+        0.64,
+        0.66
+      ],
+      "distance": 290,
+      "course": 98,
+      "climb": 8,
+      "bank": 45,
+      "turn": 14,
+      "speed": 180,
+      "fire": true,
+      "target": 1,
+      "rearGun": true,
+      "fireFor": 1.0,
+      "fireInterval": 0.12,
+      "aimOffset": [
+        0,
+        12,
+        0
+      ],
+      "overshoot": 0.25,
+      "flashScale": 0.45
+    },
+    {
+      "model": "albatros_d3",
+      "skin": "plywood",
+      "screen": [
+        0.36,
+        0.6
+      ],
+      "distance": 350,
+      "course": 104,
+      "climb": 8,
+      "bank": 14,
+      "turn": 0,
+      "speed": 182,
+      "fire": true,
+      "target": 0,
+      "fireFor": 1.0,
+      "fireInterval": 0.13,
+      "aimOffset": [
+        0,
+        -16,
+        0
+      ],
+      "overshoot": 0.28,
+      "flashScale": 0.6
+    },
+    {
+      "model": "albatros_d3",
+      "skin": "raven",
+      "screen": [
+        0.1,
+        0.72
+      ],
+      "distance": 430,
+      "course": 106,
+      "climb": 6,
+      "bank": 18,
+      "turn": 0,
+      "speed": 182,
+      "fire": true,
+      "target": 0,
+      "fireFor": 1.0,
+      "fireInterval": 0.13,
+      "aimOffset": [
+        0,
+        18,
+        0
+      ],
+      "overshoot": 0.28,
+      "flashScale": 0.6
+    }
+  ],
+  "squads": [
+    {
+      "screenX": 0.64,
+      "distance": 170,
+      "count": 4,
+      "spread": 12,
+      "faction": 0,
+      "fire": true,
+      "target": 1,
+      "atSquad": true
+    },
+    {
+      "screenX": 0.24,
+      "distance": 165,
+      "count": 4,
+      "spread": 12,
+      "faction": 1,
+      "fire": true,
+      "target": 0,
+      "atSquad": true
+    }
+  ],
+  "boats": [
+    {
+      "wreck": true,
+      "screenX": 0.44,
+      "distance": 150,
+      "yaw": 100,
+      "roll": -18
+    }
+  ],
+  "bunkers": [
+    {
+      "model": 1,
+      "screenX": 0.99,
+      "distance": 185,
+      "yaw": -50
+    }
+  ],
+  "groynes": [
+    {
+      "screenX": 0.12,
+      "distance": 220,
+      "angle": -70
+    }
+  ],
+  "ships": [
+    {
+      "kind": "thornycroft",
+      "screenX": 0.4,
+      "distance": 470
+    },
+    {
+      "kind": "s150",
+      "screenX": 0.8,
+      "distance": 760,
+      "volleys": [
+        0.2,
+        0
+      ],
+      "guns": [
+        0,
+        2
+      ]
+    },
+    {
+      "kind": "lordclive",
+      "screenX": 0.12,
+      "distance": 1800,
+      "volleys": [
+        0
+      ],
+      "guns": [
+        0
+      ]
+    }
+  ],
+  "splashes": [
+    {
+      "screen": [
+        0.58
+      ],
+      "distance": 840,
+      "size": 70,
+      "age": 0.4
+    }
+  ],
+  "gulls": [
+    {
+      "screen": [
+        0.86,
+        0.9
+      ],
+      "distance": 620,
+      "count": 5,
+      "spread": 50,
+      "course": 270,
+      "bank": 26
+    }
+  ],
+  "flak": [
+    {
+      "screen": [
+        0.3,
+        0.92
+      ],
+      "distance": 650,
+      "size": 30,
+      "age": 1.3
+    },
+    {
+      "screen": [
+        0.95,
+        0.74
+      ],
+      "distance": 700,
+      "size": 26,
+      "age": 1.6
+    },
+    {
+      "screen": [
+        0.55,
+        0.95
+      ],
+      "distance": 620,
+      "size": 22,
+      "age": 0.9
+    }
+  ],
+  "clouds": [
+    {
+      "screen": [
+        0.2,
+        0.9
+      ],
+      "distance": 900,
+      "width": 130,
+      "alpha": 0.3
+    },
+    {
+      "screen": [
+        0.46,
+        0.93
+      ],
+      "distance": 900,
+      "width": 130,
+      "alpha": 0.3
+    },
+    {
+      "screen": [
+        0.97,
+        0.56
+      ],
+      "distance": 900,
+      "width": 110,
+      "alpha": 0.26
+    },
+    {
+      "screen": [
+        0.84,
+        0.9
+      ],
+      "distance": 900,
+      "width": 130,
+      "alpha": 0.3
+    }
+  ],
+  "props": [
+    {
+      "model": "rubble/planks/plank_3",
+      "kind": "rubble",
+      "screenX": 0.52,
+      "distance": 135,
+      "yaw": 40
+    },
+    {
+      "model": "rubble/barrels/barrel_2",
+      "kind": "rubble",
+      "screenX": 0.18,
+      "distance": 150,
+      "yaw": 200
+    }
+  ]
+}

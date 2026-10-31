@@ -28,6 +28,7 @@ namespace MetalRaptors
         WingStreaks _trails;
         float _running;
         float _cooldown;
+        bool _sustained;
 
         public void Initialize(PlayerConfig config, CubeController plane, Transform model,
             PlaneModelConfig planeModel = null)
@@ -40,6 +41,7 @@ namespace MetalRaptors
         public void Stop()
         {
             enabled = false;
+            _sustained = false;
             if (_running > 0f) End();
         }
 
@@ -51,13 +53,22 @@ namespace MetalRaptors
             Begin();
         }
 
+        public void Sustain(bool on)
+        {
+            if (on == _sustained || (on && (!enabled || _config == null))) return;
+
+            _sustained = on;
+            if (on && _running <= 0f) Begin();
+            else if (!on && _running > 0f) End();
+        }
+
         void Update()
         {
             if (_config == null || GameMenu.IsOpen || LevelBriefing.IsOpen) return;
 
             if (_running > 0f)
             {
-                _running -= Time.deltaTime;
+                if (!_sustained) _running -= Time.deltaTime;
                 if (_running <= 0f) End();
                 return;
             }

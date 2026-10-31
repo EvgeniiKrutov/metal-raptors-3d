@@ -9,6 +9,7 @@ namespace MetalRaptors
         const float GapHard = 120f;
         const float GapHz = 0.07f;
         const float ArriveSlack = 90f;
+        const float ReachSlope = 0.3f;
 
         const float WeaveMin = 70f;
         const float WeaveMax = 110f;
@@ -39,6 +40,26 @@ namespace MetalRaptors
         const float RetreatDeg = -14f;
         const float RetreatSlow = 90f;
 
+        const float SneakGapMin = 120f;
+        const float SneakGapMax = 150f;
+        const float SneakDropMin = 170f;
+        const float SneakDropMax = 220f;
+        const float SneakUnder = 55f;
+        const float FirstSneakMinSec = 3f;
+        const float FirstSneakMaxSec = 5f;
+        const float SneakEveryMinSec = 3f;
+        const float SneakEveryMaxSec = 5f;
+        const float SneakMinSec = 6f;
+        const float SneakMaxSec = 9f;
+        const float HideMinSec = 1.4f;
+        const float HideMaxSec = 2.4f;
+        const float PopMinSec = 0.5f;
+        const float PopMaxSec = 0.8f;
+        const float SettleSlack = 40f;
+        const float SettleRetrySec = 0.3f;
+        const float FlushSpeed = 130f;
+        const float FlushSec = 1.8f;
+
         EnemyController _enemy;
         Rigidbody _target;
         float _minY;
@@ -58,8 +79,17 @@ namespace MetalRaptors
         bool _attacking;
         float _phaseLeft;
 
+        bool _sneaker;
+        bool _sneaking;
+        float _untilSneak;
+        float _sneakLeft;
+        float _sneakGap;
+        float _sneakDrop;
+        float _flushLeft;
+        float _flushY;
+
         public static EnemyPursuit Begin(EnemyController enemy, Rigidbody target, float minY,
-            float maxY)
+            float maxY, bool sneak = false)
         {
             if (enemy == null) return null;
 
@@ -73,6 +103,8 @@ namespace MetalRaptors
             pursuit._cruise = Mathf.Max(MinCruise, target != null ? target.linearVelocity.x : 0f);
             pursuit._vx = pursuit._cruise + CatchUpMax;
             pursuit._offset = target != null ? pursuit._pos.y - target.position.y : 0f;
+            pursuit._sneaker = sneak;
+            pursuit._untilSneak = Random.Range(FirstSneakMinSec, FirstSneakMaxSec);
             pursuit.Stalk();
 
             enemy.BeginScript();
@@ -108,24 +140,12 @@ namespace MetalRaptors
             }
             else
             {
-                float gap = Mathf.Lerp(GapNear, GapFar, Mathf.PerlinNoise(_seed, Time.time * GapHz));
-                float slotX = player.x - gap;
-                float along = slotX - _pos.x;
-
-                _phaseLeft -= dt;
-                if (_phaseLeft <= 0f)
-                {
-                    if (_attacking) Stalk();
-                    else if (along < ArriveSlack) Attack();
-                }
-
-                float sway = Mathf.Sin((Time.time + _seed) * _weaveHz * 2f * Mathf.PI) * _weave;
-                _offset = Mathf.Lerp(_offset, sway + _bias, 1f - Mathf.Exp(-OffsetResponse * dt));
-                float slotY = Mathf.Clamp(player.y + _offset, _minY, _maxY);
+                Vector2 slot = _sneaker ? Sneak(player, dt) : Weave(player, dt);
+                float along = slot.x - _pos.x;
 
                 aim = _attacking
                     ? Mathf.Atan2(player.y - _pos.y, player.x - _pos.x)
-                    : Mathf.Atan2(slotY - _pos.y, slotX + Lookahead - _pos.x);
+                    : Mathf.Atan2(slot.y - _pos.y, slot.x + Lookahead - _pos.x);
 
                 want = _cruise + Mathf.Clamp(along * CatchUp, -FallBackMax, CatchUpMax);
                 float room = player.x - GapHard - _pos.x;
@@ -139,14 +159,75 @@ namespace MetalRaptors
             float speed = _vx / Mathf.Max(MinTilt, Mathf.Cos(_heading));
             _pos += new Vector2(Mathf.Cos(_heading), Mathf.Sin(_heading)) * (speed * dt);
 
-            if (_pos.y < _minY || _pos.y > _maxY)
+            float floor = _sneaker ? _minY - SneakUnder : _minY;
+            if (_pos.y < floor || _pos.y > _maxY)
             {
-                _pos.y = Mathf.Clamp(_pos.y, _minY, _maxY);
+                _pos.y = Mathf.Clamp(_pos.y, floor, _maxY);
                 _heading = Mathf.MoveTowards(_heading, 0f, _enemy.MaxTurnRate * dt);
             }
 
             _enemy.ScriptSteer(new Vector3(_pos.x, _pos.y, 0f), _heading, dt);
         }
+
+        Vector2 Weave(Vector2 player, float dt)
+        {
+            float gap = Mathf.Lerp(GapNear, GapFar, Mathf.PerlinNoise(_seed, Time.time * GapHz));
+            float slotX = player.x - gap;
+
+            _phaseLeft -= dt;
+            if (_phaseLeft <= 0f)
+            {
+                if (_attacking) Stalk();
+                else if (slotX - _pos.x < ArriveSlack) Attack();
+            }
+
+            float sway = Mathf.Sin((Time.time + _seed) * _weaveHz * 2f * Mathf.PI) * _weave;
+            _offset = Mathf.Lerp(_offset, sway + _bias, 1f - Mathf.Exp(-OffsetResponse * dt));
+            float slotY = Mathf.Max(player.y + _offset, player.y - gap * ReachSlope);
+            return new Vector2(slotX, Mathf.Clamp(slotY, _minY, _maxY));
+        }
+
+        Vector2 Sneak(Vector2 player, float dt)
+        {
+            if (_flushLeft > 0f)
+            {
+                _flushLeft -= dt;
+                if (_flushLeft <= 0f) Surface(player);
+                return new Vector2(player.x - _sneakGap, _flushY);
+            }
+
+            if (!_sneaking)
+            {
+                Vector2 slot = Weave(player, dt);
+                _untilSneak -= dt;
+                if (_untilSneak <= 0f && !_attacking) Duck();
+                return slot;
+            }
+
+            if (_target.linearVelocity.y < -FlushSpeed)
+            {
+                Flush();
+                return new Vector2(player.x - _sneakGap, _flushY);
+            }
+
+            var hide = new Vector2(player.x - _sneakGap,
+                Mathf.Clamp(player.y - _sneakDrop, _minY - SneakUnder, _maxY));
+
+            _sneakLeft -= dt;
+            _phaseLeft -= dt;
+            if (_phaseLeft <= 0f)
+            {
+                if (_attacking) Hide();
+                else if (_sneakLeft <= 0f) Surface(player);
+                else if (Settled(hide)) Pop();
+                else _phaseLeft = SettleRetrySec;
+            }
+
+            return hide;
+        }
+
+        bool Settled(Vector2 hide) =>
+            Mathf.Abs(hide.x - _pos.x) < ArriveSlack && Mathf.Abs(hide.y - _pos.y) < SettleSlack;
 
         void Turn(float aim, float dt)
         {
@@ -172,6 +253,44 @@ namespace MetalRaptors
         {
             _attacking = true;
             _phaseLeft = Random.Range(AttackMinSec, AttackMaxSec);
+        }
+
+        void Duck()
+        {
+            _sneaking = true;
+            _sneakLeft = Random.Range(SneakMinSec, SneakMaxSec);
+            _sneakGap = Random.Range(SneakGapMin, SneakGapMax);
+            _sneakDrop = Random.Range(SneakDropMin, SneakDropMax);
+            Hide();
+        }
+
+        void Hide()
+        {
+            _attacking = false;
+            _phaseLeft = Random.Range(HideMinSec, HideMaxSec);
+        }
+
+        void Pop()
+        {
+            _attacking = true;
+            _phaseLeft = Random.Range(PopMinSec, PopMaxSec);
+        }
+
+        void Flush()
+        {
+            _sneaking = false;
+            _attacking = false;
+            _flushLeft = FlushSec;
+            _flushY = _pos.y;
+        }
+
+        void Surface(Vector2 player)
+        {
+            _sneaking = false;
+            _flushLeft = 0f;
+            _untilSneak = Random.Range(SneakEveryMinSec, SneakEveryMaxSec);
+            _offset = _pos.y - player.y;
+            Stalk();
         }
     }
 }

@@ -151,10 +151,13 @@ namespace MetalRaptors
             public PlayerEngineVoice(GameObject host, CubeController plane)
             {
                 _plane = plane;
+                float pitch = plane != null ? plane.EnginePitch : 1f;
                 _idle = CreateLoop(host, "Sounds/engine_idle");
                 _throttle = CreateLoop(host, RandomThrottleClip());
                 _boost = CreateLoop(host, ThrottleClipPaths[0]);
-                if (_boost != null) _boost.pitch = BoostPitch;
+                if (_idle != null) _idle.pitch = pitch;
+                if (_throttle != null) _throttle.pitch = pitch;
+                if (_boost != null) _boost.pitch = BoostPitch * pitch;
                 _idleLevel.Jump(1f);
                 _throttleLevel.Jump(0f);
                 _boostLevel.Jump(0f);

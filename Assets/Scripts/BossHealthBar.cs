@@ -10,6 +10,7 @@ namespace MetalRaptors
 
         readonly float _width;
         readonly Image _fill;
+        readonly GameObject _root;
 
         public BossHealthBar(Transform parent, Vector2 topLeft, string name)
         {
@@ -18,6 +19,7 @@ namespace MetalRaptors
 
             var go = new GameObject("Boss Health", typeof(Image));
             go.transform.SetParent(parent, false);
+            _root = go;
 
             Sprite rounded = UIFactory.RoundedSprite(HudTheme.BarRadius);
 
@@ -63,5 +65,7 @@ namespace MetalRaptors
             size.x = _width * frac;
             _fill.rectTransform.sizeDelta = size;
         }
+
+        public void Remove() => Object.Destroy(_root);
     }
 }

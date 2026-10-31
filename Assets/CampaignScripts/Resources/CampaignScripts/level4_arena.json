@@ -4,7 +4,7 @@
     { "op": "warn", "planes": 1 },
     { "op": "danger", "side": "left", "seconds": 2 },
 
-    { "op": "boss", "plane": "fokker", "skin": "raven", "health": 13, "speaker": "ravensberg" },
+    { "op": "boss", "plane": "fokker", "skin": "raven", "health": 26, "speaker": "ravensberg" },
 
     { "op": "say", "speaker": "ravensberg", "line": "l4_boss1" },
     { "op": "say", "speaker": "you", "line": "l4_boss2" },
@@ -15,6 +15,27 @@
     { "op": "duel" },
 
     { "op": "wait", "seconds": 1.5 },
+    { "op": "warn", "planes": 1 },
+    { "op": "danger", "side": "left", "seconds": 2 },
+
+    { "op": "boss", "plane": "fokker", "skin": "raven", "health": 26, "speaker": "ravensberg", "burning": true },
+
+    { "op": "say", "speaker": "you", "line": "l4_end1" },
+    { "op": "say", "speaker": "ravensberg", "line": "l4_end2" },
+    { "op": "say", "speaker": "lasalle", "line": "l4_end3" },
+    { "op": "say", "speaker": "you", "line": "l4_end4" },
+    { "op": "say", "speaker": "ravensberg", "line": "l4_end5" },
+    { "op": "say", "speaker": "you", "line": "l4_end6" },
+    { "op": "say", "speaker": "ravensberg", "line": "l4_end7" },
+    { "op": "say", "speaker": "you", "line": "l4_end8" },
+    { "op": "say", "speaker": "ravensberg", "line": "l4_end9" },
+    { "op": "say", "speaker": "lasalle", "line": "l4_end10" },
+    { "op": "say", "speaker": "you", "line": "l4_end11" },
+    { "op": "say", "speaker": "ravensberg", "line": "l4_end12" },
+
+    { "op": "escape" },
+
+    { "op": "wait", "seconds": 2 },
     { "op": "finish" }
   ]
 }

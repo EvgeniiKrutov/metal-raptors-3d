@@ -141,7 +141,7 @@ namespace MetalRaptors
 
                     var at = new Vector3(camX - halfViewWidth - SpawnAhead - index * SpawnStagger,
                         y, z);
-                    SpawnOne(group.plane, at);
+                    SpawnOne(group.plane, at, sneak: group.sneak);
                 }
             }
         }
@@ -316,7 +316,7 @@ namespace MetalRaptors
         }
 
         EnemyController SpawnOne(PlaneModelConfig plane, Vector3 position,
-            EnemyConfig config = null, PlaneSkin skin = null)
+            EnemyConfig config = null, PlaneSkin skin = null, bool sneak = false)
         {
             if (config == null) config = Lifted(EnemyConfigs.For(plane, _scout, _fighter), plane);
 
@@ -345,8 +345,13 @@ namespace MetalRaptors
             enemy.OnDestroyed += OnDestroyed;
             _live.Add(enemy);
             _planes[enemy] = plane;
-            if (Pursuit) EnemyPursuit.Begin(enemy, _player, PursuitMinY, PursuitMaxY);
+            if (Pursuit) EnemyPursuit.Begin(enemy, _player, PursuitMinY, PursuitMaxY, sneak);
             return enemy;
+        }
+
+        public void DismissAll()
+        {
+            for (int i = _live.Count - 1; i >= 0; i--) Dismiss(_live[i]);
         }
 
         public void StandDown()

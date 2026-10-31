@@ -23,6 +23,9 @@ namespace MetalRaptors
         Func<float> _warn;
         bool _incoming;
         float _incomingLeft;
+        Vector3 _camPos;
+        float _halfWidth;
+        float _halfHeight;
 
         public static SupplyDrop Begin(GameObject owner, CampaignDefinition level,
             CubeController plane, Transform model, float z, float floorY, Func<float> warn)
@@ -45,9 +48,21 @@ namespace MetalRaptors
 
         bool Pending => _crate != null || _incoming;
 
-        public bool Incoming => _incoming;
+        public bool Aim(out Vector3 box)
+        {
+            if (_crate != null)
+            {
+                box = _crate.Box;
+                return true;
+            }
 
-        public SupplyCrate Crate => _crate;
+            box = Vector3.zero;
+            if (!_incoming || _plane == null) return false;
+
+            box = SupplyCrate.SpawnBox(_camPos, _halfWidth, _halfHeight, _z,
+                Side(_camPos.x, _halfWidth), _lead);
+            return true;
+        }
 
         public int Left => _left + (Pending ? 1 : 0);
 
@@ -81,6 +96,10 @@ namespace MetalRaptors
 
         public void Tick(Vector3 camPos, float halfWidth, float halfHeight, bool cinematic)
         {
+            _camPos = camPos;
+            _halfWidth = halfWidth;
+            _halfHeight = halfHeight;
+
             if (_crate != null)
             {
                 _crate.Tick(camPos.x, halfWidth, Time.deltaTime);

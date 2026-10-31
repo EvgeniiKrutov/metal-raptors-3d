@@ -26,11 +26,14 @@ namespace MetalRaptors
         public System.Action<bool> cinematic;
         public System.Action<float> roof;
         public System.Action enraged;
+        public System.Action beaten;
         public System.Action shake;
     }
 
     public class RavenMoveset : MonoBehaviour
     {
+        public const float RagePitch = 1.25f;
+
         const float GapSec = 1f;
         const float WarnSec = 1f;
         const float Offscreen = 140f;
@@ -73,6 +76,7 @@ namespace MetalRaptors
         const float SmokeDamage = 20f;
 
         const float RageHealth = 0.5f;
+        const float BeatenHealth = 1f;
         const float RageLeadSec = 0.8f;
         const float RageStartSpeed = 105f;
         const float RageTopSpeed = 294f;
@@ -80,7 +84,6 @@ namespace MetalRaptors
         const float RageBrake = 210f;
         const float RagePitchDelay = 0.5f;
         const float RagePitchSec = 1.5f;
-        const float RagePitch = 1.25f;
         const float RageShowSec = 1.5f;
         const float RageBoomVolume = 1f;
 
@@ -186,6 +189,19 @@ namespace MetalRaptors
             if (_raged || !Live) return;
 
             StopAllCoroutines();
+            ClearStage();
+            _boss.Restore(_boss.Heading, _boss.MaxHealth * RageHealth);
+            StartCoroutine(Enrage());
+        }
+
+        public void SkipToEnd()
+        {
+            if (!_raged || !Live) return;
+            _boss.Restore(_boss.Heading, BeatenHealth);
+        }
+
+        void ClearStage()
+        {
             Unpin();
             Roof(float.PositiveInfinity);
             FadeSmoke();
@@ -195,10 +211,7 @@ namespace MetalRaptors
             Dismiss(ref _lower);
             Dismiss(ref _lead);
             Dismiss(ref _tail);
-
             _boss.Sputter(false);
-            _boss.Restore(_boss.Heading, _boss.MaxHealth * RageHealth);
-            StartCoroutine(Enrage());
         }
 
         void OnDestroy()
@@ -206,7 +219,11 @@ namespace MetalRaptors
             if (_bombProp != null) Destroy(_bombProp);
         }
 
-        bool Live => _boss != null && _boss.IsAlive && (_stage.over == null || !_stage.over());
+        bool Present => _boss != null && _boss.IsAlive && (_stage.over == null || !_stage.over());
+
+        bool Beaten => _raged && _boss != null && _boss.CurrentHealth <= BeatenHealth;
+
+        bool Live => Present && !Beaten;
 
         float Left => _stage.camPos.x - _stage.halfW;
         float Right => _stage.camPos.x + _stage.halfW;
@@ -264,6 +281,21 @@ namespace MetalRaptors
                         break;
                 }
             }
+
+            if (Beaten) yield return BreakOff();
+        }
+
+        IEnumerator BreakOff()
+        {
+            ClearStage();
+            _boss.Exposed = false;
+            _stage.beaten?.Invoke();
+
+            yield return Leave(true);
+            if (!Present) yield break;
+
+            _stage.enemies.Dismiss(_boss);
+            _boss = null;
         }
 
         Move Next()
@@ -382,10 +414,10 @@ namespace MetalRaptors
             return true;
         }
 
-        IEnumerator Leave()
+        IEnumerator Leave(bool beaten = false)
         {
             Throttle(true);
-            while (Live && _pos.x < Right + Offscreen)
+            while ((beaten ? Present : Live) && _pos.x < Right + Offscreen)
             {
                 float dt = Time.deltaTime;
                 _speed = Mathf.MoveTowards(_speed, LeaveSpeed, LeaveAccel * dt);
@@ -580,7 +612,7 @@ namespace MetalRaptors
             if (Live)
             {
                 _boss.EnginePitch = RagePitch;
-                _boss.HealthFloor = 0f;
+                _boss.HealthFloor = BeatenHealth;
                 Explosion.Spawn(_boss.NosePoint, _boss.ModelSize, RageBoomVolume * AudioOptions.Sfx);
                 _boss.Blaze();
                 _stage.enraged?.Invoke();

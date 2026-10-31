@@ -64,12 +64,14 @@ namespace MetalRaptors
         public readonly EnemyKind kind;
         public readonly PlaneModelConfig plane;
         public readonly int count;
+        public readonly bool sneak;
 
-        public EnemyGroup(PlaneModelConfig plane, int count)
+        public EnemyGroup(PlaneModelConfig plane, int count, bool sneak = false)
         {
             kind = EnemyKind.Plane;
             this.plane = plane;
             this.count = count;
+            this.sneak = sneak;
         }
 
         public EnemyGroup(EnemyKind kind, int count)

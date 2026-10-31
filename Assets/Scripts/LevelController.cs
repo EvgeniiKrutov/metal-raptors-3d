@@ -147,6 +147,7 @@ namespace MetalRaptors
 
             _cube.Initialize(flight, 0f, MinX, MaxX, WorldTop - CubeHalf, EdgeMargin);
             _cube.MountEngine(PlaneFactory.EngineLocal(go, plane, planeModel));
+            _cube.EnginePitch = planeModel.enginePitch;
 
             SetupGuns(flight, go, plane, planeModel);
 

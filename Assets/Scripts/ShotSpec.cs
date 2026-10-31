@@ -21,10 +21,15 @@ namespace MetalRaptors
         public bool ambientZeppelins;
         public bool ambientPeople = true;
         public bool ambientClouds = true;
+        public bool ambientShips = true;
+        public bool ambientGulls = true;
+        public bool bunkerFire;
         public bool aerodrome;
         public bool aerodromeFires;
         public bool darkHangars;
         public float clearNear;
+        public float clearCoast;
+        public bool clearGroynes;
         public ShotCamera camera = new ShotCamera();
         public ShotFocus focus = new ShotFocus();
         public ShotPlane[] planes = new ShotPlane[0];
@@ -37,8 +42,25 @@ namespace MetalRaptors
         public ShotZeppelin[] zeppelins = new ShotZeppelin[0];
         public ShotCrater[] craters = new ShotCrater[0];
         public ShotCloud[] clouds = new ShotCloud[0];
+        public ShotShip[] ships = new ShotShip[0];
+        public ShotBunker[] bunkers = new ShotBunker[0];
+        public ShotBoat[] boats = new ShotBoat[0];
+        public ShotGroyne[] groynes = new ShotGroyne[0];
+        public ShotGull[] gulls = new ShotGull[0];
+        public ShotBurst[] splashes = new ShotBurst[0];
         public ShotMistSpec mist = new ShotMistSpec();
         public ShotFill planeFill = new ShotFill();
+        public ShotArena arena = new ShotArena();
+    }
+
+    [Serializable]
+    public class ShotArena
+    {
+        public bool on;
+        public float distance;
+        public float fov;
+        public float[] eye;
+        public int seed;
     }
 
     [Serializable]
@@ -59,6 +81,9 @@ namespace MetalRaptors
         public float distance;
         public float focalLength = 85f;
         public float aperture = 4f;
+        public float farStart;
+        public float farEnd;
+        public float farRadius;
     }
 
     [Serializable]
@@ -88,6 +113,68 @@ namespace MetalRaptors
         public float overshoot;
         public bool sharpProp;
         public bool boost;
+        public bool rearGun;
+        public float[] aimOffset;
+        public bool noFill;
+        public float streakWidth;
+        public float[] smokeColor;
+        public float smokeScale;
+        public float smokeDepth;
+        public int hitEvery;
+    }
+
+    [Serializable]
+    public class ShotShip
+    {
+        public string kind;
+        public float screenX;
+        public float distance;
+        public float speed;
+        public float[] volleys;
+        public int[] guns;
+        public bool shells;
+    }
+
+    [Serializable]
+    public class ShotBunker
+    {
+        public int model;
+        public float screenX;
+        public float distance;
+        public float yaw;
+        public float sink;
+    }
+
+    [Serializable]
+    public class ShotBoat
+    {
+        public bool wreck;
+        public float screenX;
+        public float distance;
+        public float yaw;
+        public float roll;
+        public bool capsized;
+        public float sink;
+        public float scale;
+    }
+
+    [Serializable]
+    public class ShotGroyne
+    {
+        public float screenX;
+        public float distance;
+        public float angle;
+    }
+
+    [Serializable]
+    public class ShotGull
+    {
+        public float[] screen;
+        public float distance;
+        public int count;
+        public float spread;
+        public float course;
+        public float bank;
     }
 
     [Serializable]
@@ -103,6 +190,9 @@ namespace MetalRaptors
         public bool atSquad;
         public int cover;
         public float coverScale;
+        public string[] coverModels;
+        public float[] coverTint;
+        public float coverAngle;
         public bool unarmed;
     }
 

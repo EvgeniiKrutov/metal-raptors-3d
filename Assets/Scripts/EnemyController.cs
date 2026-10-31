@@ -114,6 +114,8 @@ namespace MetalRaptors
 
         public float HealthFloor { get; set; }
 
+        public float Spin { get; set; }
+
         public bool Blazing { get; private set; }
 
         public float BodyLow => _bodyLow;
@@ -1543,7 +1545,7 @@ namespace MetalRaptors
 
         void ApplyRotation()
         {
-            float roll = _roll.Angle + _dodge.Bank + (_fall != null ? _fall.Roll : 0f);
+            float roll = _roll.Angle + _dodge.Bank + (_fall != null ? _fall.Roll : 0f) + Spin;
             transform.rotation = Quaternion.Euler(0f, 0f, _heading * Mathf.Rad2Deg)
                                * Quaternion.Euler(roll, 0f, 0f);
         }

@@ -7,7 +7,7 @@ namespace MetalRaptors
     public enum CampaignOp
     {
         Wait, Say, Wave, Spawn, WaitClear, Supply, Foe, Zeppelin, Onslaught, Formation, Warn,
-        Danger, Arena, Boss, Duel, Raid, Unlock, Finish
+        Danger, Arena, Boss, Duel, Escape, Raid, Unlock, Jams, Boost, Finish
     }
 
     public class CampaignStep
@@ -21,6 +21,8 @@ namespace MetalRaptors
         public int count;
         public bool air;
         public bool spread;
+        public bool hold;
+        public bool burning;
         public string skin;
         public float scale;
         public ScreenEdge edge;
@@ -146,8 +148,16 @@ namespace MetalRaptors
                 case "arena": return new CampaignStep { op = CampaignOp.Arena };
                 case "boss": return ParseBoss(step, origin, index);
                 case "duel": return new CampaignStep { op = CampaignOp.Duel };
+                case "escape": return new CampaignStep { op = CampaignOp.Escape };
                 case "raid": return new CampaignStep { op = CampaignOp.Raid };
                 case "unlock": return ParseUnlock(step, origin, index);
+                case "jams": return new CampaignStep { op = CampaignOp.Jams };
+                case "boost":
+                    return new CampaignStep
+                    {
+                        op = CampaignOp.Boost,
+                        hold = !(Value(step, "hold") is bool held) || held,
+                    };
                 case "finish": return new CampaignStep { op = CampaignOp.Finish };
                 default:
                     Debug.LogError($"CampaignScript {origin}[{index}]: unknown op '{op}'.");
@@ -180,6 +190,7 @@ namespace MetalRaptors
                 case "bomb": ability = PlaneAbility.Bomb; break;
                 case "boost": ability = PlaneAbility.Boost; break;
                 case "roll": ability = PlaneAbility.Roll; break;
+                case "dive": ability = PlaneAbility.Dive; break;
                 default:
                     Debug.LogError($"CampaignScript {origin}[{index}]: unknown ability '{id}'.");
                     return null;
@@ -243,6 +254,7 @@ namespace MetalRaptors
                 plane = plane,
                 skin = Text(step, "skin"),
                 scale = Mathf.Max(0.01f, Number(step, "health", 1f)),
+                burning = Value(step, "burning") is bool lit && lit,
                 speaker = speaker.Length > 0 ? CampaignSpeakers.For(speaker) : null,
             };
         }
@@ -280,7 +292,8 @@ namespace MetalRaptors
                         continue;
                     }
 
-                    groups.Add(new EnemyGroup(plane, count));
+                    bool sneak = Value(group, "sneak") is bool sneaky && sneaky;
+                    groups.Add(new EnemyGroup(plane, count, sneak));
                 }
             }
 

@@ -15,33 +15,36 @@ namespace MetalRaptors
         const float SwitchFadeSec = 0.3f;
         const float BrowseFadeInSec = 0.5f;
         const double ScheduleDelaySec = 0.1;
-
-        const float LoopBakeSafety = 1.3f;
-        const float HandoffMarginSec = 0.35f;
-        const float MaxStartWaitSec = 2.5f;
-        const double LateLoopDelaySec = 0.05;
+        const double LateSec = 0.02;
+        const int LoopParts = 3;
+        const float BakeSafety = 1.5f;
+        const double StartMarginSec = 1.0;
 
         static readonly Dictionary<string, RenderedMusic> RenderCache = new Dictionary<string, RenderedMusic>();
 
         class BakeJob
         {
             public string Id;
-            public MusicConfig Config;
             public float Fade;
             public bool Wanted;
-            public Task<MusicBake> Intro;
-            public Task<MusicBake> Loop;
+            public bool Started;
             public float StartedAt;
-            public double IntroSec, LoopSec;
-            public AudioClip IntroClip;
-            public double IntroDuration;
-            public double BakeSecPerAudioSec;
-            public bool IntroBaked, IntroStarted, LoopDone, Dropped;
-            public double LoopDueDsp;
+            public Task<MusicBake> Intro;
+            public Task<MusicBake>[] Parts;
+            public double[] PartSec;
+            public bool[] PartTaken;
+            public bool IntroBaked;
+            public double BakeSecPerAudioSec = -1;
+            public RenderedMusic Music;
         }
 
         AudioSource _introSource;
-        AudioSource _loopSource;
+        readonly AudioSource[] _partSources = new AudioSource[2];
+        AudioClip[] _parts;
+        int _nextPart;
+        int _slot;
+        double _nextAt;
+        double _queuedAt;
         string _currentId;
         bool _menuScene = true;
         float _volume;
@@ -90,8 +93,9 @@ namespace MetalRaptors
             Instance = this;
             DontDestroyOnLoad(gameObject);
             AudioOptions.Changed += OnVolumeChanged;
-            _introSource = CreateSource(false);
-            _loopSource = CreateSource(true);
+            _introSource = CreateSource();
+            _partSources[0] = CreateSource();
+            _partSources[1] = CreateSource();
             SceneManager.sceneLoaded += OnSceneLoaded;
             AudioSettings.OnAudioConfigurationChanged += OnAudioConfigurationChanged;
             Prewarm(MusicTracks.Selected);
@@ -128,6 +132,7 @@ namespace MetalRaptors
         void Update()
         {
             PollBake();
+            Advance();
             Fade();
             LaunchPending();
             PrewarmNext();
@@ -140,8 +145,10 @@ namespace MetalRaptors
 
             _volume = Mathf.MoveTowards(_volume, _volumeTarget,
                 MusicVolume * Time.unscaledDeltaTime / Mathf.Max(_fadeSec, 0.01f));
-            _introSource.volume = _volume * CutsceneMix.Level;
-            _loopSource.volume = _volume * CutsceneMix.Level;
+            float level = _volume * CutsceneMix.Level;
+            _introSource.volume = level;
+            _partSources[0].volume = level;
+            _partSources[1].volume = level;
 
             if (_stopWhenSilent && _volume <= 0f) Stop();
         }
@@ -279,7 +286,7 @@ namespace MetalRaptors
 
         bool LoopArmed(string id)
         {
-            if (_loopSource.clip != null) return true;
+            if (_parts != null) return true;
             BakeJob job = FindJob(id);
             return job != null && job.Wanted;
         }
@@ -323,9 +330,14 @@ namespace MetalRaptors
             {
                 RenderedMusic rendered = RenderCache[id];
                 RenderCache.Remove(id);
-                Discard(rendered.Intro);
-                Discard(rendered.Loop);
+                Discard(rendered);
             }
+        }
+
+        static void Discard(RenderedMusic music)
+        {
+            Discard(music.Intro);
+            foreach (AudioClip part in music.Parts) Discard(part);
         }
 
         static void Discard(AudioClip clip)
@@ -362,20 +374,28 @@ namespace MetalRaptors
 
             int rate = AudioSettings.outputSampleRate;
             int loopStart = MusicSynth.LoopStartIndex(config);
+            int[] bounds = MusicSynth.LoopBounds(config, LoopParts);
+            int count = bounds.Length - 1;
             var job = new BakeJob
             {
                 Id = id,
-                Config = config,
                 Fade = fadeSec,
                 Wanted = wanted,
                 StartedAt = Time.realtimeSinceStartup,
-                IntroSec = MusicSynth.SectionSeconds(config, 0, loopStart),
-                LoopSec = MusicSynth.SectionSeconds(config, loopStart, config.Sequence.Count),
+                Parts = new Task<MusicBake>[count],
+                PartSec = new double[count],
+                PartTaken = new bool[count],
+                Music = new RenderedMusic { Parts = new AudioClip[count] },
             };
 
             if (loopStart > 0)
                 job.Intro = Task.Run(() => MusicSynth.BakeSection(config, rate, intro: true));
-            job.Loop = Task.Run(() => MusicSynth.BakeSection(config, rate, intro: false));
+            for (int p = 0; p < count; p++)
+            {
+                int part = p;
+                job.PartSec[p] = MusicSynth.SectionSeconds(config, bounds[p], bounds[p + 1]);
+                job.Parts[p] = Task.Run(() => MusicSynth.BakePart(config, rate, bounds, part));
+            }
             _jobs.Add(job);
         }
 
@@ -386,14 +406,58 @@ namespace MetalRaptors
                 BakeJob job = _jobs[i];
 
                 if (!job.IntroBaked && job.Intro != null && job.Intro.IsCompleted) TakeIntro(job);
-                if (job.Wanted && job.IntroBaked && !job.IntroStarted && job.IntroClip != null) StartIntro(job);
+                bool baked = job.Intro == null || job.IntroBaked;
+                for (int p = 0; p < job.Parts.Length; p++)
+                {
+                    if (!job.PartTaken[p] && job.Parts[p].IsCompleted) TakePart(job, p);
+                    baked &= job.PartTaken[p];
+                }
 
-                if (!job.LoopDone && job.Loop.IsCompleted) TakeLoop(job);
-                if (!job.LoopDone || (job.Intro != null && !job.IntroBaked)) continue;
-
-                if (job.Dropped) Discard(job.IntroClip);
-                _jobs.RemoveAt(i);
+                if (baked)
+                {
+                    _jobs.RemoveAt(i);
+                    Finish(job);
+                }
+                else if (job.Wanted && !job.Started && CanStart(job))
+                {
+                    job.Started = true;
+                    Begin(job.Id, job.Music, job.Fade);
+                }
             }
+        }
+
+        bool CanStart(BakeJob job)
+        {
+            if (job.Intro != null && !job.IntroBaked) return false;
+            if (job.Music.Parts[0] == null || job.BakeSecPerAudioSec < 0) return false;
+
+            double elapsed = Time.realtimeSinceStartup - job.StartedAt;
+            double due = ScheduleDelaySec + (job.Music.Intro != null ? job.Music.IntroDuration : 0.0);
+            for (int p = 0; p < job.Parts.Length; p++)
+            {
+                if (!job.PartTaken[p])
+                {
+                    double left = job.BakeSecPerAudioSec * job.PartSec[p] * BakeSafety - elapsed;
+                    if (left + StartMarginSec > due) return false;
+                }
+                due += job.PartSec[p];
+            }
+            return true;
+        }
+
+        void Finish(BakeJob job)
+        {
+            RenderedMusic music = job.Music;
+            bool failed = System.Array.IndexOf(music.Parts, null) >= 0;
+            if (failed || (!job.Wanted && !Keeps(job.Id)))
+            {
+                if (failed && job.Started) Stop();
+                Discard(music);
+                return;
+            }
+
+            RenderCache[job.Id] = music;
+            if (job.Wanted && !job.Started) Begin(job.Id, music, job.Fade);
         }
 
         void TakeIntro(BakeJob job)
@@ -410,40 +474,14 @@ namespace MetalRaptors
             var bake = task.Result;
             if (bake == null) return;
 
-            job.IntroClip = MusicSynth.ToClip(bake, intro: true, $"{job.Id}-intro");
-            job.IntroDuration = bake.IntroDuration;
-
-            double rendered = job.IntroSec + (job.Config.IsRetro ? MusicSynthRetro.TailSec : 0.0);
-            job.BakeSecPerAudioSec = (Time.realtimeSinceStartup - job.StartedAt) / Mathf.Max((float)rendered, 0.05f);
+            job.Music.Intro = MusicSynth.ToClip(bake, intro: true, $"{job.Id}-intro");
+            job.Music.IntroDuration = bake.IntroDuration;
         }
 
-        void StartIntro(BakeJob job)
+        void TakePart(BakeJob job, int part)
         {
-            job.IntroStarted = true;
-
-            float elapsed = Time.realtimeSinceStartup - job.StartedAt;
-            double loopReadyIn = job.LoopDone
-                ? 0.0
-                : job.BakeSecPerAudioSec * job.LoopSec * LoopBakeSafety - elapsed;
-            double wait = Mathf.Clamp((float)(loopReadyIn + HandoffMarginSec - job.IntroSec),
-                (float)ScheduleDelaySec, MaxStartWaitSec);
-
-            double start = AudioSettings.dspTime + wait;
-            _introSource.clip = job.IntroClip;
-            _introSource.PlayScheduled(start);
-            job.LoopDueDsp = start + job.IntroDuration;
-
-            _currentId = job.Id;
-            _volume = 0f;
-            _volumeTarget = MusicTarget;
-            _fadeSec = job.Fade;
-            _fadeAfterDsp = start;
-        }
-
-        void TakeLoop(BakeJob job)
-        {
-            job.LoopDone = true;
-            var task = job.Loop;
+            job.PartTaken[part] = true;
+            var task = job.Parts[part];
 
             if (task.IsFaulted)
             {
@@ -451,68 +489,65 @@ namespace MetalRaptors
                 return;
             }
 
-            var bake = task.Result;
-            var loopClip = MusicSynth.ToClip(bake, intro: false, $"{job.Id}-loop");
-            if (loopClip == null) return;
-
-            if (!job.Wanted && !Keeps(job.Id))
-            {
-                job.Dropped = true;
-                Discard(loopClip);
-                return;
-            }
-
-            var rendered = new RenderedMusic
-            {
-                Intro = job.IntroClip,
-                Loop = loopClip,
-                IntroDuration = job.IntroDuration,
-            };
-            RenderCache[job.Id] = rendered;
-
-            if (!job.Wanted) return;
-
-            if (job.IntroStarted)
-            {
-                _loopSource.clip = loopClip;
-                _loopSource.PlayScheduled(System.Math.Max(job.LoopDueDsp,
-                    AudioSettings.dspTime + LateLoopDelaySec));
-            }
-            else
-            {
-                Begin(job.Id, rendered, job.Fade);
-            }
+            job.Music.Parts[part] = MusicSynth.ToClip(task.Result, intro: false, $"{job.Id}-loop{part}");
+            if (part == 0)
+                job.BakeSecPerAudioSec = (Time.realtimeSinceStartup - job.StartedAt) /
+                                         System.Math.Max(job.PartSec[0], 0.05);
         }
 
-        void Begin(string id, RenderedMusic rendered, float fadeSec)
+        void Begin(string id, RenderedMusic music, float fadeSec)
         {
             double start = AudioSettings.dspTime + ScheduleDelaySec;
-            if (rendered.Intro != null)
+            _fadeAfterDsp = start;
+            if (music.Intro != null)
             {
-                _introSource.clip = rendered.Intro;
+                _introSource.clip = music.Intro;
                 _introSource.PlayScheduled(start);
-                _loopSource.clip = rendered.Loop;
-                _loopSource.PlayScheduled(start + rendered.IntroDuration);
+                start += music.IntroDuration;
             }
-            else
-            {
-                _loopSource.clip = rendered.Loop;
-                _loopSource.PlayScheduled(start);
-            }
+
+            _parts = music.Parts;
+            _nextPart = 0;
+            _nextAt = start;
+            _queuedAt = double.MinValue;
+            _slot = 1;
 
             _currentId = id;
             _volume = 0f;
             _volumeTarget = MusicTarget;
             _fadeSec = fadeSec;
-            _fadeAfterDsp = start;
+            Advance();
+        }
+
+        void Advance()
+        {
+            if (_parts == null) return;
+
+            double now = AudioSettings.dspTime;
+            if (now < _queuedAt) return;
+
+            AudioClip clip = _parts[_nextPart];
+            if (clip == null) return;
+
+            double at = _nextAt < now + LateSec ? now + ScheduleDelaySec : _nextAt;
+            _slot = 1 - _slot;
+            _partSources[_slot].clip = clip;
+            _partSources[_slot].PlayScheduled(at);
+            _queuedAt = at;
+            _nextAt = at + (double)clip.samples / clip.frequency;
+            _nextPart = (_nextPart + 1) % _parts.Length;
         }
 
         void Stop()
         {
             _introSource.Stop();
-            _loopSource.Stop();
             _introSource.clip = null;
-            _loopSource.clip = null;
+            foreach (AudioSource source in _partSources)
+            {
+                source.Stop();
+                source.clip = null;
+            }
+            _parts = null;
             _currentId = null;
             _volume = 0f;
             _volumeTarget = 0f;
@@ -521,15 +556,15 @@ namespace MetalRaptors
             foreach (BakeJob job in _jobs)
             {
                 job.Wanted = false;
-                job.IntroStarted = false;
+                job.Started = false;
             }
         }
 
-        AudioSource CreateSource(bool loop)
+        AudioSource CreateSource()
         {
             var source = gameObject.AddComponent<AudioSource>();
             source.playOnAwake = false;
-            source.loop = loop;
+            source.loop = false;
             source.spatialBlend = 0f;
             source.volume = 0f;
             return source;

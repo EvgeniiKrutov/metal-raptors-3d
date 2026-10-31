@@ -37,6 +37,8 @@ namespace MetalRaptors
 
         public float pitchTrimDeg;
 
+        public float enginePitch = 1f;
+
         public float lengthMeters;
 
         public float wingspanMeters;
@@ -276,6 +278,7 @@ namespace MetalRaptors
             standUpEuler   = new Vector3(90f, -90f, 0f),
             rollWheelsDown = true,
             pitchTrimDeg   = 10f,
+            enginePitch    = 0.8409f,
             lengthMeters   = 9.35f,
             wingspanMeters = 12.92f,
             heightMeters   = 3.35f,
@@ -283,6 +286,7 @@ namespace MetalRaptors
             propBladesNode = "prop_blade_mesh",
             gunNode        = "front_guns_mesh",
             rearGunNode    = "back_guns_mesh",
+            wingNode       = "wing_upper",
             hitboxNode     = "fuselage",
             hitboxScale    = 1.5f,
             skins          = PlaneSkins.AircoDh4,

@@ -1,0 +1,151 @@
+{
+  "width": 1920,
+  "height": 1080,
+  "supersample": 2,
+  "terrain": "Flanders",
+  "seed": 1604,
+  "daytime": "Morning",
+  "settle": 3,
+  "warmup": 3,
+  "ambientBlasts": false,
+  "ambientFlak": false,
+  "ambientZeppelins": false,
+  "ambientPeople": false,
+  "ambientClouds": false,
+  "ambientShips": false,
+  "ambientGulls": false,
+  "arena": {
+    "on": true,
+    "distance": 420,
+    "fov": 60,
+    "eye": [
+      0,
+      87,
+      -150
+    ],
+    "seed": 1604
+  },
+  "camera": {
+    "x": 0,
+    "z": 0,
+    "height": 0,
+    "yaw": 0,
+    "pitch": 6,
+    "roll": 0,
+    "fov": 46
+  },
+  "focus": {
+    "farStart": 400,
+    "farEnd": 800,
+    "farRadius": 1.2
+  },
+  "output": "../../Builds/Screenshots/arena_duel_c.png",
+  "planes": [
+    {
+      "model": "sopwith_camel",
+      "skin": "green",
+      "screen": [
+        0.265,
+        0.52
+      ],
+      "distance": 305,
+      "course": 90,
+      "climb": 6,
+      "bank": 25,
+      "speed": 175,
+      "fire": true,
+      "target": 1,
+      "fireFor": 1.0,
+      "fireInterval": 0.13,
+      "aimOffset": [
+        0,
+        32,
+        0
+      ],
+      "overshoot": 0.2,
+      "flashScale": 0.42,
+      "noFill": true
+    },
+    {
+      "model": "fokker_dr1",
+      "skin": "raven",
+      "screen": [
+        0.735,
+        0.61
+      ],
+      "distance": 305,
+      "course": 270,
+      "climb": -6,
+      "bank": -25,
+      "speed": 175,
+      "fire": true,
+      "target": 0,
+      "fireFor": 1.0,
+      "fireInterval": 0.13,
+      "aimOffset": [
+        0,
+        -14,
+        0
+      ],
+      "overshoot": 0.2,
+      "flashScale": 0.42
+    }
+  ],
+  "clouds": [
+    {
+      "screen": [
+        0.08,
+        0.45
+      ],
+      "distance": 850,
+      "width": 240,
+      "alpha": 0.33
+    },
+    {
+      "screen": [
+        0.35,
+        0.8
+      ],
+      "distance": 1000,
+      "width": 288,
+      "alpha": 0.33
+    },
+    {
+      "screen": [
+        0.62,
+        0.35
+      ],
+      "distance": 800,
+      "width": 208,
+      "alpha": 0.33
+    },
+    {
+      "screen": [
+        0.9,
+        0.62
+      ],
+      "distance": 900,
+      "width": 240,
+      "alpha": 0.33
+    },
+    {
+      "screen": [
+        0.55,
+        0.95
+      ],
+      "distance": 950,
+      "width": 240,
+      "alpha": 0.33
+    }
+  ],
+  "planeFill": {
+    "intensity": 3.6,
+    "yaw": 65,
+    "pitch": 8,
+    "color": [
+      1.0,
+      0.97,
+      0.92
+    ]
+  }
+}

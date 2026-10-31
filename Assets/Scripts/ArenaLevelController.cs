@@ -8,7 +8,7 @@ namespace MetalRaptors
     public class ArenaLevelController : MonoBehaviour, ICampaignScriptHost, IBossHost,
         IDangerHost
     {
-        const float CameraDistance = 420f;
+        public const float CameraDistance = 420f;
         const float PlayPlaneZ = 100f;
         const float CamZ = PlayPlaneZ - CameraDistance;
         const float EyeY = 500f;
@@ -38,6 +38,15 @@ namespace MetalRaptors
         const float BossArrive = 1f;
         const float BossSpeedFactor = 1.125f;
 
+        const int EscapeBlasts = 2;
+        const float EscapeBlastGapSec = 0.7f;
+        const float EscapeBlastScale = 0.7f;
+        const float EscapeBoomVolume = 1f;
+        const float EscapeSinkTop = 0.32f;
+        const float EscapeSinkAccel = 0.12f;
+        const float EscapeDriftRatio = 0.4f;
+        const float EscapeSpinRate = 260f;
+
         const float EntryMargin = 120f;
         const float HoldFraction = 0.5f;
         const float SettleSec = 0.7f;
@@ -57,6 +66,7 @@ namespace MetalRaptors
 
         const string Objective = "no way out  •  clear the sky";
         const string StageTwoSkipCaption = "SKIP TO STAGE 2";
+        const string EndingSkipCaption = "SKIP TO ENDING";
 
         CampaignDefinition _level;
         int _levelNumber;
@@ -98,6 +108,8 @@ namespace MetalRaptors
         float _bossMax = 1f;
         bool _bossEntry;
         bool _bossReady;
+        bool _bossGone;
+        bool _finale;
         string _bossName;
 
         bool _entering = true;
@@ -123,6 +135,8 @@ namespace MetalRaptors
         bool Cinematic => _entering || _outro || _bossEntry || CinematicBars.AnyShowing;
 
         public bool BossReady => _bossReady;
+
+        public bool BossGone => _bossGone;
 
         string Subtitle => _level.title.ToLowerInvariant();
 
@@ -192,7 +206,7 @@ namespace MetalRaptors
         {
             CampaignCheckpoint.InCareer = false;
             SmokeTrail.Wind = Vector2.zero;
-            DevSkip.Withdraw(SkipToStageTwo);
+            WithdrawSkips();
         }
 
         static float ScrollSpeed => DuelPlane.CruiseSpeed * CloudSpeedFactor;
@@ -233,9 +247,9 @@ namespace MetalRaptors
             go.transform.position = new Vector3(_camPos.x - _halfW - EntryMargin,
                 (_floorY + _ceilingY) * 0.5f, PlayPlaneZ);
 
-            var planeModel = GameManager.CurrentPlane;
+            var planeModel = _level.PlayerPlane;
             var model = PlaneFactory.BuildPlaneModel(go.transform, planeModel,
-                skin: GameManager.CurrentSkin);
+                skin: _level.PlayerSkin);
             model.localScale *= PlaneScale;
 
             PlayerConfig flight = PlaneLoadout.Build(config, planeModel);
@@ -255,6 +269,7 @@ namespace MetalRaptors
                 hardWalls: true);
             _cube.SetControlled(false);
             _cube.MountEngine(PlaneFactory.EngineLocal(go, model, planeModel));
+            _cube.EnginePitch = planeModel.enginePitch;
 
             var muzzle = PlaneFactory.MountMuzzle(go, model, planeModel, out var flashPoint);
             var hitbox = go.GetComponentInChildren<Collider>();
@@ -325,7 +340,7 @@ namespace MetalRaptors
         {
             if (_gameOver || _cube == null || _bossEntry) return;
             PlaneScrapes.Check(_cube, _cubeTr, _enemies != null ? _enemies.Live : null, null,
-                PlaneScrapes.HitboxRadius * GameManager.CurrentPlane.hitboxScale);
+                PlaneScrapes.HitboxRadius * _level.PlayerPlane.hitboxScale);
         }
 
         void LateUpdate()
@@ -341,10 +356,14 @@ namespace MetalRaptors
             if (!_outro && _hudView != null) _hudView.Tick();
             if (_enemies != null) _enemies.SetWindow(_camPos.x, _halfW);
 
-            if (_entryBars != null && _dialogue != null && _dialogue.IsReady)
+            if (_entryBars != null && _dialogue != null)
             {
-                Destroy(_entryBars.gameObject);
-                _entryBars = null;
+                if (_finale) _entryBars.gameObject.SetActive(!(_dialogue.IsOpen && _dialogue.IsReady));
+                else if (_dialogue.IsReady)
+                {
+                    Destroy(_entryBars.gameObject);
+                    _entryBars = null;
+                }
             }
             if (_bossBar != null) _bossBar.Set(_boss != null ? _boss.CurrentHealth : 0f, _bossMax);
         }
@@ -410,7 +429,8 @@ namespace MetalRaptors
 
         public void EnterArena() { }
 
-        public void EnterBoss(PlaneModelConfig plane, string skin, float health, string name)
+        public void EnterBoss(PlaneModelConfig plane, string skin, float health, string name,
+            bool burning)
         {
             if (_gameOver || _enemies == null || _cube == null || plane == null || _boss != null)
             {
@@ -420,6 +440,7 @@ namespace MetalRaptors
 
             _bossEntry = true;
             _bossReady = false;
+            _finale = burning;
             _bossName = name;
             _cube.SetControlled(false);
             if (_shooter != null) _shooter.Stop();
@@ -443,6 +464,11 @@ namespace MetalRaptors
 
             _bossMax = _boss.MaxHealth;
             _boss.HideHealthBar();
+            if (burning)
+            {
+                _boss.EnginePitch = RavenMoveset.RagePitch;
+                _boss.Blaze();
+            }
             StartCoroutine(FlyBossIn(start));
         }
 
@@ -555,9 +581,75 @@ namespace MetalRaptors
             _moves.SkipToRage();
         }
 
+        void SkipToEnding()
+        {
+            if (_gameOver || _moves == null) return;
+            _moves.SkipToEnd();
+        }
+
+        void WithdrawSkips()
+        {
+            DevSkip.Withdraw(SkipToStageTwo);
+            DevSkip.Withdraw(SkipToEnding);
+        }
+
+        void BossBeaten()
+        {
+            WithdrawSkips();
+            if (_bossBar != null) _bossBar.Remove();
+            _bossBar = null;
+        }
+
+        public void BeginEscape()
+        {
+            _bossGone = _gameOver || _boss == null;
+            if (!_bossGone) StartCoroutine(Escape());
+        }
+
+        bool Escaping => _boss != null && !_gameOver;
+
+        IEnumerator Escape()
+        {
+            _boss.Featured = true;
+
+            for (int i = 0; i < EscapeBlasts; i++)
+            {
+                for (float t = 0f; t < EscapeBlastGapSec && Escaping; t += Time.deltaTime)
+                    yield return null;
+                if (!Escaping) break;
+
+                Explosion.Spawn(_boss.NosePoint, _boss.ModelSize * EscapeBlastScale,
+                    EscapeBoomVolume * AudioOptions.Sfx);
+                Shake(HitShakeMagnitude, HitShakeDuration);
+            }
+
+            Vector2 pos = _boss != null ? (Vector2)_boss.transform.position : Vector2.zero;
+            float hideY = _camPos.y - _halfH - (_boss != null ? _boss.ModelSize : 0f);
+            float sink = 0f;
+            float spin = 0f;
+
+            while (Escaping && pos.y > hideY)
+            {
+                float dt = Time.deltaTime;
+                sink = Mathf.MoveTowards(sink, EscapeSinkTop * _halfH, EscapeSinkAccel * _halfH * dt);
+                float drift = sink * EscapeDriftRatio;
+                pos += new Vector2(-drift, -sink) * dt;
+                spin += EscapeSpinRate * dt;
+
+                _boss.Spin = spin;
+                _boss.ScriptTo(pos, Mathf.Atan2(-sink, ScrollSpeed - drift));
+                yield return null;
+            }
+
+            if (_boss != null) _enemies.Dismiss(_boss);
+            _boss = null;
+            _bossGone = true;
+        }
+
         void BossEnraged()
         {
             DevSkip.Withdraw(SkipToStageTwo);
+            DevSkip.Offer(EndingSkipCaption, SkipToEnding);
             if (_flight == null) return;
 
             _flight.rollCooldown = RollCooldown * StageTwoRollFactor;
@@ -586,6 +678,7 @@ namespace MetalRaptors
             cinematic = BossCinematic,
             roof = PinCeiling,
             enraged = BossEnraged,
+            beaten = BossBeaten,
             shake = () => Shake(HitShakeMagnitude, HitShakeDuration),
         };
 
@@ -643,12 +736,12 @@ namespace MetalRaptors
             if (_moves != null) _moves.Stop();
             if (_enemies != null) _enemies.StandDown();
             if (_dialogue != null) _dialogue.Hide();
-            DevSkip.Withdraw(SkipToStageTwo);
+            WithdrawSkips();
             if (_cube != null)
             {
                 _cube.ClearWalls();
                 _cube.SetControlled(false);
-                _cube.SetHoverInput(Vector2.right);
+                _cube.SetHoverInput(_finale ? Vector2.zero : Vector2.right);
             }
 
             CampaignProgress.Complete(_levelNumber);
@@ -659,7 +752,7 @@ namespace MetalRaptors
 
         IEnumerator FlyOut()
         {
-            float left = OutroExitMaxSec;
+            float left = _finale ? 0f : OutroExitMaxSec;
             while (left > 0f && !PlaneGone)
             {
                 left -= Time.deltaTime;
@@ -678,12 +771,14 @@ namespace MetalRaptors
         {
             SmokeTrail.Wind = Vector2.zero;
             if (_cube != null) _cube.Stop();
+            if (_entryBars != null) Destroy(_entryBars.gameObject);
+            _entryBars = null;
             CampaignFinale.Play(_level, _levelNumber, _hud, Subtitle);
         }
 
         void StopScript()
         {
-            DevSkip.Withdraw(SkipToStageTwo);
+            WithdrawSkips();
             if (_runner != null) _runner.Stop();
             if (_moves != null) _moves.Stop();
             if (_enemies != null) _enemies.StandDown();

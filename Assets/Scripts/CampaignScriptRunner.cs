@@ -26,9 +26,11 @@ namespace MetalRaptors
 
     public interface IBossHost
     {
-        void EnterBoss(PlaneModelConfig plane, string skin, float health, string name);
+        void EnterBoss(PlaneModelConfig plane, string skin, float health, string name, bool burning);
         bool BossReady { get; }
         void BeginDuel();
+        void BeginEscape();
+        bool BossGone { get; }
     }
 
     public interface IDangerHost
@@ -44,6 +46,16 @@ namespace MetalRaptors
     public interface IAbilityHost
     {
         void Unlock(PlaneAbility ability);
+    }
+
+    public interface IGunnerHost
+    {
+        void EnableJams();
+    }
+
+    public interface IBoostHost
+    {
+        void HoldBoost(bool on);
     }
 
     public class CampaignScriptRunner : MonoBehaviour
@@ -92,12 +104,13 @@ namespace MetalRaptors
 
         void ReplayUnlocks()
         {
-            if (!(_host is IAbilityHost abilityHost)) return;
-
             for (int i = 0; i < _start; i++)
             {
                 CampaignStep step = _script.Steps[i];
-                if (step.op == CampaignOp.Unlock) abilityHost.Unlock(step.ability);
+                if (step.op == CampaignOp.Unlock && _host is IAbilityHost abilityHost)
+                    abilityHost.Unlock(step.ability);
+                else if (step.op == CampaignOp.Jams && _host is IGunnerHost gunnerHost)
+                    gunnerHost.EnableJams();
             }
         }
 
@@ -204,7 +217,7 @@ namespace MetalRaptors
                         if (_host is IBossHost bossHost)
                         {
                             bossHost.EnterBoss(step.plane, step.skin, step.scale,
-                                step.speaker != null ? step.speaker.Name : null);
+                                step.speaker != null ? step.speaker.Name : null, step.burning);
                             while (Running && !bossHost.BossReady) yield return null;
                         }
                         break;
@@ -214,12 +227,28 @@ namespace MetalRaptors
                         yield return WaitForClear();
                         break;
 
+                    case CampaignOp.Escape:
+                        if (_host is IBossHost escapeHost)
+                        {
+                            escapeHost.BeginEscape();
+                            while (Running && !escapeHost.BossGone) yield return null;
+                        }
+                        break;
+
                     case CampaignOp.Arena:
                         if (Running) _host.EnterArena();
                         yield break;
 
                     case CampaignOp.Unlock:
                         if (_host is IAbilityHost abilityHost) abilityHost.Unlock(step.ability);
+                        break;
+
+                    case CampaignOp.Jams:
+                        if (_host is IGunnerHost gunnerHost) gunnerHost.EnableJams();
+                        break;
+
+                    case CampaignOp.Boost:
+                        if (_host is IBoostHost boostHost) boostHost.HoldBoost(step.hold);
                         break;
 
                     case CampaignOp.Raid:

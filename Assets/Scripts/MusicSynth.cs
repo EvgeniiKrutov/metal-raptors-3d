@@ -7,7 +7,7 @@ namespace MetalRaptors
     public class RenderedMusic
     {
         public AudioClip Intro;
-        public AudioClip Loop;
+        public AudioClip[] Parts;
         public double IntroDuration;
     }
 
@@ -113,6 +113,45 @@ namespace MetalRaptors
             return bake;
         }
 
+        public static int[] LoopBounds(MusicConfig config, int parts)
+        {
+            int from = LoopStartIndex(config);
+            int to = config.Sequence.Count;
+            if (!config.IsRetro) parts = 1;
+            parts = Mathf.Clamp(parts, 1, Math.Max(1, to - from));
+
+            var durations = PatternDurations(config);
+            double total = SectionSeconds(config, from, to);
+            var bounds = new List<int> { from };
+            double done = 0;
+
+            for (int i = from; i < to && bounds.Count < parts; i++)
+            {
+                durations.TryGetValue(config.Sequence[i], out double duration);
+                double target = total * bounds.Count / parts;
+                if (i > bounds[bounds.Count - 1] && target - done < done + duration - target)
+                    bounds.Add(i);
+                else if (i + 1 < to && done + duration >= target)
+                    bounds.Add(i + 1);
+                done += duration;
+            }
+
+            bounds.Add(to);
+            return bounds.ToArray();
+        }
+
+        public static MusicBake BakePart(MusicConfig config, int rate, int[] bounds, int part)
+        {
+            if (bounds.Length <= 2) return BakeSection(config, rate, intro: false);
+
+            int from = bounds[part];
+            int to = bounds[part + 1];
+            int preroll = (part > 0 ? from : bounds[bounds.Length - 1]) - 1;
+            var samples = MusicSynthRetro.RenderPart(config, preroll, from, to, rate, PatternDurations(config),
+                out _);
+            return samples == null ? null : new MusicBake { Rate = rate, Channels = 2, Loop = samples };
+        }
+
         public static int LoopStartIndex(MusicConfig config) =>
             config == null || config.Sequence.Count == 0
                 ? 0
@@ -137,7 +176,7 @@ namespace MetalRaptors
             return new RenderedMusic
             {
                 Intro = ToClip(bake.Intro, bake, $"{config.Id}-intro"),
-                Loop = ToClip(bake.Loop, bake, $"{config.Id}-loop"),
+                Parts = new[] { ToClip(bake.Loop, bake, $"{config.Id}-loop") },
                 IntroDuration = bake.IntroDuration,
             };
         }

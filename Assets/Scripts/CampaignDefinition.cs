@@ -9,6 +9,7 @@ namespace MetalRaptors
         Bomb = 1,
         Boost = 2,
         Roll = 4,
+        Dive = 8,
         All = Bomb | Boost | Roll,
     }
 
@@ -34,6 +35,7 @@ namespace MetalRaptors
         public string script;
         public PlaneAbility abilities = PlaneAbility.All;
         public PlaneModelConfig plane;
+        public string skin;
         public bool gunner;
         public string arenaScript;
         public CampaignOutroLine[] arenaLines;
@@ -62,6 +64,12 @@ namespace MetalRaptors
         public PlaneModelConfig companionPlane = PlaneModels.Sopwith;
         public PlaneModelConfig companionFoe = PlaneModels.Albatros;
         public string[] companionPilots;
+
+        public PlaneModelConfig PlayerPlane => plane ?? GameManager.CurrentPlane;
+
+        public PlaneSkin PlayerSkin => plane != null
+            ? PlaneSkins.ById(plane, skin) ?? PlaneSkins.Default(plane)
+            : GameManager.CurrentSkin;
 
         public string CompanionPilot(int index) =>
             companionPilots != null && index >= 0 && index < companionPilots.Length
@@ -194,6 +202,8 @@ namespace MetalRaptors
             weather = Weather.Calm,
             clouds = new CloudsPart(),
             script = "level1",
+            plane = PlaneModels.Sopwith,
+            skin = "green",
             abilities = PlaneAbility.None,
             companion = true,
             zeppelins = true,
@@ -218,6 +228,8 @@ namespace MetalRaptors
             weather = Weather.Calm,
             clouds = new CloudsPart(),
             script = "level2",
+            plane = PlaneModels.Sopwith,
+            skin = "green",
             abilities = PlaneAbility.Boost,
             companion = true,
             backCompanions = 2,
@@ -244,6 +256,8 @@ namespace MetalRaptors
             weather = Weather.Calm,
             clouds = new CloudsPart(),
             script = "level3",
+            plane = PlaneModels.Sopwith,
+            skin = "green",
             abilities = PlaneAbility.Boost | PlaneAbility.Roll,
             worldWidth = 2000f,
             aerodrome = true,
@@ -270,6 +284,8 @@ namespace MetalRaptors
             weather = Weather.Calm,
             clouds = new CloudsPart(),
             script = "level4",
+            plane = PlaneModels.Sopwith,
+            skin = "green",
             abilities = PlaneAbility.Boost | PlaneAbility.Roll,
             arenaScript = "level4_arena",
             arenaLines = Arena4,
@@ -301,6 +317,7 @@ namespace MetalRaptors
             script = "level5",
             abilities = PlaneAbility.None,
             plane = PlaneModels.AircoDh4,
+            skin = "green",
             gunner = true,
             flak = 1.25f,
             enemyHealthScale = 0.78f,
@@ -322,6 +339,8 @@ namespace MetalRaptors
             weather = Weather.Calm,
             clouds = new CloudsPart { frequency = CloudLevel.Low },
             script = "level6",
+            plane = PlaneModels.Sopwith,
+            skin = "green",
             flak = 1.35f,
             enemyHealthScale = 0.70f,
             enemyRotationScale = 0.91f,
@@ -341,6 +360,8 @@ namespace MetalRaptors
             weather = Weather.Calm,
             clouds = new CloudsPart { size = CloudLevel.High },
             script = "level7",
+            plane = PlaneModels.Sopwith,
+            skin = "green",
             companion = true,
             flak = 1.5f,
             enemyHealthScale = 0.80f,
@@ -361,6 +382,8 @@ namespace MetalRaptors
             weather = Weather.Calm,
             clouds = new CloudsPart(),
             script = "level8",
+            plane = PlaneModels.Sopwith,
+            skin = "green",
             flak = 1.2f,
             enemyHealthScale = 0.90f,
             enemyRotationScale = 1.10f,
@@ -380,6 +403,8 @@ namespace MetalRaptors
             weather = Weather.Calm,
             clouds = new CloudsPart { size = CloudLevel.High },
             script = "level9",
+            plane = PlaneModels.Sopwith,
+            skin = "green",
             companion = true,
             flak = 1.4f,
             enemyHealthScale = 1.00f,

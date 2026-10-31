@@ -53,6 +53,11 @@ namespace MetalRaptors
 
         public Vector3 Box => BoxCentre;
 
+        public static Vector3 SpawnBox(Vector3 camPos, float halfWidth, float halfHeight,
+            float z, float side, float lead) =>
+            new Vector3(camPos.x + side * halfWidth * lead,
+                camPos.y + halfHeight + OnScreenSize * (SpawnLiftFactor - HangFraction), z);
+
         public static SupplyCrate Spawn(Vector3 camPos, float halfWidth, float halfHeight,
             float z, float floorY, float side, float lead, Transform player, System.Action onCaught)
         {

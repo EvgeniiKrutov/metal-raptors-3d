@@ -16,11 +16,12 @@
     { "op": "say", "speaker": "marchand", "line": "l5_line7" },
     { "op": "say", "speaker": "you", "line": "l5_line8" },
 
+    { "op": "unlock", "ability": "dive" },
     { "op": "supply", "count": 1 },
     { "op": "wait", "seconds": 2.5 },
     { "op": "warn", "planes": 1 },
     { "op": "danger", "side": "left", "seconds": 2 },
-    { "op": "wave", "enemies": [ { "plane": "albatros", "count": 1 } ] },
+    { "op": "wave", "enemies": [ { "plane": "albatros", "count": 1, "sneak": true } ] },
 
     { "op": "wait", "seconds": 1.5 },
     { "op": "say", "speaker": "marchand", "line": "l5_line9" },
@@ -28,13 +29,22 @@
     { "op": "say", "speaker": "marchand", "line": "l5_line11" },
     { "op": "say", "speaker": "you", "line": "l5_line12" },
 
+    { "op": "jams" },
+    { "op": "boost", "hold": true },
     { "op": "supply", "count": 1 },
     { "op": "wait", "seconds": 2.5 },
     { "op": "warn", "planes": 1 },
     { "op": "danger", "side": "left", "seconds": 2 },
-    { "op": "wave", "enemies": [ { "plane": "albatros", "count": 1 } ] },
+    { "op": "wave", "enemies": [ { "plane": "albatros", "count": 1, "sneak": true } ] },
+    { "op": "boost", "hold": false },
 
     { "op": "wait", "seconds": 1.5 },
+    { "op": "say", "speaker": "you", "line": "l5_line13" },
+    { "op": "say", "speaker": "marchand", "line": "l5_line14" },
+    { "op": "say", "speaker": "you", "line": "l5_line15" },
+    { "op": "say", "speaker": "marchand", "line": "l5_line16" },
+
+    { "op": "wait", "seconds": 5 },
     { "op": "finish" }
   ]
 }

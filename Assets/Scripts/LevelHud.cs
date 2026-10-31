@@ -16,6 +16,12 @@ namespace MetalRaptors
         const string ArenaKeyHint = "W A S D to fly  •  F to fire  •  B to roll  •  ";
 
         const string GunnerKeyHint = "W / S to aim  •  F to fire  •  ";
+        const string DiveHint = "R to dive  •  ";
+        const string JamHint = "GUN JAMMED  •  TAP F ×";
+        const string JamTouchHint = "GUN JAMMED  •  TAP FIRE ×";
+        const int JamSizeBoost = 6;
+        const float JamAnchorY = 0.3f;
+        static readonly Color JamColor = new Color(1f, 0.42f, 0.28f, 1f);
 
         const float BossGap = 0.35f;
 
@@ -26,6 +32,7 @@ namespace MetalRaptors
         readonly PlaneBarrelRoll _roll;
         readonly PlaneSearchlight _searchlight;
         readonly RearGun _gun;
+        readonly GunnerAutopilot _pilot;
 
         readonly HealthBar _health;
         readonly HealthBar _airfieldBar;
@@ -33,6 +40,7 @@ namespace MetalRaptors
         readonly CooldownSquare _bombSquare;
         readonly CooldownSquare _boostSquare;
         readonly CooldownSquare _rollSquare;
+        readonly CooldownSquare _diveSquare;
         readonly CooldownSquare _fireSquare;
         readonly CooldownSquare _lightSquare;
         readonly List<CooldownSquare> _column = new List<CooldownSquare>();
@@ -43,6 +51,8 @@ namespace MetalRaptors
         bool _bossShown;
 
         readonly Text _hint;
+        readonly Text _jam;
+        int _jamShown = -1;
         readonly string _objective;
         PlaneAbility _abilities;
 
@@ -56,10 +66,12 @@ namespace MetalRaptors
         public LevelHud(Transform parent, string objective, CubeController plane,
             PlaneShooter shooter, PlaneBomber bomber, PlaneBoost boost, PlaneBarrelRoll roll,
             PlaneSearchlight searchlight, Airfield airfield, System.Action onPause,
-            bool arena = false, PlaneAbility abilities = PlaneAbility.All, RearGun gun = null)
+            bool arena = false, PlaneAbility abilities = PlaneAbility.All, RearGun gun = null,
+            GunnerAutopilot pilot = null)
         {
             _plane = plane;
             _gun = gun;
+            _pilot = pilot;
             _arena = arena;
             _abilities = abilities;
             _objective = objective;
@@ -101,6 +113,9 @@ namespace MetalRaptors
                 _boostSquare = Square(parent, HudTheme.Label("R", "BOOST"), RequestBoost,
                     PlaneAbility.Boost);
             }
+            if (pilot != null)
+                _diveSquare = Square(parent, HudTheme.Label("R", "DIVE"), RequestDive,
+                    PlaneAbility.Dive);
             if (!arena || _roll != null)
                 _rollSquare = Square(parent, HudTheme.Label("B", "ROLL"), RequestRoll,
                     PlaneAbility.Roll);
@@ -133,7 +148,27 @@ namespace MetalRaptors
             rt.sizeDelta = new Vector2(-2f * HudTheme.HintSideInset, HudTheme.HintRowHeight);
             rt.anchoredPosition = new Vector2(0f, HudTheme.HintBottom);
 
+            if (gun != null) _jam = JamLabel(parent);
+
             Tick();
+        }
+
+        static Text JamLabel(Transform parent)
+        {
+            int size = HudTheme.HintSize + JamSizeBoost;
+            Text label = UIFactory.CreateText(parent, string.Empty, size, Vector2.zero, Vector2.zero,
+                TextAnchor.MiddleCenter, FontStyle.Bold);
+            label.color = JamColor;
+
+            var rt = label.rectTransform;
+            rt.anchorMin = new Vector2(0f, JamAnchorY);
+            rt.anchorMax = new Vector2(1f, JamAnchorY);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = new Vector2(-2f * HudTheme.HintSideInset, HudTheme.HintRowHeight);
+            rt.anchoredPosition = Vector2.zero;
+
+            label.gameObject.SetActive(false);
+            return label;
         }
 
         CooldownSquare Square(Transform parent, string label, System.Action onPress,
@@ -171,7 +206,11 @@ namespace MetalRaptors
         string HintText()
         {
             if (HudTheme.IsTouch) return _objective;
-            if (_gun != null) return GunnerKeyHint + _objective;
+            if (_gun != null)
+            {
+                string dive = Has(PlaneAbility.Dive) ? DiveHint : string.Empty;
+                return GunnerKeyHint + dive + _objective;
+            }
             if (_arena) return ArenaKeyHint + _objective;
 
             string keys = KeyHint;
@@ -208,6 +247,8 @@ namespace MetalRaptors
                 _boostSquare.Set(_boost.Charge, _boost.IsReady || _boost.IsRunning);
             if (_rollSquare != null && _roll != null)
                 _rollSquare.Set(_roll.Charge, _roll.IsReady || _roll.IsRunning);
+            if (_diveSquare != null && _pilot != null)
+                _diveSquare.Set(_pilot.Charge, _pilot.IsReady || _pilot.IsRunning);
             if (_fireSquare != null && _shooter != null)
             {
                 _fireSquare.Set(0f, _shooter.IsReady);
@@ -221,7 +262,20 @@ namespace MetalRaptors
             if (_airfieldBar != null && _airfield != null)
                 _airfieldBar.Set(_airfield.CurrentHealth, Airfield.MaxHealth);
 
+            TickJam();
             TickSteering();
+        }
+
+        void TickJam()
+        {
+            if (_jam == null || _shooter == null) return;
+
+            int taps = _shooter.Jammed && _gun.Ready ? _shooter.TapsLeft : 0;
+            if (taps == _jamShown) return;
+
+            _jamShown = taps;
+            _jam.gameObject.SetActive(taps > 0);
+            if (taps > 0) _jam.text = (HudTheme.IsTouch ? JamTouchHint : JamHint) + taps;
         }
 
         void TickSteering()
@@ -265,6 +319,11 @@ namespace MetalRaptors
         void RequestRoll()
         {
             if (_roll != null) _roll.Request();
+        }
+
+        void RequestDive()
+        {
+            if (_pilot != null) _pilot.Request();
         }
 
         void ToggleLight()

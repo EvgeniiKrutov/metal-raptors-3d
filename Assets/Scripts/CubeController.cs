@@ -24,6 +24,8 @@ namespace MetalRaptors
 
         public float AngularVelocity => _angularVelocity;
 
+        public float EnginePitch { get; set; } = 1f;
+
         public float MaxTurnRate => _config != null
             ? _config.rotationSpeed * Mathf.Deg2Rad * _boost
             : 0f;

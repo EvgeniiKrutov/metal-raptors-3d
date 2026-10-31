@@ -1,0 +1,175 @@
+{
+  "width": 1920,
+  "height": 1080,
+  "supersample": 2,
+  "terrain": "Flanders",
+  "seed": 1604,
+  "daytime": "Morning",
+  "settle": 3,
+  "warmup": 3,
+  "ambientBlasts": false,
+  "ambientFlak": false,
+  "ambientZeppelins": false,
+  "ambientPeople": false,
+  "ambientClouds": false,
+  "ambientShips": false,
+  "ambientGulls": false,
+  "arena": {
+    "on": true,
+    "distance": 420,
+    "fov": 60,
+    "eye": [
+      0,
+      33,
+      0
+    ],
+    "seed": 1604
+  },
+  "camera": {
+    "x": 0,
+    "z": 0,
+    "height": 0,
+    "yaw": 0,
+    "pitch": 0,
+    "roll": 0,
+    "fov": 46
+  },
+  "focus": {
+    "farStart": 400,
+    "farEnd": 800,
+    "farRadius": 1.2
+  },
+  "output": "../../Builds/Screenshots/arena_duel_a.png",
+  "planes": [
+    {
+      "model": "sopwith_camel",
+      "skin": "green",
+      "screen": [
+        0.75,
+        0.47
+      ],
+      "distance": 270,
+      "course": 270,
+      "climb": 0,
+      "bank": -8,
+      "speed": 175,
+      "fire": true,
+      "target": 1,
+      "fireFor": 1.0,
+      "fireInterval": 0.13,
+      "aimOffset": [
+        0,
+        32,
+        0
+      ],
+      "overshoot": 0.2,
+      "flashScale": 0.42,
+      "noFill": true,
+      "boost": true,
+      "streakWidth": 1.5,
+      "smoking": true,
+      "smokeColor": [
+        0.42,
+        0.42,
+        0.44,
+        0.6
+      ],
+      "smokeScale": 1.0,
+      "hitEvery": 2,
+      "smokeDepth": 25
+    },
+    {
+      "model": "fokker_dr1",
+      "skin": "raven",
+      "screen": [
+        0.25,
+        0.47
+      ],
+      "distance": 270,
+      "course": 90,
+      "climb": 0,
+      "bank": 8,
+      "speed": 175,
+      "fire": true,
+      "target": 0,
+      "fireFor": 1.0,
+      "fireInterval": 0.13,
+      "aimOffset": [
+        0,
+        -14,
+        0
+      ],
+      "overshoot": 0.2,
+      "flashScale": 0.42,
+      "boost": true,
+      "streakWidth": 1.5,
+      "smoking": true,
+      "smokeColor": [
+        0.42,
+        0.42,
+        0.44,
+        0.6
+      ],
+      "smokeScale": 1.0,
+      "hitEvery": 2,
+      "smokeDepth": 25
+    }
+  ],
+  "clouds": [
+    {
+      "screen": [
+        0.1,
+        0.75
+      ],
+      "distance": 900,
+      "width": 240,
+      "alpha": 0.33
+    },
+    {
+      "screen": [
+        0.45,
+        0.88
+      ],
+      "distance": 1000,
+      "width": 272,
+      "alpha": 0.33
+    },
+    {
+      "screen": [
+        0.5,
+        0.36
+      ],
+      "distance": 800,
+      "width": 176,
+      "alpha": 0.33
+    },
+    {
+      "screen": [
+        0.88,
+        0.85
+      ],
+      "distance": 950,
+      "width": 240,
+      "alpha": 0.33
+    },
+    {
+      "screen": [
+        0.25,
+        0.45
+      ],
+      "distance": 850,
+      "width": 192,
+      "alpha": 0.33
+    }
+  ],
+  "planeFill": {
+    "intensity": 3.0,
+    "yaw": -40,
+    "pitch": 20,
+    "color": [
+      1.0,
+      0.97,
+      0.92
+    ]
+  }
+}

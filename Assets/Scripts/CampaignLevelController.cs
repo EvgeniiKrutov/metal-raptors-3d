@@ -6,7 +6,7 @@ using UnityEngine.Rendering.Universal;
 namespace MetalRaptors
 {
     public class CampaignLevelController : MonoBehaviour, ICampaignScriptHost, IRaidHost,
-        IAbilityHost, IDevSpawnHost, IDangerHost
+        IAbilityHost, IDevSpawnHost, IDangerHost, IGunnerHost, IBoostHost
     {
         const float WorldTop = 650f;
         float HitboxScale => PlaneModelConfig.LevelScale * PlayerPlane.hitboxScale;
@@ -75,6 +75,7 @@ namespace MetalRaptors
         const float EntryLow = 0.45f;
         const float EntryHigh = 0.55f;
         const string HudObjectiveGunner = "rear gun  •  keep them off our tail";
+        const string WaveSkipCaption = "SKIP WAVE";
 
         const float DitchSplashSize = 75f;
         const float SinkSpeed = 26f;
@@ -94,6 +95,7 @@ namespace MetalRaptors
         PlaneSearchlight _searchlight;
         RearGun _rearGun;
         GunnerAutopilot _autopilot;
+        bool _waveSkip;
         float? _entryY;
         PlaneAbility _abilities;
         Transform _cubeTr;
@@ -160,8 +162,7 @@ namespace MetalRaptors
 
         bool Gunner => _level.gunner;
 
-        PlaneModelConfig PlayerPlane =>
-            _level != null && _level.plane != null ? _level.plane : GameManager.CurrentPlane;
+        PlaneModelConfig PlayerPlane => _level != null ? _level.PlayerPlane : GameManager.CurrentPlane;
 
         bool Bounded => _level.worldWidth > 0f;
 
@@ -302,6 +303,7 @@ namespace MetalRaptors
             DevSpawn.Unregister(this);
             DevSkip.Withdraw(SkipToArena);
             DevSkip.Withdraw(SkipToRaid);
+            DevSkip.Withdraw(SkipWave);
             if (!_handedOff) CampaignCheckpoint.InCareer = false;
         }
 
@@ -539,7 +541,7 @@ namespace MetalRaptors
 
             var planeModel = PlayerPlane;
             var model = PlaneFactory.BuildPlaneModel(go.transform, planeModel,
-                skin: _level.plane != null ? PlaneSkins.Default(planeModel) : GameManager.CurrentSkin);
+                skin: _level.PlayerSkin);
             model.localScale *= PlaneModelConfig.LevelScale;
             _playerModel = model;
 
@@ -558,6 +560,7 @@ namespace MetalRaptors
             Vector3 nose = PlaneFactory.NoseLocal(go, model, planeModel);
             Vector3? engine = PlaneFactory.EngineLocal(go, model, planeModel);
             _cube.MountEngine(engine);
+            _cube.EnginePitch = planeModel.enginePitch;
 
             var muzzle = PlaneFactory.MountMuzzle(go, model, planeModel, out var flashPoint);
             var hitbox = go.GetComponentInChildren<Collider>();
@@ -605,6 +608,39 @@ namespace MetalRaptors
             _rearGun = RearGun.Mount(_cubeTr.gameObject, _playerModel, PlayerPlane);
             _shooter.MountTurret(_rearGun, RearGun.ShotPitch);
             _autopilot = GunnerAutopilot.Begin(_cube, GunnerCamY, _halfViewHeight);
+            LockAbilities();
+        }
+
+        public void EnableJams()
+        {
+            if (_shooter != null) _shooter.Jams = true;
+        }
+
+        public void HoldBoost(bool on)
+        {
+            if (_boost != null) _boost.Sustain(on);
+        }
+
+        void OfferWaveSkip()
+        {
+            if (CustomBattle.Requested) return;
+
+            _waveSkip = true;
+            DevSkip.Offer(WaveSkipCaption, SkipWave);
+        }
+
+        void SkipWave()
+        {
+            _waveSkip = false;
+            if (_enemies != null && !_gameOver) _enemies.DismissAll();
+        }
+
+        void TickWaveSkip()
+        {
+            if (!_waveSkip || EnemiesAlive > 0) return;
+
+            _waveSkip = false;
+            DevSkip.Withdraw(SkipWave);
         }
 
         void ArmPursuit()
@@ -777,6 +813,7 @@ namespace MetalRaptors
                 && _cubeTr.position.y <= SeaSurface.Level) Ditch();
 
             if (!_outro) UpdateHud();
+            TickWaveSkip();
             if (_formation && !_playerFalling && _cube != null) AlignToMiddle();
             if (!_gameOver && _supply != null)
                 _supply.Tick(_camBasePos, _halfViewWidth, _halfViewHeight, Cinematic);
@@ -873,7 +910,10 @@ namespace MetalRaptors
             if (_enemies != null)
             {
                 if (Gunner)
+                {
                     _enemies.SpawnBehind(groups, _camBasePos.x, _halfViewWidth, TakeEntryY());
+                    OfferWaveSkip();
+                }
                 else if (spread)
                     _enemies.SpawnSpread(groups, _camBasePos, _halfViewWidth, _halfViewHeight);
                 else
@@ -1319,7 +1359,7 @@ namespace MetalRaptors
                 : Bounded ? HudObjectiveBounded : HudObjective;
             _hudView = new LevelHud(canvas.transform, objective,
                 _cube, _shooter, _bomber, _boost, _roll, _searchlight, _airfield, TryPause,
-                abilities: _abilities, gun: _rearGun);
+                abilities: _abilities, gun: _rearGun, pilot: _autopilot);
 
             _curtain = HudCurtain.Attach(_hud);
             _curtain.Set(false);
@@ -1342,6 +1382,7 @@ namespace MetalRaptors
             if (_bomber != null) _bomber.Locked = (_abilities & PlaneAbility.Bomb) == 0;
             if (_boost != null) _boost.Locked = (_abilities & PlaneAbility.Boost) == 0;
             if (_roll != null) _roll.Locked = (_abilities & PlaneAbility.Roll) == 0;
+            if (_autopilot != null) _autopilot.Locked = (_abilities & PlaneAbility.Dive) == 0;
         }
     }
 }

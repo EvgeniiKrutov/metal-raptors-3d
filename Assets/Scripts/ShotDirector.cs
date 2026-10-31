@@ -19,6 +19,10 @@ namespace MetalRaptors
         const float DefaultFireFor = 0.7f;
         const float TrailScale = 0.7f;
         const float HitScale = 0.35f;
+        const float DefaultSmokeAlpha = 0.6f;
+        const float StrikeSpread = 0.15f;
+        const int SplinterCount = 4;
+        const float SplinterScale = 0.8f;
 
         const float BoltSpeed = 430f;
         const float BoltLength = 9f;
@@ -43,8 +47,17 @@ namespace MetalRaptors
         const float RifleFlashShare = 0.4f;
         const float ChestHeight = 7.2f;
         const float FoeScatterLow = -2.5f, FoeScatterHigh = 3.5f;
-        const float CoverGap = 7f;
-        const float CoverJitter = 2.5f;
+        const float CoverSink = 0.3f;
+        const float DefaultCoverAngle = 45f;
+        const float WallGap = 4f;
+        const float WallPack = 0.9f;
+        const float WallTwist = 20f, TopTwist = 30f;
+        const float WallTilt = 5f;
+        const float WallSlide = 0.5f, WallBulge = 0.6f;
+        const float StackLift = 0.75f;
+        const float BagSizeJitter = 0.1f;
+        const float SoldierGap = 5f;
+        const int SoldierTries = 32;
 
         const float CraterReach = 1.8f;
         const float CraterRim = 0.4f;
@@ -61,6 +74,7 @@ namespace MetalRaptors
         const float StreakWidth = 2.1f;
         const float StreakLife = 0.55f;
         const float StreakAlpha = 0.8f;
+        const float StreakGlow = 0.9f;
         const float StreakSweepBack = 0.12f;
         const int StreakStride = 4;
         const float PropTipAlpha = 0.09f;
@@ -83,7 +97,35 @@ namespace MetalRaptors
         const float FireballLift = 0.25f;
         const float WreckSmokeLift = 0.35f;
 
+        const float RearPivotFromBreech = 0.21f;
+        const float RearPivotHeight = 0.54f;
+        const float RearMuzzleHeight = 0.84f;
+        const float RearMuzzleClearance = 3f;
+        const float RearSpacingShare = 0.25f;
+
+        const float GunHold = 999f;
+        const float DefaultSplashSize = 80f;
+        const float DefaultBunkerSink = 0.6f;
+        const float BoatSize = 1.584f;
+        const float DefaultBoatSink = 0.08f;
+        const float BoatBleach = 0.1f;
+        const float GroyneDrop = 6f;
+        const float ShoreProbeStep = 5f;
+        const float ShoreProbeFar = 700f;
+
+        const string GullModel = "objects/seagull";
+        const string GullBeak = "Beak";
+        const float GullSize = 3f;
+        const float GullJitter = 0.1f;
+        const float DefaultGullDistance = 500f;
+        const float DefaultGullSpread = 60f;
+        const float DefaultGullBank = 30f;
+        const float GullYawJitter = 12f, GullBankJitter = 6f, GullPitchJitter = 6f;
+        const float GullGap = 0.35f;
+        const int GullTries = 12;
+
         const float FocusPriority = 1000f;
+        const float ArenaAltitude = 3000f;
         const float ProbeY = -5000f;
         const string PropFolder = "objects/";
         const string AerodromeFires = "Aerodrome Fires";
@@ -119,6 +161,9 @@ namespace MetalRaptors
             BindingFlags.NonPublic | BindingFlags.Instance);
         static readonly FieldInfo FieldPeople = typeof(Battlefield).GetField("_people",
             BindingFlags.NonPublic | BindingFlags.Instance);
+        static readonly FieldInfo SeaTimer = typeof(Battlefield).GetField("_seaTimer",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        const BindingFlags Hidden = BindingFlags.NonPublic | BindingFlags.Instance;
 
         class Flyer
         {
@@ -134,6 +179,12 @@ namespace MetalRaptors
             public Vector3[] tips;
             public float nextShot;
             public int gunSide = 1;
+            public int shots;
+            public Vector3 center;
+            public Transform rearPivot;
+            public Vector3[] rearMuzzles;
+            public Vector3 rearRest;
+            public Vector3 aim;
             public Vector3 Forward => tr.right;
             public Vector3 Up => tr.up;
             public Vector3 Velocity => tr.right * speed;
@@ -144,6 +195,7 @@ namespace MetalRaptors
             public Transform tr;
             public Vector3 velocity;
             public float life;
+            public Flyer mark;
         }
 
         class Shard
@@ -165,10 +217,23 @@ namespace MetalRaptors
             public float foeSpread;
         }
 
+        struct Bag
+        {
+            public string model;
+            public float scale, turn, length, depth, height;
+        }
+
         class Airship
         {
             public Transform tr;
             public Vector3 velocity;
+        }
+
+        class Vessel
+        {
+            public Transform root;
+            public Vector3 end;
+            public float speed;
         }
 
         class Cue
@@ -192,7 +257,9 @@ namespace MetalRaptors
         readonly List<Rifleman> _riflemen = new List<Rifleman>();
         readonly List<Cue> _cues = new List<Cue>();
         readonly List<Airship> _airships = new List<Airship>();
+        readonly List<Vessel> _vessels = new List<Vessel>();
         readonly HashSet<MuzzleFlash> _aimedFlashes = new HashSet<MuzzleFlash>();
+        readonly List<IList> _mutedShells = new List<IList>();
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         static void Bootstrap()
@@ -284,15 +351,25 @@ namespace MetalRaptors
 
         void Stage()
         {
+            Random.InitState(_spec.seed);
             _set = new GameObject("Shot Set").transform;
             Silence();
             Frame();
             Focus();
+            if (_spec.arena.on) BuildArena();
 
             LogAerodrome();
+            SurveyCoast();
             if (_spec.darkHangars) DarkenHangars();
             BuildFill();
             foreach (ShotCrater crater in _spec.craters) StampCrater(crater);
+            foreach (ShotGroyne groyne in _spec.groynes) BuildGroyne(groyne);
+            foreach (ShotBunker bunker in _spec.bunkers) BuildBunker(bunker);
+            if (!_spec.bunkerFire)
+                foreach (var gun in FindObjectsByType<BunkerGun>(FindObjectsSortMode.None)) gun.enabled = false;
+            foreach (ShotBoat boat in _spec.boats) BuildBoat(boat);
+            StageShips();
+            foreach (ShotGull gull in _spec.gulls) BuildGulls(gull);
             foreach (ShotPlane plane in _spec.planes) _flyers.Add(BuildFlyer(plane));
             foreach (ShotProp prop in _spec.props) BuildProp(prop);
             foreach (ShotZeppelin zeppelin in _spec.zeppelins) BuildZeppelin(zeppelin);
@@ -328,6 +405,10 @@ namespace MetalRaptors
                 foreach (var clouds in FindObjectsByType<CloudSystem>(FindObjectsSortMode.None))
                     Destroy(clouds.gameObject);
 
+            if (!_spec.ambientGulls)
+                foreach (var gulls in FindObjectsByType<Seagulls>(FindObjectsSortMode.None))
+                    Destroy(gulls.gameObject);
+
             if (!_spec.aerodromeFires)
             {
                 GameObject fires = GameObject.Find(AerodromeFires);
@@ -338,6 +419,7 @@ namespace MetalRaptors
             if (field == null) return;
 
             if (!_spec.ambientBlasts && BlastTimer != null) BlastTimer.SetValue(field, float.MaxValue);
+            if (!_spec.ambientBlasts && SeaTimer != null) SeaTimer.SetValue(field, float.MaxValue);
             if (_spec.ambientPeople || field.People == null) return;
 
             Destroy(field.People.gameObject);
@@ -348,34 +430,69 @@ namespace MetalRaptors
         {
             _cam = Camera.main;
             ShotCamera shot = _spec.camera;
-            float y = GroundY(shot.x, shot.z) + shot.height;
+            float y = (_spec.arena.on ? ArenaAltitude : GroundY(shot.x, shot.z)) + shot.height;
             _cam.transform.SetPositionAndRotation(new Vector3(shot.x, y, shot.z),
                 Quaternion.Euler(-shot.pitch, shot.yaw, shot.roll));
             _cam.fieldOfView = shot.fov > 0f ? shot.fov : 40f;
             _cam.aspect = _spec.width / (float)_spec.height;
             _cam.farClipPlane = Mathf.Max(_cam.farClipPlane, 2600f);
 
+            if (_spec.arena.on) CoastSky.ApplyFog(SpecDaytime, ArenaDistance, 0f);
             if (_spec.fogStart >= 0f) RenderSettings.fogStartDistance = _spec.fogStart;
             if (_spec.fogEnd > 0f) RenderSettings.fogEndDistance = _spec.fogEnd;
         }
 
         void Focus()
         {
-            if (_spec.focus == null || _spec.focus.distance <= 0f) return;
+            ShotFocus focus = _spec.focus;
+            if (focus == null || (focus.distance <= 0f && focus.farEnd <= 0f)) return;
 
             var profile = ScriptableObject.CreateInstance<VolumeProfile>();
             profile.name = "Shot Focus (runtime)";
             var field = profile.Add<DepthOfField>();
-            field.mode.Override(DepthOfFieldMode.Bokeh);
-            field.focusDistance.Override(_spec.focus.distance);
-            field.focalLength.Override(_spec.focus.focalLength > 0f ? _spec.focus.focalLength : 85f);
-            field.aperture.Override(_spec.focus.aperture > 0f ? _spec.focus.aperture : 4f);
+            if (focus.farEnd > 0f)
+            {
+                field.mode.Override(DepthOfFieldMode.Gaussian);
+                field.gaussianStart.Override(focus.farStart);
+                field.gaussianEnd.Override(focus.farEnd);
+                field.gaussianMaxRadius.Override(focus.farRadius > 0f ? focus.farRadius : 1f);
+                field.highQualitySampling.Override(true);
+            }
+            else
+            {
+                field.mode.Override(DepthOfFieldMode.Bokeh);
+                field.focusDistance.Override(focus.distance);
+                field.focalLength.Override(focus.focalLength > 0f ? focus.focalLength : 85f);
+                field.aperture.Override(focus.aperture > 0f ? focus.aperture : 4f);
+            }
 
             var volume = new GameObject("Shot Focus").AddComponent<Volume>();
             volume.isGlobal = true;
             volume.priority = FocusPriority;
             volume.profile = profile;
             _cam.GetUniversalAdditionalCameraData().renderPostProcessing = true;
+        }
+
+        float ArenaDistance => _spec.arena.distance > 0f
+            ? _spec.arena.distance : ArenaLevelController.CameraDistance;
+
+        Daytime SpecDaytime => Enum.TryParse(_spec.daytime, true, out Daytime time) ? time : Daytime.Morning;
+
+        void BuildArena()
+        {
+            ShotArena arena = _spec.arena;
+            float fov = arena.fov > 0f ? arena.fov : LevelCamera.BaseFieldOfView;
+            float halfH = ArenaDistance * Mathf.Tan(fov * 0.5f * Mathf.Deg2Rad);
+            Vector3 eye = _cam.transform.position;
+            if (arena.eye != null && arena.eye.Length >= 3)
+                eye += new Vector3(arena.eye[0], arena.eye[1], arena.eye[2]);
+
+            if (arena.seed != 0) Random.InitState(arena.seed);
+            ArenaClouds clouds = ArenaClouds.Begin(eye, halfH * LevelCamera.ReferenceAspect, halfH,
+                ArenaDistance, eye.z + ArenaDistance, CoastSky.CloudColor(SpecDaytime),
+                CoastSky.CloudGlow(SpecDaytime), 0f);
+            clouds.transform.SetParent(_set, true);
+            Debug.Log($"ShotDirector: arena eye {eye}, cloud floor y {clouds.FloorY}");
         }
 
         Flyer BuildFlyer(ShotPlane spec)
@@ -386,7 +503,7 @@ namespace MetalRaptors
                 PlaneSkins.Enemy(config, spec.skin));
             model.localScale *= PlaneModelConfig.LevelScale;
             foreach (Collider col in go.GetComponentsInChildren<Collider>()) Destroy(col);
-            if (_spec.planeFill != null && _spec.planeFill.intensity > 0f)
+            if (_spec.planeFill != null && _spec.planeFill.intensity > 0f && !spec.noFill)
                 foreach (Renderer r in go.GetComponentsInChildren<Renderer>()) r.renderingLayerMask |= FillLayer;
 
             var flyer = new Flyer
@@ -395,6 +512,7 @@ namespace MetalRaptors
                 tr = go.transform,
                 size = config.OnScreenSize * PlaneModelConfig.LevelScale,
                 speed = spec.speed > 0f ? spec.speed : DefaultSpeed,
+                center = BodyCenter(go),
             };
             if (PlaneFactory.GunMuzzleLocal(go, model, config, out Vector3 gun)) flyer.gun = gun;
             else if (config.gunLift > 0f)
@@ -403,6 +521,7 @@ namespace MetalRaptors
             flyer.gunSpacing = config == PlaneModels.Eindecker ? 0f
                 : config == PlaneModels.Sopwith ? CamelGunSpacing
                 : config == PlaneModels.Fokker ? TriplaneGunSpacing : GunSpacing;
+            if (spec.rearGun) MountRearGun(flyer, model, config);
 
             if (spec.boost)
             {
@@ -411,12 +530,17 @@ namespace MetalRaptors
             }
 
             Vector3? engine = PlaneFactory.EngineLocal(go, model, config);
+            SmokeTrail smoke = null;
             if (spec.burning || spec.smoking)
             {
-                var smoke = go.AddComponent<SmokeTrail>();
+                smoke = go.AddComponent<SmokeTrail>();
                 if (engine.HasValue) smoke.Mount = engine.Value;
-                if (spec.burning) smoke.Ignite(flyer.size * TrailScale);
-                else smoke.Arm(flyer.size * TrailScale);
+                float[] tint = spec.smokeColor;
+                if (tint != null && tint.Length >= 3)
+                    smoke.Tint(new Color(tint[0], tint[1], tint[2], tint.Length > 3 ? tint[3] : DefaultSmokeAlpha));
+                float trail = flyer.size * (spec.smokeScale > 0f ? spec.smokeScale : TrailScale);
+                if (spec.burning) smoke.Ignite(trail);
+                else smoke.Arm(trail);
             }
             if (spec.burning) PlaneFire.Ignite(go, flyer.size, engine);
 
@@ -431,10 +555,61 @@ namespace MetalRaptors
 
             PlanPath(flyer, end, forward, up);
             Place(flyer, _spec.warmup);
+            if (smoke != null && spec.smokeDepth != 0f)
+                smoke.Mount += flyer.tr.InverseTransformDirection(_cam.transform.forward) * spec.smokeDepth;
 
             if (spec.hitAge > 0f)
                 Schedule(_spec.warmup - spec.hitAge, () => Hit(flyer));
             return flyer;
+        }
+
+        void MountRearGun(Flyer flyer, Transform model, PlaneModelConfig config)
+        {
+            Transform body = flyer.tr;
+            Transform node = string.IsNullOrEmpty(config.rearGunNode)
+                ? null : PlaneFactory.FindDeep(model, config.rearGunNode);
+            if (node == null || !MeasureIn(body, node, out Bounds bounds))
+            {
+                Debug.LogError($"ShotDirector: {config.resourceName} has no rear gun.");
+                return;
+            }
+
+            float length = bounds.size.x, height = bounds.size.y;
+            var pivot = new Vector3(bounds.max.x - length * RearPivotFromBreech,
+                bounds.min.y + height * RearPivotHeight, bounds.center.z);
+            var muzzle = new Vector3(bounds.min.x - RearMuzzleClearance,
+                bounds.min.y + height * RearMuzzleHeight, bounds.center.z);
+            var spacing = new Vector3(0f, 0f, bounds.size.z * RearSpacingShare);
+
+            var hinge = new GameObject("Shot Rear Gun").transform;
+            hinge.SetParent(model, false);
+            hinge.SetPositionAndRotation(body.TransformPoint(pivot), body.rotation);
+            node.SetParent(hinge, true);
+
+            flyer.rearPivot = hinge;
+            flyer.rearRest = (muzzle - pivot).normalized;
+            flyer.rearMuzzles = new[]
+            {
+                hinge.InverseTransformPoint(body.TransformPoint(muzzle - spacing)),
+                hinge.InverseTransformPoint(body.TransformPoint(muzzle + spacing)),
+            };
+        }
+
+        static bool MeasureIn(Transform body, Transform node, out Bounds bounds)
+        {
+            bounds = default;
+            var filter = node.GetComponent<MeshFilter>();
+            if (filter == null || filter.sharedMesh == null) return false;
+
+            Bounds local = filter.sharedMesh.bounds;
+            for (int i = 0; i < BoxCorners.Length; i++)
+            {
+                Vector3 point = body.InverseTransformPoint(
+                    node.TransformPoint(local.center + Vector3.Scale(local.extents, BoxCorners[i])));
+                if (i == 0) bounds = new Bounds(point, Vector3.zero);
+                else bounds.Encapsulate(point);
+            }
+            return bounds.size.x > 1e-4f;
         }
 
         void PlanPath(Flyer flyer, Vector3 end, Vector3 forward, Vector3 up)
@@ -482,25 +657,40 @@ namespace MetalRaptors
         {
             Explosion.Spawn(flyer.tr.position, flyer.size * HitScale, 0f);
 
-            for (int i = 0; i < flyer.spec.debris; i++)
+            for (int i = 0; i < flyer.spec.debris; i++) SpawnShard(flyer.tr.position, flyer, 1f);
+        }
+
+        void Strike(Vector3 point, Flyer mark)
+        {
+            for (int i = 0; i < SplinterCount; i++) SpawnShard(point, mark, SplinterScale);
+        }
+
+        void SpawnShard(Vector3 at, Flyer from, float scale)
+        {
+            var go = UIFactory.CreatePrimitive3D(PrimitiveType.Cube, at,
+                new Vector3(Random.Range(ShardSizeMin, ShardSizeMax),
+                    Random.Range(ShardSizeMin, ShardSizeMax) * 0.4f,
+                    Random.Range(ShardSizeMin, ShardSizeMax)) * scale,
+                ShardColor, emissive: false, keepCollider: false);
+            go.name = "Shard";
+            go.transform.SetParent(_set, true);
+            go.transform.rotation = Random.rotation;
+            _shards.Add(new Shard
             {
-                var go = UIFactory.CreatePrimitive3D(PrimitiveType.Cube, flyer.tr.position,
-                    new Vector3(Random.Range(ShardSizeMin, ShardSizeMax),
-                        Random.Range(ShardSizeMin, ShardSizeMax) * 0.4f,
-                        Random.Range(ShardSizeMin, ShardSizeMax)),
-                    ShardColor, emissive: false, keepCollider: false);
-                go.name = "Shard";
-                go.transform.SetParent(_set, true);
-                go.transform.rotation = Random.rotation;
-                _shards.Add(new Shard
-                {
-                    tr = go.transform,
-                    velocity = flyer.Velocity * Random.Range(0.35f, 0.7f)
-                               + Random.insideUnitSphere * ShardScatter,
-                    spinAxis = Random.onUnitSphere,
-                    spin = Random.Range(180f, 720f),
-                });
-            }
+                tr = go.transform,
+                velocity = from.Velocity * Random.Range(0.35f, 0.7f) + Random.insideUnitSphere * ShardScatter,
+                spinAxis = Random.onUnitSphere,
+                spin = Random.Range(180f, 720f),
+            });
+        }
+
+        static Vector3 BodyCenter(GameObject body)
+        {
+            var renderers = body.GetComponentsInChildren<Renderer>();
+            if (renderers.Length == 0) return Vector3.zero;
+            Bounds bounds = renderers[0].bounds;
+            foreach (Renderer r in renderers) bounds.Encapsulate(r.bounds);
+            return body.transform.InverseTransformPoint(bounds.center);
         }
 
         void LogAerodrome()
@@ -595,18 +785,257 @@ namespace MetalRaptors
             _airships.Add(new Airship { tr = root, velocity = velocity });
         }
 
+        void SurveyCoast()
+        {
+            var coast = FindFirstObjectByType<FlandersTerrain>();
+            if (coast == null) return;
+
+            Vector3 eye = _cam.transform.position;
+            for (float dx = -300f; dx <= 300f; dx += 150f)
+            {
+                float x = eye.x + dx;
+                for (float z = 0f; z < ShoreProbeFar; z += ShoreProbeStep)
+                {
+                    if (GroundY(x, z) > SeaSurface.Level) continue;
+                    Debug.Log($"ShotDirector: waterline at x {x:F0} z {z:F0}");
+                    break;
+                }
+            }
+
+            float reach = _spec.clearCoast * _spec.clearCoast;
+            foreach (Transform node in coast.GetComponentsInChildren<Transform>())
+            {
+                bool groyne = node.name == "Groyne";
+                if (!groyne && node.name != "Bunker" && node.name != "Boat") continue;
+
+                Vector3 view = _cam.WorldToViewportPoint(node.position);
+                Debug.Log($"ShotDirector: coast {node.name} at {node.position} view ({view.x:F2}, {view.y:F2}, {view.z:F0})");
+
+                Vector3 gap = node.position - eye;
+                gap.y = 0f;
+                if (gap.sqrMagnitude < reach && (!groyne || _spec.clearGroynes)) Destroy(node.gameObject);
+            }
+        }
+
+        void BuildGroyne(ShotGroyne spec)
+        {
+            if (!FlandersGroyne.Measure()) return;
+            Vector3 land = Ground(spec.screenX, spec.distance);
+            Vector3 run = Quaternion.Euler(0f, _spec.camera.yaw + spec.angle, 0f) * Vector3.forward
+                          * FlandersGroyne.Length;
+            FlandersGroyne.Place(_set, land, land + run + Vector3.down * GroyneDrop, GroundY);
+        }
+
+        void BuildBunker(ShotBunker spec)
+        {
+            int model = Mathf.Clamp(spec.model, 0, FlandersBunker.Models - 1);
+            if (!FlandersBunker.Has(model)) return;
+
+            Vector3 at = Ground(spec.screenX, spec.distance);
+            Quaternion rotation = Quaternion.Euler(0f, _spec.camera.yaw + spec.yaw, 0f);
+            Bounds box = FlandersBunker.Footprint(model);
+            float floor = at.y;
+            for (int sx = -1; sx <= 1; sx += 2)
+            for (int sz = -1; sz <= 1; sz += 2)
+            {
+                Vector3 corner = at + rotation * new Vector3(sx * box.extents.x, 0f, sz * box.extents.z);
+                floor = Mathf.Min(floor, GroundY(corner.x, corner.z));
+            }
+
+            Vector3 offset = rotation * new Vector3(box.center.x, 0f, box.center.z);
+            float sink = spec.sink > 0f ? spec.sink : DefaultBunkerSink;
+            FlandersBunker.Place(_set, model, new Vector3(at.x, floor - sink, at.z) - offset, rotation);
+            Debug.Log($"ShotDirector: bunker {model} at {at}");
+        }
+
+        void BuildBoat(ShotBoat spec)
+        {
+            int model = spec.wreck ? FlandersBoat.Wreck : FlandersBoat.Intact;
+            if (!FlandersBoat.Has(model)) return;
+
+            float scale = PlaneModelConfig.UnitsPerMeter * BoatSize * (spec.scale > 0f ? spec.scale : 1f);
+            Bounds hull = FlandersBoat.Hull(model);
+            float length = hull.extents.z * scale, beam = hull.extents.x * scale;
+            Vector3 at = Ground(spec.screenX, spec.distance);
+            Vector3 f = Quaternion.Euler(0f, _spec.camera.yaw + spec.yaw, 0f) * Vector3.forward;
+            var r = new Vector3(f.z, 0f, -f.x);
+
+            float bow = GroundY(at.x + f.x * length, at.z + f.z * length);
+            float stern = GroundY(at.x - f.x * length, at.z - f.z * length);
+            float right = GroundY(at.x + r.x * beam, at.z + r.z * beam);
+            float left = GroundY(at.x - r.x * beam, at.z - r.z * beam);
+
+            Vector3 along = f * (2f * length) + Vector3.up * (bow - stern);
+            Vector3 across = r * (2f * beam) + Vector3.up * (right - left);
+            Quaternion frame = Quaternion.LookRotation(along, Vector3.Cross(along, across));
+            float y = Mathf.Min(at.y, Mathf.Min((bow + stern) * 0.5f, (right + left) * 0.5f));
+
+            FlandersBoat.Place(_set, model, new Vector3(at.x, y, at.z), frame, scale, spec.roll, spec.capsized,
+                spec.sink > 0f ? spec.sink : DefaultBoatSink, 1f, BoatBleach);
+        }
+
+        void StageShips()
+        {
+            StageFleet(typeof(ThornycroftBoats), "thornycroft", "_boats");
+            StageFleet(typeof(S150Boats), "s150", "_boats");
+            StageFleet(typeof(LordCliveShips), "lordclive", "_ships");
+        }
+
+        void StageFleet(Type type, string kind, string listName)
+        {
+            var fleet = FindFirstObjectByType(type) as MonoBehaviour;
+            if (fleet == null) return;
+
+            var wanted = new List<ShotShip>();
+            foreach (ShotShip ship in _spec.ships)
+                if (string.Equals(ship.kind, kind, StringComparison.OrdinalIgnoreCase)) wanted.Add(ship);
+            if (wanted.Count == 0)
+            {
+                if (_spec.ships.Length > 0 || !_spec.ambientShips) Destroy(fleet.gameObject);
+                return;
+            }
+
+            var boats = (IList)type.GetField(listName, Hidden).GetValue(fleet);
+            MethodInfo spawn = type.GetMethod("Spawn", Hidden);
+            while (boats.Count < wanted.Count) spawn.Invoke(fleet, new object[] { _cam.transform.position, true });
+
+            MethodInfo release = type.GetMethod("Release", BindingFlags.NonPublic | BindingFlags.Static);
+            for (int i = boats.Count - 1; i >= wanted.Count; i--)
+            {
+                release.Invoke(null, new[] { boats[i] });
+                boats.RemoveAt(i);
+            }
+
+            bool shells = false;
+            for (int i = 0; i < wanted.Count; i++)
+            {
+                StageShip(boats[i], wanted[i]);
+                shells |= wanted[i].shells;
+            }
+
+            FieldInfo pending = type.GetField("_shells", Hidden);
+            if (!shells && pending != null) _mutedShells.Add((IList)pending.GetValue(fleet));
+        }
+
+        void StageShip(object boat, ShotShip spec)
+        {
+            Type type = boat.GetType();
+            var root = (Transform)type.GetField("root").GetValue(boat);
+            FieldInfo speedField = type.GetField("speed");
+            float speed = (float)speedField.GetValue(boat) * (spec.speed > 0f ? spec.speed : 1f);
+            speedField.SetValue(boat, speed);
+
+            Vector3 end = Sea(spec.screenX, spec.distance);
+            root.position = end + Vector3.right * (speed * _spec.warmup);
+            _vessels.Add(new Vessel { root = root, end = end, speed = speed });
+            Debug.Log($"ShotDirector: {root.name} ends at {end}");
+
+            FieldInfo gunsField = type.GetField("guns");
+            if (gunsField == null) return;
+            var all = (IList)gunsField.GetValue(boat);
+            var guns = new List<object>();
+            for (int i = 0; i < all.Count; i++)
+            {
+                all[i].GetType().GetField("wait").SetValue(all[i], GunHold);
+                if (spec.guns == null || spec.guns.Length == 0 || Array.IndexOf(spec.guns, i) >= 0) guns.Add(all[i]);
+            }
+
+            if (spec.volleys == null) return;
+            foreach (float age in spec.volleys)
+                Schedule(_spec.warmup - Mathf.Max(0f, age) - StepSec * 0.5f, () => Volley(guns));
+        }
+
+        static void Volley(IList guns)
+        {
+            foreach (object gun in guns)
+            {
+                Type type = gun.GetType();
+                type.GetField("wait").SetValue(gun, 0f);
+                type.GetField("yawGoal").SetValue(gun, type.GetField("yawNow").GetValue(gun));
+                type.GetField("liftGoal").SetValue(gun, type.GetField("liftNow").GetValue(gun));
+            }
+        }
+
+        void BuildGulls(ShotGull spec)
+        {
+            var prefab = Resources.Load<GameObject>(GullModel);
+            if (prefab == null)
+            {
+                Debug.LogError($"ShotDirector: {GullModel} not found in Resources.");
+                return;
+            }
+
+            var probe = Instantiate(prefab);
+            probe.transform.position = new Vector3(0f, ProbeY, 0f);
+            Renderer[] renderers = probe.GetComponentsInChildren<Renderer>();
+            if (renderers.Length == 0)
+            {
+                Destroy(probe);
+                return;
+            }
+            Bounds box = renderers[0].bounds;
+            foreach (Renderer r in renderers) box.Encapsulate(r.bounds);
+            Transform beak = PlaneFactory.FindDeep(probe.transform, GullBeak);
+            Quaternion flip = Quaternion.Euler(0f, beak != null && beak.position.z < box.center.z ? 180f : 0f, 0f);
+            Vector3 centre = box.center - probe.transform.position;
+            Destroy(probe);
+
+            float[] screen = spec.screen != null && spec.screen.Length >= 2 ? spec.screen : new[] { 0.5f, 0.8f };
+            Vector3 at = Air(screen, spec.distance > 0f ? spec.distance : DefaultGullDistance);
+            int count = spec.count > 0 ? spec.count : 5;
+            float spread = spec.spread > 0f ? spec.spread : DefaultGullSpread;
+            float bank = spec.bank != 0f ? spec.bank : DefaultGullBank;
+            Transform eye = _cam.transform;
+
+            var spots = new List<Vector2>();
+            for (int i = 0; i < count; i++)
+            {
+                Vector2 spot = Random.insideUnitCircle;
+                for (int k = 0; k < GullTries && Crowded(spots, spot); k++) spot = Random.insideUnitCircle;
+                spots.Add(spot);
+
+                var root = new GameObject("Shot Gull").transform;
+                root.SetParent(_set, false);
+                root.localScale = Vector3.one * (PlaneModelConfig.UnitsPerMeter * GullSize
+                                                 * Random.Range(1f - GullJitter, 1f + GullJitter));
+                Transform view = Instantiate(prefab, root, false).transform;
+                view.localPosition = flip * -centre;
+                view.localRotation = flip * view.localRotation;
+                foreach (Collider col in view.GetComponentsInChildren<Collider>()) Destroy(col);
+                foreach (Renderer r in view.GetComponentsInChildren<Renderer>())
+                {
+                    r.shadowCastingMode = ShadowCastingMode.Off;
+                    r.receiveShadows = false;
+                }
+
+                Vector3 offset = eye.right * (spot.x * spread) + Vector3.up * (spot.y * spread * 0.5f)
+                                 + eye.forward * (Random.Range(-0.3f, 0.3f) * spread);
+                root.SetPositionAndRotation(at + offset, Quaternion.Euler(
+                    Random.Range(-GullPitchJitter, GullPitchJitter),
+                    _spec.camera.yaw + spec.course + Random.Range(-GullYawJitter, GullYawJitter),
+                    bank + Random.Range(-GullBankJitter, GullBankJitter)));
+            }
+        }
+
+        static bool Crowded(List<Vector2> spots, Vector2 spot)
+        {
+            foreach (Vector2 other in spots)
+                if (Vector2.Distance(other, spot) < GullGap) return true;
+            return false;
+        }
+
         void BuildProp(ShotProp spec) =>
             PlaceProp(spec.model, spec.kind, Ground(spec.screenX, spec.distance), spec.yaw,
                 spec.scale, spec.sink, spec.pitch, spec.tilt, spec.burning, spec.smokeScale);
 
-        void PlaceProp(string model, string kind, Vector3 at, float yaw, float size, float sink,
+        Transform PlaceProp(string model, string kind, Vector3 at, float yaw, float size, float sink,
             float pitch, float tilt, bool burning, float smokeScale = 0f)
         {
             var prefab = Resources.Load<GameObject>(PropFolder + model);
             if (prefab == null)
             {
                 Debug.LogError($"ShotDirector: {PropFolder}{model} not found in Resources.");
-                return;
+                return null;
             }
 
             kind = string.IsNullOrEmpty(kind) ? "tree" : kind;
@@ -630,12 +1059,13 @@ namespace MetalRaptors
                 r.shadowCastingMode = ShadowCastingMode.On;
             if (kind == "tank") TankSkin.Apply(view.transform);
 
-            if (!burning) return;
+            if (!burning) return root.transform;
             float radius = Mathf.Max(bounds.extents.x, bounds.extents.z) * scale;
             int seed = Random.Range(0, int.MaxValue);
             WreckFire.Begin(_set, at, radius, seed, smokeScale == 0f);
             if (smokeScale > 0f)
                 SmokeColumn.Begin(_set, at + Vector3.up * (radius * WreckSmokeLift), seed, smokeScale);
+            return root.transform;
         }
 
         static Bounds Measure(GameObject prefab, Quaternion rotation)
@@ -671,12 +1101,26 @@ namespace MetalRaptors
                     ? _flyers[spec.target].positions[0]
                     : centre + Vector3.up * 200f;
             float scatter = atSquad ? foeSpread * 0.5f : RifleScatter;
-            if (atSquad && spec.cover > 0) BuildCover(spec, centre, goal);
-
-            for (int i = 0; i < count; i++)
+            var spots = new List<Vector2>();
+            if (atSquad && spec.cover > 0)
             {
-                Vector2 jitter = Random.insideUnitCircle * spread;
-                float x = centre.x + jitter.x, z = centre.z + jitter.y;
+                Vector3 toward = goal - centre;
+                toward.y = 0f;
+                toward = toward.sqrMagnitude > 1e-4f ? toward.normalized : Vector3.forward;
+                Vector3 toCamera = _cam.transform.position - centre;
+                toCamera.y = 0f;
+                toCamera = toCamera.sqrMagnitude > 1e-4f ? toCamera.normalized : -toward;
+                float angle = (spec.coverAngle != 0f ? spec.coverAngle : DefaultCoverAngle) * Mathf.Deg2Rad;
+                Vector3 face = Vector3.RotateTowards(toward, toCamera, angle, 0f);
+                BuildWall(spec, centre, face, spread);
+            }
+            Vector3 right = _cam.transform.right;
+            var lateral = new Vector2(right.x, right.z).normalized;
+            for (int i = 0; i < count; i++) spots.Add(FreeSpot(centre, spread, lateral, spots));
+
+            foreach (Vector2 spot in spots)
+            {
+                float x = spot.x, z = spot.y;
                 var figure = (Transform)BuildFigure.Invoke(null,
                     new object[] { _set, Mathf.Clamp(spec.faction, 0, 1), Random.Range(0, 3) });
                 figure.position = new Vector3(x, GroundY(x, z), z);
@@ -688,9 +1132,9 @@ namespace MetalRaptors
 
                 if (spec.unarmed) continue;
 
-                Vector3 side = figure.right * 1.8f;
+                Vector3 hand = figure.right * 1.8f;
                 var rifle = UIFactory.CreatePrimitive3D(PrimitiveType.Cube,
-                    shoulder + side + aim * (RifleLength * 0.35f),
+                    shoulder + hand + aim * (RifleLength * 0.35f),
                     new Vector3(RifleWidth, RifleWidth, RifleLength), RifleColor,
                     emissive: false, keepCollider: false);
                 rifle.name = "Rifle";
@@ -700,7 +1144,7 @@ namespace MetalRaptors
                 if (!spec.fire) continue;
                 _riflemen.Add(new Rifleman
                 {
-                    muzzle = shoulder + side + aim * (RifleLength * 0.85f),
+                    muzzle = shoulder + hand + aim * (RifleLength * 0.85f),
                     aim = aim,
                     target = spec.target,
                     nextShot = Random.Range(0f, RifleIntervalMax),
@@ -711,25 +1155,107 @@ namespace MetalRaptors
             }
         }
 
-        void BuildCover(ShotSquad spec, Vector3 centre, Vector3 goal)
+        static Vector2 FreeSpot(Vector3 centre, float spread, Vector2 lateral, List<Vector2> taken)
         {
-            float spread = spec.spread > 0f ? spec.spread : 16f;
-            Vector3 toward = goal - centre;
-            toward.y = 0f;
-            toward = toward.sqrMagnitude > 1e-4f ? toward.normalized : Vector3.forward;
-            Vector3 side = Vector3.Cross(Vector3.up, toward);
-            float yaw = Quaternion.LookRotation(side).eulerAngles.y;
+            Vector2 best = Vector2.zero;
+            float bestGap = -1f;
+            for (int k = 0; k < SoldierTries && bestGap < SoldierGap; k++)
+            {
+                Vector2 spot = new Vector2(centre.x, centre.z) + Random.insideUnitCircle * spread;
+                float gap = float.MaxValue;
+                foreach (Vector2 other in taken) gap = Mathf.Min(gap, Mathf.Abs(Vector2.Dot(other - spot, lateral)));
+                if (gap <= bestGap) continue;
+                best = spot;
+                bestGap = gap;
+            }
+            return best;
+        }
 
+        void BuildWall(ShotSquad spec, Vector3 centre, Vector3 face, float spread)
+        {
+            string[] models = spec.coverModels != null && spec.coverModels.Length > 0 ? spec.coverModels : CoverModels;
+            float size = spec.coverScale > 0f ? spec.coverScale : 1f;
+            Vector3 along = Vector3.Cross(Vector3.up, face);
+            Vector3 broad = _cam.transform.right;
+            broad.y = 0f;
+            broad = broad.sqrMagnitude > 1e-4f ? broad.normalized : along;
+            float baseYaw = Quaternion.LookRotation(broad).eulerAngles.y;
+            float lengthwise = Mathf.Abs(Vector3.Dot(broad, along));
+            float crosswise = Mathf.Sqrt(Mathf.Max(0f, 1f - lengthwise * lengthwise));
+
+            var bags = new List<Bag>();
+            var steps = new List<float>();
+            float thickness = 0f, total = 0f;
             for (int i = 0; i < spec.cover; i++)
             {
-                float t = spec.cover > 1 ? i / (spec.cover - 1f) * 2f - 1f : 0f;
-                Vector3 at = centre + toward * (spread + CoverGap + Random.Range(-CoverJitter, CoverJitter))
-                             + side * (t * spread * 1.1f + Random.Range(-CoverJitter, CoverJitter));
-                at.y = GroundY(at.x, at.z);
-                string model = CoverModels[Random.Range(0, CoverModels.Length)];
-                PlaceProp(model, "rubble", at, yaw + Random.Range(-25f, 25f),
-                    (spec.coverScale > 0f ? spec.coverScale : 1f) * Random.Range(0.85f, 1.15f),
-                    0.4f, 0f, 0f, false);
+                Bag bag = PickBag(models, size);
+                bags.Add(bag);
+                steps.Add((lengthwise * bag.length + crosswise * 2f * bag.depth) * WallPack);
+                total += steps[i];
+                thickness = Mathf.Max(thickness, crosswise * bag.length * 0.5f + lengthwise * bag.depth);
+            }
+            Vector3 mid = centre + face * (spread + WallGap + thickness);
+
+            var joints = new List<float>();
+            float offset = -total * 0.5f;
+            for (int i = 0; i < bags.Count; i++)
+            {
+                float step = steps[i];
+                LayBag(spec, bags[i], mid + along * (offset + step * 0.5f), along, face, baseYaw, 0f, WallTwist);
+                offset += step;
+                if (i < bags.Count - 1) joints.Add(offset);
+            }
+
+            int top = Mathf.Min(joints.Count, spec.cover / 2);
+            for (int n = 0; n < top; n++)
+            {
+                int i = Random.Range(0, joints.Count);
+                float lift = Mathf.Max(bags[i].height, bags[i + 1].height) * StackLift;
+                LayBag(spec, PickBag(models, size), mid + along * joints[i], along, face, baseYaw, lift, TopTwist);
+                joints.RemoveAt(i);
+                bags.RemoveAt(i);
+            }
+        }
+
+        Bag PickBag(string[] models, float size)
+        {
+            string model = models[Random.Range(0, models.Length)];
+            var prefab = Resources.Load<GameObject>(PropFolder + model);
+            float scale = size * Random.Range(1f - BagSizeJitter, 1f + BagSizeJitter);
+            if (prefab == null) return new Bag { model = model, scale = scale };
+
+            Vector3 extents = Measure(prefab, Quaternion.identity).extents * (BattlefieldProps.MetreScale * scale);
+            bool wide = extents.x > extents.z;
+            return new Bag
+            {
+                model = model,
+                scale = scale,
+                turn = wide ? 90f : 0f,
+                length = 2f * (wide ? extents.x : extents.z),
+                depth = wide ? extents.z : extents.x,
+                height = 2f * extents.y,
+            };
+        }
+
+        void LayBag(ShotSquad spec, Bag bag, Vector3 at, Vector3 along, Vector3 across, float baseYaw, float lift, float twist)
+        {
+            at += along * Random.Range(-WallSlide, WallSlide) + across * Random.Range(-WallBulge, WallBulge);
+            at.y = GroundY(at.x, at.z) + lift;
+            float yaw = baseYaw + bag.turn + (Random.value < 0.5f ? 0f : 180f) + Random.Range(-twist, twist);
+            Transform piece = PlaceProp(bag.model, "rubble", at, yaw, bag.scale, lift > 0f ? 0f : CoverSink,
+                Random.Range(-WallTilt, WallTilt), Random.Range(-WallTilt, WallTilt), false);
+            if (piece != null && spec.coverTint != null && spec.coverTint.Length >= 3) Tint(piece, spec.coverTint);
+        }
+
+        static void Tint(Transform root, float[] tint)
+        {
+            var block = new MaterialPropertyBlock();
+            var color = new Color(tint[0], tint[1], tint[2]);
+            foreach (Renderer r in root.GetComponentsInChildren<Renderer>())
+            {
+                r.GetPropertyBlock(block);
+                block.SetColor(BaseColorId, color);
+                r.SetPropertyBlock(block);
             }
         }
 
@@ -805,8 +1331,9 @@ namespace MetalRaptors
                 ? spec.screen : new[] { 0.5f, 0.85f };
             Vector3 at = Air(screen, spec.distance > 0f ? spec.distance : 600f);
             float width = spec.width > 0f ? spec.width : DefaultCloudWidth;
-            Daytime daytime = Enum.TryParse(_spec.daytime, true, out Daytime time) ? time : Daytime.Morning;
-            Material mat = CloudSystem.CloudMaterial(CloudSystem.TintFor(daytime), CloudSystem.GlowFor(daytime),
+            Color tint = _spec.arena.on ? CoastSky.CloudColor(SpecDaytime) : CloudSystem.TintFor(SpecDaytime);
+            Color glow = _spec.arena.on ? CoastSky.CloudGlow(SpecDaytime) : CloudSystem.GlowFor(SpecDaytime);
+            Material mat = CloudSystem.CloudMaterial(tint, glow,
                 spec.alpha > 0f ? spec.alpha : DefaultCloudAlpha);
 
             var root = new GameObject("Shot Cloud").transform;
@@ -891,6 +1418,14 @@ namespace MetalRaptors
                     : Air(burst.screen, burst.distance);
                 Schedule(_spec.warmup - burst.age, () => Explosion.Spawn(at, size, 0f));
             }
+
+            foreach (ShotBurst burst in _spec.splashes)
+            {
+                if (burst.screen == null || burst.screen.Length < 1) continue;
+                Vector3 at = Sea(burst.screen[0], burst.distance);
+                float size = burst.size > 0f ? burst.size : DefaultSplashSize;
+                Schedule(_spec.warmup - burst.age, () => WaterSplash.Spawn(at, size, _cam.transform.position));
+            }
         }
 
         void Schedule(float at, Action run) => _cues.Add(new Cue { at = Mathf.Max(0f, at), run = run });
@@ -909,9 +1444,11 @@ namespace MetalRaptors
                 run();
             }
 
+            foreach (IList shells in _mutedShells) shells.Clear();
+            foreach (Flyer flyer in _flyers) Place(flyer, remaining);
             foreach (Flyer flyer in _flyers)
             {
-                Place(flyer, remaining);
+                if (flyer.rearPivot != null) AimRearGun(flyer);
                 if (!flyer.spec.fire) continue;
 
                 float window = flyer.spec.fireFor > 0f ? flyer.spec.fireFor : DefaultFireFor;
@@ -940,6 +1477,9 @@ namespace MetalRaptors
             MoveBolts(dt);
             MoveShards(dt);
             foreach (Airship ship in _airships) ship.tr.position += ship.velocity * dt;
+            foreach (Vessel vessel in _vessels)
+                if (vessel.root != null)
+                    vessel.root.position = vessel.end + Vector3.right * (vessel.speed * (remaining + StepSec));
             if (_spec.clearNear > 0f) ClearNear();
 
             if (!last) return;
@@ -952,7 +1492,8 @@ namespace MetalRaptors
             {
                 if (!flyer.spec.fire) continue;
                 float scale = CaptureFlashScale * (flyer.spec.flashScale > 0f ? flyer.spec.flashScale : 1f);
-                Flash(GunPoint(flyer), flyer.Forward, flyer.Up, flyer.size * scale);
+                if (flyer.rearPivot != null) Flash(RearPoint(flyer), flyer.aim, flyer.Up, flyer.size * scale);
+                else Flash(GunPoint(flyer), flyer.Forward, flyer.Up, flyer.size * scale);
             }
             foreach (Rifleman man in _riflemen)
                 if (Random.value < RifleFlashShare)
@@ -976,8 +1517,14 @@ namespace MetalRaptors
             {
                 Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
                 _streakMaterial = new Material(shader != null ? shader : NightReceivers.Lit) { name = "Shot Streak (runtime)" };
-                _streakMaterial.SetColor(BaseColorId, new Color(1f, 1f, 1f, StreakAlpha));
-                UIFactory.MakeTransparent(_streakMaterial);
+                bool solid = _spec.focus != null && _spec.focus.farEnd > 0f;
+                _streakMaterial.SetColor(BaseColorId, new Color(1f, 1f, 1f, solid ? 1f : StreakAlpha));
+                if (solid)
+                {
+                    _streakMaterial.EnableKeyword("_EMISSION");
+                    _streakMaterial.SetColor("_EmissionColor", Color.white * StreakGlow);
+                }
+                else UIFactory.MakeTransparent(_streakMaterial);
             }
 
             var line = new GameObject("Shot Wing Streak").AddComponent<LineRenderer>();
@@ -986,7 +1533,7 @@ namespace MetalRaptors
             line.positionCount = count;
             line.SetPositions(points);
             line.widthCurve = new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(0.6f, 0.8f), new Keyframe(1f, 0f));
-            line.widthMultiplier = StreakWidth;
+            line.widthMultiplier = flyer.spec.streakWidth > 0f ? flyer.spec.streakWidth : StreakWidth;
             line.alignment = LineAlignment.View;
             line.numCapVertices = 0;
             line.sharedMaterial = _streakMaterial;
@@ -1177,29 +1724,81 @@ namespace MetalRaptors
         static Vector3 GunPoint(Flyer flyer) =>
             flyer.tr.TransformPoint(flyer.gun + Vector3.forward * (flyer.gunSpacing * flyer.gunSide));
 
+        Vector3 RearPoint(Flyer flyer) =>
+            flyer.rearPivot.TransformPoint(flyer.rearMuzzles[flyer.gunSide > 0 ? 1 : 0]);
+
+        bool TryMark(Flyer flyer, out Flyer mark)
+        {
+            int index = flyer.spec.target;
+            mark = index >= 0 && index < _flyers.Count && _flyers[index] != flyer ? _flyers[index] : null;
+            return mark != null;
+        }
+
+        Vector3 AimPoint(Flyer flyer, Flyer mark, Vector3 muzzle)
+        {
+            float time = Vector3.Distance(muzzle, mark.tr.position) / BoltSpeed;
+            float[] offset = flyer.spec.aimOffset;
+            if (offset == null || offset.Length < 3)
+                return mark.tr.position + mark.Velocity * (time - flyer.spec.aimLag);
+
+            Transform eye = _cam.transform;
+            Vector3 relative = mark.Velocity - flyer.Velocity;
+            Vector3 goal = mark.tr.position - mark.Velocity * flyer.spec.aimLag
+                           + eye.right * offset[0] + eye.up * offset[1] + eye.forward * offset[2];
+            return goal + relative * InterceptTime(goal - muzzle, relative);
+        }
+
+        Vector3 StrikePoint(Flyer flyer, Flyer mark, Vector3 muzzle)
+        {
+            Vector3 local = mark.center + Vector3.right * (Random.Range(-StrikeSpread, StrikeSpread) * mark.size);
+            Vector3 relative = mark.Velocity - flyer.Velocity;
+            Vector3 goal = mark.tr.TransformPoint(local);
+            return goal + relative * InterceptTime(goal - muzzle, relative);
+        }
+
+        static float InterceptTime(Vector3 gap, Vector3 relative)
+        {
+            float a = relative.sqrMagnitude - BoltSpeed * BoltSpeed;
+            if (a >= -1f) return gap.magnitude / BoltSpeed;
+            float b = 2f * Vector3.Dot(gap, relative);
+            return (-b - Mathf.Sqrt(b * b - 4f * a * gap.sqrMagnitude)) / (2f * a);
+        }
+
+        void AimRearGun(Flyer flyer)
+        {
+            Vector3 pivot = flyer.rearPivot.position;
+            Vector3 goal = TryMark(flyer, out Flyer mark)
+                ? AimPoint(flyer, mark, pivot) : pivot - flyer.Forward * 400f;
+            Vector3 rest = flyer.tr.TransformDirection(flyer.rearRest);
+            flyer.aim = (goal - pivot).normalized;
+            flyer.rearPivot.rotation = Quaternion.FromToRotation(rest, flyer.aim) * flyer.tr.rotation;
+        }
+
         void Shoot(Flyer flyer)
         {
             flyer.gunSide = -flyer.gunSide;
-            Vector3 muzzle = GunPoint(flyer);
+            bool rear = flyer.rearPivot != null;
+            Vector3 muzzle = rear ? RearPoint(flyer) : GunPoint(flyer);
 
-            Vector3 aimAt = muzzle + flyer.Forward * 400f;
+            Vector3 aimAt = muzzle + (rear ? flyer.aim : flyer.Forward) * 400f;
             float life = BoltLife;
-            if (flyer.spec.target >= 0 && flyer.spec.target < _flyers.Count
-                && _flyers[flyer.spec.target] != flyer)
+            bool strike = false;
+            if (TryMark(flyer, out Flyer mark))
             {
-                Flyer mark = _flyers[flyer.spec.target];
-                float time = Vector3.Distance(muzzle, mark.tr.position) / BoltSpeed;
-                aimAt = mark.tr.position + mark.Velocity * (time - flyer.spec.aimLag);
+                strike = flyer.spec.hitEvery > 0 && ++flyer.shots % flyer.spec.hitEvery == 0;
+                aimAt = strike ? StrikePoint(flyer, mark, muzzle) : AimPoint(flyer, mark, muzzle);
+                float reach = Vector3.Distance(muzzle, aimAt) / BoltSpeed;
                 float overshoot = flyer.spec.overshoot > 0f ? flyer.spec.overshoot : BoltOvershoot;
-                life = Mathf.Min(BoltLife, Vector3.Distance(muzzle, aimAt) / BoltSpeed + overshoot);
+                life = strike ? reach : Mathf.Min(BoltLife, reach + overshoot);
             }
 
-            Vector3 dir = ((aimAt - muzzle).normalized + Random.insideUnitSphere * BoltSpread).normalized;
-            SpawnBolt(muzzle, dir, dir * BoltSpeed + flyer.Velocity, life);
-            Flash(muzzle, flyer.Forward, flyer.Up, flyer.size * GunFlashScale);
+            Vector3 dir = (aimAt - muzzle).normalized;
+            if (!strike) dir = (dir + Random.insideUnitSphere * BoltSpread).normalized;
+            SpawnBolt(muzzle, dir, dir * BoltSpeed + flyer.Velocity, life, strike ? mark : null);
+            Flash(muzzle, rear ? dir : flyer.Forward, flyer.Up, flyer.size * GunFlashScale);
         }
 
-        void SpawnBolt(Vector3 muzzle, Vector3 dir, Vector3 velocity, float life)
+        void SpawnBolt(Vector3 muzzle, Vector3 dir, Vector3 velocity, float life, Flyer mark)
         {
             if (_boltTemplate == null)
             {
@@ -1218,7 +1817,7 @@ namespace MetalRaptors
             bolt.transform.SetPositionAndRotation(muzzle + dir * BoltLength,
                 Quaternion.FromToRotation(Vector3.up, velocity));
             bolt.SetActive(true);
-            _bolts.Add(new Bolt { tr = bolt.transform, velocity = velocity, life = life });
+            _bolts.Add(new Bolt { tr = bolt.transform, velocity = velocity, life = life, mark = mark });
         }
 
         void Flash(Vector3 at, Vector3 forward, Vector3 up, float size)
@@ -1242,6 +1841,7 @@ namespace MetalRaptors
                 bolt.life -= dt;
                 if (bolt.life <= 0f)
                 {
+                    if (bolt.mark != null) Strike(bolt.tr.position, bolt.mark);
                     Destroy(bolt.tr.gameObject);
                     _bolts.RemoveAt(i);
                     continue;
@@ -1321,6 +1921,15 @@ namespace MetalRaptors
 
         Vector3 Air(float[] screen, float distance) =>
             _cam.ViewportPointToRay(new Vector3(screen[0], screen[1], 0f)).GetPoint(distance);
+
+        Vector3 Sea(float screenX, float distance)
+        {
+            Vector3 dir = _cam.ViewportPointToRay(new Vector3(screenX, 0.5f, 0f)).direction;
+            dir.y = 0f;
+            Vector3 point = _cam.transform.position + dir.normalized * distance;
+            point.y = SeaSurface.Level;
+            return point;
+        }
 
         Vector3 Ground(float screenX, float distance)
         {

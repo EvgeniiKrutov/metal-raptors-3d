@@ -8,7 +8,7 @@ namespace MetalRaptors
     {
         public const float ShotPitch = 0.8409f;
 
-        const float MinElevation = -80f;
+        const float MinElevation = -25f;
         const float MaxElevation = 80f;
         const float StartElevation = 8f;
         const float AimRate = 80f;
@@ -22,12 +22,14 @@ namespace MetalRaptors
 
         const float LineStart = 6f;
         const float LineLength = 300f;
-        const float LineWidth = 1.6f;
+        const float LineWidth = 2.8f;
         const float LineDepth = 6f;
         const int LineDashes = 14;
-        const float LineDashFill = 0.55f;
+        const float LineDashFill = 0.6f;
+        const float LineFade = 0.55f;
         const int LineTextureWidth = 256;
-        static readonly Color LineColor = new Color(1f, 0.97f, 0.88f, 0.4f);
+        static readonly Color LineColor = new Color(0.09f, 0.07f, 0.05f, 0.85f);
+        static readonly Color JamColor = new Color(0.78f, 0.12f, 0.06f, 0.9f);
 
         Transform _pivot;
         Quaternion _rest;
@@ -36,12 +38,26 @@ namespace MetalRaptors
         float _elevation = StartElevation;
         float _rate;
         float _input;
+        bool _jammed;
 
         LineRenderer _line;
         Material _lineMaterial;
         Texture2D _lineTexture;
 
         public bool Ready { get; set; }
+
+        public bool Jammed
+        {
+            get => _jammed;
+            set
+            {
+                if (_jammed == value) return;
+
+                _jammed = value;
+                if (_lineMaterial != null)
+                    _lineMaterial.SetColor("_BaseColor", value ? JamColor : LineColor);
+            }
+        }
 
         public Vector3 Muzzle
         {
@@ -173,7 +189,7 @@ namespace MetalRaptors
             {
                 float u = (float)x / (LineTextureWidth - 1);
                 bool dash = Mathf.Repeat(u * LineDashes, 1f) < LineDashFill;
-                texture.SetPixel(x, 0, new Color(1f, 1f, 1f, dash ? 1f - u : 0f));
+                texture.SetPixel(x, 0, new Color(1f, 1f, 1f, dash ? 1f - u * LineFade : 0f));
             }
             texture.Apply();
             return texture;

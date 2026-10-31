@@ -49,8 +49,8 @@ namespace MetalRaptors
         const float SupportStationAhead = 40f;
         const float SupportStationAbove = 60f;
 
-        static float BumpReach => PlaneScrapes.HitboxRadius * PlaneModelConfig.LevelScale
-                                  * (1f + GameManager.CurrentPlane.hitboxScale);
+        float BumpReach => PlaneScrapes.HitboxRadius * PlaneModelConfig.LevelScale
+                           * (1f + _level.PlayerPlane.hitboxScale);
         const float BumpCooldown = 0.5f;
         const float BumpDepthBand = 40f;
 

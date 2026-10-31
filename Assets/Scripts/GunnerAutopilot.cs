@@ -1,25 +1,26 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace MetalRaptors
 {
     public class GunnerAutopilot : MonoBehaviour
     {
         const float Lookahead = 260f;
+        const float SeekNear = 180f;
         const float CruiseClimbDeg = 8f;
-        const float SeekClimbDeg = 14f;
+        const float SeekClimbDeg = 18f;
+        const float RecoverClimbDeg = 14f;
 
         const float BandLow = 0.3f;
         const float BandHigh = 0.32f;
         const float SeekLow = 0.35f;
         const float SeekHigh = 0.7f;
-        const float SeekLift = 0.25f;
         const float SeekPassed = 40f;
         const float MinSpeed = 1f;
 
         const float LegMinSec = 5f;
         const float LegMaxSec = 10f;
         const float CruiseResponse = 0.8f;
-        const float SeekResponse = 1.6f;
 
         const float NoseWanderDeg = 0.6f;
         const float NoseWanderHz = 0.13f;
@@ -40,7 +41,23 @@ namespace MetalRaptors
         const float GustRollMaxDeg = 9f;
         const float GustPitchPerLift = 0.05f;
         const float GustReturnBias = 0.3f;
-        const float SeekGustScale = 0.4f;
+        const float SeekGustScale = 0.25f;
+
+        const float DiveDeg = 38f;
+        const float DiveReach = 120f;
+        const float DiveDrop = 0.75f;
+        const float DiveFloor = 0.62f;
+        const float DiveArrive = 20f;
+        const float DiveSink = 70f;
+        const float DiveSinkEase = 60f;
+        const float DiveSinkRampSec = 0.2f;
+        const float DivePushMaxSec = 2f;
+        const float DiveHoldSec = 0.7f;
+        const float PullDeg = 16f;
+        const float PullSec = 1.1f;
+        const float DiveCooldown = 8f;
+
+        enum DivePhase { Off, Push, Hold, Pull }
 
         CubeController _plane;
         Rigidbody _rb;
@@ -62,6 +79,20 @@ namespace MetalRaptors
         float _gustLift;
         float _gustDrag;
         float _gustRoll;
+
+        DivePhase _phase;
+        float _diveAge;
+        float _diveFloorY;
+        float _cooldown;
+
+        public bool Locked { get; set; }
+
+        public bool IsRunning => _phase != DivePhase.Off;
+
+        public bool IsReady => enabled && !Locked && _steering && _cooldown <= 0f
+                               && _phase == DivePhase.Off && !CinematicBars.AnyShowing;
+
+        public float Charge => IsRunning ? 1f : 1f - Mathf.Clamp01(_cooldown / DiveCooldown);
 
         public static GunnerAutopilot Begin(CubeController plane, float centreY, float halfHeight)
         {
@@ -85,7 +116,32 @@ namespace MetalRaptors
 
         public void Track(SupplyDrop supply) => _supply = supply;
 
-        public void Release() => _steering = false;
+        public void Release()
+        {
+            _steering = false;
+            if (IsRunning) EndDive();
+        }
+
+        public void Request()
+        {
+            if (!IsReady || GameMenu.IsOpen || LevelBriefing.IsOpen || !_plane.Steerable) return;
+
+            float y = _plane.transform.position.y;
+            _diveFloorY = Mathf.Max(y - _halfHeight * DiveDrop, _centreY - _halfHeight * DiveFloor);
+            if (_diveFloorY >= y - DiveArrive) return;
+
+            _phase = DivePhase.Push;
+            _diveAge = 0f;
+        }
+
+        void Update()
+        {
+            if (GameMenu.IsOpen || LevelBriefing.IsOpen) return;
+            if (_phase == DivePhase.Off) _cooldown = Mathf.Max(0f, _cooldown - Time.deltaTime);
+
+            var kb = Keyboard.current;
+            if (kb != null && kb.rKey.wasPressedThisFrame) Request();
+        }
 
         void FixedUpdate()
         {
@@ -93,56 +149,104 @@ namespace MetalRaptors
 
             float dt = Time.fixedDeltaTime;
             bool seeking = Steer(dt);
-            Blow(dt, seeking);
+            Blow(dt, seeking || IsRunning);
         }
 
         bool Steer(float dt)
         {
-            if (!_steering || !_plane.Steerable) return false;
+            if (!_steering || !_plane.Steerable)
+            {
+                if (IsRunning) EndDive();
+                return false;
+            }
 
             Vector3 pos = _plane.transform.position;
-            bool seeking = Seek(pos, out float seekY);
+            if (IsRunning)
+            {
+                _plane.SetTargetHeading(DiveHeading(pos, dt));
+                return false;
+            }
 
-            if (!seeking)
+            float heading;
+            bool seeking = Seek(pos, out float ahead, out float seekY);
+
+            if (seeking)
+            {
+                _goalY = pos.y;
+                float climb = SeekClimbDeg * Mathf.Deg2Rad;
+                float reach = Mathf.Clamp(ahead, SeekNear, Lookahead);
+                heading = Mathf.Clamp(Mathf.Atan2(seekY - pos.y, reach), -climb, climb);
+            }
+            else
             {
                 _legLeft -= dt;
                 if (_legLeft <= 0f) NextLeg();
+
+                _goalY = Mathf.Lerp(_goalY, _legY, 1f - Mathf.Exp(-CruiseResponse * dt));
+                float climb = (pos.y < _low ? RecoverClimbDeg : CruiseClimbDeg) * Mathf.Deg2Rad;
+                heading = Mathf.Clamp(Mathf.Atan2(_goalY - pos.y, Lookahead), -climb, climb);
+                heading += Noise(Time.time * NoseWanderHz, 21.7f) * NoseWanderDeg * Mathf.Deg2Rad;
             }
-
-            float goal = seeking ? seekY : _legY;
-            float response = seeking ? SeekResponse : CruiseResponse;
-            _goalY = Mathf.Lerp(_goalY, goal, 1f - Mathf.Exp(-response * dt));
-
-            float climb = (seeking ? SeekClimbDeg : CruiseClimbDeg) * Mathf.Deg2Rad;
-            float heading = Mathf.Clamp(Mathf.Atan2(_goalY - pos.y, Lookahead), -climb, climb);
-            heading += Noise(Time.time * NoseWanderHz, 21.7f) * NoseWanderDeg * Mathf.Deg2Rad;
 
             _plane.SetTargetHeading(heading);
             return seeking;
         }
 
-        bool Seek(Vector3 pos, out float y)
+        float DiveHeading(Vector3 pos, float dt)
         {
+            _diveAge += dt;
+
+            if (_phase == DivePhase.Push
+                && (pos.y <= _diveFloorY + DiveArrive || _diveAge >= DivePushMaxSec))
+                NextPhase(DivePhase.Hold);
+            else if (_phase == DivePhase.Hold && _diveAge >= DiveHoldSec)
+                NextPhase(DivePhase.Pull);
+            else if (_phase == DivePhase.Pull && _diveAge >= PullSec)
+                EndDive();
+
+            if (_phase != DivePhase.Push && _phase != DivePhase.Hold)
+                return PullDeg * Mathf.Deg2Rad;
+
+            float steep = DiveDeg * Mathf.Deg2Rad;
+            return Mathf.Clamp(Mathf.Atan2(_diveFloorY - pos.y, DiveReach), -steep, steep);
+        }
+
+        void NextPhase(DivePhase phase)
+        {
+            _phase = phase;
+            _diveAge = 0f;
+        }
+
+        void EndDive()
+        {
+            _phase = DivePhase.Off;
+            _cooldown = DiveCooldown;
+            _goalY = _plane.transform.position.y;
+            NextLeg();
+        }
+
+        float Sink()
+        {
+            if (_phase != DivePhase.Push) return 0f;
+
+            float above = _plane.transform.position.y - _diveFloorY - DiveArrive;
+            return DiveSink * Mathf.Clamp01(above / DiveSinkEase)
+                   * Mathf.Clamp01(_diveAge / DiveSinkRampSec);
+        }
+
+        bool Seek(Vector3 pos, out float ahead, out float y)
+        {
+            ahead = 0f;
             y = pos.y;
-            if (_supply == null) return false;
+            if (_supply == null || !_supply.Aim(out Vector3 box)) return false;
 
-            SupplyCrate crate = _supply.Crate;
-            if (crate != null)
-            {
-                Vector3 box = crate.Box;
-                float ahead = box.x - pos.x;
-                if (ahead < -SeekPassed) return false;
+            ahead = box.x - pos.x;
+            if (ahead < -SeekPassed) return false;
 
-                float speed = Mathf.Max(MinSpeed, _rb != null ? _rb.linearVelocity.x : MinSpeed);
-                float reach = Mathf.Max(0f, ahead) / speed;
-                y = Mathf.Clamp(box.y - SupplyCrate.FallSpeed * reach,
-                    _centreY - _halfHeight * SeekLow, _centreY + _halfHeight * SeekHigh);
-                return true;
-            }
-
-            if (!_supply.Incoming) return false;
-
-            y = _centreY + _halfHeight * SeekLift;
+            float speed = Mathf.Max(MinSpeed, _rb != null ? _rb.linearVelocity.x : MinSpeed);
+            float reach = Mathf.Max(0f, ahead) / speed;
+            y = Mathf.Clamp(box.y - SupplyCrate.FallSpeed * reach,
+                _centreY - _halfHeight * SeekLow, _centreY + _halfHeight * SeekHigh);
             return true;
         }
 
@@ -152,10 +256,11 @@ namespace MetalRaptors
             _legY = Random.Range(_low, _high);
         }
 
-        void Blow(float dt, bool seeking)
+        void Blow(float dt, bool calmed)
         {
             float t = Time.time * TurbulenceHz;
-            float lift = Noise(t, 0f) * TurbulenceLift;
+            float calm = calmed ? SeekGustScale : 1f;
+            float lift = Noise(t, 0f) * TurbulenceLift * calm;
             float pitch = Noise(t, 7.3f) * TurbulencePitchDeg;
             float roll = Noise(t, 13.1f) * TurbulenceRollDeg;
             float drag = 0f;
@@ -166,8 +271,7 @@ namespace MetalRaptors
             if (_gustAge < _gustSec)
             {
                 _gustAge += dt;
-                float k = Mathf.Sin(Mathf.PI * Mathf.Clamp01(_gustAge / _gustSec))
-                          * (seeking ? SeekGustScale : 1f);
+                float k = Mathf.Sin(Mathf.PI * Mathf.Clamp01(_gustAge / _gustSec)) * calm;
 
                 lift += _gustLift * k;
                 drag += _gustDrag * k;
@@ -175,7 +279,7 @@ namespace MetalRaptors
                 pitch += _gustLift * GustPitchPerLift * k;
             }
 
-            _plane.SetWind(new Vector2(drag, lift), pitch, roll);
+            _plane.SetWind(new Vector2(drag, lift - Sink()), pitch, roll);
         }
 
         void StartGust()
