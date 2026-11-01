@@ -38,7 +38,24 @@ namespace MetalRaptors
 
         public bool HighRevs => Boosting || BarrelRolling;
 
+        public bool TurningBack => _turnSec > 0f;
+
+        public float Facing => TurningBack
+            ? _turnFrom * Mathf.Cos(_turnYaw)
+            : Mathf.Cos(_heading) < 0f ? -1f : 1f;
+
         const float ExplosionSize = 60f;
+
+        const float TurnMainShare = 0.6f;
+        const float TurnSwingFrom = 0.35f;
+        const float TurnOvershoot = 0.5825f;
+        const float TurnPeakRate = 8.36f;
+        const float TurnSlow = 0.6f;
+        const float TurnSlowUntil = 0.75f;
+        const float TurnBankLead = 0.05f;
+        const float TurnRateProbe = 0.01f;
+        const float TurnSettleShare = 0.25f;
+        const float WindReturnSec = 1.2f;
 
         const float CollisionDamage = 10f;
         const float CollisionCooldown = 0.5f;
@@ -107,6 +124,16 @@ namespace MetalRaptors
 
         ISolid _solid;
         float _solidRadius = PlaneScrapes.HitboxRadius;
+
+        float _turnSec;
+        float _turnAge;
+        float _turnFrom = 1f;
+        float _turnYaw;
+        float _turnBank;
+        float _turnZ;
+        float _turnLift;
+        Quaternion _turnLean = Quaternion.identity;
+        float _windBlend = 1f;
 
         public void Initialize(PlayerConfig config, float startHeadingRad, float minX, float maxX,
             float ceilingY, float edgeMargin, bool hardWalls = false)
@@ -181,6 +208,7 @@ namespace MetalRaptors
             _heading = headingRad;
             _targetHeading = headingRad;
             _angularVelocity = 0f;
+            _roll.Settle(headingRad);
             CurrentHealth = Mathf.Clamp(health, 1f, MaxHealth);
             if (CurrentHealth < SmokeHealthThreshold && _smoke != null) _smoke.Arm(ExplosionSize);
             ApplyRotation();
@@ -223,6 +251,26 @@ namespace MetalRaptors
         }
 
         public void SetTargetHeading(float headingRad) => _targetHeading = headingRad;
+
+        public bool BeginTurnBack(float seconds, float bankDeg)
+        {
+            if (!_active || _falling || _hover || TurningBack || _rb == null) return false;
+
+            _turnSec = Mathf.Max(0.1f, seconds);
+            _turnAge = 0f;
+            _turnFrom = Mathf.Cos(_heading) < 0f ? -1f : 1f;
+            _turnYaw = 0f;
+            _turnBank = bankDeg;
+            _turnZ = _rb.position.z;
+            _turnLift = _rb.linearVelocity.y;
+            _turnLean = Quaternion.Inverse(Quaternion.Euler(0f, _turnFrom > 0f ? 0f : 180f, 0f))
+                        * transform.rotation;
+            _angularVelocity = 0f;
+            _barrelLeft = 0f;
+            _barrelAngle = 0f;
+            _rb.constraints &= ~RigidbodyConstraints.FreezePositionZ;
+            return true;
+        }
 
         public void FlyLevel()
         {
@@ -281,6 +329,14 @@ namespace MetalRaptors
                 ? _boostTarget
                 : _boost + (_boostTarget - _boost) * (1f - Mathf.Exp(-BoostResponse * dt));
 
+            if (TurningBack)
+            {
+                TurnBack(dt);
+                return;
+            }
+
+            _windBlend = Mathf.MoveTowards(_windBlend, 1f, dt / WindReturnSec);
+
             float maxRate = MaxTurnRate;
             float desiredRate;
             bool steady;
@@ -316,7 +372,7 @@ namespace MetalRaptors
 
             _speed = CruiseSpeed;
             Vector3 vel = new Vector3(Mathf.Cos(_heading), Mathf.Sin(_heading), 0f) * _speed
-                          + new Vector3(_windDrift.x, _windDrift.y, 0f);
+                          + new Vector3(_windDrift.x, _windDrift.y, 0f) * _windBlend;
 
             Vector3 pos = _rb.position;
 
@@ -379,6 +435,73 @@ namespace MetalRaptors
             ApplyRotation();
         }
 
+        void TurnBack(float dt)
+        {
+            float before = _turnAge / _turnSec;
+            _turnAge = Mathf.Min(_turnAge + dt, _turnSec);
+            float p = _turnAge / _turnSec;
+            float mid = (before + p) * 0.5f;
+
+            float course = TurnYaw(mid);
+            Vector3 velocity = new Vector3(_turnFrom * Mathf.Cos(course), 0f, Mathf.Sin(course))
+                               * (CruiseSpeed * TurnPace(mid));
+            velocity.y = _turnLift * TurnSettle(mid);
+            _rb.linearVelocity = velocity;
+
+            _turnYaw = TurnYaw(p);
+            float lead = TurnBankLead * (1f - TurnSettle(p));
+            float rate = TurnRate(Mathf.Min(1f, p + lead)) / TurnPeakRate;
+            float bank = _turnFrom * _turnBank * Mathf.Clamp(rate, -1f, 1f);
+            float yaw = _turnYaw * Mathf.Rad2Deg;
+            transform.rotation = Quaternion.Euler(0f, _turnFrom > 0f ? -yaw : 180f + yaw, 0f)
+                               * Quaternion.Slerp(Quaternion.identity, _turnLean, TurnSettle(p))
+                               * Quaternion.Euler(bank, 0f, 0f);
+
+            if (_turnAge >= _turnSec) EndTurnBack();
+        }
+
+        void EndTurnBack()
+        {
+            _turnSec = 0f;
+            _windBlend = 0f;
+            _heading = _turnFrom > 0f ? Mathf.PI : 0f;
+            _targetHeading = _heading;
+            _angularVelocity = 0f;
+            _roll.Settle(_heading);
+
+            Vector3 pos = _rb.position;
+            _rb.position = new Vector3(pos.x, pos.y, _turnZ);
+            _rb.linearVelocity = new Vector3(Mathf.Cos(_heading) * CruiseSpeed, 0f, 0f);
+            _rb.constraints |= RigidbodyConstraints.FreezePositionZ;
+            ApplyRotation();
+        }
+
+        static float TurnYaw(float p)
+        {
+            float yaw = Mathf.SmoothStep(0f, Mathf.PI, p / TurnMainShare);
+            if (p <= TurnSwingFrom) return yaw;
+
+            float swing = Mathf.Sin(Mathf.PI * (p - TurnSwingFrom) / (1f - TurnSwingFrom));
+            return yaw + TurnOvershoot * swing * swing;
+        }
+
+        static float TurnRate(float p)
+        {
+            float a = Mathf.Max(0f, p - TurnRateProbe);
+            float b = Mathf.Min(1f, p + TurnRateProbe);
+            return (TurnYaw(b) - TurnYaw(a)) / Mathf.Max(1e-4f, b - a);
+        }
+
+        static float TurnSettle(float p) => 1f - Mathf.SmoothStep(0f, 1f, p / TurnSettleShare);
+
+        static float TurnPace(float p)
+        {
+            if (p >= TurnSlowUntil) return 1f;
+
+            float dip = Mathf.Sin(Mathf.PI * p / TurnSlowUntil);
+            return 1f - TurnSlow * dip * dip;
+        }
+
         static Vector2 HoverKeys()
         {
             var kb = Keyboard.current;
@@ -408,6 +531,8 @@ namespace MetalRaptors
         }
 
         public void SetLeftWall(float x) => _wallMinX = Mathf.Max(_wallMinX, x);
+
+        public void SetRightWall(float x) => _wallMaxX = Mathf.Min(_wallMaxX, x);
 
         public void SetCeiling(float y) => _ceilingY = y;
 
@@ -439,10 +564,10 @@ namespace MetalRaptors
 
         void ApplyRotation()
         {
-            float roll = _roll.Angle + _barrelAngle + _bank + _windRoll
+            float roll = _roll.Angle + _barrelAngle + _bank + _windRoll * _windBlend
                          + (_fall != null ? _fall.Roll : 0f);
-            transform.rotation = Quaternion.Euler(0f, 0f, _heading * Mathf.Rad2Deg + _windPitch)
-                               * Quaternion.Euler(roll, 0f, 0f);
+            float pitch = _heading * Mathf.Rad2Deg + _windPitch * _windBlend;
+            transform.rotation = Quaternion.Euler(0f, 0f, pitch) * Quaternion.Euler(roll, 0f, 0f);
         }
 
         public void TakeDamage(float amount)
@@ -493,6 +618,7 @@ namespace MetalRaptors
 
         void BeginFall()
         {
+            if (TurningBack) EndTurnBack();
             _falling = true;
             _windDrift = Vector2.zero;
             _windPitch = 0f;

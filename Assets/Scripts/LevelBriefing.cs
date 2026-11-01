@@ -242,6 +242,10 @@ namespace MetalRaptors
         }
 
         public static CanvasGroup BuildPrompt(Transform parent, float y, Color color,
+            Color caretColor, out Image caret) =>
+            BuildPrompt(parent, y, PromptSize, color, caretColor, out caret);
+
+        public static CanvasGroup BuildPrompt(Transform parent, float y, int size, Color color,
             Color caretColor, out Image caret)
         {
             var row = new GameObject("Prompt", typeof(RectTransform), typeof(CanvasGroup));
@@ -259,7 +263,8 @@ namespace MetalRaptors
             prompt.blocksRaycasts = false;
             prompt.interactable = false;
 
-            Text text = Centered(row.transform, Prompt, PromptSize, y, color, UIFactory.MediumFont);
+            Text text = Centered(row.transform, Prompt, size, y, color, UIFactory.MediumFont);
+            float scale = (float)size / PromptSize;
 
             var go = new GameObject("Caret", typeof(Image));
             go.transform.SetParent(row.transform, false);
@@ -269,9 +274,10 @@ namespace MetalRaptors
             caret.raycastTarget = false;
 
             var rt = caret.rectTransform;
-            rt.sizeDelta = new Vector2(CaretWidth, CaretHeight);
+            rt.sizeDelta = new Vector2(CaretWidth, CaretHeight) * scale;
             rt.anchoredPosition = new Vector2(
-                text.preferredWidth * 0.5f + CaretGap + CaretWidth * 0.5f, y - CaretDrop);
+                text.preferredWidth * 0.5f + (CaretGap + CaretWidth * 0.5f) * scale,
+                y - CaretDrop * scale);
             return prompt;
         }
 

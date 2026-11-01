@@ -15,6 +15,7 @@ namespace MetalRaptors
         const float GapMin = 2f, GapMax = 6f;
         const float OnScreenMin = -0.3f, OnScreenMax = 0.5f;
         const float EdgeMargin = 40f;
+        const float MinDrift = 45f;
 
         const float Heading = 180f;
         const float Draft = 1.15f;
@@ -144,14 +145,16 @@ namespace MetalRaptors
                 float window = HalfWindow(pos.z, eye);
                 float left = eye.x - window - EdgeMargin;
                 float right = eye.x + window + EdgeMargin;
+                bool rightward = LevelScroll.Drift(boat.speed) > 0f;
 
-                if (!boat.gone && pos.x + half < left)
+                if (!boat.gone && (rightward ? pos.x - half > right : pos.x + half < left))
                 {
                     boat.gone = true;
                     _wait = Random.Range(GapMin, GapMax);
                 }
 
-                if (boat.gone && pos.x + boat.wake.Reach < left && boat.spray.Idle)
+                bool past = rightward ? pos.x - half > right : pos.x + boat.wake.Reach < left;
+                if (boat.gone && past && boat.spray.Idle)
                 {
                     Release(boat);
                     _boats.RemoveAt(i);
@@ -160,7 +163,8 @@ namespace MetalRaptors
 
                 Animate(boat, time);
                 boat.wake.Follow(pos, time);
-                boat.spray.Tick(dt, time, !boat.gone && pos.x - half < right, boat.root, boat.speed);
+                boat.spray.Tick(dt, time, !boat.gone && pos.x - half < right && pos.x + half > left,
+                    boat.root, boat.speed);
                 if (!boat.gone) sailing = true;
             }
 
@@ -176,9 +180,13 @@ namespace MetalRaptors
         {
             float z = Random.Range(LaneNear, LaneFar);
             float window = HalfWindow(z, eye);
+            float speed = LevelScroll.Pace(Random.Range(SpeedMin, SpeedMax), MinDrift);
+            var wake = new BoatWake(transform, _length, _beam);
             float x = onScreen
                 ? eye.x + window * Random.Range(OnScreenMin, OnScreenMax)
-                : eye.x + window + _length * 0.5f + EdgeMargin;
+                : LevelScroll.Drift(speed) > 0f
+                    ? eye.x - window - wake.Reach - EdgeMargin
+                    : eye.x + window + _length * 0.5f + EdgeMargin;
 
             var root = new GameObject("Thornycroft").transform;
             root.SetParent(transform, false);
@@ -214,9 +222,9 @@ namespace MetalRaptors
             {
                 root = root,
                 motion = motion,
-                wake = new BoatWake(transform, _length, _beam),
+                wake = wake,
                 spray = new BoatSpray(transform, _scale, _length, _beam),
-                speed = Random.Range(SpeedMin, SpeedMax),
+                speed = speed,
                 pitchSlow = BoatSway.Roll(PitchSlowMin, PitchSlowMax, PitchSlowSecMin, PitchSlowSecMax),
                 pitchFast = BoatSway.Roll(PitchFastMin, PitchFastMax, PitchFastSecMin, PitchFastSecMax),
                 roll = BoatSway.Roll(RollMin, RollMax, RollSecMin, RollSecMax),

@@ -7,7 +7,7 @@ namespace MetalRaptors
     public enum CampaignOp
     {
         Wait, Say, Wave, Spawn, WaitClear, Supply, Foe, Zeppelin, Onslaught, Formation, Warn,
-        Danger, Arena, Boss, Duel, Escape, Raid, Unlock, Jams, Boost, Finish
+        Danger, Arena, Boss, Duel, Escape, Raid, Unlock, Jams, Boost, Turn, Assault, Disarm, Finish
     }
 
     public class CampaignStep
@@ -25,6 +25,9 @@ namespace MetalRaptors
         public bool burning;
         public string skin;
         public float scale;
+        public float pairsAt;
+        public float single;
+        public bool blasts;
         public ScreenEdge edge;
         public PlaneAbility ability;
     }
@@ -158,6 +161,9 @@ namespace MetalRaptors
                         op = CampaignOp.Boost,
                         hold = !(Value(step, "hold") is bool held) || held,
                     };
+                case "turn": return new CampaignStep { op = CampaignOp.Turn, seconds = Seconds(step) };
+                case "assault": return ParseAssault(step, origin, index);
+                case "disarm": return new CampaignStep { op = CampaignOp.Disarm };
                 case "finish": return new CampaignStep { op = CampaignOp.Finish };
                 default:
                     Debug.LogError($"CampaignScript {origin}[{index}]: unknown op '{op}'.");
@@ -293,7 +299,8 @@ namespace MetalRaptors
                     }
 
                     bool sneak = Value(group, "sneak") is bool sneaky && sneaky;
-                    groups.Add(new EnemyGroup(plane, count, sneak));
+                    bool high = Value(group, "high") is bool raised && raised;
+                    groups.Add(new EnemyGroup(plane, count, sneak, high));
                 }
             }
 
@@ -309,6 +316,18 @@ namespace MetalRaptors
                 groups = groups.ToArray(),
                 spread = Value(step, "spread") is bool flag && flag,
             };
+        }
+
+        static CampaignStep ParseAssault(Dictionary<string, object> step, string origin, int index)
+        {
+            CampaignStep assault = ParseWave(CampaignOp.Assault, step, origin, index);
+            if (assault == null) return null;
+
+            assault.seconds = Seconds(step);
+            assault.pairsAt = Mathf.Max(0f, Number(step, "pairs", 0f));
+            assault.single = Mathf.Clamp01(Number(step, "single", 0f));
+            assault.blasts = Value(step, "blasts") is bool blasts && blasts;
+            return assault;
         }
 
         static float Seconds(Dictionary<string, object> step) =>

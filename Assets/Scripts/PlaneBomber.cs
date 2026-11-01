@@ -16,6 +16,8 @@ namespace MetalRaptors
 
         public bool Locked { get; set; }
 
+        public float CooldownSec => _config != null ? Mathf.Max(0.01f, _config.bombCooldown) : 0f;
+
         public bool IsReady => enabled && !Locked && _cooldown <= 0f && !CinematicBars.AnyShowing;
 
         public float Cooldown

@@ -63,6 +63,7 @@ namespace MetalRaptors
             _options = new OptionsPage(canvas.transform, GoHome);
 
             ShowHome(_main);
+            StartScreen.Open();
         }
 
         void Update()

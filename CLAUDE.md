@@ -6,3 +6,4 @@
 6. Do not update any docs md file
 7. Do not generate a huge text in the chat with results of the work. Keep it short and in simple words
 8. Do not ask me about creating new sessions in the chat
+9. Always ask me questions until you will get 98% of info you need for executing a prompt

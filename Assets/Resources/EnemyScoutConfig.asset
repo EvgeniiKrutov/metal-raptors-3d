@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: EnemyScoutConfig
   m_EditorClassIdentifier:
   role: 0
-  health: 137.5
+  health: 90
   damage: 6
   fireRate: 0.18
   bulletSpeed: 400

@@ -231,14 +231,16 @@ namespace MetalRaptors
                 float window = HalfWindow(pos.z, eye);
                 float left = eye.x - window - EdgeMargin;
                 float right = eye.x + window + EdgeMargin;
+                bool rightward = LevelScroll.Drift(boat.speed) > 0f;
 
-                if (!boat.gone && pos.x + half < left)
+                if (!boat.gone && (rightward ? pos.x - half > right : pos.x + half < left))
                 {
                     boat.gone = true;
                     _wait = Random.Range(GapMin, GapMax);
                 }
 
-                if (boat.gone && pos.x + boat.wake.Reach < left && boat.spray.Idle)
+                bool past = rightward ? pos.x - half > right : pos.x + boat.wake.Reach < left;
+                if (boat.gone && past && boat.spray.Idle)
                 {
                     Release(boat);
                     _boats.RemoveAt(i);
@@ -247,7 +249,8 @@ namespace MetalRaptors
 
                 Animate(boat, time);
                 boat.wake.Follow(pos, time);
-                boat.spray.Tick(dt, time, !boat.gone && pos.x - half < right, boat.root, boat.speed);
+                boat.spray.Tick(dt, time, !boat.gone && pos.x - half < right && pos.x + half > left,
+                    boat.root, boat.speed);
                 foreach (Gun gun in boat.guns)
                 {
                     Aim(gun, dt);
@@ -270,9 +273,13 @@ namespace MetalRaptors
         {
             float z = Random.Range(LaneNear, LaneFar);
             float window = HalfWindow(z, eye);
+            float speed = Random.Range(SpeedMin, SpeedMax);
+            var wake = new BoatWake(transform, _length, _beam, BowWave);
             float x = onScreen
                 ? eye.x + window * Random.Range(OnScreenMin, OnScreenMax)
-                : eye.x + window + _length * 0.5f + EdgeMargin;
+                : LevelScroll.Drift(speed) > 0f
+                    ? eye.x - window - wake.Reach - EdgeMargin
+                    : eye.x + window + _length * 0.5f + EdgeMargin;
 
             var root = new GameObject("S150").transform;
             root.SetParent(transform, false);
@@ -309,10 +316,10 @@ namespace MetalRaptors
             {
                 root = root,
                 motion = motion,
-                wake = new BoatWake(transform, _length, _beam, BowWave),
+                wake = wake,
                 spray = new BoatSpray(transform, _scale, _length, _beam, BowWave),
                 guns = Arm(view.transform, root),
-                speed = Random.Range(SpeedMin, SpeedMax),
+                speed = speed,
                 pitchSlow = BoatSway.Roll(PitchSlowMin, PitchSlowMax, PitchSlowSecMin, PitchSlowSecMax),
                 pitchFast = BoatSway.Roll(PitchFastMin, PitchFastMax, PitchFastSecMin, PitchFastSecMax),
                 roll = BoatSway.Roll(RollMin, RollMax, RollSecMin, RollSecMax),

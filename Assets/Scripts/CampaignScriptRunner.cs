@@ -51,11 +51,25 @@ namespace MetalRaptors
     public interface IGunnerHost
     {
         void EnableJams();
+        void Disarm();
     }
 
     public interface IBoostHost
     {
         void HoldBoost(bool on);
+    }
+
+    public interface ITurnHost
+    {
+        void TurnBack();
+        bool Turning { get; }
+    }
+
+    public interface IAssaultHost
+    {
+        void BeginAssault(bool blasts);
+        void EndAssault();
+        bool AssaultSkipped { get; }
     }
 
     public class CampaignScriptRunner : MonoBehaviour
@@ -152,7 +166,7 @@ namespace MetalRaptors
                 if (step.op != CampaignOp.Say)
                 {
                     _resumed = false;
-                    yield return CloseBar();
+                    if (step.op != CampaignOp.Turn) yield return CloseBar();
                 }
 
                 switch (step.op)
@@ -247,8 +261,20 @@ namespace MetalRaptors
                         if (_host is IGunnerHost gunnerHost) gunnerHost.EnableJams();
                         break;
 
+                    case CampaignOp.Disarm:
+                        if (_host is IGunnerHost disarmHost) disarmHost.Disarm();
+                        break;
+
                     case CampaignOp.Boost:
                         if (_host is IBoostHost boostHost) boostHost.HoldBoost(step.hold);
+                        break;
+
+                    case CampaignOp.Turn:
+                        yield return Turn(step.seconds);
+                        break;
+
+                    case CampaignOp.Assault:
+                        yield return Assault(step, index);
                         break;
 
                     case CampaignOp.Raid:
@@ -275,6 +301,29 @@ namespace MetalRaptors
 
             _bar.Hide();
             yield return Wait(CinematicBars.SlideSec);
+        }
+
+        IEnumerator Turn(float pause)
+        {
+            if (!(_host is ITurnHost turnHost)) yield break;
+
+            if (_bar != null && _bar.IsOpen)
+            {
+                yield return Unblur();
+                yield return Unfreeze();
+                _bar.ClearLine();
+            }
+            else if (_bar != null)
+            {
+                _bar.Open();
+                while (Running && !_bar.IsReady) yield return null;
+            }
+
+            yield return Wait(pause);
+            if (!Running) yield break;
+
+            turnHost.TurnBack();
+            while (Running && turnHost.Turning) yield return null;
         }
 
         IEnumerator Freeze()
@@ -491,13 +540,40 @@ namespace MetalRaptors
             WaveStatus = null;
         }
 
+        IEnumerator Assault(CampaignStep step, int index)
+        {
+            int wave = WaveNumber(index);
+            var assaultHost = _host as IAssaultHost;
+            var assault = new CampaignAssault(_host, step);
+
+            if (assaultHost != null) assaultHost.BeginAssault(step.blasts);
+
+            while (Running && !assault.Over && (assaultHost == null || !assaultHost.AssaultSkipped))
+            {
+                assault.Tick(CutscenePause.Delta);
+                WaveStatus = $"W{wave}  {Clock(assault.Left)}";
+                yield return null;
+            }
+
+            if (assaultHost != null) assaultHost.EndAssault();
+
+            while (Running && _host.EnemiesAlive > 0)
+            {
+                WaveStatus = $"W{wave}  LEAVING {_host.EnemiesAlive}";
+                yield return null;
+            }
+
+            WaveStatus = null;
+        }
+
         int WaveNumber(int index)
         {
             int wave = 0;
             for (int i = 0; i <= index && i < _script.Steps.Length; i++)
             {
                 CampaignOp op = _script.Steps[i].op;
-                if (op == CampaignOp.Onslaught || op == CampaignOp.Zeppelin) wave++;
+                if (op == CampaignOp.Onslaught || op == CampaignOp.Zeppelin || op == CampaignOp.Assault)
+                    wave++;
             }
             return wave;
         }

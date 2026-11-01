@@ -30,6 +30,13 @@ namespace MetalRaptors
         const float TurbulenceRollDeg = 2.5f;
         const float TurbulenceHz = 0.35f;
 
+        const float RockDeg = 4.5f;
+        const float RockSec = 3.4f;
+        const float RockSwell = 0.3f;
+        const float RockSwellHz = 0.08f;
+        const float BobLift = 18f;
+        const float BobSec = 4.2f;
+
         const float GustGapMin = 3.5f;
         const float GustGapMax = 7f;
         const float GustSecMin = 0.6f;
@@ -45,8 +52,6 @@ namespace MetalRaptors
 
         const float DiveDeg = 38f;
         const float DiveReach = 120f;
-        const float DiveDrop = 0.75f;
-        const float DiveFloor = 0.62f;
         const float DiveArrive = 20f;
         const float DiveSink = 70f;
         const float DiveSinkEase = 60f;
@@ -55,7 +60,6 @@ namespace MetalRaptors
         const float DiveHoldSec = 0.7f;
         const float PullDeg = 16f;
         const float PullSec = 1.1f;
-        const float DiveCooldown = 8f;
 
         enum DivePhase { Off, Push, Hold, Pull }
 
@@ -84,6 +88,10 @@ namespace MetalRaptors
         float _diveAge;
         float _diveFloorY;
         float _cooldown;
+        float _cooldownSec;
+        System.Func<float> _deck;
+
+        public static bool Diving { get; private set; }
 
         public bool Locked { get; set; }
 
@@ -92,9 +100,14 @@ namespace MetalRaptors
         public bool IsReady => enabled && !Locked && _steering && _cooldown <= 0f
                                && _phase == DivePhase.Off && !CinematicBars.AnyShowing;
 
-        public float Charge => IsRunning ? 1f : 1f - Mathf.Clamp01(_cooldown / DiveCooldown);
+        public float Charge => IsRunning ? 1f : 1f - Mathf.Clamp01(_cooldown / Mathf.Max(0.01f, _cooldownSec));
 
-        public static GunnerAutopilot Begin(CubeController plane, float centreY, float halfHeight)
+        float Dir => Mathf.Cos(_plane.Heading) < 0f ? -1f : 1f;
+
+        float Toward(float heading) => Dir > 0f ? heading : Mathf.PI - heading;
+
+        public static GunnerAutopilot Begin(CubeController plane, float centreY, float halfHeight,
+            float cooldownSec, System.Func<float> deck)
         {
             if (plane == null) return null;
 
@@ -103,6 +116,8 @@ namespace MetalRaptors
             pilot._rb = plane.GetComponent<Rigidbody>();
             pilot._centreY = centreY;
             pilot._halfHeight = halfHeight;
+            pilot._cooldownSec = cooldownSec;
+            pilot._deck = deck;
             pilot._low = centreY - halfHeight * BandLow;
             pilot._high = centreY + halfHeight * BandHigh;
             pilot._legY = centreY;
@@ -127,12 +142,15 @@ namespace MetalRaptors
             if (!IsReady || GameMenu.IsOpen || LevelBriefing.IsOpen || !_plane.Steerable) return;
 
             float y = _plane.transform.position.y;
-            _diveFloorY = Mathf.Max(y - _halfHeight * DiveDrop, _centreY - _halfHeight * DiveFloor);
+            _diveFloorY = _deck != null ? _deck() : _centreY - _halfHeight;
             if (_diveFloorY >= y - DiveArrive) return;
 
             _phase = DivePhase.Push;
             _diveAge = 0f;
+            Diving = true;
         }
+
+        void OnDestroy() => Diving = false;
 
         void Update()
         {
@@ -163,7 +181,7 @@ namespace MetalRaptors
             Vector3 pos = _plane.transform.position;
             if (IsRunning)
             {
-                _plane.SetTargetHeading(DiveHeading(pos, dt));
+                _plane.SetTargetHeading(Toward(DiveHeading(pos, dt)));
                 return false;
             }
 
@@ -188,7 +206,7 @@ namespace MetalRaptors
                 heading += Noise(Time.time * NoseWanderHz, 21.7f) * NoseWanderDeg * Mathf.Deg2Rad;
             }
 
-            _plane.SetTargetHeading(heading);
+            _plane.SetTargetHeading(Toward(heading));
             return seeking;
         }
 
@@ -220,7 +238,8 @@ namespace MetalRaptors
         void EndDive()
         {
             _phase = DivePhase.Off;
-            _cooldown = DiveCooldown;
+            Diving = false;
+            _cooldown = _cooldownSec;
             _goalY = _plane.transform.position.y;
             NextLeg();
         }
@@ -240,10 +259,10 @@ namespace MetalRaptors
             y = pos.y;
             if (_supply == null || !_supply.Aim(out Vector3 box)) return false;
 
-            ahead = box.x - pos.x;
+            ahead = (box.x - pos.x) * Dir;
             if (ahead < -SeekPassed) return false;
 
-            float speed = Mathf.Max(MinSpeed, _rb != null ? _rb.linearVelocity.x : MinSpeed);
+            float speed = Mathf.Max(MinSpeed, _rb != null ? _rb.linearVelocity.x * Dir : MinSpeed);
             float reach = Mathf.Max(0f, ahead) / speed;
             y = Mathf.Clamp(box.y - SupplyCrate.FallSpeed * reach,
                 _centreY - _halfHeight * SeekLow, _centreY + _halfHeight * SeekHigh);
@@ -263,6 +282,11 @@ namespace MetalRaptors
             float lift = Noise(t, 0f) * TurbulenceLift * calm;
             float pitch = Noise(t, 7.3f) * TurbulencePitchDeg;
             float roll = Noise(t, 13.1f) * TurbulenceRollDeg;
+
+            float now = Time.time;
+            float swell = 1f - RockSwell + RockSwell * Noise(now * RockSwellHz, 31.9f);
+            roll += Mathf.Sin(now * 2f * Mathf.PI / RockSec + _seed) * RockDeg * swell;
+            lift += Mathf.Sin(now * 2f * Mathf.PI / BobSec + _seed * 1.7f) * BobLift * calm;
             float drag = 0f;
 
             _gustGap -= dt;
@@ -279,7 +303,7 @@ namespace MetalRaptors
                 pitch += _gustLift * GustPitchPerLift * k;
             }
 
-            _plane.SetWind(new Vector2(drag, lift - Sink()), pitch, roll);
+            _plane.SetWind(new Vector2(drag, lift - Sink()), pitch * Dir, roll);
         }
 
         void StartGust()

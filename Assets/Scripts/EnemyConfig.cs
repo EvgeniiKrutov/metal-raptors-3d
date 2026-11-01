@@ -212,10 +212,9 @@ namespace MetalRaptors
             return config;
         }
 
-        public static void Scale(EnemyConfig config, float health, float rotation)
+        public static void Scale(EnemyConfig config, float rotation)
         {
             if (config == null) return;
-            if (health > 0f) config.health = Mathf.Max(1f, config.health * health);
             if (rotation > 0f)
                 config.rotationSpeed = Mathf.Max(1f, config.rotationSpeed * rotation);
         }

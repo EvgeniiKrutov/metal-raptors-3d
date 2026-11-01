@@ -155,7 +155,11 @@ namespace MetalRaptors
                 Flock flock = _flocks[i];
                 flock.age += dt;
 
-                if (flock.Center.x + flock.reach < eye.x - flock.halfWindow - EdgeMargin)
+                float centre = flock.Center.x;
+                bool past = LevelScroll.Drift(flock.speed) > 0f
+                    ? centre - flock.reach > eye.x + flock.halfWindow + EdgeMargin
+                    : centre + flock.reach < eye.x - flock.halfWindow - EdgeMargin;
+                if (past)
                 {
                     Release(flock);
                     _flocks.RemoveAt(i);
@@ -197,7 +201,8 @@ namespace MetalRaptors
             float floor = SeaSurface.Level + Floor - lowest + flock.rise.amp + BobMax;
             float x = onScreen
                 ? eye.x + flock.halfWindow * Random.Range(OnScreenMin, OnScreenMax)
-                : eye.x + flock.halfWindow + flock.reach + EdgeMargin;
+                : eye.x + (LevelScroll.Drift(flock.speed) > 0f ? -1f : 1f)
+                  * (flock.halfWindow + flock.reach + EdgeMargin);
             flock.start = new Vector3(x, Mathf.Max(PickAltitude(), floor), z);
 
             float yaw = Random.Range(-FlockYaw, FlockYaw);

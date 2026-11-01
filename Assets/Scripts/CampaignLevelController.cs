@@ -6,7 +6,7 @@ using UnityEngine.Rendering.Universal;
 namespace MetalRaptors
 {
     public class CampaignLevelController : MonoBehaviour, ICampaignScriptHost, IRaidHost,
-        IAbilityHost, IDevSpawnHost, IDangerHost, IGunnerHost, IBoostHost
+        IAbilityHost, IDevSpawnHost, IDangerHost, IGunnerHost, IBoostHost, ITurnHost, IAssaultHost
     {
         const float WorldTop = 650f;
         float HitboxScale => PlaneModelConfig.LevelScale * PlayerPlane.hitboxScale;
@@ -21,6 +21,10 @@ namespace MetalRaptors
         const float FallCamResponse = 3.3f;
         const float CamShakeMagnitude = 7f;
         const float CamShakeDuration = 0.3f;
+        const float AimedFireIdleSec = 5f;
+        const float DeckReach = 800f;
+        const int DeckProbes = 8;
+        const float DeckClearance = 20f;
         const float BoostZoom = 0.05f;
         const float BoostZoomResponse = 5f;
         const float BoostRumble = 2.5f;
@@ -72,10 +76,15 @@ namespace MetalRaptors
         const float PursuitHigh = 0.82f;
         const float PursuitFloor = 40f;
         const float PursuitCeiling = 60f;
+        const float PursuitSpacingShare = 0.5f;
         const float EntryLow = 0.45f;
         const float EntryHigh = 0.55f;
         const string HudObjectiveGunner = "rear gun  •  keep them off our tail";
         const string WaveSkipCaption = "SKIP WAVE";
+
+        const float TurnSec = 4.5f;
+        const float TurnBankDeg = 70f;
+        const float ScrollResponse = 4f;
 
         const float DitchSplashSize = 75f;
         const float SinkSpeed = 26f;
@@ -96,6 +105,10 @@ namespace MetalRaptors
         RearGun _rearGun;
         GunnerAutopilot _autopilot;
         bool _waveSkip;
+        bool _assault;
+        bool _assaultSkipped;
+        NearBlasts _blasts;
+        float _gunIdle;
         float? _entryY;
         PlaneAbility _abilities;
         Transform _cubeTr;
@@ -141,6 +154,8 @@ namespace MetalRaptors
         bool _playerFalling;
         bool _outro;
         bool _camHold;
+        float _facing = 1f;
+        float _lastCamX;
 
         public bool IsOver => _gameOver;
 
@@ -184,6 +199,7 @@ namespace MetalRaptors
 
         void Start()
         {
+            LevelScroll.Reset();
             _launched = CampaignRun.TakeLaunch();
             _revealAt = Time.realtimeSinceStartup + (_launched ? MinLoadSec : 0f);
             _levelNumber = CampaignRun.Level;
@@ -196,6 +212,8 @@ namespace MetalRaptors
             _replay = CampaignCheckpoint.TakeReplay() && career;
             if (_resume == null) CampaignCheckpoint.Clear();
             CampaignCheckpoint.InCareer = career;
+            if (_resume != null && _resume.facing < 0f) _facing = -1f;
+            LevelScroll.Face(_facing);
 
             if (_resume != null && _resume.arena)
             {
@@ -283,10 +301,12 @@ namespace MetalRaptors
             Time.timeScale = 1f;
             BeginSupply();
             if (_autopilot != null) _autopilot.Track(_supply);
+            if (_hudView != null) _hudView.Track(_supply);
             _sound = SoundSystem.Begin(_cube, null);
             if (_rush != null) _rush.Sound = _sound;
             if (_resume == null) BeginIntro();
             _cubeTr.gameObject.SetActive(true);
+            _lastCamX = _camBasePos.x;
             _loading = false;
             BeginCompanion(config);
             if (_resume != null) Resume();
@@ -304,7 +324,9 @@ namespace MetalRaptors
             DevSkip.Withdraw(SkipToArena);
             DevSkip.Withdraw(SkipToRaid);
             DevSkip.Withdraw(SkipWave);
+            EnemyController.AimedFire = false;
             if (!_handedOff) CampaignCheckpoint.InCareer = false;
+            LevelScroll.Reset();
         }
 
         void SkipToArena()
@@ -359,6 +381,7 @@ namespace MetalRaptors
                 boostCooldown = _boost != null ? _boost.Cooldown : 0f,
                 rollCooldown = _roll != null ? _roll.Cooldown : 0f,
                 camera = _camBasePos,
+                facing = _facing,
                 companionFoe = _wing != null ? _wing.FoePlane : null,
             };
 
@@ -511,6 +534,7 @@ namespace MetalRaptors
                     WorldTop, _level);
                 _enemies.ModelScale = PlaneModelConfig.LevelScale;
                 _enemies.LiftClearance = true;
+                _enemies.Facing = _facing;
                 if (Gunner) ArmPursuit();
                 if (_sound != null) _sound.Track(_enemies.Live);
             }
@@ -607,7 +631,8 @@ namespace MetalRaptors
 
             _rearGun = RearGun.Mount(_cubeTr.gameObject, _playerModel, PlayerPlane);
             _shooter.MountTurret(_rearGun, RearGun.ShotPitch);
-            _autopilot = GunnerAutopilot.Begin(_cube, GunnerCamY, _halfViewHeight);
+            _autopilot = GunnerAutopilot.Begin(_cube, GunnerCamY, _halfViewHeight,
+                _bomber.CooldownSec, DiveDeckY);
             LockAbilities();
         }
 
@@ -616,9 +641,79 @@ namespace MetalRaptors
             if (_shooter != null) _shooter.Jams = true;
         }
 
+        public void Disarm()
+        {
+            if (_shooter != null) _shooter.Stop();
+            if (_autopilot != null) _autopilot.Locked = true;
+            if (_supply != null) _supply.StandDown();
+            if (_hudView != null) _hudView.Disarm(_curtain);
+        }
+
         public void HoldBoost(bool on)
         {
             if (_boost != null) _boost.Sustain(on);
+        }
+
+        public void TurnBack()
+        {
+            if (_gameOver || _playerFalling || _cube == null) return;
+
+            _cube.ClearWalls();
+            if (!_cube.BeginTurnBack(TurnSec, TurnBankDeg)) return;
+
+            _facing = -_facing;
+            if (_enemies != null) _enemies.Facing = _facing;
+        }
+
+        public bool Turning => _cube != null && _cube.TurningBack && !_gameOver && !_playerFalling;
+
+        public void BeginAssault(bool blasts)
+        {
+            _assault = true;
+            _assaultSkipped = false;
+            OfferWaveSkip();
+
+            if (!blasts || _cubeTr == null) return;
+            _blasts = new NearBlasts(_cubeTr, PlayerPlane.LengthUnits * PlaneModelConfig.LevelScale,
+                _enemies != null ? _enemies.PursuitMinY : AiGroundY, _rearGun,
+                amount => _camShake = Mathf.Max(_camShake, amount));
+        }
+
+        public void EndAssault()
+        {
+            _assault = false;
+            _blasts = null;
+            if (_enemies != null && !_gameOver) _enemies.Retreat();
+        }
+
+        public bool AssaultSkipped => _assaultSkipped;
+
+        void TickGunIdle()
+        {
+            if (_rearGun == null) return;
+
+            bool idle = _rearGun.Ready && !_shooter.Jammed && !_shooter.Firing && EnemiesAlive > 0;
+            _gunIdle = idle ? _gunIdle + Time.deltaTime : 0f;
+            EnemyController.AimedFire = _gunIdle >= AimedFireIdleSec;
+        }
+
+        float DiveDeckY()
+        {
+            Vector3 pos = _cubeTr.position;
+            float ground = AiGroundY;
+
+            Battlefield field = Battlefield.Current;
+            if (field != null)
+                for (int i = 0; i <= DeckProbes; i++)
+                {
+                    float x = pos.x + _facing * DeckReach * i / DeckProbes;
+                    if (field.SampleGround(x, PlayPlaneZ, out float y)) ground = Mathf.Max(ground, y);
+                }
+
+            float props = Coast ? FlandersBunker.Tallest : 0f;
+            float half = PlayerPlane.heightMeters * PlaneModelConfig.UnitsPerMeter
+                         * PlaneModelConfig.LevelScale * 0.5f;
+            return ground + props + half + DeckClearance;
         }
 
         void OfferWaveSkip()
@@ -632,12 +727,13 @@ namespace MetalRaptors
         void SkipWave()
         {
             _waveSkip = false;
+            if (_assault) _assaultSkipped = true;
             if (_enemies != null && !_gameOver) _enemies.DismissAll();
         }
 
         void TickWaveSkip()
         {
-            if (!_waveSkip || EnemiesAlive > 0) return;
+            if (!_waveSkip || _assault || EnemiesAlive > 0) return;
 
             _waveSkip = false;
             DevSkip.Withdraw(SkipWave);
@@ -652,6 +748,8 @@ namespace MetalRaptors
                 camY - _halfViewHeight * PursuitLow);
             _enemies.PursuitMaxY = Mathf.Min(WorldTop - PursuitCeiling,
                 camY + _halfViewHeight * PursuitHigh);
+            _enemies.PursuitMidY = camY;
+            _enemies.PursuitSpacing = _halfViewHeight * PursuitSpacingShare;
         }
 
         float GunnerCamY
@@ -794,9 +892,13 @@ namespace MetalRaptors
             else if (_cam != null && !_camHold) PositionCamera(instant: false);
             if (_flyby != null) _flyby.Tick(_camBasePos, Time.deltaTime);
 
-            if (_cube != null && !IntroActive && !_outro)
+            TrackScroll();
+            if (!Turning) LevelScroll.Face(_facing);
+
+            if (_cube != null && !IntroActive && !_outro && !_cube.TurningBack)
             {
                 if (Bounded) _cube.SetWalls(CubeHalf, WorldRight - CubeHalf);
+                else if (_facing < 0f) _cube.SetRightWall(_camBasePos.x + _halfViewWidth - CubeHalf);
                 else _cube.SetLeftWall(_camBasePos.x - _halfViewWidth + CubeHalf);
             }
 
@@ -804,6 +906,9 @@ namespace MetalRaptors
             if (_curtain != null) _curtain.Set(!Cinematic);
             if (_rearGun != null)
                 _rearGun.Ready = !Cinematic && !_gameOver && !_playerFalling && _shooter.IsReady;
+            if (_blasts != null && !Cinematic && !_gameOver && !_playerFalling)
+                _blasts.Tick(Time.deltaTime);
+            TickGunIdle();
 
             if (_terrain != null) _terrain.UpdateStreaming(_camBasePos.x);
             if (_ceilingBar != null)
@@ -817,13 +922,28 @@ namespace MetalRaptors
             if (_formation && !_playerFalling && _cube != null) AlignToMiddle();
             if (!_gameOver && _supply != null)
                 _supply.Tick(_camBasePos, _halfViewWidth, _halfViewHeight, Cinematic);
-            if (_enemies != null) _enemies.SetWindow(_camBasePos.x, _halfViewWidth);
+            if (_enemies != null)
+            {
+                _enemies.SetWindow(_camBasePos.x, _halfViewWidth);
+                _enemies.Reinforce(Time.deltaTime);
+            }
 
             if (_wing == null) return;
             _wing.SetWindow(_camBasePos, _halfViewWidth, _halfViewHeight);
             _wing.SetTargets(_enemies != null ? _enemies.Live : null);
             _wing.SetCinematic(Cinematic);
             _wing.Tick(Time.deltaTime);
+        }
+
+        void TrackScroll()
+        {
+            float dt = Time.deltaTime;
+            if (dt <= 0f) return;
+
+            float velocity = (_camBasePos.x - _lastCamX) / dt;
+            _lastCamX = _camBasePos.x;
+            LevelScroll.Track(Mathf.Lerp(LevelScroll.Velocity, velocity,
+                1f - Mathf.Exp(-ScrollResponse * dt)));
         }
 
         void AlignToMiddle()
@@ -847,13 +967,14 @@ namespace MetalRaptors
             float targetY = Gunner && !_playerFalling
                 ? GunnerCamY
                 : Mathf.Clamp(cubePos.y, minCamY, maxCamY);
-            float targetX = Gunner ? cubePos.x - _halfViewWidth * GunnerLead : cubePos.x;
+            float lead = Turning ? _cube.Facing : _facing;
+            float targetX = Gunner ? cubePos.x - _halfViewWidth * GunnerLead * lead : cubePos.x;
 
             if (instant)
             {
                 float x = Bounded
                     ? Mathf.Clamp(targetX, CamMinX, CamMaxX)
-                    : Mathf.Max(StartX, targetX);
+                    : _facing > 0f ? Mathf.Max(StartX, targetX) : targetX;
                 _camBasePos = new Vector3(x, targetY, CamZ);
             }
             else
@@ -862,7 +983,9 @@ namespace MetalRaptors
                 float t = 1f - Mathf.Exp(-response * Time.deltaTime);
                 float x = Bounded
                     ? Mathf.Lerp(_camBasePos.x, Mathf.Clamp(targetX, CamMinX, CamMaxX), t)
-                    : Mathf.Max(_camBasePos.x, Mathf.Lerp(_camBasePos.x, targetX, t));
+                    : Mathf.Lerp(_camBasePos.x, targetX, t);
+                if (!Bounded && !Turning)
+                    x = _facing > 0f ? Mathf.Max(_camBasePos.x, x) : Mathf.Min(_camBasePos.x, x);
                 _camBasePos = new Vector3(x, Mathf.Lerp(_camBasePos.y, targetY, t), CamZ);
             }
 
@@ -1105,6 +1228,7 @@ namespace MetalRaptors
             {
                 _cube.ClearWalls();
                 _cube.FlyLevel();
+                if (_facing < 0f) _cube.SetTargetHeading(Mathf.PI);
             }
 
             if (!CustomBattle.Requested) CampaignProgress.Complete(_levelNumber);
@@ -1197,7 +1321,7 @@ namespace MetalRaptors
         }
 
         bool PlaneGone => _cubeTr == null
-            || _cubeTr.position.x > _camBasePos.x + _halfViewWidth + OutroExitMargin;
+            || (_cubeTr.position.x - _camBasePos.x) * _facing > _halfViewWidth + OutroExitMargin;
 
         static IEnumerator Wait(float seconds)
         {

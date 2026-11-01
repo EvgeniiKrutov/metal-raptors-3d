@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: EnemyFighterConfig
   m_EditorClassIdentifier:
   role: 1
-  health: 130
+  health: 85
   damage: 6
   fireRate: 0.2
   bulletSpeed: 400

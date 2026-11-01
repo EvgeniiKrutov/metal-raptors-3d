@@ -43,6 +43,7 @@ namespace MetalRaptors
         public float rollCooldown;
 
         public Vector3 camera;
+        public float facing = 1f;
 
         public float airfieldHealth = Airfield.MaxHealth;
         public int suppliesLeft;

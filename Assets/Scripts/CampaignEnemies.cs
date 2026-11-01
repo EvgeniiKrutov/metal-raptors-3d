@@ -18,6 +18,14 @@ namespace MetalRaptors
         const float SpreadAheadGap = 120f;
 
         const float BehindSpacing = 70f;
+        const int PursuitCap = 2;
+        const float ReinforceMinSec = 2f, ReinforceMaxSec = 3f;
+
+        struct Reserve
+        {
+            public PlaneModelConfig plane;
+            public bool sneak, high;
+        }
 
         enum SpawnEdge { Right, Top }
 
@@ -28,6 +36,8 @@ namespace MetalRaptors
             new Dictionary<(EnemyConfig, PlaneModelConfig), EnemyConfig>();
         readonly Dictionary<EnemyController, PlaneModelConfig> _planes =
             new Dictionary<EnemyController, PlaneModelConfig>();
+        readonly Queue<Reserve> _reserve = new Queue<Reserve>();
+        readonly HashSet<EnemyController> _leaving = new HashSet<EnemyController>();
         readonly EnemyConfig _scout;
         readonly EnemyConfig _fighter;
         readonly Rigidbody _player;
@@ -37,6 +47,9 @@ namespace MetalRaptors
 
         float _minX;
         float _maxX;
+        float _camX;
+        float _halfWidth;
+        float _reinforceIn = -1f;
 
         public float ModelScale { get; set; } = 1f;
 
@@ -48,7 +61,13 @@ namespace MetalRaptors
 
         public float PursuitMaxY { get; set; }
 
-        public int AliveCount => _live.Count;
+        public float PursuitMidY { get; set; }
+
+        public float PursuitSpacing { get; set; }
+
+        public float Facing { get; set; } = 1f;
+
+        public int AliveCount => _live.Count + _reserve.Count;
 
         public IReadOnlyList<EnemyController> Live => _live;
 
@@ -61,6 +80,8 @@ namespace MetalRaptors
                 if (_planes.TryGetValue(enemy, out PlaneModelConfig model) && model == plane)
                     count++;
             }
+            foreach (Reserve reserve in _reserve)
+                if (reserve.plane == plane) count++;
             return count;
         }
 
@@ -76,12 +97,17 @@ namespace MetalRaptors
 
             if (level == null) return;
             _skin = level.enemySkin;
-            EnemyConfigs.Scale(_scout, level.enemyHealthScale, level.enemyRotationScale);
-            EnemyConfigs.Scale(_fighter, level.enemyHealthScale, level.enemyRotationScale);
+            EnemyConfigs.Scale(_scout, level.enemyRotationScale);
+            EnemyConfigs.Scale(_fighter, level.enemyRotationScale);
+            if (level.scoutShotsPerSec > 0f) _scout.fireRate = 1f / level.scoutShotsPerSec;
+            if (level.scoutFireCone > 0f) _scout.fireAngleThreshold = level.scoutFireCone;
+            if (level.fighterShotsPerSec > 0f) _fighter.fireRate = 1f / level.fighterShotsPerSec;
         }
 
         public void SetWindow(float camX, float halfViewWidth)
         {
+            _camX = camX;
+            _halfWidth = halfViewWidth;
             _minX = camX - halfViewWidth + WindowMargin;
             _maxX = camX + halfViewWidth - WindowMargin;
 
@@ -95,8 +121,31 @@ namespace MetalRaptors
                     _live.RemoveAt(i);
                     continue;
                 }
+                if (_leaving.Contains(_live[i]))
+                {
+                    if (_live[i].IsAlive && Gone(_live[i].transform.position.x)) Dismiss(_live[i]);
+                    continue;
+                }
                 _live[i].SetBounds(_minX, _maxX);
                 if (_live[i].transform.position.x < leash) _live[i].Reappear(ahead);
+            }
+        }
+
+        bool Gone(float x) => (x - _camX) * Facing < -(_halfWidth + SpawnAhead);
+
+        public void Retreat()
+        {
+            ClearReserve();
+            foreach (EnemyController enemy in _live)
+            {
+                if (enemy == null || !enemy.IsAlive) continue;
+
+                var pursuit = enemy.GetComponent<EnemyPursuit>();
+                if (pursuit == null) continue;
+
+                enemy.StandDown();
+                pursuit.Leave();
+                _leaving.Add(enemy);
             }
         }
 
@@ -127,23 +176,68 @@ namespace MetalRaptors
 
             SetWindow(camX, halfViewWidth);
 
-            float z = _player != null ? _player.position.z : 0f;
             int index = 0;
             foreach (EnemyGroup group in groups)
             {
                 if (group.kind != EnemyKind.Plane) continue;
 
-                for (int i = 0; i < group.count; i++, index++)
+                for (int i = 0; i < group.count; i++)
                 {
+                    if (Pursuit && Pursuers >= PursuitCap)
+                    {
+                        _reserve.Enqueue(new Reserve
+                            { plane = group.plane, sneak = group.sneak, high = group.high });
+                        continue;
+                    }
+
                     float side = index % 2 == 0 ? 1f : -1f;
                     float y = entryY + side * BehindSpacing * ((index + 1) / 2);
-                    if (Pursuit) y = Mathf.Clamp(y, PursuitMinY, PursuitMaxY);
+                    if (Pursuit)
+                        y = EnemyPursuit.Apart(Mathf.Clamp(y, PursuitMinY, PursuitMaxY),
+                            PursuitMinY, PursuitMaxY, PursuitSpacing);
 
-                    var at = new Vector3(camX - halfViewWidth - SpawnAhead - index * SpawnStagger,
-                        y, z);
-                    SpawnOne(group.plane, at, sneak: group.sneak);
+                    SpawnOne(group.plane, BehindPoint(index, y), sneak: group.sneak, high: group.high);
+                    index++;
                 }
             }
+        }
+
+        public void Reinforce(float dt)
+        {
+            if (_reserve.Count == 0) return;
+            if (Pursuers >= PursuitCap)
+            {
+                _reinforceIn = -1f;
+                return;
+            }
+
+            if (_reinforceIn < 0f) _reinforceIn = Random.Range(ReinforceMinSec, ReinforceMaxSec);
+            _reinforceIn -= dt;
+            if (_reinforceIn > 0f) return;
+
+            _reinforceIn = -1f;
+            Reserve next = _reserve.Dequeue();
+            float low = next.high ? Mathf.Clamp(PursuitMidY, PursuitMinY, PursuitMaxY) : PursuitMinY;
+            float y = EnemyPursuit.Apart(Random.Range(low, PursuitMaxY), PursuitMinY, PursuitMaxY,
+                PursuitSpacing);
+            SpawnOne(next.plane, BehindPoint(0, y), sneak: next.sneak, high: next.high);
+        }
+
+        int Pursuers
+        {
+            get
+            {
+                int count = 0;
+                foreach (EnemyController enemy in _live)
+                    if (enemy != null && enemy.IsAlive) count++;
+                return count;
+            }
+        }
+
+        Vector3 BehindPoint(int index, float y)
+        {
+            float z = _player != null ? _player.position.z : 0f;
+            return new Vector3(_camX - Facing * (_halfWidth + SpawnAhead + index * SpawnStagger), y, z);
         }
 
         public void SpawnSpread(EnemyGroup[] groups, Vector3 camPos, float halfViewWidth,
@@ -285,6 +379,7 @@ namespace MetalRaptors
 
             _live.Remove(enemy);
             _planes.Remove(enemy);
+            _leaving.Remove(enemy);
             Object.Destroy(enemy.gameObject);
         }
 
@@ -316,7 +411,7 @@ namespace MetalRaptors
         }
 
         EnemyController SpawnOne(PlaneModelConfig plane, Vector3 position,
-            EnemyConfig config = null, PlaneSkin skin = null, bool sneak = false)
+            EnemyConfig config = null, PlaneSkin skin = null, bool sneak = false, bool high = false)
         {
             if (config == null) config = Lifted(EnemyConfigs.For(plane, _scout, _fighter), plane);
 
@@ -345,19 +440,31 @@ namespace MetalRaptors
             enemy.OnDestroyed += OnDestroyed;
             _live.Add(enemy);
             _planes[enemy] = plane;
-            if (Pursuit) EnemyPursuit.Begin(enemy, _player, PursuitMinY, PursuitMaxY, sneak);
+            if (Pursuit)
+                EnemyPursuit.Begin(enemy, _player, new PursuitBand
+                {
+                    minY = PursuitMinY, maxY = PursuitMaxY, midY = PursuitMidY, spacing = PursuitSpacing,
+                }, sneak, high, Facing);
             return enemy;
         }
 
         public void DismissAll()
         {
+            ClearReserve();
             for (int i = _live.Count - 1; i >= 0; i--) Dismiss(_live[i]);
         }
 
         public void StandDown()
         {
+            ClearReserve();
             foreach (EnemyController enemy in _live)
                 if (enemy != null) enemy.StandDown();
+        }
+
+        void ClearReserve()
+        {
+            _reserve.Clear();
+            _reinforceIn = -1f;
         }
 
         Vector3 SpawnPoint(float camX, float halfViewWidth, int index, EnemyConfig config,
@@ -376,6 +483,7 @@ namespace MetalRaptors
         {
             _live.Remove(enemy);
             _planes.Remove(enemy);
+            _leaving.Remove(enemy);
         }
     }
 }

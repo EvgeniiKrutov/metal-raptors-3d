@@ -65,13 +65,15 @@ namespace MetalRaptors
         public readonly PlaneModelConfig plane;
         public readonly int count;
         public readonly bool sneak;
+        public readonly bool high;
 
-        public EnemyGroup(PlaneModelConfig plane, int count, bool sneak = false)
+        public EnemyGroup(PlaneModelConfig plane, int count, bool sneak = false, bool high = false)
         {
             kind = EnemyKind.Plane;
             this.plane = plane;
             this.count = count;
             this.sneak = sneak;
+            this.high = high;
         }
 
         public EnemyGroup(EnemyKind kind, int count)

@@ -67,6 +67,19 @@ namespace MetalRaptors
             return _any;
         }
 
+        public static float Tallest
+        {
+            get
+            {
+                if (!Measure()) return 0f;
+
+                float tallest = 0f;
+                for (int i = 0; i < Models; i++)
+                    if (Prefabs[i] != null) tallest = Mathf.Max(tallest, Boxes[i].size.y * Scale);
+                return tallest;
+            }
+        }
+
         public static bool Has(int model) =>
             Measure() && model >= 0 && model < Models && Prefabs[model] != null;
 

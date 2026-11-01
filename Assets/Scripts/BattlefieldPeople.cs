@@ -149,7 +149,7 @@ namespace MetalRaptors
         float InitialX(int index)
         {
             if (!_field.Bounded)
-                return _field.CameraX + Random.Range(-ScrollerBehind, ScrollerAhead);
+                return _field.CameraX + LevelScroll.Sign * Random.Range(-ScrollerBehind, ScrollerAhead);
 
             return Mathf.Lerp(BandMinX, BandMaxX, (index + 0.5f) / _targetGroups)
                    + Random.Range(-Spacing, Spacing) * 0.35f;
@@ -230,13 +230,15 @@ namespace MetalRaptors
             if (group.figures.Count == 0) return true;
             if (group.garrison || _field.Bounded) return false;
 
-            return group.x < camX - ScrollerBehind || group.x > camX + ScrollerAhead + CullMargin;
+            float along = (group.x - camX) * LevelScroll.Sign;
+            return along < -ScrollerBehind || along > ScrollerAhead + CullMargin;
         }
 
         float RespawnX(float camX)
         {
             if (!_field.Bounded)
-                return camX + _field.HalfViewWidth + Random.Range(ScrollerLeadMin, ScrollerLeadMax);
+                return camX + LevelScroll.Sign
+                    * (_field.HalfViewWidth + Random.Range(ScrollerLeadMin, ScrollerLeadMax));
 
             float left = camX - _field.HalfViewWidth - OffCameraMargin;
             float right = camX + _field.HalfViewWidth + OffCameraMargin;

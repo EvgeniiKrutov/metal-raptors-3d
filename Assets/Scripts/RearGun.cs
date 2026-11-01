@@ -14,6 +14,9 @@ namespace MetalRaptors
         const float AimRate = 80f;
         const float AimResponse = 12f;
 
+        const float JoltSec = 0.4f;
+        const float JoltHz = 11f;
+
         const float PivotFromBreech = 0.21f;
         const float PivotHeight = 0.54f;
         const float MuzzleHeight = 0.84f;
@@ -40,11 +43,18 @@ namespace MetalRaptors
         float _input;
         bool _jammed;
 
+        float _jolt;
+        float _joltSize;
+        float _joltLeft;
+        float _joltSign = 1f;
+
         LineRenderer _line;
         Material _lineMaterial;
         Texture2D _lineTexture;
 
         public bool Ready { get; set; }
+
+        public bool Blocked => _elevation < 0f;
 
         public bool Jammed
         {
@@ -74,7 +84,8 @@ namespace MetalRaptors
             get
             {
                 Vector3 nose = transform.right;
-                float angle = Mathf.Atan2(nose.y, nose.x) + Mathf.PI - _elevation * Mathf.Deg2Rad;
+                float side = transform.forward.z < 0f ? -1f : 1f;
+                float angle = Mathf.Atan2(nose.y, nose.x) + Mathf.PI - side * Aim * Mathf.Deg2Rad;
                 return new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f);
             }
         }
@@ -95,6 +106,15 @@ namespace MetalRaptors
         }
 
         public void SetAimInput(float input) => _input = Mathf.Clamp(input, -1f, 1f);
+
+        public void Jolt(float degrees)
+        {
+            _joltSize = degrees;
+            _joltLeft = JoltSec;
+            _joltSign = Random.value < 0.5f ? -1f : 1f;
+        }
+
+        float Aim => Mathf.Clamp(_elevation + _jolt, MinElevation, MaxElevation);
 
         void Hinge(Transform body, Transform model, Transform node, Bounds bounds)
         {
@@ -222,6 +242,10 @@ namespace MetalRaptors
                 _rate = 0f;
             }
 
+            _joltLeft = Mathf.Max(0f, _joltLeft - dt);
+            float k = _joltLeft / JoltSec;
+            _jolt = _joltSign * _joltSize * k * k * Mathf.Cos((JoltSec - _joltLeft) * JoltHz * 2f * Mathf.PI);
+
             Apply();
         }
 
@@ -239,15 +263,15 @@ namespace MetalRaptors
 
         void Apply()
         {
-            _pivot.localRotation = _rest * Quaternion.Euler(0f, 0f, _restElevation - _elevation);
+            _pivot.localRotation = _rest * Quaternion.Euler(0f, 0f, _restElevation - Aim);
         }
 
         void LateUpdate()
         {
             if (_line == null) return;
 
-            _line.enabled = Ready;
-            if (!Ready) return;
+            _line.enabled = Ready && !Blocked;
+            if (!_line.enabled) return;
 
             Vector3 from = Muzzle;
             Vector3 dir = Direction;

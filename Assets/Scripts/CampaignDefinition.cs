@@ -54,13 +54,16 @@ namespace MetalRaptors
         public bool zeppelins;
         public float flak = 1f;
         public float people = 1.5f;
-        public float enemyHealthScale = 1f;
         public float enemyRotationScale = 1f;
+        public float scoutShotsPerSec;
+        public float scoutFireCone;
+        public float fighterShotsPerSec;
         public string enemySkin;
         public int supplyDrops;
         public float supplyHealthFraction = 0.3f;
         public float supplyHeal = 55f;
         public float supplyLead = SupplyCrate.LeadFraction;
+        public bool supplyRepairs;
         public PlaneModelConfig companionPlane = PlaneModels.Sopwith;
         public PlaneModelConfig companionFoe = PlaneModels.Albatros;
         public string[] companionPilots;
@@ -208,7 +211,6 @@ namespace MetalRaptors
             companion = true,
             zeppelins = true,
             flak = 1.0f,
-            enemyHealthScale = 0.50f,
             enemyRotationScale = 0.80f,
             supplyDrops = 1,
             companionFoe = PlaneModels.Eindecker,
@@ -236,7 +238,6 @@ namespace MetalRaptors
             supportCompanion = true,
             zeppelins = true,
             flak = 1.1f,
-            enemyHealthScale = 0.60f,
             enemyRotationScale = 0.84f,
             supplyDrops = 3,
             companionFoe = PlaneModels.Eindecker,
@@ -265,7 +266,6 @@ namespace MetalRaptors
             companionForms = false,
             zeppelins = true,
             flak = 0.9f,
-            enemyHealthScale = 0.65f,
             enemyRotationScale = 0.88f,
             supplyDrops = 6,
             companionPilots = new[] { "marchand" },
@@ -294,7 +294,6 @@ namespace MetalRaptors
             backCompanions = 2,
             supportCompanion = true,
             flak = 1.2f,
-            enemyHealthScale = 0.75f,
             enemyRotationScale = 1.00f,
             enemySkin = "raven",
             supplyDrops = 2,
@@ -320,10 +319,12 @@ namespace MetalRaptors
             skin = "green",
             gunner = true,
             flak = 1.25f,
-            enemyHealthScale = 0.78f,
             enemyRotationScale = 1.02f,
-            supplyDrops = 2,
-            supplyLead = 1.37f,
+            scoutShotsPerSec = 3f,
+            scoutFireCone = 14f,
+            fighterShotsPerSec = 4.5f,
+            supplyDrops = 7,
+            supplyRepairs = true,
             title = "FACING BACKWARDS",
             dateline = "21 June 1917 — the Flanders coast — midday",
             lore = Lore1,
@@ -342,7 +343,6 @@ namespace MetalRaptors
             plane = PlaneModels.Sopwith,
             skin = "green",
             flak = 1.35f,
-            enemyHealthScale = 0.70f,
             enemyRotationScale = 0.91f,
             supplyDrops = 1,
             title = "NOTHING BURNS AT NIGHT",
@@ -364,7 +364,6 @@ namespace MetalRaptors
             skin = "green",
             companion = true,
             flak = 1.5f,
-            enemyHealthScale = 0.80f,
             enemyRotationScale = 1.03f,
             supplyDrops = 1,
             title = "HOHRUPT",
@@ -385,7 +384,6 @@ namespace MetalRaptors
             plane = PlaneModels.Sopwith,
             skin = "green",
             flak = 1.2f,
-            enemyHealthScale = 0.90f,
             enemyRotationScale = 1.10f,
             supplyDrops = 2,
             title = "TWO FIRES",
@@ -407,7 +405,6 @@ namespace MetalRaptors
             skin = "green",
             companion = true,
             flak = 1.4f,
-            enemyHealthScale = 1.00f,
             enemyRotationScale = 1.18f,
             supplyDrops = 2,
             companionFoe = PlaneModels.Fokker,

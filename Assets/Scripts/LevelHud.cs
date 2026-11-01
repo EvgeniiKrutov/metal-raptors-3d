@@ -22,6 +22,9 @@ namespace MetalRaptors
         const int JamSizeBoost = 6;
         const float JamAnchorY = 0.3f;
         static readonly Color JamColor = new Color(1f, 0.42f, 0.28f, 1f);
+        const string RepairHint = "PLANE DAMAGED  •  TAP H ×";
+        const string RepairTouchHint = "PLANE DAMAGED  •  TAP FIX ×";
+        static readonly Color RepairColor = new Color(0.42f, 0.95f, 0.5f, 1f);
 
         const float BossGap = 0.35f;
 
@@ -42,6 +45,7 @@ namespace MetalRaptors
         readonly CooldownSquare _rollSquare;
         readonly CooldownSquare _diveSquare;
         readonly CooldownSquare _fireSquare;
+        readonly CooldownSquare _fixSquare;
         readonly CooldownSquare _lightSquare;
         readonly List<CooldownSquare> _column = new List<CooldownSquare>();
         readonly List<PlaneAbility> _needs = new List<PlaneAbility>();
@@ -53,12 +57,16 @@ namespace MetalRaptors
         readonly Text _hint;
         readonly Text _jam;
         int _jamShown = -1;
+        readonly Text _repair;
+        int _repairShown = -1;
+        SupplyDrop _supply;
         readonly string _objective;
         PlaneAbility _abilities;
 
         readonly TouchStick _stick;
         readonly HeadingArrow _arrow;
         readonly bool _arena;
+        bool _disarmed;
         Camera _cam;
 
         public Vector2 BossSlot { get; }
@@ -121,6 +129,8 @@ namespace MetalRaptors
                     PlaneAbility.Roll);
             if (HudTheme.IsTouch)
                 _fireSquare = Square(parent, "FIRE", null, PlaneAbility.None, holdable: true);
+            if (HudTheme.IsTouch && gun != null)
+                _fixSquare = Square(parent, "FIX", RequestFix, PlaneAbility.None);
             if (_searchlight != null)
                 _lightSquare = Square(parent, HudTheme.Label("T", "LIGHT"), ToggleLight,
                     PlaneAbility.None);
@@ -148,24 +158,30 @@ namespace MetalRaptors
             rt.sizeDelta = new Vector2(-2f * HudTheme.HintSideInset, HudTheme.HintRowHeight);
             rt.anchoredPosition = new Vector2(0f, HudTheme.HintBottom);
 
-            if (gun != null) _jam = JamLabel(parent);
+            if (gun != null)
+            {
+                _jam = AlertLabel(parent, JamColor, 0f);
+                _repair = AlertLabel(parent, RepairColor, HudTheme.HintRowHeight);
+            }
 
             Tick();
         }
 
-        static Text JamLabel(Transform parent)
+        public void Track(SupplyDrop supply) => _supply = supply;
+
+        static Text AlertLabel(Transform parent, Color color, float lift)
         {
             int size = HudTheme.HintSize + JamSizeBoost;
             Text label = UIFactory.CreateText(parent, string.Empty, size, Vector2.zero, Vector2.zero,
                 TextAnchor.MiddleCenter, FontStyle.Bold);
-            label.color = JamColor;
+            label.color = color;
 
             var rt = label.rectTransform;
             rt.anchorMin = new Vector2(0f, JamAnchorY);
             rt.anchorMax = new Vector2(1f, JamAnchorY);
             rt.pivot = new Vector2(0.5f, 0.5f);
             rt.sizeDelta = new Vector2(-2f * HudTheme.HintSideInset, HudTheme.HintRowHeight);
-            rt.anchoredPosition = Vector2.zero;
+            rt.anchoredPosition = new Vector2(0f, lift);
 
             label.gameObject.SetActive(false);
             return label;
@@ -239,6 +255,19 @@ namespace MetalRaptors
             _hint.text = HintText();
         }
 
+        public void Disarm(HudCurtain curtain)
+        {
+            _disarmed = true;
+
+            foreach (CooldownSquare square in new[] { _diveSquare, _fireSquare })
+            {
+                if (square == null) continue;
+
+                if (curtain != null) curtain.Withdraw(square.Root);
+                else square.Root.SetActive(false);
+            }
+        }
+
         public void Tick()
         {
             if (_bombSquare != null && _bomber != null)
@@ -263,7 +292,22 @@ namespace MetalRaptors
                 _airfieldBar.Set(_airfield.CurrentHealth, Airfield.MaxHealth);
 
             TickJam();
+            TickRepair();
             TickSteering();
+        }
+
+        void TickRepair()
+        {
+            if (_repair == null) return;
+
+            int taps = _supply != null && _supply.Repairing && _gun.Ready ? _supply.RepairLeft : 0;
+            if (_fixSquare != null && _fixSquare.Root.activeSelf != taps > 0)
+                _fixSquare.Root.SetActive(taps > 0);
+            if (taps == _repairShown) return;
+
+            _repairShown = taps;
+            _repair.gameObject.SetActive(taps > 0);
+            if (taps > 0) _repair.text = (HudTheme.IsTouch ? RepairTouchHint : RepairHint) + taps;
         }
 
         void TickJam()
@@ -282,7 +326,7 @@ namespace MetalRaptors
         {
             if (_stick == null || _plane == null) return;
 
-            bool steerable = _plane.Steerable && !GameMenu.IsOpen;
+            bool steerable = _plane.Steerable && !GameMenu.IsOpen && !_disarmed;
             _stick.SetVisible(steerable);
 
             if (_gun != null)
@@ -324,6 +368,11 @@ namespace MetalRaptors
         void RequestDive()
         {
             if (_pilot != null) _pilot.Request();
+        }
+
+        void RequestFix()
+        {
+            if (_supply != null) _supply.Tap();
         }
 
         void ToggleLight()

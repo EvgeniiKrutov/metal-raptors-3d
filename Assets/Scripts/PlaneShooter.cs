@@ -11,8 +11,14 @@ namespace MetalRaptors
 
         const float JamSafeSec = 2f;
         const float JamRate = 0.5f;
-        const int JamTaps = 7;
+        const int JamTaps = 5;
         const float ClatterVolume = 0.5f;
+
+        const float SpreadBaseDeg = 2f;
+        const float SpreadMaxDeg = 7f;
+        const float SpreadHoldSec = 0.7f;
+        const float SpreadGrowSec = 2f;
+        const float SpreadFadeSec = 0.5f;
 
         PlayerConfig _config;
         Transform _muzzle;
@@ -31,6 +37,7 @@ namespace MetalRaptors
         bool _held;
         bool _heldBefore;
         float _burst;
+        float _spread;
         int _tapsLeft;
 
         public bool IsReady => enabled;
@@ -68,6 +75,8 @@ namespace MetalRaptors
             enabled = false;
             _aimHold = 0f;
             _burst = 0f;
+            _spread = 0f;
+            if (_tapsLeft > 0) Unjam();
         }
 
         public void Resume() => enabled = true;
@@ -95,25 +104,31 @@ namespace MetalRaptors
 
             if (_tapsLeft > 0)
             {
+                Settle();
                 if (!_turret.Ready) Unjam();
                 else if (tapped) Rack();
                 return;
             }
 
-            if (!wants)
+            if (!wants || (_turret != null && _turret.Blocked))
             {
                 _burst = 0f;
+                Settle();
                 return;
             }
 
             _aimHold = AimMemory;
             _burst += Time.deltaTime;
+            if (_turret != null && _burst > SpreadHoldSec)
+                _spread = Mathf.Min(1f, _spread + Time.deltaTime / SpreadGrowSec);
             if (_cooldown > 0f) return;
 
             _cooldown = Mathf.Max(0.01f, _config.fireRate);
             if (Jamming()) Jam();
             else Fire();
         }
+
+        void Settle() => _spread = Mathf.Max(0f, _spread - Time.deltaTime / SpreadFadeSec);
 
         bool Jamming()
         {
@@ -188,7 +203,9 @@ namespace MetalRaptors
         {
             Vector3 dir = _turret.Direction;
             Vector3 from = _turret.Muzzle;
-            float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+            float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg
+                          + Random.Range(-1f, 1f) * Mathf.Lerp(SpreadBaseDeg, SpreadMaxDeg, _spread);
+            dir = new Vector3(Mathf.Cos(angle * Mathf.Deg2Rad), Mathf.Sin(angle * Mathf.Deg2Rad), 0f);
             Vector3 carry = _body != null ? _body.linearVelocity : Vector3.zero;
             Vector3 shot = AlongLine(dir, carry, _config.bulletSpeed);
 

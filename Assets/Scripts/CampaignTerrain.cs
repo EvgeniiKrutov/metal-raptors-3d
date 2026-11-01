@@ -156,17 +156,29 @@ namespace MetalRaptors
                 }
         }
 
+        float KeepLeft => LevelScroll.Sign > 0f ? _keepBehind : _keepAhead;
+
+        float KeepRight => LevelScroll.Sign > 0f ? _keepAhead : _keepBehind;
+
         int FirstChunk(float camX) => _bounded
             ? _firstChunk
-            : Mathf.FloorToInt((camX - _keepBehind) / ChunkLength);
+            : Mathf.FloorToInt((camX - KeepLeft) / ChunkLength);
 
         int LastChunk(float camX) => _bounded
             ? _lastChunk
-            : Mathf.FloorToInt((camX + _keepAhead) / ChunkLength);
+            : Mathf.FloorToInt((camX + KeepRight) / ChunkLength);
 
         IEnumerable<int> MissingChunks(float camX)
         {
-            for (int i = FirstChunk(camX); i <= LastChunk(camX); i++)
+            int first = FirstChunk(camX), last = LastChunk(camX);
+            if (LevelScroll.Sign < 0f)
+            {
+                for (int i = last; i >= first; i--)
+                    if (!_chunks.ContainsKey(i)) yield return i;
+                yield break;
+            }
+
+            for (int i = first; i <= last; i++)
                 if (!_chunks.ContainsKey(i)) yield return i;
         }
 

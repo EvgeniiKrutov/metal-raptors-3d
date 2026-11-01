@@ -34,6 +34,7 @@ namespace MetalRaptors
         IDamageable _victim;
         CubeController _player;
         System.Action _onHit;
+        System.Action _onBlow;
         float _radius;
         float _damage;
         float _warn;
@@ -42,7 +43,7 @@ namespace MetalRaptors
         bool _blown;
 
         public static SkyBlast Arm(Vector3 at, float radius, float warnSec, Transform target,
-            float damage, System.Action onHit = null)
+            float damage, System.Action onHit = null, System.Action onBlow = null)
         {
             var blast = new GameObject("Sky Blast").AddComponent<SkyBlast>();
             blast.transform.position = at;
@@ -53,6 +54,7 @@ namespace MetalRaptors
             blast._player = target != null ? target.GetComponent<CubeController>() : null;
             blast._damage = damage;
             blast._onHit = onHit;
+            blast._onBlow = onBlow;
             blast.Build();
             return blast;
         }
@@ -145,6 +147,7 @@ namespace MetalRaptors
         {
             _blown = true;
             Explosion.Spawn(transform.position, _radius, BoomVolume * AudioOptions.Sfx);
+            _onBlow?.Invoke();
 
             if (_victim == null || _target == null) return;
             if (_player != null && _player.Evading) return;

@@ -12,7 +12,6 @@ namespace MetalRaptors
 
         const float MaxStep = 0.05f;
         const int SortingOrder = 1000;
-        const float PromptBottom = 70f;
 
         static ScreenFade _rig;
         static bool _busy;
@@ -21,6 +20,9 @@ namespace MetalRaptors
         public static bool IsBusy => _busy;
 
         Image _sheet;
+        LoadingScreen _screen;
+
+        LoadingScreen Backdrop => _screen != null ? _screen : _screen = LoadingScreen.Build(transform);
 
         public static void Swap(Action change) => Swap(change, FadeSec);
 
@@ -61,6 +63,8 @@ namespace MetalRaptors
 
             ScreenFade rig = Rig();
             rig._sheet.raycastTarget = true;
+            if (_busy && rig.Backdrop.Visible) return;
+
             rig.SetAlpha(1f);
             if (_busy) return;
 
@@ -72,25 +76,34 @@ namespace MetalRaptors
 
         public static IEnumerator AwaitContinue()
         {
-            MenuPalette colors = MenuTheme.Colors;
-            CanvasGroup prompt = LevelBriefing.BuildPrompt(Rig().transform, 0f, colors.Muted,
-                colors.Accent, out Image caret);
-
-            var rt = (RectTransform)prompt.transform;
-            rt.anchorMin = new Vector2(0.5f, 0f);
-            rt.anchorMax = new Vector2(0.5f, 0f);
-            rt.anchoredPosition = new Vector2(0f, PromptBottom);
-
-            for (float age = 0f; ; age += Time.unscaledDeltaTime)
+            ScreenFade rig = Rig();
+            if (!rig.Backdrop.Visible)
             {
-                prompt.alpha = Mathf.Clamp01(age / LevelBriefing.PromptFadeSec);
-                caret.enabled = Mathf.Repeat(age, 2f * LevelBriefing.CaretBlinkSec)
-                                < LevelBriefing.CaretBlinkSec;
-                yield return null;
-                if (MenuInput.ReadAnyKey()) break;
+                rig.Backdrop.Show(null);
+                rig.SetAlpha(0f);
             }
 
-            Destroy(prompt.gameObject);
+            yield return rig.Backdrop.AwaitContinue();
+        }
+
+        public static void BeginTitle(string title, IEnumerator work)
+        {
+            if (_busy) return;
+
+            ScreenFade rig = Rig();
+            _busy = true;
+            rig._sheet.raycastTarget = true;
+            rig.SetAlpha(1f);
+            rig.Backdrop.Show(title);
+            rig.StartCoroutine(rig.RunTitle(work));
+        }
+
+        IEnumerator RunTitle(IEnumerator work)
+        {
+            yield return Ramp(1f, 0f, FadeSec);
+            if (work != null) yield return work;
+            yield return Backdrop.AwaitContinue();
+            yield return Reveal(FadeSec);
         }
 
         void Begin(Action atBlack, string scene, float outSec, float holdSec, float inSec)
@@ -106,6 +119,12 @@ namespace MetalRaptors
             yield return Ramp(0f, 1f, outSec);
 
             atBlack?.Invoke();
+            if (scene != null && LoadingScreen.Covers(scene))
+            {
+                Backdrop.Show(null);
+                yield return Ramp(1f, 0f, FadeSec);
+            }
+
             if (scene != null) SceneManager.LoadScene(scene);
 
             yield return null;
@@ -118,6 +137,13 @@ namespace MetalRaptors
         IEnumerator Reveal(float inSec)
         {
             while (_loading) yield return null;
+
+            if (_screen != null && _screen.Visible)
+            {
+                while (!_screen.Held) yield return null;
+                yield return Ramp(_sheet.color.a, 1f, FadeSec);
+                _screen.Hide();
+            }
 
             yield return Ramp(1f, 0f, inSec);
 

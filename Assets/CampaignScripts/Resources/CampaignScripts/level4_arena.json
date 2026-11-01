@@ -4,7 +4,7 @@
     { "op": "warn", "planes": 1 },
     { "op": "danger", "side": "left", "seconds": 2 },
 
-    { "op": "boss", "plane": "fokker", "skin": "raven", "health": 26, "speaker": "ravensberg" },
+    { "op": "boss", "plane": "fokker", "skin": "raven", "health": 24.06, "speaker": "ravensberg" },
 
     { "op": "say", "speaker": "ravensberg", "line": "l4_boss1" },
     { "op": "say", "speaker": "you", "line": "l4_boss2" },
@@ -18,7 +18,7 @@
     { "op": "warn", "planes": 1 },
     { "op": "danger", "side": "left", "seconds": 2 },
 
-    { "op": "boss", "plane": "fokker", "skin": "raven", "health": 26, "speaker": "ravensberg", "burning": true },
+    { "op": "boss", "plane": "fokker", "skin": "raven", "health": 24.06, "speaker": "ravensberg", "burning": true },
 
     { "op": "say", "speaker": "you", "line": "l4_end1" },
     { "op": "say", "speaker": "ravensberg", "line": "l4_end2" },

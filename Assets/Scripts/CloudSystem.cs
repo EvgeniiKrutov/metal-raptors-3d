@@ -10,6 +10,7 @@ namespace MetalRaptors
         const float LowMinAltitude = 190f, LowMaxAltitude = 330f;
         const float DepthJitter = 0.08f;
         const float WindowMargin = 300f;
+        const float CullGaps = 1.5f;
         const float BaseAlpha = 0.5f;
         const int BlobCountMin = 5, BlobCountMax = 9;
 
@@ -41,8 +42,8 @@ namespace MetalRaptors
             public float fade;
             public float jitter;
             public float minAltitude, maxAltitude;
-            public float left;
-            public float nextSpawnU;
+            public float left, right;
+            public float nextSpawnU, prevSpawnU;
             public bool primed;
         }
 
@@ -124,7 +125,8 @@ namespace MetalRaptors
                 if (cloud.root == null) { _clouds.RemoveAt(i); continue; }
 
                 cloud.root.position += Vector3.left * (_speed * cloud.speedMul * Time.deltaTime);
-                if (cloud.root.position.x < cloud.layer.left)
+                float x = cloud.root.position.x;
+                if (x < cloud.layer.left || x > cloud.layer.right)
                 {
                     DestroyCloud(cloud);
                     _clouds.RemoveAt(i);
@@ -177,20 +179,34 @@ namespace MetalRaptors
             float dist = _playPlaneZ + layer.depth + layer.jitter - eye.z;
             float halfW = dist * Mathf.Tan(_cam.fieldOfView * 0.5f * Mathf.Deg2Rad) * _cam.aspect;
             float margin = WindowMargin * layer.ratio;
+            float gap = _spacing * layer.ratio;
+            float drift = _speed * _time;
 
-            layer.left = eye.x - halfW - margin;
+            float left = eye.x - halfW - margin;
             float right = eye.x + halfW + margin;
+            layer.left = left - gap * CullGaps;
+            layer.right = right + gap * CullGaps;
 
             if (!layer.primed)
             {
-                layer.nextSpawnU = layer.left + _speed * _time;
+                layer.nextSpawnU = left + drift;
+                layer.prevSpawnU = layer.nextSpawnU;
                 layer.primed = true;
             }
 
-            while (layer.nextSpawnU - _speed * _time < right)
+            layer.prevSpawnU = Mathf.Max(layer.prevSpawnU, layer.left + drift);
+            layer.nextSpawnU = Mathf.Min(layer.nextSpawnU, layer.right + drift);
+
+            while (layer.nextSpawnU - drift < right)
             {
-                SpawnCloud(layer, layer.nextSpawnU - _speed * _time, eye.y);
-                layer.nextSpawnU += _spacing * layer.ratio * Random.Range(0.55f, 1.45f);
+                SpawnCloud(layer, layer.nextSpawnU - drift, eye.y);
+                layer.nextSpawnU += gap * Random.Range(0.55f, 1.45f);
+            }
+
+            while (layer.prevSpawnU - drift > left)
+            {
+                layer.prevSpawnU -= gap * Random.Range(0.55f, 1.45f);
+                SpawnCloud(layer, layer.prevSpawnU - drift, eye.y);
             }
         }
 

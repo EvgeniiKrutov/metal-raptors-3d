@@ -1,11 +1,13 @@
 using System;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace MetalRaptors
 {
     public class SupplyDrop : MonoBehaviour
     {
         const float MinRoomFraction = 0.3f;
+        const int RepairTaps = 5;
 
         CubeController _plane;
         Transform _model;
@@ -26,6 +28,9 @@ namespace MetalRaptors
         Vector3 _camPos;
         float _halfWidth;
         float _halfHeight;
+        bool _repairs;
+        int _repairLeft;
+        bool _tapped;
 
         public static SupplyDrop Begin(GameObject owner, CampaignDefinition level,
             CubeController plane, Transform model, float z, float floorY, Func<float> warn)
@@ -43,10 +48,19 @@ namespace MetalRaptors
             drop._left = level.supplyDrops;
             drop._bothWays = level.worldWidth > 0f;
             drop._warn = warn;
+            drop._repairs = level.supplyRepairs;
             return drop;
         }
 
-        bool Pending => _crate != null || _incoming;
+        bool Pending => _crate != null || _incoming || Repairing;
+
+        public bool Repairs => _repairs;
+
+        public bool Repairing => _repairLeft > 0;
+
+        public int RepairLeft => _repairLeft;
+
+        public void Tap() => _tapped = true;
 
         public bool Aim(out Vector3 box)
         {
@@ -90,6 +104,7 @@ namespace MetalRaptors
         {
             _left = 0;
             _incoming = false;
+            _repairLeft = 0;
             if (_crate != null) Destroy(_crate.gameObject);
             _crate = null;
         }
@@ -99,6 +114,15 @@ namespace MetalRaptors
             _camPos = camPos;
             _halfWidth = halfWidth;
             _halfHeight = halfHeight;
+
+            bool tapped = _tapped || TappedKey();
+            _tapped = false;
+
+            if (Repairing)
+            {
+                if (tapped && !cinematic && --_repairLeft <= 0) Repair();
+                return;
+            }
 
             if (_crate != null)
             {
@@ -124,13 +148,33 @@ namespace MetalRaptors
 
             _left--;
             if (_scripted) _armed--;
+            if (_repairs)
+            {
+                _repairLeft = RepairTaps;
+                return;
+            }
+
             _incoming = true;
             _incomingLeft = _warn != null ? _warn() : 0f;
         }
 
+        bool TappedKey()
+        {
+            if (!_repairs || GameMenu.IsOpen || LevelBriefing.IsOpen) return false;
+
+            var kb = Keyboard.current;
+            return kb != null && kb.hKey.wasPressedThisFrame;
+        }
+
+        void Repair()
+        {
+            Collect();
+            if (_plane != null) SupplyCrate.PlayChime(_plane.transform.position);
+        }
+
         float Side(float camX, float halfWidth)
         {
-            if (!_bothWays) return 1f;
+            if (!_bothWays) return LevelScroll.Sign;
 
             float nose = Mathf.Cos(_plane.Heading) >= 0f ? 1f : -1f;
             float drop = camX + nose * halfWidth * SupplyCrate.LeadFraction;

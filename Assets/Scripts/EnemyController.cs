@@ -31,6 +31,15 @@ namespace MetalRaptors
         const float SnapWindowFactor = 2f;
         const float DefaultTargetRadius = 15f;
 
+        const int BurstMin = 3, BurstMax = 5;
+        const float BurstGapMin = 1.5f, BurstGapMax = 2.5f;
+        const float FirstBurstSec = 1.5f;
+        const float BurstSpreadDeg = 4f;
+        const float BurstTrueChance = 0.4f;
+        const float BurstTrueDeg = 1.5f;
+        const float BurstMissMinDeg = 6f, BurstMissMaxDeg = 10f;
+        const float BurstBreakFactor = 2f;
+
         const float SmokeHealthThreshold = 30f;
         const float BlazeScale = 0.55f;
 
@@ -108,7 +117,11 @@ namespace MetalRaptors
 
         public bool Pursuing { get; set; }
 
+        public bool HoldFire { get; set; }
+
         public bool StandingDown => _standDown;
+
+        public static bool AimedFire { get; set; }
 
         public float EnginePitch { get; set; } = 1f;
 
@@ -165,6 +178,10 @@ namespace MetalRaptors
         float _tailLost;
         bool _tailLocked;
         float _fireCooldown;
+        int _burstLeft;
+        float _burstGap;
+        float _burstError;
+        float _seenFor;
         float _lastCollisionTime = -999f;
         ShakeEffect _shake;
         SmokeTrail _smoke;
@@ -543,10 +560,54 @@ namespace MetalRaptors
         void PursueFire(float dt)
         {
             _fireCooldown -= dt;
+            _burstGap -= dt;
             _onCamera = IsOnCamera(transform.position);
             _appeared |= _onCamera;
-            if (_onCamera) UpdateFiring();
+            _seenFor = _onCamera ? _seenFor + dt : 0f;
+
+            if (!_onCamera || HoldFire || _seenFor < FirstBurstSec || _dodge.Active
+                || _target == null)
+            {
+                _burstLeft = 0;
+                return;
+            }
+
+            if (_burstLeft <= 0)
+            {
+                if (_burstGap > 0f || !BurstReady()) return;
+
+                _burstLeft = UnityEngine.Random.Range(BurstMin, BurstMax + 1);
+                float side = UnityEngine.Random.value < 0.5f ? -1f : 1f;
+                _burstError = AimedFire || UnityEngine.Random.value < BurstTrueChance
+                    ? UnityEngine.Random.Range(-BurstTrueDeg, BurstTrueDeg)
+                    : side * UnityEngine.Random.Range(BurstMissMinDeg, BurstMissMaxDeg);
+            }
+            else if (AimError(_target.position) > _config.fireAngleThreshold * BurstBreakFactor)
+            {
+                EndBurst();
+                return;
+            }
+
+            if (_fireCooldown > 0f) return;
+            _fireCooldown = Mathf.Max(0.01f, _config.fireRate);
+
+            Shoot(_config.bulletSpeed, _config.damage,
+                _burstError + UnityEngine.Random.Range(-BurstSpreadDeg, BurstSpreadDeg));
+            if (--_burstLeft <= 0) EndBurst();
         }
+
+        bool BurstReady() =>
+            IsOnCamera(_target.position) && TargetDistance() <= _config.maxFireRange
+            && (HasFiringSolution(PredictIntercept()) || HasFiringSolution(_target.position));
+
+        void EndBurst()
+        {
+            _burstLeft = 0;
+            _burstGap = UnityEngine.Random.Range(BurstGapMin, BurstGapMax);
+        }
+
+        float AimError(Vector2 point) =>
+            Mathf.Abs(Mathf.DeltaAngle(_heading * Mathf.Rad2Deg, HeadingTo(point) * Mathf.Rad2Deg));
 
         void TickFall(float dt)
         {
@@ -1610,15 +1671,17 @@ namespace MetalRaptors
             Shoot(_config.bulletSpeed, _config.damage);
         }
 
-        void Shoot(float bulletSpeed, float damage)
+        void Shoot(float bulletSpeed, float damage, float offsetDeg = 0f)
         {
-            Vector3 dir = new Vector3(Mathf.Cos(_heading), Mathf.Sin(_heading), 0f);
+            float aim = _heading + offsetDeg * Mathf.Deg2Rad;
+            Vector3 dir = new Vector3(Mathf.Cos(aim), Mathf.Sin(aim), 0f);
             Vector3 muzzle = _gunMounted
                 ? transform.TransformPoint(_gunLocal)
                 : transform.position + dir * (_bodyRadius + 6f);
             muzzle.z = transform.position.z;
             var go = Instantiate(_bulletTemplate, muzzle,
-                transform.rotation * Quaternion.Euler(0f, 0f, -90f));
+                Quaternion.AngleAxis(offsetDeg, Vector3.forward) * transform.rotation
+                * Quaternion.Euler(0f, 0f, -90f));
             go.name = "EnemyBullet";
             go.SetActive(true);
             go.GetComponent<Bullet>().Launch(dir, bulletSpeed, damage, _collider, fromEnemy: true);

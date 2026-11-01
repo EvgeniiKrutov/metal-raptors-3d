@@ -296,7 +296,7 @@ namespace MetalRaptors
                 rotationSpeed = 90f,
                 mass          = 3.4f,
                 fireRate      = 6.5f,
-                damage        = 10f,
+                damage        = 12f,
                 health        = 260f,
             },
         };

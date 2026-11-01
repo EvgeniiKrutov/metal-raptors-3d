@@ -69,6 +69,8 @@ namespace MetalRaptors
 
         public static float LevelPresence => Instance != null ? Instance.Presence() : 0f;
 
+        public static bool IsBaking(string id) => Instance != null && Instance.FindJob(id) != null;
+
         static bool HasMenuMusic(string scene) =>
             scene == SceneNames.MainMenu || scene == SceneNames.Garage;
 

@@ -191,15 +191,18 @@ namespace MetalRaptors
                 ship.root.position += Vector3.left * (ship.speed * dt);
 
                 Vector3 pos = ship.root.position;
-                float left = eye.x - HalfWindow(pos.z, eye) - EdgeMargin;
+                float window = HalfWindow(pos.z, eye);
+                float left = eye.x - window - EdgeMargin;
+                float right = eye.x + window + EdgeMargin;
+                bool rightward = LevelScroll.Drift(ship.speed) > 0f;
 
-                if (!ship.gone && pos.x + half < left)
+                if (!ship.gone && (rightward ? pos.x - half > right : pos.x + half < left))
                 {
                     ship.gone = true;
                     _wait = Random.Range(GapMin, GapMax);
                 }
 
-                if (ship.gone && pos.x + ship.wake.Reach < left)
+                if (ship.gone && (rightward ? pos.x - half > right : pos.x + ship.wake.Reach < left))
                 {
                     Release(ship);
                     _ships.RemoveAt(i);
@@ -228,9 +231,13 @@ namespace MetalRaptors
         {
             float z = Random.Range(LaneNear, LaneFar);
             float window = HalfWindow(z, eye);
+            float speed = Random.Range(SpeedMin, SpeedMax);
+            var wake = new BoatWake(transform, _length, _beam, BowWave, WakeRun, WakeStrength);
             float x = onScreen
                 ? eye.x + window * Random.Range(OnScreenMin, OnScreenMax)
-                : eye.x + window + _length * 0.5f + EdgeMargin;
+                : LevelScroll.Drift(speed) > 0f
+                    ? eye.x - window - wake.Reach - EdgeMargin
+                    : eye.x + window + _length * 0.5f + EdgeMargin;
 
             var root = new GameObject("Lord Clive").transform;
             root.SetParent(transform, false);
@@ -265,9 +272,9 @@ namespace MetalRaptors
             {
                 root = root,
                 motion = motion,
-                wake = new BoatWake(transform, _length, _beam, BowWave, WakeRun, WakeStrength),
+                wake = wake,
                 guns = Arm(view.transform, root),
-                speed = Random.Range(SpeedMin, SpeedMax),
+                speed = speed,
                 pitchSlow = BoatSway.Roll(PitchSlowMin, PitchSlowMax, PitchSlowSecMin, PitchSlowSecMax),
                 pitchFast = BoatSway.Roll(PitchFastMin, PitchFastMax, PitchFastSecMin, PitchFastSecMax),
                 roll = BoatSway.Roll(RollMin, RollMax, RollSecMin, RollSecMax),
