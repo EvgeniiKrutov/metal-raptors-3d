@@ -4,7 +4,7 @@ using UnityEngine;
 namespace MetalRaptors
 {
     [RequireComponent(typeof(Rigidbody))]
-    public class EnemyController : MonoBehaviour, IDamageable
+    public class EnemyController : MonoBehaviour, IDamageable, IScoreTarget
     {
         const float ShotVolume = 0.18f;
         const float RecoverClimbAngleDeg = 70f;
@@ -90,12 +90,18 @@ namespace MetalRaptors
         const float BarLiftMargin = 8f;
 
         const float ScriptRollRate = 300f;
+        const float LandReach = 26f;
+        const float HomeTimeout = 14f;
 
         public event Action<EnemyController> OnDestroyed;
 
         public float CurrentHealth { get; private set; }
 
         public bool IsAlive => !_dead && !_falling;
+
+        public bool Falling => _falling && !_dead;
+
+        public bool ByPlayer => _byPlayer;
 
         public Collider Hitbox => _collider;
 
@@ -145,6 +151,7 @@ namespace MetalRaptors
 
         EnemyConfig _config;
         Rigidbody _target;
+        Rigidbody _pace;
         Rigidbody _rb;
         Collider _collider;
         Camera _cam;
@@ -158,7 +165,10 @@ namespace MetalRaptors
         bool _falling;
         PlaneFall _fall;
         bool _reported;
+        bool _byPlayer;
         float _fallTimer;
+        Vector3? _fallTarget;
+        Action _landed;
         bool _standDown;
 
         float _minX, _maxX, _groundY, _ceilingY, _edgeMargin;
@@ -313,6 +323,8 @@ namespace MetalRaptors
         }
 
         public void MountNose(Vector3 local) => _noseLocal = local;
+
+        public void PaceWith(Rigidbody pace) => _pace = pace;
 
         public Vector3 NosePoint => transform.TransformPoint(_noseLocal ?? Vector3.zero);
 
@@ -609,14 +621,46 @@ namespace MetalRaptors
         float AimError(Vector2 point) =>
             Mathf.Abs(Mathf.DeltaAngle(_heading * Mathf.Rad2Deg, HeadingTo(point) * Mathf.Rad2Deg));
 
+        public bool SteerFall(Vector3 target, Action landed)
+        {
+            if (!_falling || _dead || _fall == null) return false;
+
+            _fallTarget = target;
+            _landed = landed;
+            _fallTimer = 0f;
+            _rb.constraints &= ~RigidbodyConstraints.FreezePositionZ;
+            return true;
+        }
+
         void TickFall(float dt)
         {
+            if (_fallTarget.HasValue)
+            {
+                Vector3 target = _fallTarget.Value;
+                _fall.Home(_rb, target, dt);
+                _heading = _fall.Heading;
+                ApplyRotation();
+
+                _fallTimer += dt;
+                Vector2 gap = (Vector2)_rb.position - (Vector2)target;
+                if (gap.sqrMagnitude <= LandReach * LandReach || _fallTimer >= HomeTimeout) Explode();
+                return;
+            }
+
             _fall.Step(_rb, dt);
             _heading = _fall.Heading;
             ApplyRotation();
 
             _fallTimer += dt;
             if (_fallTimer >= PlaneFall.Timeout) RemoveWreck();
+        }
+
+        void Land()
+        {
+            Action landed = _landed;
+            _landed = null;
+            _fallTarget = null;
+            landed?.Invoke();
         }
 
         void TickDeck()
@@ -1578,6 +1622,9 @@ namespace MetalRaptors
                 speed = Mathf.Max(speed,
                     _config.flySpeed * Mathf.Max(1f, _config.recoverBoost));
             if (Scouting) speed = Mathf.Min(speed, TopSpeed);
+            if (_pace != null)
+                speed = Mathf.Min(speed,
+                    Mathf.Max(_config.flySpeed, ((Vector2)_pace.linearVelocity).magnitude));
             return Mathf.Max(1f, speed);
         }
 
@@ -1725,6 +1772,12 @@ namespace MetalRaptors
             return vp.x > -0.05f && vp.x < 1.05f && vp.y > -0.05f && vp.y < 1.05f;
         }
 
+        public void MarkStrike(bool byPlayer)
+        {
+            if (_dead || _falling || OffPlane || (_scripted && !Exposed)) return;
+            _byPlayer = byPlayer;
+        }
+
         public void TakeDamage(float amount)
         {
             if (_dead || _falling || OffPlane || (_scripted && !Exposed)) return;
@@ -1800,6 +1853,7 @@ namespace MetalRaptors
 
         void RemoveWreck()
         {
+            Land();
             _dead = true;
             if (_smoke != null) _smoke.Clear();
 
@@ -1817,6 +1871,7 @@ namespace MetalRaptors
         public void Explode()
         {
             if (_dead) return;
+            Land();
             _dead = true;
 
             Explosion.Spawn(transform.position, ModelSize);

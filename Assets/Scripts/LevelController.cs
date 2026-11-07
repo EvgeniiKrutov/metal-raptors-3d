@@ -51,6 +51,8 @@ namespace MetalRaptors
 
         EnemyConfig _scoutConfig;
         EnemyConfig _fighterConfig;
+        readonly Dictionary<PlaneModelConfig, EnemyConfig> _armedConfigs =
+            new Dictionary<PlaneModelConfig, EnemyConfig>();
         readonly List<EnemyController> _enemies = new List<EnemyController>();
         SoundSystem _sound;
 
@@ -185,8 +187,8 @@ namespace MetalRaptors
             foreach (var group in _level.enemies)
                 for (int i = 0; i < group.count; i++)
                 {
-                    EnemyConfig config =
-                        EnemyConfigs.For(group.plane, _scoutConfig, _fighterConfig);
+                    EnemyConfig config = EnemyConfigs.Armed(group.plane,
+                        EnemyConfigs.For(group.plane, _scoutConfig, _fighterConfig), _armedConfigs);
                     float ceilingY = WorldTop - group.plane.OnScreenSize / 2f;
 
                     var go = new GameObject("Enemy");

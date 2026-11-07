@@ -44,6 +44,9 @@ namespace MetalRaptors
             "Sounds/engine_throttle_1",
         };
 
+        static readonly string[] PreloadClipPaths = { EnemyIdleClip, EnemyThrottleClip };
+        static readonly List<AudioClip> Preloaded = new List<AudioClip>();
+
         struct Ramp
         {
             public float Value;
@@ -354,6 +357,19 @@ namespace MetalRaptors
         Ramp _pauseGain;
         Ramp _fadeGain;
         Ramp _duck;
+
+        public static void Preload()
+        {
+            Preloaded.Clear();
+            foreach (string path in PreloadClipPaths)
+            {
+                var clip = Resources.Load<AudioClip>(path);
+                if (clip == null) continue;
+
+                clip.LoadAudioData();
+                Preloaded.Add(clip);
+            }
+        }
 
         public static SoundSystem Begin(CubeController player, IReadOnlyList<EnemyController> enemies)
         {

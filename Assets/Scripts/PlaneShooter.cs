@@ -193,7 +193,7 @@ namespace MetalRaptors
             go.name = "Bullet";
             go.SetActive(true);
             go.GetComponent<Bullet>().Launch(dir, _config.bulletSpeed, _config.damage,
-                _planeCollider, fromEnemy: false);
+                _planeCollider, fromEnemy: false, fromPlayer: true);
 
             MuzzleFlash.Spawn(_flashPoint.position, dir, _bodyRadius);
             if (_shotClip != null) _audio.PlayOneShot(_shotClip, ShotVolume * AudioOptions.Scene);
@@ -213,7 +213,7 @@ namespace MetalRaptors
             go.name = "Bullet";
             go.SetActive(true);
             go.GetComponent<Bullet>().Launch(shot, _config.bulletSpeed, _config.damage,
-                _planeCollider, fromEnemy: false);
+                _planeCollider, fromEnemy: false, fromPlayer: true);
 
             MuzzleFlash.Spawn(from, dir, _bodyRadius * TurretFlashScale);
             if (_shotClip != null) _audio.PlayOneShot(_shotClip, ShotVolume * AudioOptions.Scene);

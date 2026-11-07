@@ -14,6 +14,9 @@
 
     { "op": "wait", "seconds": 2.5 },
 
+    { "op": "supply", "count": 1 },
+    { "op": "wave", "enemies": [ { "plane": "eindecker", "count": 1 } ] },
+    { "op": "wait", "seconds": 4 },
     { "op": "wave", "enemies": [ { "plane": "eindecker", "count": 1 } ] },
     { "op": "wait", "seconds": 4 },
     { "op": "wave", "enemies": [ { "plane": "eindecker", "count": 1 } ] },
@@ -32,6 +35,9 @@
     { "op": "say", "speaker": "roussel", "line": "l1_line21" },
 
     { "op": "unlock", "ability": "boost" },
+    { "op": "supply", "count": 2 },
+    { "op": "wave", "enemies": [ { "plane": "eindecker", "count": 1 } ] },
+    { "op": "wait", "seconds": 4 },
     { "op": "wave", "enemies": [ { "plane": "eindecker", "count": 1 } ] },
     { "op": "wait", "seconds": 4 },
     { "op": "wave", "enemies": [ { "plane": "eindecker", "count": 1 } ] },

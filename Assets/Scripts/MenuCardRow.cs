@@ -15,9 +15,9 @@ namespace MetalRaptors
 
         public float CardSize => _metrics.Size;
 
-        public MenuCardRow(Transform parent, string name, float top, int count)
+        public MenuCardRow(Transform parent, string name, float top, float size)
         {
-            _metrics = new CardMetrics(count, 1, top);
+            _metrics = new CardMetrics(size, 1);
 
             var go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(parent, false);

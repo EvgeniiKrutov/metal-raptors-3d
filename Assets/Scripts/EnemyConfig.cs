@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace MetalRaptors
@@ -223,6 +224,27 @@ namespace MetalRaptors
             EnemyConfig fighter)
         {
             return plane != null && plane.enemyRole == EnemyRole.Scout ? scout : fighter;
+        }
+
+        public static float FireGap(PlaneModelConfig plane, float fallback)
+        {
+            float rate = plane != null && plane.stats != null ? plane.stats.fireRate : 0f;
+            return rate > 0f ? 1f / rate : fallback;
+        }
+
+        public static EnemyConfig Armed(PlaneModelConfig plane, EnemyConfig config,
+            Dictionary<PlaneModelConfig, EnemyConfig> cache)
+        {
+            if (plane == null || config == null || cache == null) return config;
+            if (cache.TryGetValue(plane, out EnemyConfig copy) && copy != null) return copy;
+
+            float gap = FireGap(plane, config.fireRate);
+            if (Mathf.Approximately(gap, config.fireRate)) return config;
+
+            copy = Object.Instantiate(config);
+            copy.fireRate = gap;
+            cache[plane] = copy;
+            return copy;
         }
 
         public static void SpawnBand(EnemyConfig config, float groundY, float ceilingY,

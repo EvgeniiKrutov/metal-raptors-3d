@@ -115,6 +115,7 @@ namespace MetalRaptors
                 passData.depthRange = depthRange;
                 passData.shadowOn = ShadowOn && !_lightweight;
 
+                if (passData.shadowOn) builder.UseGlobalTexture(NightLightShadowPass.ShadowMapId);
                 builder.SetRenderAttachment(mask, 0, AccessFlags.Write);
                 builder.AllowPassCulling(false);
                 builder.AllowGlobalStateModification(true);

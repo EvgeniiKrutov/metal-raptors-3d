@@ -7,7 +7,8 @@ namespace MetalRaptors
     public enum CampaignOp
     {
         Wait, Say, Wave, Spawn, WaitClear, Supply, Foe, Zeppelin, Onslaught, Formation, Warn,
-        Danger, Arena, Boss, Duel, Escape, Raid, Unlock, Jams, Boost, Turn, Assault, Disarm, Finish
+        Danger, Arena, Boss, Duel, Escape, Raid, Unlock, Jams, Boost, Turn, Assault, Disarm, Finish,
+        Stealth, Patrol, Lull, Backup, AaGun, Tunnel, Uboat
     }
 
     public class CampaignStep
@@ -17,6 +18,7 @@ namespace MetalRaptors
         public CampaignSpeaker speaker;
         public string text;
         public EnemyGroup[] groups;
+        public EnemyGroup[] hit;
         public PlaneModelConfig plane;
         public int count;
         public bool air;
@@ -28,6 +30,7 @@ namespace MetalRaptors
         public float pairsAt;
         public float single;
         public bool blasts;
+        public bool uboats;
         public ScreenEdge edge;
         public PlaneAbility ability;
     }
@@ -53,7 +56,11 @@ namespace MetalRaptors
         {
             Steps = steps;
             foreach (CampaignStep step in steps)
-                if (step.op == CampaignOp.Supply) { HasSupply = true; break; }
+                if (step.op == CampaignOp.Supply || (step.op == CampaignOp.AaGun && step.count > 0))
+                {
+                    HasSupply = true;
+                    break;
+                }
         }
 
         public bool Has(CampaignOp op)
@@ -164,6 +171,37 @@ namespace MetalRaptors
                 case "turn": return new CampaignStep { op = CampaignOp.Turn, seconds = Seconds(step) };
                 case "assault": return ParseAssault(step, origin, index);
                 case "disarm": return new CampaignStep { op = CampaignOp.Disarm };
+                case "stealth":
+                    return new CampaignStep
+                    {
+                        op = CampaignOp.Stealth,
+                        hold = !(Value(step, "on") is bool lit) || lit,
+                    };
+                case "patrol":
+                    return new CampaignStep
+                    {
+                        op = CampaignOp.Patrol,
+                        hold = !(Value(step, "on") is bool patrolling) || patrolling,
+                        count = Mathf.Max(1, Mathf.RoundToInt(Number(step, "tiers", 1f))),
+                    };
+                case "lull": return new CampaignStep { op = CampaignOp.Lull, seconds = Seconds(step) };
+                case "backup":
+                    return new CampaignStep
+                    {
+                        op = CampaignOp.Backup,
+                        groups = Groups(step, origin, index).ToArray(),
+                    };
+                case "aagun":
+                    return new CampaignStep
+                    {
+                        op = CampaignOp.AaGun,
+                        groups = Groups(step, origin, index).ToArray(),
+                        hit = Groups(step, origin, index, "hit").ToArray(),
+                        uboats = Value(step, "uboats") is bool flotilla && flotilla,
+                        count = Mathf.Max(0, Mathf.RoundToInt(Number(step, "supply", 0f))),
+                    };
+                case "uboat": return new CampaignStep { op = CampaignOp.Uboat };
+                case "tunnel": return new CampaignStep { op = CampaignOp.Tunnel };
                 case "finish": return new CampaignStep { op = CampaignOp.Finish };
                 default:
                     Debug.LogError($"CampaignScript {origin}[{index}]: unknown op '{op}'.");
@@ -268,9 +306,28 @@ namespace MetalRaptors
         static CampaignStep ParseWave(CampaignOp op, Dictionary<string, object> step, string origin,
             int index)
         {
+            List<EnemyGroup> groups = Groups(step, origin, index);
+
+            if (groups.Count == 0)
+            {
+                Debug.LogError($"CampaignScript {origin}[{index}]: '{op}' names no enemies.");
+                return null;
+            }
+
+            return new CampaignStep
+            {
+                op = op,
+                groups = groups.ToArray(),
+                spread = Value(step, "spread") is bool flag && flag,
+            };
+        }
+
+        static List<EnemyGroup> Groups(Dictionary<string, object> step, string origin, int index,
+            string key = "enemies")
+        {
             var groups = new List<EnemyGroup>();
 
-            if (Value(step, "enemies") is List<object> list)
+            if (Value(step, key) is List<object> list)
             {
                 foreach (object entry in list)
                 {
@@ -304,18 +361,7 @@ namespace MetalRaptors
                 }
             }
 
-            if (groups.Count == 0)
-            {
-                Debug.LogError($"CampaignScript {origin}[{index}]: '{op}' names no enemies.");
-                return null;
-            }
-
-            return new CampaignStep
-            {
-                op = op,
-                groups = groups.ToArray(),
-                spread = Value(step, "spread") is bool flag && flag,
-            };
+            return groups;
         }
 
         static CampaignStep ParseAssault(Dictionary<string, object> step, string origin, int index)

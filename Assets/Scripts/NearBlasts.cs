@@ -18,6 +18,7 @@ namespace MetalRaptors
         readonly float _floorY;
         readonly RearGun _gun;
         readonly System.Action<float> _shake;
+        readonly System.Action<Vector3> _fire;
 
         float _timer;
         Vector3 _last;
@@ -25,13 +26,14 @@ namespace MetalRaptors
         bool _tracked;
 
         public NearBlasts(Transform plane, float length, float floorY, RearGun gun,
-            System.Action<float> shake)
+            System.Action<float> shake, System.Action<Vector3> fire = null)
         {
             _plane = plane;
             _length = Mathf.Max(1f, length);
             _floorY = floorY;
             _gun = gun;
             _shake = shake;
+            _fire = fire;
             _timer = Random.Range(FirstMin, FirstMax);
         }
 
@@ -59,6 +61,7 @@ namespace MetalRaptors
             var at = new Vector3(ahead.x + dx, ahead.y + dy, plane.z + Random.Range(-DepthFront, DepthBack));
             float strength = Mathf.Lerp(ShakeNear, ShakeFar, Mathf.InverseLerp(NearLengths, FarLengths, reach));
 
+            _fire?.Invoke(at);
             SkyBlast.Arm(at, _length * Random.Range(SizeMin, SizeMax), WarnSec, null, 0f,
                 onBlow: () => Blow(strength));
         }

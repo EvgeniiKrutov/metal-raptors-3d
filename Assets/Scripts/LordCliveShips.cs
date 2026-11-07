@@ -19,7 +19,7 @@ namespace MetalRaptors
         const float EdgeMargin = 40f;
 
         const float Heading = 180f;
-        const float Draft = 5.1f;
+        const float Draft = 6.4f;
         const float BowWave = 0.47f;
         const float WakeRun = 0.4f, WakeStrength = 0.6f;
 
@@ -94,6 +94,9 @@ namespace MetalRaptors
         float _halfViewWidth, _cameraDistance;
         float _scale, _length, _beam;
         float _wait;
+        bool _halted;
+
+        public void Halt() => _halted = true;
 
         public static LordCliveShips Begin(Camera cam, float halfViewWidth, float playPlaneZ,
             float cameraDistance, bool wanted)
@@ -219,7 +222,7 @@ namespace MetalRaptors
                 if (!ship.gone) sailing = true;
             }
 
-            if (sailing) return;
+            if (sailing || _halted) return;
 
             _wait -= dt;
             if (_wait <= 0f) Spawn(eye, onScreen: false);

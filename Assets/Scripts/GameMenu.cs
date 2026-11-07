@@ -95,6 +95,9 @@ namespace MetalRaptors
 
             _panel.AddNav(subtitle, null, interactable: false);
 
+            if (kind == GameMenuKind.Completed && PilotProfile.TakeResult(out RankResult rank))
+                StartCoroutine(_panel.AddRankRow().Play(rank));
+
             if (kind == GameMenuKind.Pause) _panel.AddNav("resume", Close);
 
             bool career = CampaignCheckpoint.InCareer && kind != GameMenuKind.Completed;

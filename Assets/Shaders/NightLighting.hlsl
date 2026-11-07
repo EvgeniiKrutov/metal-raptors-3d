@@ -8,12 +8,6 @@ float _NL_MaskDecode;
 float _NL_PlaneZ;
 float _NL_DepthRange;
 
-Texture2D _NL_ShadowMap;
-float4x4 _NL_ShadowMatrix;
-float4 _NL_ShadowParams;
-float4 _NL_ShadowLight;
-float4 _NL_ShadowSize;
-
 float _NightBlend;
 float3 _NightSkyTop;
 float3 _NightSkyHorizon;
@@ -58,48 +52,6 @@ half3 NightLamp(float3 posWS)
     return m.rgb * (half)_NL_MaskDecode * depth;
 }
 
-half NightShadowRay(float bin, float r)
-{
-    float2 ray = _NL_ShadowMap.Load(int3((int)bin, 0, 0)).rg;
-    float exitR = ray.x * _NL_ShadowParams.w;
-    return 1.0h - (half)(ray.y * saturate(r - exitR - _NL_ShadowParams.y));
-}
-
-half NightLampShadow(float3 posWS)
-{
-    if (_NL_ShadowParams.x < 0.5) return 1.0h;
-
-    float4 c = mul(_NL_ShadowMatrix, float4(posWS, 1.0));
-    if (c.w <= 1e-4) return 1.0h;
-
-    float2 rel = (c.xy / c.w * 0.5 + 0.5) * _NL_ShadowSize.xy - _NL_ShadowLight.xy;
-    float2 axis = _NL_ShadowLight.zw;
-    float angle = atan2(axis.x * rel.y - axis.y * rel.x, dot(axis, rel));
-    float last = _NL_ShadowSize.z - 1.0;
-    float bin = (angle / _NL_ShadowParams.z + 0.5) * _NL_ShadowSize.z - 0.5;
-    if (bin < 0.0 || bin > last) return 1.0h;
-
-    float r = length(rel);
-    float first = floor(bin);
-    return lerp(NightShadowRay(first, r), NightShadowRay(min(first + 1.0, last), r), (half)(bin - first));
-}
-
-half3 NightLampAirShadowed(float3 planePosWS)
-{
-    half3 air = NightLampAir(planePosWS);
-    UNITY_BRANCH
-    if (air.r + air.g + air.b > 1e-3h) air *= NightLampShadow(planePosWS);
-    return air;
-}
-
-half3 NightLampShadowed(float3 posWS)
-{
-    half3 lamp = NightLamp(posWS);
-    UNITY_BRANCH
-    if (lamp.r + lamp.g + lamp.b > 1e-3h) lamp *= NightLampShadow(posWS);
-    return lamp;
-}
-
 half3 NightGrade(half3 c)
 {
     half luma = dot(c, half3(0.299h, 0.587h, 0.114h));
@@ -112,7 +64,7 @@ half3 NightColorLitShadowed(half3 albedo, half3 n, float3 posWS, half response, 
     half moon = saturate(dot(n, (half3)_NightMoonDir) * 0.5h + 0.5h)
               * lerp(1.0h, shadow, (half)_NightMoonShadow);
     return NightGrade(albedo) * (amb + (half3)_NightMoonColor * moon)
-         + albedo * NightLampShadowed(posWS) * response;
+         + albedo * NightLamp(posWS) * response;
 }
 
 half3 NightColorLit(half3 albedo, half3 n, float3 posWS, half response)

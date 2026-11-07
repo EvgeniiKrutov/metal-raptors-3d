@@ -8,6 +8,7 @@ namespace MetalRaptors
     {
         const float DevTransitionSeconds = 3f;
         const float AirBehindPlane = 25f;
+        const int LowShadowLights = 2;
 
         static readonly GlobalKeyword NightKeyword = GlobalKeyword.Create("_NIGHT_LIGHTING");
 
@@ -325,6 +326,17 @@ namespace MetalRaptors
             return new Vector4(l.r, l.g, l.b, 0f);
         }
 
+        int ShadowBudget()
+        {
+            if (_tier == null) return 0;
+
+            QualityTier quality = GraphicsOptions.Shadows;
+            int cap = quality == QualityTier.High ? NightLightShadowPass.MaxRows
+                : quality == QualityTier.Low ? LowShadowLights
+                : 0;
+            return Mathf.Min(cap, _tier.shadowLights);
+        }
+
         void OnBeginCamera(ScriptableRenderContext context, Camera cam)
         {
             if (_blend <= 0f || _mainPass == null || cam == null) return;
@@ -340,8 +352,9 @@ namespace MetalRaptors
                 || (cam.cameraType == CameraType.SceneView && _settings.previewInSceneView);
 
             bool shadow = main && cam == _camera && _shadowPass != null
-                && _shadowPass.Prepare(cam, _tier, NightLights.ShadowCaster());
+                && _shadowPass.Prepare(cam, _tier, ShadowBudget());
             if (shadow) renderer.EnqueuePass(_shadowPass);
+            else if (cam == _camera) NightLights.AssignShadowRows(null, 0);
             _mainPass.ShadowOn = shadow;
 
             renderer.EnqueuePass(main ? _mainPass : _lightPass);

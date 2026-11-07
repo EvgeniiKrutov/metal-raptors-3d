@@ -12,6 +12,7 @@ Shader "Hidden/SearchlightBeam"
         _GlowSize ("Glow Size", Float) = 2
         _GlowIntensity ("Glow Intensity", Float) = 2
         _Soft ("Soft Depth", Float) = 4
+        _ShadowRow ("Shadow Row", Float) = -1
     }
 
     SubShader
@@ -41,6 +42,7 @@ Shader "Hidden/SearchlightBeam"
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
+            #include "../NightShadows.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
             half4 _Tint;
@@ -53,6 +55,7 @@ Shader "Hidden/SearchlightBeam"
             float _GlowSize;
             half _GlowIntensity;
             float _Soft;
+            float _ShadowRow;
             CBUFFER_END
 
             struct Attributes
@@ -66,6 +69,7 @@ Shader "Hidden/SearchlightBeam"
                 float4 positionCS : SV_POSITION;
                 float3 local : TEXCOORD0;
                 float eye : TEXCOORD1;
+                float3 positionWS : TEXCOORD2;
             };
 
             Varyings Vert(Attributes v)
@@ -102,6 +106,7 @@ Shader "Hidden/SearchlightBeam"
                 o.positionCS = TransformWorldToHClip(p);
                 o.local = local;
                 o.eye = -TransformWorldToView(p).z;
+                o.positionWS = p;
                 return o;
             }
 
@@ -124,7 +129,8 @@ Shader "Hidden/SearchlightBeam"
                     half radial = pow((half)saturate(1.0 - length(local) / max(_Range, 1e-3)), _Falloff);
                     float2 q = local + float2(_SourceRadius, 0.0);
                     float cosA = q.x * rsqrt(max(dot(q, q), 1e-6));
-                    light = radial * (half)smoothstep(_CosOuter, _CosInner, cosA);
+                    light = radial * (half)smoothstep(_CosOuter, _CosInner, cosA)
+                          * NightShadow(_ShadowRow, i.positionWS);
                 }
 
                 half3 rgb = _Tint.rgb * (light * soft * _Intensity);

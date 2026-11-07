@@ -321,6 +321,7 @@ namespace MetalRaptors
                 float falloff = 1f - Mathf.Clamp01(Vector3.Distance(centre, tr.position) / _radius);
                 if (falloff <= 0f) continue;
 
+                if (target is IScoreTarget scored) scored.MarkStrike(true);
                 target.TakeDamage(_damage * falloff);
             }
             Struck.Clear();

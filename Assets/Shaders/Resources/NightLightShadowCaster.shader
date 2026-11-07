@@ -12,7 +12,6 @@ Shader "Hidden/NightLightShadowCaster"
             ZWrite Off
             ZTest Always
             Cull Off
-            ColorMask RG
 
             HLSLPROGRAM
             #pragma vertex Vert
@@ -20,9 +19,13 @@ Shader "Hidden/NightLightShadowCaster"
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
+            #define NL_MAX_SHADOWS 4
+
             float4x4 _NL_CasterVP;
-            float4 _NL_CasterLight;
-            float4 _NL_CasterCone;
+            float4 _NL_CasterLights[NL_MAX_SHADOWS];
+            float4 _NL_CasterCones[NL_MAX_SHADOWS];
+            float4 _NL_CasterNear;
+            float _NL_CasterCount;
 
             struct Attributes
             {
@@ -33,6 +36,7 @@ Shader "Hidden/NightLightShadowCaster"
             {
                 float4 positionCS : SV_POSITION;
                 float3 positionWS : TEXCOORD0;
+                float objectZ : TEXCOORD1;
             };
 
             Varyings Vert(Attributes v)
@@ -40,22 +44,38 @@ Shader "Hidden/NightLightShadowCaster"
                 Varyings o;
                 o.positionWS = TransformObjectToWorld(v.positionOS.xyz);
                 o.positionCS = mul(_NL_CasterVP, float4(o.positionWS, 1.0));
+                o.objectZ = TransformObjectToWorld(float3(0.0, 0.0, 0.0)).z;
                 return o;
+            }
+
+            float CasterLit(float3 positionWS, float objectZ, float4 light, float4 cone, float near)
+            {
+                float2 rel = positionWS.xy - light.xy;
+                float along = dot(rel, cone.xy);
+                float side = dot(rel, float2(-cone.y, cone.x));
+                float range = cone.w;
+                float edge = min(max(along + light.w, 0.0) * cone.z,
+                                 sqrt(max(range * range - along * along, 0.0)));
+                float extent = sqrt(max(edge * edge - side * side, 0.0));
+                float depth = min(abs(positionWS.z - light.z), abs(objectZ - light.z));
+                float t = depth / max(extent, 1e-3);
+                float lit = (1.0 - smoothstep(0.4, 1.0, t)) * step(near, along) * step(1e-3, extent);
+                return lit * step(0.02, lit);
             }
 
             float4 Frag(Varyings i) : SV_Target
             {
-                float2 rel = i.positionWS.xy - _NL_CasterLight.xy;
-                float along = dot(rel, _NL_CasterCone.xy);
-                float side = dot(rel, float2(-_NL_CasterCone.y, _NL_CasterCone.x));
-                float range = _NL_CasterCone.w;
-                float edge = min(max(along + _NL_CasterLight.w, 0.0) * _NL_CasterCone.z,
-                                 sqrt(max(range * range - along * along, 0.0)));
-                float extent = sqrt(max(edge * edge - side * side, 0.0));
-                float t = abs(i.positionWS.z - _NL_CasterLight.z) / max(extent, 1e-3);
-                float lit = (1.0 - smoothstep(0.4, 1.0, t)) * step(0.0, along) * step(1e-3, extent);
-                clip(lit - 0.02);
-                return float4(1.0, lit, 0.0, 0.0);
+                float4 lit = 0.0;
+
+                [unroll]
+                for (int k = 0; k < NL_MAX_SHADOWS; k++)
+                {
+                    if (k < (int)_NL_CasterCount)
+                        lit[k] = CasterLit(i.positionWS, i.objectZ, _NL_CasterLights[k], _NL_CasterCones[k], _NL_CasterNear[k]);
+                }
+
+                clip(max(max(lit.x, lit.y), max(lit.z, lit.w)) - 0.02);
+                return lit;
             }
             ENDHLSL
         }
@@ -74,11 +94,14 @@ Shader "Hidden/NightLightShadowCaster"
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
+            #define NL_MAX_SHADOWS 4
+
             Texture2D _NL_Occupancy;
             SamplerState sampler_NL_Occupancy;
             float4 _NL_OccupancySize;
-            float4 _NL_RayStart;
             float4 _NL_RayParams;
+            float4 _NL_ShadowRows[NL_MAX_SHADOWS];
+            float4 _NL_ShadowSpans[NL_MAX_SHADOWS];
 
             struct Varyings
             {
@@ -95,26 +118,40 @@ Shader "Hidden/NightLightShadowCaster"
 
             float4 Frag(Varyings i) : SV_Target
             {
-                float angle = (i.positionCS.x * _NL_RayParams.z - 0.5) * _NL_RayParams.x;
+                int row = min((int)i.positionCS.y, NL_MAX_SHADOWS - 1);
+                float4 start = _NL_ShadowRows[row];
+                float4 span = _NL_ShadowSpans[row];
+                float4 pick = (float4)(int4(0, 1, 2, 3) == row);
+
+                float angle = (i.positionCS.x * _NL_RayParams.x - 0.5) * span.x;
                 float s, c;
                 sincos(angle, s, c);
-                float2 axis = _NL_RayStart.zw;
+                float2 axis = start.zw;
                 float2 dir = float2(axis.x * c - axis.y * s, axis.x * s + axis.y * c);
-                float reach = _NL_RayParams.y;
+                float reach = span.y;
 
-                bool leaving = true;
+                float2 safe = float2(abs(dir.x) > 1e-5 ? dir.x : 1e-5, abs(dir.y) > 1e-5 ? dir.y : 1e-5);
+                float2 t0 = -start.xy / safe;
+                float2 t1 = (_NL_OccupancySize.xy - start.xy) / safe;
+                float2 lo = min(t0, t1);
+                float2 hi = max(t0, t1);
+                float enter = max(max(lo.x, lo.y), 0.0);
+                float leave = min(min(hi.x, hi.y), reach);
+
+                bool leaving = enter <= 0.0;
                 bool inside = false;
-                float strength = 0.0;
-                float exitR = reach;
+                float segment = 0.0;
+                float firstExit = reach;
+                float firstStrength = 0.0;
+                float strongExit = reach;
+                float strongStrength = 0.0;
 
                 [loop]
-                for (float r = 0.0; r < reach; r += _NL_RayParams.w)
+                for (float r = enter; r < leave; r += _NL_RayParams.y)
                 {
-                    float2 p = _NL_RayStart.xy + dir * r;
-                    if (p.x < 0.0 || p.y < 0.0 || p.x > _NL_OccupancySize.x || p.y > _NL_OccupancySize.y) break;
-
-                    float2 occ = _NL_Occupancy.SampleLevel(sampler_NL_Occupancy, p * _NL_OccupancySize.zw, 0).rg;
-                    bool solid = occ.x > 0.5;
+                    float2 p = start.xy + dir * r;
+                    float occ = dot(_NL_Occupancy.SampleLevel(sampler_NL_Occupancy, p * _NL_OccupancySize.zw, 0), pick);
+                    bool solid = occ > 0.01;
                     if (leaving)
                     {
                         leaving = solid;
@@ -123,17 +160,27 @@ Shader "Hidden/NightLightShadowCaster"
                     if (solid)
                     {
                         inside = true;
-                        strength = max(strength, occ.y);
+                        segment = max(segment, occ);
                         continue;
                     }
-                    if (inside)
+                    if (!inside) continue;
+
+                    inside = false;
+                    if (firstStrength <= 0.0)
                     {
-                        exitR = r;
-                        break;
+                        firstExit = r;
+                        firstStrength = segment;
                     }
+                    else if (segment > max(firstStrength, strongStrength))
+                    {
+                        strongExit = r;
+                        strongStrength = segment;
+                    }
+                    segment = 0.0;
+                    if (max(firstStrength, strongStrength) >= 0.999) break;
                 }
 
-                return float4(exitR / reach, inside ? strength : 0.0, 0.0, 0.0);
+                return float4(firstExit / reach, firstStrength, strongExit / reach, strongStrength);
             }
             ENDHLSL
         }

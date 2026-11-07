@@ -64,6 +64,7 @@ namespace MetalRaptors
                 if (vehicle == null || !vehicle.Touches(playerPos, radius)) continue;
 
                 player.Scrape();
+                vehicle.MarkStrike(true);
                 vehicle.Scrape();
             }
         }

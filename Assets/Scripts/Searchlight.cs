@@ -24,6 +24,7 @@ namespace MetalRaptors
         static readonly int GlowSizeId = Shader.PropertyToID("_GlowSize");
         static readonly int GlowIntensityId = Shader.PropertyToID("_GlowIntensity");
         static readonly int SoftId = Shader.PropertyToID("_Soft");
+        static readonly int ShadowRowId = Shader.PropertyToID("_ShadowRow");
 
         static Mesh _mesh;
 
@@ -39,13 +40,20 @@ namespace MetalRaptors
         public float intensity = 0.5f;
         public float glowIntensity = 1.5f;
         public float soft = 4f;
+        public float innerAngle = PlaneSearchlight.InnerAngle;
+        public float outerAngle = PlaneSearchlight.OuterAngle;
+        public Vector3? worldDirection;
 
         Transform _beam;
         MeshRenderer _renderer;
         Material _material;
         float _phase, _seed;
         float _failAt = -1f;
+        float _reach;
+        int _shadowRow = -1;
         bool _out;
+
+        public float Reach => _reach;
 
         public static Searchlight Mount(Transform parent, Vector3 localPosition)
         {
@@ -68,6 +76,19 @@ namespace MetalRaptors
             if (_failAt < 0f) _failAt = Time.time;
         }
 
+        public void Relight()
+        {
+            _failAt = -1f;
+            _out = false;
+        }
+
+        internal void SetShadowRow(int row)
+        {
+            if (_material == null || row == _shadowRow) return;
+            _shadowRow = row;
+            _material.SetFloat(ShadowRowId, row);
+        }
+
         void Build(Shader shader)
         {
             _phase = Random.value * Mathf.PI * 2f;
@@ -75,9 +96,8 @@ namespace MetalRaptors
 
             _material = new Material(shader) { name = "Searchlight Beam (runtime)" };
             _material.SetColor(TintId, BeamColor);
-            _material.SetFloat(CosInnerId, Mathf.Cos(PlaneSearchlight.InnerAngle * 0.5f * Mathf.Deg2Rad));
-            _material.SetFloat(CosOuterId, Mathf.Cos(PlaneSearchlight.OuterAngle * 0.5f * Mathf.Deg2Rad));
             _material.SetFloat(FalloffId, PlaneSearchlight.Falloff);
+            _material.SetFloat(ShadowRowId, _shadowRow);
 
             var beam = new GameObject("Searchlight Beam");
             _beam = beam.transform;
@@ -104,19 +124,24 @@ namespace MetalRaptors
             }
 
             float angle = sweep * Mathf.Sin(Time.time * Mathf.PI * 2f / Mathf.Max(0.1f, period) + _phase);
-            Vector3 dir = transform.rotation * (Quaternion.AngleAxis(angle, sweepAxis) * aim.normalized);
+            Vector3 dir = worldDirection.HasValue && worldDirection.Value.sqrMagnitude > 1e-6f
+                ? worldDirection.Value.normalized
+                : transform.rotation * (Quaternion.AngleAxis(angle, sweepAxis) * aim.normalized);
             Vector3 origin = transform.position;
 
             float reach = length;
             if (!float.IsNaN(reachY))
                 reach = Mathf.Max(0f, origin.y - reachY) / Mathf.Max(MinDown, -dir.y) * reachOvershoot;
+            _reach = reach;
 
             float halfWidth = Mathf.Min(reach,
-                (reach + sourceRadius) * Mathf.Sin(PlaneSearchlight.OuterAngle * 0.5f * Mathf.Deg2Rad));
+                (reach + sourceRadius) * Mathf.Sin(outerAngle * 0.5f * Mathf.Deg2Rad));
 
             _beam.SetPositionAndRotation(origin,
                 Quaternion.LookRotation(dir, Mathf.Abs(dir.z) < 0.9f ? Vector3.forward : Vector3.up));
 
+            _material.SetFloat(CosInnerId, Mathf.Cos(innerAngle * 0.5f * Mathf.Deg2Rad));
+            _material.SetFloat(CosOuterId, Mathf.Cos(outerAngle * 0.5f * Mathf.Deg2Rad));
             _material.SetFloat(IntensityId, intensity * level);
             _material.SetFloat(GlowIntensityId, glowIntensity);
             _material.SetFloat(RangeId, reach);

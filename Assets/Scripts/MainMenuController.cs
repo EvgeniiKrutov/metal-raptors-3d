@@ -5,7 +5,12 @@ namespace MetalRaptors
 {
     public class MainMenuController : MonoBehaviour
     {
-        enum MenuScreen { Home, Eras, Era, Levels, Custom, Options }
+        enum MenuScreen { Home, Eras, Era, Levels, Custom, Options, ResetCareer, Profile }
+
+        const string ResetTitle = "RESET CAREER";
+        const string ResetMessage = "Are you sure? This will erase all career progress.";
+        const float ResetLineSpacing = 1.15f;
+        const float ResetMessageGap = 24f;
 
         MenuPanel _main;
         MenuPanel _challenges;
@@ -21,7 +26,12 @@ namespace MetalRaptors
         GameObject _eraPage;
         GameObject _levelsPage;
         GameObject _customPage;
+        GameObject _resetPage;
         OptionsPage _options;
+        ProfilePage _profile;
+        MenuRankCorner _corner;
+        MenuPanel _resetPanel;
+        Text _resetMessage;
 
         MenuPlaneView _planeView;
 
@@ -55,16 +65,21 @@ namespace MetalRaptors
             MenuLayout.BuildTitle(column, "METAL RAPTORS");
             _main = BuildMainPanel(column);
             _challenges = BuildChallengesPanel(column);
+            _corner = BuildCorner(canvas.transform);
 
             _erasPage = BuildErasPage(canvas.transform);
             _eraPage = BuildEraPage(canvas.transform);
             _levelsPage = BuildLevelsPage(canvas.transform);
             _customPage = BuildCustomPage(canvas.transform);
             _options = new OptionsPage(canvas.transform, GoHome);
+            _profile = new ProfilePage(canvas.transform, BackFromProfile);
+            _resetPage = BuildResetPage(canvas.transform);
 
             ShowHome(_main);
             StartScreen.Open();
         }
+
+        void OnDestroy() => DevCareerReset.Withdraw(OpenResetCareer);
 
         void Update()
         {
@@ -90,6 +105,14 @@ namespace MetalRaptors
             panel.AddNav("online battles", null, interactable: false);
             panel.AddNav("options", () => ScreenFade.Swap(ShowOptions));
             return panel;
+        }
+
+        MenuRankCorner BuildCorner(Transform canvas)
+        {
+            MenuRankCorner corner = MenuRankCorner.Create(canvas, PilotProfile.RankIndex);
+            corner.Avatar.Activated += () => ScreenFade.Swap(ShowProfile);
+            _main.AddFocusable(corner.Avatar);
+            return corner;
         }
 
         MenuPanel BuildChallengesPanel(Transform column)
@@ -119,7 +142,7 @@ namespace MetalRaptors
                 MenuTheme.DescriptionLineSpacing, MenuTheme.Colors.Muted, UIFactory.MediumFont);
 
             float top = MenuTheme.ListTop - MenuTheme.DescriptionRowHeight - MenuTheme.DescriptionToCards;
-            _eras = new MenuCardRow(page, "Era Cards", top, CareerEras.All.Length);
+            _eras = new MenuCardRow(page, "Era Cards", top, MenuTheme.CareerCardSize);
 
             CareerEra[] eras = CareerEras.All;
             for (int i = 0; i < eras.Length; i++)
@@ -253,6 +276,23 @@ namespace MetalRaptors
             return screen.gameObject;
         }
 
+        GameObject BuildResetPage(Transform parent)
+        {
+            Transform column = MenuLayout.CreatePage(parent, "Reset Career Column", MenuTheme.ColumnFraction);
+            MenuLayout.BuildTitle(column, ResetTitle);
+
+            _resetMessage = UIFactory.CreateParagraph(column, ResetMessage, MenuTheme.ItemSize,
+                MenuTheme.ListTop, 0f, MenuTheme.ItemRowHeight, ResetLineSpacing,
+                MenuTheme.Colors.Muted, UIFactory.MediumFont);
+            _resetMessage.rectTransform.anchorMax = Vector2.one;
+
+            _resetPanel = new MenuPanel(column, "Reset Career Panel",
+                MenuTheme.ListTop - MenuTheme.ItemRowHeight - ResetMessageGap);
+            _resetPanel.AddNav("no", BackToOptions);
+            _resetPanel.AddNav("yes", ResetCareer);
+            return column.gameObject;
+        }
+
         void PickMap(int index)
         {
             _mapIndex = index;
@@ -356,6 +396,52 @@ namespace MetalRaptors
             _group = _options;
         }
 
+        void BackToOptions() => ScreenFade.Swap(ShowOptions);
+
+        void ShowProfile()
+        {
+            SetScreen(MenuScreen.Profile);
+            _group = _profile;
+        }
+
+        void BackFromProfile() => ScreenFade.Swap(() =>
+        {
+            ShowHome(_main);
+            _main.Focus(_corner.Avatar);
+        });
+
+        void OpenResetCareer()
+        {
+            if (ScreenFade.IsBusy || _screen != MenuScreen.Options) return;
+            ScreenFade.Swap(ShowResetCareer);
+        }
+
+        void ShowResetCareer()
+        {
+            SetScreen(MenuScreen.ResetCareer);
+            FitResetMessage();
+            _resetPanel.FocusFirst();
+            _group = _resetPanel;
+        }
+
+        void FitResetMessage()
+        {
+            Canvas.ForceUpdateCanvases();
+
+            RectTransform message = _resetMessage.rectTransform;
+            float height = Mathf.Max(MenuTheme.ItemRowHeight, _resetMessage.preferredHeight);
+            message.sizeDelta = new Vector2(message.sizeDelta.x, height);
+
+            var panel = (RectTransform)_resetPanel.Root.transform;
+            panel.anchoredPosition = new Vector2(0f, MenuTheme.ListTop - height - ResetMessageGap);
+        }
+
+        static void ResetCareer()
+        {
+            CampaignProgress.Reset();
+            ScreenFade.Load(SceneNames.MainMenu);
+        }
+
         void SetScreen(MenuScreen screen)
         {
             _screen = screen;
@@ -365,7 +451,13 @@ namespace MetalRaptors
             _levelsPage.SetActive(screen == MenuScreen.Levels);
             _customPage.SetActive(screen == MenuScreen.Custom);
             _options.SetActive(screen == MenuScreen.Options);
+            _resetPage.SetActive(screen == MenuScreen.ResetCareer);
             _planeView.SetActive(screen == MenuScreen.Home);
+            _corner.SetActive(screen == MenuScreen.Home);
+            _profile.SetActive(screen == MenuScreen.Profile);
+
+            if (screen == MenuScreen.Options) DevCareerReset.Offer(OpenResetCareer);
+            else DevCareerReset.Withdraw(OpenResetCareer);
         }
 
         void Cancel()
@@ -384,6 +476,16 @@ namespace MetalRaptors
             {
                 if (_options.Cancel()) return;
                 GoHome();
+                return;
+            }
+            if (_screen == MenuScreen.ResetCareer)
+            {
+                BackToOptions();
+                return;
+            }
+            if (_screen == MenuScreen.Profile)
+            {
+                BackFromProfile();
                 return;
             }
             if (_screen != MenuScreen.Home || _homePanel != _main) GoHome();

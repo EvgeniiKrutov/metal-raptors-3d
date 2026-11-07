@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Unity.Profiling;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.InputSystem;
 using UnityEngine.Profiling;
 using UnityEngine.SceneManagement;
@@ -36,6 +37,7 @@ namespace MetalRaptors
         const float SpawnButtonHeight = 30f;
         const float SpawnButtonGap = 8f;
         const int SpawnFontSize = 14;
+        const float LevelButtonStep = SpawnButtonHeight + SpawnButtonGap;
 
         const string FireOffCaption = "AERODROME FIRE   OFF";
         const string FireOnCaption = "AERODROME FIRE   ON";
@@ -94,11 +96,29 @@ namespace MetalRaptors
         bool _fireShown;
         bool _fireOn;
 
+        GameObject _levelSection;
+        RectTransform _levelRt;
+        float _levelHeight;
+
         GameObject _skipSection;
         RectTransform _skipRt;
         Text _skipLabel;
-        float _skipHeight;
         bool _skipShown;
+
+        GameObject _jumpSection;
+        RectTransform _jumpRt;
+        Text _jumpLabel;
+        bool _jumpShown;
+
+        GameObject _finalSection;
+        RectTransform _finalRt;
+        Text _finalLabel;
+        bool _finalShown;
+
+        GameObject _careerSection;
+        RectTransform _careerRt;
+        float _careerHeight;
+        bool _careerShown;
 
         GameObject _spawnSection;
         RectTransform _spawnRt;
@@ -213,6 +233,7 @@ namespace MetalRaptors
             _statsHeight = -y - RowGap + 2f * PadY;
             BuildFireSection(content, y);
             BuildSkipSection(content, y);
+            BuildCareerSection(content, y);
             BuildSpawnSection(content, y);
             rt.sizeDelta = new Vector2(PanelWidth, _statsHeight);
         }
@@ -256,8 +277,8 @@ namespace MetalRaptors
         void BuildSkipSection(Transform content, float y)
         {
             RectTransform rt = CreateSection(content, "Level");
-            _skipSection = rt.gameObject;
-            _skipRt = rt;
+            _levelSection = rt.gameObject;
+            _levelRt = rt;
             float top = y;
 
             UIFactory.CreateRule(rt, y, new Vector2(PanelWidth - 2f * PadX, 1f), MeterTrackColor);
@@ -267,13 +288,52 @@ namespace MetalRaptors
                 TitleColor, UIFactory.MediumFont);
             y -= TitleRowHeight + SpawnCaptionGap;
 
-            Button button = CreateButton(rt, string.Empty, ref y);
-            button.onClick.AddListener(DevSkip.Run);
-            _skipLabel = button.GetComponentInChildren<Text>();
-            _skipLabel.color = ValueColor;
+            _levelHeight = top - y;
+            _levelSection.SetActive(false);
 
-            _skipHeight = top - y - SpawnButtonGap + RowGap;
-            _skipSection.SetActive(false);
+            _skipRt = CreateSection(content, "Level Skip");
+            _skipSection = _skipRt.gameObject;
+            _skipLabel = CreateLevelButton(_skipRt, y, DevSkip.Run);
+
+            _jumpRt = CreateSection(content, "Level Jump");
+            _jumpSection = _jumpRt.gameObject;
+            _jumpLabel = CreateLevelButton(_jumpRt, y, DevJump.Run);
+
+            _finalRt = CreateSection(content, "Level Final");
+            _finalSection = _finalRt.gameObject;
+            _finalLabel = CreateLevelButton(_finalRt, y, DevFinalJump.Run);
+        }
+
+        static Text CreateLevelButton(RectTransform section, float y, UnityAction run)
+        {
+            Button button = CreateButton(section, string.Empty, ref y);
+            button.onClick.AddListener(run);
+            Text label = button.GetComponentInChildren<Text>();
+            label.color = ValueColor;
+            section.gameObject.SetActive(false);
+            return label;
+        }
+
+        void BuildCareerSection(Transform content, float y)
+        {
+            RectTransform rt = CreateSection(content, "Career");
+            _careerSection = rt.gameObject;
+            _careerRt = rt;
+            float top = y;
+
+            UIFactory.CreateRule(rt, y, new Vector2(PanelWidth - 2f * PadX, 1f), MeterTrackColor);
+            y -= SpawnRuleGap;
+
+            UIFactory.CreateLabel(rt, "CAREER", TitleSize, y, TitleRowHeight,
+                TitleColor, UIFactory.MediumFont);
+            y -= TitleRowHeight + SpawnCaptionGap;
+
+            Button button = CreateButton(rt, "RESET CAREER", ref y);
+            button.onClick.AddListener(DevCareerReset.Run);
+            button.GetComponentInChildren<Text>().color = ValueColor;
+
+            _careerHeight = top - y - SpawnButtonGap + RowGap;
+            _careerSection.SetActive(false);
         }
 
         void BuildSpawnSection(Transform content, float y)
@@ -416,6 +476,7 @@ namespace MetalRaptors
 
             TickFire();
             TickSkip();
+            TickCareer();
             TickSpawn();
             TickNight(kb);
 
@@ -494,12 +555,31 @@ namespace MetalRaptors
 
         void TickSkip()
         {
-            bool shown = DevSkip.Available;
-            if (shown == _skipShown) return;
+            bool skip = DevSkip.Available;
+            bool jump = DevJump.Available;
+            bool final = DevFinalJump.Available;
+            if (skip == _skipShown && jump == _jumpShown && final == _finalShown) return;
 
-            _skipShown = shown;
-            if (_skipSection != null) _skipSection.SetActive(shown);
-            if (shown && _skipLabel != null) _skipLabel.text = DevSkip.Caption;
+            _skipShown = skip;
+            _jumpShown = jump;
+            _finalShown = final;
+            if (_levelSection != null) _levelSection.SetActive(skip || jump || final);
+            if (_skipSection != null) _skipSection.SetActive(skip);
+            if (_jumpSection != null) _jumpSection.SetActive(jump);
+            if (_finalSection != null) _finalSection.SetActive(final);
+            if (skip && _skipLabel != null) _skipLabel.text = DevSkip.Caption;
+            if (jump && _jumpLabel != null) _jumpLabel.text = DevJump.Caption;
+            if (final && _finalLabel != null) _finalLabel.text = DevFinalJump.Caption;
+            Layout();
+        }
+
+        void TickCareer()
+        {
+            bool shown = DevCareerReset.Available;
+            if (shown == _careerShown) return;
+
+            _careerShown = shown;
+            if (_careerSection != null) _careerSection.SetActive(shown);
             Layout();
         }
 
@@ -512,11 +592,21 @@ namespace MetalRaptors
         void Layout()
         {
             float fire = _fireShown ? _fireHeight : 0f;
-            float skip = _skipShown ? _skipHeight : 0f;
+            float skipButton = _skipShown ? LevelButtonStep : 0f;
+            float jumpButton = _jumpShown ? LevelButtonStep : 0f;
+            float finalButton = _finalShown ? LevelButtonStep : 0f;
+            float skip = _skipShown || _jumpShown || _finalShown
+                ? _levelHeight + skipButton + jumpButton + finalButton - SpawnButtonGap + RowGap
+                : 0f;
+            float career = _careerShown ? _careerHeight : 0f;
+            if (_levelRt != null) _levelRt.offsetMax = new Vector2(0f, -fire);
             if (_skipRt != null) _skipRt.offsetMax = new Vector2(0f, -fire);
-            if (_spawnRt != null) _spawnRt.offsetMax = new Vector2(0f, -(fire + skip));
+            if (_jumpRt != null) _jumpRt.offsetMax = new Vector2(0f, -(fire + skipButton));
+            if (_finalRt != null) _finalRt.offsetMax = new Vector2(0f, -(fire + skipButton + jumpButton));
+            if (_careerRt != null) _careerRt.offsetMax = new Vector2(0f, -(fire + skip));
+            if (_spawnRt != null) _spawnRt.offsetMax = new Vector2(0f, -(fire + skip + career));
             if (_panelRt != null)
-                _panelRt.sizeDelta = new Vector2(PanelWidth, fire + skip
+                _panelRt.sizeDelta = new Vector2(PanelWidth, fire + skip + career
                     + (!_spawnShown ? _statsHeight
                         : _zeppelinShown ? _zeppelinPanelHeight : _spawnPanelHeight));
         }

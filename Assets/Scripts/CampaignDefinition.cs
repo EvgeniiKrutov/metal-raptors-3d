@@ -37,6 +37,8 @@ namespace MetalRaptors
         public PlaneModelConfig plane;
         public string skin;
         public bool gunner;
+        public bool stealth;
+        public bool lowSky;
         public string arenaScript;
         public CampaignOutroLine[] arenaLines;
         public string bossMusic;
@@ -212,7 +214,7 @@ namespace MetalRaptors
             zeppelins = true,
             flak = 1.0f,
             enemyRotationScale = 0.80f,
-            supplyDrops = 1,
+            supplyDrops = 3,
             companionFoe = PlaneModels.Eindecker,
             companionPilots = new[] { "roussel" },
             title = "WARMING ENGINES",
@@ -239,7 +241,7 @@ namespace MetalRaptors
             zeppelins = true,
             flak = 1.1f,
             enemyRotationScale = 0.84f,
-            supplyDrops = 3,
+            supplyDrops = 5,
             companionFoe = PlaneModels.Eindecker,
             companionPilots = new[] { "crane", "roussel", "marchand" },
             title = "THE NUMBERS",
@@ -341,12 +343,14 @@ namespace MetalRaptors
             clouds = new CloudsPart { frequency = CloudLevel.Low },
             script = "level6",
             plane = PlaneModels.Sopwith,
-            skin = "green",
-            flak = 1.35f,
+            skin = "mahogany",
+            stealth = true,
+            lowSky = true,
+            flak = 0f,
             enemyRotationScale = 0.91f,
-            supplyDrops = 1,
+            supplyDrops = 11,
             title = "NOTHING BURNS AT NIGHT",
-            dateline = "19 September 1917 — Wulpendamme, behind the Flanders coast — night",
+            dateline = "22 June 1917 — Wulpendamme, behind the Flanders coast — night",
             lore = Lore1,
             outro = OutroLorem(6),
             journal = JournalLorem,

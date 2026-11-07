@@ -59,7 +59,7 @@ Shader "Hidden/NightLightAir"
             {
                 half valid;
                 float3 planePos = NightPlanePoint(_WorldSpaceCameraPos, i.positionWS - _WorldSpaceCameraPos, valid);
-                half3 air = NightLampAirShadowed(planePos) * (half)(_NightHaze * _NightBlend) * valid;
+                half3 air = NightLampAir(planePos) * (half)(_NightHaze * _NightBlend) * valid;
                 return half4(air, 0.0h);
             }
             ENDHLSL

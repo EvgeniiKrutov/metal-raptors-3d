@@ -38,8 +38,13 @@ namespace MetalRaptors
         public readonly float ArtBottom;
 
         public CardMetrics(int visible, int titleLines, float top)
+            : this(MenuTheme.RowCardSize(visible, top), titleLines)
         {
-            Size = MenuTheme.RowCardSize(visible, top);
+        }
+
+        public CardMetrics(float size, int titleLines)
+        {
+            Size = size;
 
             float k = Size / MenuTheme.CardSizeMax;
             Gap = MenuTheme.CardGap * k;
@@ -187,6 +192,24 @@ namespace MetalRaptors
         public const float BadgeValueGap = 16f;
         public const float BadgeToContent = 16f;
 
+        public const float RankBarWidth = 220f;
+        public const float RankBadgeSize = 56f;
+        public const float RankBarToBadge = 22f;
+        public const float RankBadgeToName = 12f;
+        public const int RankNameSize = 18;
+        public const float RankRowGap = 14f;
+
+        public const float CornerAvatarSize = 110f;
+        public const float CornerBottom = 48f;
+        public const float AvatarFocusScale = 1.12f;
+
+        public const int ProfileRankSize = 36;
+        public const float ProfileRankRowHeight = 46f;
+        public const float ProfileRankToBar = 28f;
+        public const float ProfileBarValueGap = 18f;
+        public const float ProfileBarToBack = 44f;
+        public const float ProfileBadgeSize = 420f;
+
         public const float GaragePadLeftBase = 200f;
         public const float GarageArrowToColumn = 80f;
 
@@ -215,6 +238,7 @@ namespace MetalRaptors
 
         public const float CardSizeMax = 360f;
         public const float CardSizeMin = 280f;
+        public const float CareerCardSize = 420f;
         public const float CardGap = 40f;
         public const float CardBorder = 4f;
         public const float CardPad = 28f;

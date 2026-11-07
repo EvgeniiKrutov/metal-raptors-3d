@@ -17,6 +17,8 @@ Shader "Hidden/NightLightShape"
             #pragma vertex Vert
             #pragma fragment Frag
 
+            #include "../NightShadows.hlsl"
+
             #define NL_MAX_LIGHTS 32
 
             float4 _NL_A[NL_MAX_LIGHTS];
@@ -26,6 +28,7 @@ Shader "Hidden/NightLightShape"
             float4x4 _NL_MaskVP;
             float _NL_MaskEncode;
             float _NL_DepthRange;
+            float _NL_PlaneZ;
 
             struct Varyings
             {
@@ -34,6 +37,8 @@ Shader "Hidden/NightLightShape"
                 nointerpolation float4 shape : TEXCOORD1;
                 nointerpolation float4 color : TEXCOORD2;
                 nointerpolation float falloff : TEXCOORD3;
+                float2 world : TEXCOORD4;
+                nointerpolation float row : TEXCOORD5;
             };
 
             half NL_Attenuation(float2 local, float4 b, float isCone, half falloff)
@@ -90,12 +95,15 @@ Shader "Hidden/NightLightShape"
                 o.shape = float4(range, b.yzw);
                 o.color = c;
                 o.falloff = d.x;
+                o.world = world;
+                o.row = d.w;
                 return o;
             }
 
             half4 Frag(Varyings i) : SV_Target
             {
-                half att = NL_Attenuation(i.local, i.shape, i.color.w, (half)i.falloff);
+                half att = NL_Attenuation(i.local, i.shape, i.color.w, (half)i.falloff)
+                         * NightShadow(i.row, float3(i.world, _NL_PlaneZ));
                 float3 rgb = i.color.rgb * att * _NL_MaskEncode;
                 float lum = dot(rgb, float3(0.2126, 0.7152, 0.0722));
                 float depth = saturate(NL_DepthExtent(i.local, i.shape, i.color.w) / max(_NL_DepthRange, 1e-3));

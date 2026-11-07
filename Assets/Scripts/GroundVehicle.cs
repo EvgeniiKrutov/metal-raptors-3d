@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace MetalRaptors
 {
-    public abstract class GroundVehicle : MonoBehaviour, IDamageable
+    public abstract class GroundVehicle : MonoBehaviour, IDamageable, IScoreTarget
     {
         public const float FenceStandoff = 45f;
         public const float QueueGap = 30f;
@@ -67,6 +67,7 @@ namespace MetalRaptors
         bool _standDown;
         bool _dead;
         bool _reported;
+        bool _byPlayer;
 
         FloatingHealthBar _bar;
 
@@ -135,6 +136,11 @@ namespace MetalRaptors
             ApplyDamage(CollisionDamage);
             if (!_dead) Sparks.Spawn(Centre, ModelSize);
             return true;
+        }
+
+        public void MarkStrike(bool byPlayer)
+        {
+            if (!_dead) _byPlayer = byPlayer;
         }
 
         public void TakeDamage(float amount)
@@ -229,6 +235,7 @@ namespace MetalRaptors
             if (_collider != null) _collider.enabled = false;
             if (_bar != null) _bar.Destroy();
 
+            if (_byPlayer) PilotProfile.Score(PilotRanks.PointsFor(this));
             Report();
             Destroy(gameObject, BurnSeconds);
         }

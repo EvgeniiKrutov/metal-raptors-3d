@@ -46,7 +46,14 @@ namespace MetalRaptors
 
         public static void Complete(int level)
         {
+            PilotProfile.Finish(level);
             if (GameManager.Instance != null) GameManager.Instance.CompleteCampaignLevel(level);
+        }
+
+        public static void Reset()
+        {
+            CampaignCheckpoint.Clear();
+            if (GameManager.Instance != null) GameManager.Instance.ResetCampaignProgress();
         }
     }
 

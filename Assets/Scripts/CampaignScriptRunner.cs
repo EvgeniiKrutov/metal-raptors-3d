@@ -72,6 +72,24 @@ namespace MetalRaptors
         bool AssaultSkipped { get; }
     }
 
+    public interface IStealthHost
+    {
+        void SetStealth(bool on);
+        void SetPatrols(bool on, int tiers);
+        void SetBackup(EnemyGroup[] groups);
+        void PlaceGun(EnemyGroup[] hit);
+        bool GunInView { get; }
+        bool GunDown { get; }
+        bool Alarmed { get; }
+        void LockGunArena();
+        void UnlockArena();
+        void ReturnToTunnel();
+        bool Returning { get; }
+        void PlaceUboats();
+        void BeginFinale();
+        bool FinaleDone { get; }
+    }
+
     public class CampaignScriptRunner : MonoBehaviour
     {
         const float HoldMin = 0.8f;
@@ -125,6 +143,12 @@ namespace MetalRaptors
                     abilityHost.Unlock(step.ability);
                 else if (step.op == CampaignOp.Jams && _host is IGunnerHost gunnerHost)
                     gunnerHost.EnableJams();
+                else if (step.op == CampaignOp.Stealth && _host is IStealthHost stealthHost)
+                    stealthHost.SetStealth(step.hold);
+                else if (step.op == CampaignOp.Backup && _host is IStealthHost backupHost)
+                    backupHost.SetBackup(step.groups);
+                else if (step.op == CampaignOp.Patrol && _host is IStealthHost patrolHost)
+                    patrolHost.SetPatrols(step.hold, step.count);
             }
         }
 
@@ -275,6 +299,42 @@ namespace MetalRaptors
 
                     case CampaignOp.Assault:
                         yield return Assault(step, index);
+                        break;
+
+                    case CampaignOp.Stealth:
+                        if (_host is IStealthHost stealthHost) stealthHost.SetStealth(step.hold);
+                        break;
+
+                    case CampaignOp.Patrol:
+                        if (_host is IStealthHost patrolHost) patrolHost.SetPatrols(step.hold, step.count);
+                        break;
+
+                    case CampaignOp.Lull:
+                        yield return Lull(step.seconds);
+                        break;
+
+                    case CampaignOp.Backup:
+                        if (_host is IStealthHost backupHost) backupHost.SetBackup(step.groups);
+                        break;
+
+                    case CampaignOp.AaGun:
+                        yield return HoldGun(step);
+                        break;
+
+                    case CampaignOp.Tunnel:
+                        yield return Tunnel();
+                        if (Running) _host.Checkpoint(index + 1, _warnedFirst, _warnedPair);
+                        break;
+
+                    case CampaignOp.Uboat:
+                        if (!Running) yield break;
+                        if (!(_host is IStealthHost finaleHost))
+                        {
+                            _host.CompleteLevel();
+                            yield break;
+                        }
+                        finaleHost.BeginFinale();
+                        while (Running && !finaleHost.FinaleDone) yield return null;
                         break;
 
                     case CampaignOp.Raid:
@@ -491,10 +551,60 @@ namespace MetalRaptors
             }
         }
 
+        IEnumerator Lull(float seconds)
+        {
+            var host = _host as IStealthHost;
+            float left = seconds;
+            while (left > 0f && Running)
+            {
+                if (host == null || !host.Alarmed) left -= CutscenePause.Delta;
+                yield return null;
+            }
+        }
+
         IEnumerator WaitForClear()
         {
             yield return null;
             while (Running && _host.EnemiesAlive > 0) yield return null;
+        }
+
+        IEnumerator Tunnel()
+        {
+            if (!(_host is IStealthHost host)) yield break;
+
+            host.ReturnToTunnel();
+            while (Running && host.Returning) yield return null;
+        }
+
+        IEnumerator HoldGun(CampaignStep step)
+        {
+            if (!(_host is IStealthHost host)) yield break;
+
+            host.PlaceGun(step.hit);
+            if (step.uboats) host.PlaceUboats();
+            while (Running && !host.GunInView) yield return null;
+            if (!Running) yield break;
+
+            host.LockGunArena();
+            _host.ArmSupply(step.count);
+            while (Running && !host.GunDown) yield return null;
+            if (!Running) yield break;
+
+            yield return Reinforce(step.groups);
+            _host.ArmSupply(0);
+            if (Running) host.UnlockArena();
+        }
+
+        IEnumerator Reinforce(EnemyGroup[] groups)
+        {
+            if (groups != null && groups.Length > 0)
+            {
+                yield return Warn(groups);
+                if (!Running) yield break;
+                _host.SpawnWave(groups);
+            }
+
+            yield return WaitForClear();
         }
 
         IEnumerator Zeppelin(CampaignStep step, int index)

@@ -8,6 +8,8 @@ namespace MetalRaptors
     {
         public const int MaxLights = 32;
 
+        public const int MaxShadowLights = 4;
+
         public const float ViewWidth = 860f;
 
         public static float PlaneZ = 100f;
@@ -43,6 +45,7 @@ namespace MetalRaptors
         static readonly List<NightLight2D> _active = new List<NightLight2D>(64);
         static readonly FlashSlot[] _flashes = new FlashSlot[FlashCapacity];
         static readonly Candidate[] _candidates = new Candidate[CandidateCapacity];
+        static readonly float[] _shadowScores = new float[MaxShadowLights];
 
         static readonly ProfilerMarker CollectMarker = new ProfilerMarker("NightLights.Collect");
 
@@ -79,16 +82,54 @@ namespace MetalRaptors
                     : renderer.renderingLayerMask & ~CasterRenderingLayer;
         }
 
-        internal static NightLight2D ShadowCaster()
+        internal static int PickShadowLights(Rect area, float planeZ, int max, NightLight2D[] into)
         {
-            NightLight2D best = null;
-            for (int i = 0; i < _active.Count; i++)
+            int limit = Mathf.Min(Mathf.Min(max, into.Length), MaxShadowLights);
+            int count = 0;
+            Vector2 center = area.center;
+
+            for (int i = 0; i < _active.Count && limit > 0; i++)
             {
                 NightLight2D light = _active[i];
                 if (light == null || !light.castShadows || light.type != NightLightType.Cone) continue;
-                if (best == null || light.priority > best.priority) best = light;
+                if (light.intensity <= 0f) continue;
+
+                Vector3 pos = light.transform.position;
+                if (!Reaches(area, planeZ, pos, Mathf.Max(0.01f, light.ShadowRange))) continue;
+
+                float score = light.shadowLead ? -1f : ((Vector2)pos - center).sqrMagnitude;
+                int slot = count;
+                while (slot > 0 && score < _shadowScores[slot - 1]) slot--;
+                if (slot >= limit) continue;
+
+                for (int k = Mathf.Min(count, limit - 1); k > slot; k--)
+                {
+                    into[k] = into[k - 1];
+                    _shadowScores[k] = _shadowScores[k - 1];
+                }
+                into[slot] = light;
+                _shadowScores[slot] = score;
+                if (count < limit) count++;
             }
-            return best;
+            return count;
+        }
+
+        internal static void AssignShadowRows(NightLight2D[] picks, int count)
+        {
+            for (int i = 0; i < _active.Count; i++)
+            {
+                NightLight2D light = _active[i];
+                if (light == null) continue;
+
+                int row = -1;
+                for (int k = 0; k < count; k++)
+                {
+                    if (picks[k] != light) continue;
+                    row = k;
+                    break;
+                }
+                light.SetShadowRow(row);
+            }
         }
 
         public static void Flash(Vector3 position, Color color, float intensity, float radius,
@@ -214,7 +255,7 @@ namespace MetalRaptors
                             Mathf.Max(0f, light.sourceRadius)),
                         c = col,
                         d = new Vector4(Mathf.Clamp(light.falloff, 0.1f, 8f),
-                            light.occludedByTerrain ? 1f : 0f, pos.z, 0f),
+                            light.occludedByTerrain ? 1f : 0f, pos.z, light.shadowRow),
                     };
                 }
 
@@ -242,7 +283,7 @@ namespace MetalRaptors
                         a = new Vector4(f.position.x, f.position.y, 1f, 0f),
                         b = new Vector4(f.radius, 1f, 0f, 0f),
                         c = Linear(f.color, intensity),
-                        d = new Vector4(1.5f, 0f, f.position.z, 0f),
+                        d = new Vector4(1.5f, 0f, f.position.z, -1f),
                     };
                 }
 

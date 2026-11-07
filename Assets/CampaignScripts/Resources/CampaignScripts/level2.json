@@ -13,6 +13,9 @@
 
     { "op": "wait", "seconds": 2.5 },
 
+    { "op": "supply", "count": 1 },
+    { "op": "wave", "enemies": [ { "plane": "eindecker", "count": 1 } ] },
+    { "op": "wait", "seconds": 4 },
     { "op": "wave", "enemies": [ { "plane": "eindecker", "count": 1 } ] },
     { "op": "wait", "seconds": 4 },
     { "op": "wave", "enemies": [ { "plane": "eindecker", "count": 2 } ] },
@@ -35,7 +38,7 @@
 
     { "op": "wave", "enemies": [ { "plane": "eindecker", "count": 2 } ] },
     { "op": "wait", "seconds": 4 },
-    { "op": "wave", "enemies": [ { "plane": "eindecker", "count": 1 } ] },
+    { "op": "wave", "enemies": [ { "plane": "eindecker", "count": 2 } ] },
 
     { "op": "wait", "seconds": 1.5 },
 
@@ -49,6 +52,9 @@
     { "op": "say", "speaker": "roussel", "line": "l2_line27" },
 
     { "op": "unlock", "ability": "roll" },
+    { "op": "supply", "count": 1 },
+    { "op": "wave", "enemies": [ { "plane": "albatros", "count": 1 } ] },
+    { "op": "wait", "seconds": 4 },
     { "op": "wave", "enemies": [ { "plane": "albatros", "count": 2 } ] },
 
     { "op": "wait", "seconds": 1.5 },

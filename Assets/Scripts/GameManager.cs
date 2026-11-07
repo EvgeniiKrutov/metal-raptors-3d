@@ -115,6 +115,13 @@ namespace MetalRaptors
             PlayerPrefs.Save();
         }
 
+        public void ResetCampaignProgress()
+        {
+            CampaignLevelsCompleted = 0;
+            PlayerPrefs.SetInt(PrefCampaign, CampaignLevelsCompleted);
+            PlayerPrefs.Save();
+        }
+
         public void UnlockLevel(int level)
         {
             if (level <= HighestUnlockedLevel) return;

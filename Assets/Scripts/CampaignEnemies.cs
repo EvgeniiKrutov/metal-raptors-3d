@@ -38,11 +38,15 @@ namespace MetalRaptors
             new Dictionary<EnemyController, PlaneModelConfig>();
         readonly Queue<Reserve> _reserve = new Queue<Reserve>();
         readonly HashSet<EnemyController> _leaving = new HashSet<EnemyController>();
+        readonly HashSet<EnemyController> _bosses = new HashSet<EnemyController>();
         readonly EnemyConfig _scout;
         readonly EnemyConfig _fighter;
+        readonly Dictionary<PlaneModelConfig, EnemyConfig> _armed =
+            new Dictionary<PlaneModelConfig, EnemyConfig>();
+        readonly bool _scoutFixed;
+        readonly bool _fighterFixed;
         readonly Rigidbody _player;
         readonly float _groundY;
-        readonly float _worldTop;
         readonly string _skin;
 
         float _minX;
@@ -53,9 +57,13 @@ namespace MetalRaptors
 
         public float ModelScale { get; set; } = 1f;
 
+        public float WorldTop { get; set; }
+
         public bool LiftClearance { get; set; }
 
         public bool Pursuit { get; set; }
+
+        public PlaneModelConfig PacedPlane { get; set; }
 
         public float PursuitMinY { get; set; }
 
@@ -66,6 +74,8 @@ namespace MetalRaptors
         public float PursuitSpacing { get; set; }
 
         public float Facing { get; set; } = 1f;
+
+        public event System.Action<EnemyController> Downed;
 
         public int AliveCount => _live.Count + _reserve.Count;
 
@@ -90,7 +100,7 @@ namespace MetalRaptors
         {
             _player = player;
             _groundY = groundY;
-            _worldTop = worldTop;
+            WorldTop = worldTop;
 
             _scout = EnemyConfigs.Load(EnemyRole.Scout);
             _fighter = EnemyConfigs.Load(EnemyRole.Fighter);
@@ -99,9 +109,18 @@ namespace MetalRaptors
             _skin = level.enemySkin;
             EnemyConfigs.Scale(_scout, level.enemyRotationScale);
             EnemyConfigs.Scale(_fighter, level.enemyRotationScale);
-            if (level.scoutShotsPerSec > 0f) _scout.fireRate = 1f / level.scoutShotsPerSec;
+            _scoutFixed = level.scoutShotsPerSec > 0f;
+            _fighterFixed = level.fighterShotsPerSec > 0f;
+            if (_scoutFixed) _scout.fireRate = 1f / level.scoutShotsPerSec;
             if (level.scoutFireCone > 0f) _scout.fireAngleThreshold = level.scoutFireCone;
-            if (level.fighterShotsPerSec > 0f) _fighter.fireRate = 1f / level.fighterShotsPerSec;
+            if (_fighterFixed) _fighter.fireRate = 1f / level.fighterShotsPerSec;
+        }
+
+        EnemyConfig Base(PlaneModelConfig plane)
+        {
+            EnemyConfig config = EnemyConfigs.For(plane, _scout, _fighter);
+            bool fixedRate = config == _scout ? _scoutFixed : _fighterFixed;
+            return fixedRate ? config : EnemyConfigs.Armed(plane, config, _armed);
         }
 
         public void SetWindow(float camX, float halfViewWidth)
@@ -149,9 +168,10 @@ namespace MetalRaptors
             }
         }
 
-        public void Spawn(EnemyGroup[] groups, float camX, float halfViewWidth)
+        public List<EnemyController> Spawn(EnemyGroup[] groups, float camX, float halfViewWidth)
         {
-            if (groups == null) return;
+            var spawned = new List<EnemyController>();
+            if (groups == null) return spawned;
 
             SetWindow(camX, halfViewWidth);
 
@@ -162,12 +182,13 @@ namespace MetalRaptors
 
                 for (int i = 0; i < group.count; i++, index++)
                 {
-                    EnemyConfig config = Lifted(EnemyConfigs.For(group.plane, _scout, _fighter),
+                    EnemyConfig config = Lifted(Base(group.plane),
                         group.plane);
-                    SpawnOne(group.plane, SpawnPoint(camX, halfViewWidth, index, config,
-                        CeilingFor(group.plane)), config);
+                    spawned.Add(SpawnOne(group.plane, SpawnPoint(camX, halfViewWidth, index, config,
+                        CeilingFor(group.plane)), config));
                 }
             }
+            return spawned;
         }
 
         public void SpawnBehind(EnemyGroup[] groups, float camX, float halfViewWidth, float entryY)
@@ -259,7 +280,7 @@ namespace MetalRaptors
                     SpawnEdge edge = edges[edges.Count - 1];
                     edges.RemoveAt(edges.Count - 1);
 
-                    EnemyConfig config = Lifted(EnemyConfigs.For(group.plane, _scout, _fighter),
+                    EnemyConfig config = Lifted(Base(group.plane),
                         group.plane);
                     SpawnOne(group.plane, SpreadPoint(camPos, halfViewWidth, halfViewHeight, edge,
                         config, CeilingFor(group.plane)), config);
@@ -281,7 +302,7 @@ namespace MetalRaptors
             SpawnEdge edge, EnemyConfig config, float ceilingY)
         {
             EnemyConfigs.SpawnBand(config, _groundY, ceilingY, out float minY, out float maxY);
-            maxY = Mathf.Max(minY, Mathf.Min(maxY, _worldTop - CeilingPad));
+            maxY = Mathf.Max(minY, Mathf.Min(maxY, WorldTop - CeilingPad));
 
             float z = _player != null ? _player.position.z : 0f;
             float extra = Random.Range(0f, SpreadStagger);
@@ -353,14 +374,27 @@ namespace MetalRaptors
             SetWindow(camX, halfViewWidth);
 
             EnemyConfig config = Object.Instantiate(_fighter);
+            if (!_fighterFixed) config.fireRate = EnemyConfigs.FireGap(plane, config.fireRate);
             config.health = Mathf.Max(1f,
                 EnemyConfigs.For(plane, _scout, _fighter).health * Mathf.Max(0.01f, healthScale));
             if (flySpeed > 0f) config.flySpeed = flySpeed;
             Raise(config, ClearanceLift(plane));
 
             float z = _player != null ? _player.position.z : 0f;
-            return SpawnOne(plane, new Vector3(position.x, position.y, z), config, skin);
+            EnemyController boss = SpawnOne(plane, new Vector3(position.x, position.y, z), config, skin);
+            _bosses.Add(boss);
+            return boss;
         }
+
+        public EnemyController SpawnAt(PlaneModelConfig plane, Vector2 position)
+        {
+            if (plane == null) return null;
+
+            float z = _player != null ? _player.position.z : 0f;
+            return SpawnOne(plane, new Vector3(position.x, position.y, z));
+        }
+
+        public float CeilingOf(PlaneModelConfig plane) => CeilingFor(plane);
 
         public EnemyController SpawnEscort(PlaneModelConfig plane, Vector2 position)
         {
@@ -380,11 +414,12 @@ namespace MetalRaptors
             _live.Remove(enemy);
             _planes.Remove(enemy);
             _leaving.Remove(enemy);
+            _bosses.Remove(enemy);
             Object.Destroy(enemy.gameObject);
         }
 
         float CeilingFor(PlaneModelConfig plane) =>
-            _worldTop - plane.OnScreenSize * ModelScale / 2f;
+            WorldTop - plane.OnScreenSize * ModelScale / 2f;
 
         float ClearanceLift(PlaneModelConfig plane) =>
             LiftClearance ? plane.OnScreenSize * 0.5f * Mathf.Max(0f, ModelScale - 1f) : 0f;
@@ -413,7 +448,7 @@ namespace MetalRaptors
         EnemyController SpawnOne(PlaneModelConfig plane, Vector3 position,
             EnemyConfig config = null, PlaneSkin skin = null, bool sneak = false, bool high = false)
         {
-            if (config == null) config = Lifted(EnemyConfigs.For(plane, _scout, _fighter), plane);
+            if (config == null) config = Lifted(Base(plane), plane);
 
             var go = new GameObject("Enemy");
             go.transform.position = position;
@@ -437,6 +472,7 @@ namespace MetalRaptors
             if (gunned) enemy.MountGun(gun);
             enemy.MountNose(nose);
             enemy.MountEngine(engine);
+            if (plane == PacedPlane && !Pursuit) enemy.PaceWith(_player);
             enemy.OnDestroyed += OnDestroyed;
             _live.Add(enemy);
             _planes[enemy] = plane;
@@ -471,7 +507,7 @@ namespace MetalRaptors
             float ceilingY)
         {
             EnemyConfigs.SpawnBand(config, _groundY, ceilingY, out float minY, out float maxY);
-            maxY = Mathf.Max(minY, Mathf.Min(maxY, _worldTop - CeilingPad));
+            maxY = Mathf.Max(minY, Mathf.Min(maxY, WorldTop - CeilingPad));
 
             float z = _player != null ? _player.position.z : 0f;
 
@@ -481,9 +517,15 @@ namespace MetalRaptors
 
         void OnDestroyed(EnemyController enemy)
         {
+            if (enemy.ByPlayer && !_bosses.Contains(enemy)
+                && _planes.TryGetValue(enemy, out PlaneModelConfig plane))
+                PilotProfile.Score(PilotRanks.PointsFor(plane));
+
             _live.Remove(enemy);
             _planes.Remove(enemy);
+            _bosses.Remove(enemy);
             _leaving.Remove(enemy);
+            Downed?.Invoke(enemy);
         }
     }
 }

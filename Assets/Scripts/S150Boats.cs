@@ -19,7 +19,7 @@ namespace MetalRaptors
         const float EdgeMargin = 40f;
 
         const float Heading = 180f;
-        const float Draft = 2.2f;
+        const float Draft = 2.55f;
         const float PivotAft = 0.1f;
 
         const float LampForward = 6f;
@@ -92,6 +92,8 @@ namespace MetalRaptors
         static float _yaw;
         static bool _measured;
 
+        public static bool Dark { get; set; }
+
         class Gun
         {
             public Transform yaw, lift;
@@ -129,6 +131,9 @@ namespace MetalRaptors
         float _halfViewWidth, _cameraDistance;
         float _scale, _length, _beam, _pivot;
         float _wait;
+        bool _halted;
+
+        public void Halt() => _halted = true;
 
         public static S150Boats Begin(Camera cam, Transform player, float halfViewWidth, float playPlaneZ,
             float cameraDistance, bool wanted)
@@ -261,7 +266,7 @@ namespace MetalRaptors
 
             Burst(eye, time);
 
-            if (sailing) return;
+            if (sailing || _halted) return;
 
             _wait -= dt;
             if (_wait <= 0f) Spawn(eye, onScreen: false);
@@ -334,6 +339,8 @@ namespace MetalRaptors
 
         void MountLamp(Transform motion, float window)
         {
+            if (Dark) return;
+
             var spot = new Vector3(_pivot + LampForward * _scale, (LampHeight - Draft) * _scale, 0f);
             Searchlight lamp = Searchlight.Mount(motion, spot);
             if (lamp == null) return;

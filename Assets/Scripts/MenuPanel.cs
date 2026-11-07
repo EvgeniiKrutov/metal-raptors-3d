@@ -47,6 +47,15 @@ namespace MetalRaptors
             return row;
         }
 
+        public MenuRankRow AddRankRow()
+        {
+            MenuRankRow row = MenuRankRow.Create(_root, _cursor);
+            _cursor -= MenuRankRow.Height + MenuTheme.RankRowGap;
+            return row;
+        }
+
+        public void AddFocusable(IMenuFocusable item) => Register(item);
+
         public MenuBadge AddBadge()
         {
             MenuBadge badge = MenuBadge.Create(_root, _cursor);

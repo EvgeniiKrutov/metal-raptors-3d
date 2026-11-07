@@ -65,9 +65,17 @@ namespace MetalRaptors
             }
 
             if (!_anchorSun) return;
-            Vector3 sunDir = _cam.ViewportPointToRay(
-                new Vector3(_sunViewportX, horizonViewportY + _sunLift, 1f)).direction;
-            _sky.SetVector(SunDirectionId, sunDir);
+            _sky.SetVector(SunDirectionId,
+                ViewportDirection(_cam, new Vector2(_sunViewportX, horizonViewportY + _sunLift)));
+        }
+
+        static Vector3 ViewportDirection(Camera cam, Vector2 viewport)
+        {
+            if (cam.orthographic) return cam.transform.forward;
+
+            var ndc = new Vector3(viewport.x * 2f - 1f, viewport.y * 2f - 1f, 0.95f);
+            Vector3 view = cam.projectionMatrix.inverse.MultiplyPoint(ndc);
+            return (cam.transform.rotation * new Vector3(view.x, view.y, -view.z)).normalized;
         }
     }
 }

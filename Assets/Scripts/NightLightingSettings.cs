@@ -66,23 +66,24 @@ namespace MetalRaptors
         public bool facing;
         public int occlusionSteps;
         public int shadowMapSize;
+        [Range(0, NightLights.MaxShadowLights)] public int shadowLights;
 
         public static NightLightingTier[] Defaults() => new[]
         {
             new NightLightingTier
             {
                 name = "Mobile Low", qualityLevel = "", maskScale = 0.25f, hdrMask = false,
-                maxLights = 12, facing = false, occlusionSteps = 0, shadowMapSize = 0,
+                maxLights = 12, facing = false, occlusionSteps = 0, shadowMapSize = 0, shadowLights = 0,
             },
             new NightLightingTier
             {
                 name = "Mobile High", qualityLevel = "Mobile", maskScale = 0.35f, hdrMask = false,
-                maxLights = 20, facing = true, occlusionSteps = 8, shadowMapSize = 512,
+                maxLights = 20, facing = true, occlusionSteps = 8, shadowMapSize = 512, shadowLights = 2,
             },
             new NightLightingTier
             {
                 name = "Desktop", qualityLevel = "PC", maskScale = 0.5f, hdrMask = true,
-                maxLights = 32, facing = true, occlusionSteps = 16, shadowMapSize = 1024,
+                maxLights = 32, facing = true, occlusionSteps = 16, shadowMapSize = 1024, shadowLights = 4,
             },
         };
     }

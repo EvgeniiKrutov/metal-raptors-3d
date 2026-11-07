@@ -14,15 +14,24 @@ namespace MetalRaptors
             out float halfViewWidth, out float halfViewHeight)
         {
             float aspect = Mathf.Max(0.1f, cam.aspect);
-            float half = Mathf.Tan(BaseFieldOfView * 0.5f * Mathf.Deg2Rad);
-
-            half = Mathf.Min(half, half * ReferenceAspect / aspect);
-            if (GraphicsOptions.Mobile) half /= MobileZoom;
+            float half = HalfTan(aspect);
 
             cam.fieldOfView = 2f * Mathf.Atan(half) * Mathf.Rad2Deg;
 
             halfViewHeight = distance * half;
             halfViewWidth = halfViewHeight * aspect;
+        }
+
+        public static float HalfHeight(Camera cam, float distance) =>
+            distance * HalfTan(Mathf.Max(0.1f, cam.aspect));
+
+        static float HalfTan(float aspect)
+        {
+            float half = Mathf.Tan(BaseFieldOfView * 0.5f * Mathf.Deg2Rad);
+
+            half = Mathf.Min(half, half * ReferenceAspect / aspect);
+            if (GraphicsOptions.Mobile) half /= MobileZoom;
+            return half;
         }
     }
 }

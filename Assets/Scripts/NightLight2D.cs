@@ -18,9 +18,13 @@ namespace MetalRaptors
         public int priority;
         public bool occludedByTerrain;
         public bool castShadows;
+        public bool shadowLead;
+        public float shadowNear;
+        public Searchlight beam;
         public Vector2 flicker;
 
         internal int registryIndex = -1;
+        internal int shadowRow = -1;
         float _seed;
 
         void OnEnable()
@@ -29,7 +33,20 @@ namespace MetalRaptors
             NightLights.Register(this);
         }
 
-        void OnDisable() => NightLights.Unregister(this);
+        void OnDisable()
+        {
+            SetShadowRow(-1);
+            NightLights.Unregister(this);
+        }
+
+        public float ShadowRange => beam != null && beam.isActiveAndEnabled ? Mathf.Max(range, beam.Reach) : range;
+
+        internal void SetShadowRow(int row)
+        {
+            if (shadowRow == row) return;
+            shadowRow = row;
+            if (beam != null) beam.SetShadowRow(row);
+        }
 
         public Vector2 PlaneDirection
         {

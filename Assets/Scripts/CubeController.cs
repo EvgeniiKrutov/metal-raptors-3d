@@ -216,6 +216,21 @@ namespace MetalRaptors
 
         public void SetControlled(bool value) => _controlled = value;
 
+        public void Warp(Vector3 position, float headingRad)
+        {
+            transform.position = position;
+            if (_rb != null)
+            {
+                _rb.position = position;
+                _rb.linearVelocity = Vector3.zero;
+            }
+            _heading = headingRad;
+            _targetHeading = headingRad;
+            _angularVelocity = 0f;
+            _roll.Settle(headingRad);
+            ApplyRotation();
+        }
+
         public void BeginHover(float speed, float floorY)
         {
             _hover = true;
@@ -251,6 +266,10 @@ namespace MetalRaptors
         }
 
         public void SetTargetHeading(float headingRad) => _targetHeading = headingRad;
+
+        public bool HeadingSteering => _headingSteering;
+
+        public void ReleaseHeading() => _headingSteering = false;
 
         public bool BeginTurnBack(float seconds, float bankDeg)
         {

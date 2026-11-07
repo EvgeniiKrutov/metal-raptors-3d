@@ -21,6 +21,7 @@ namespace MetalRaptors
         bool _wasOnScreen;
         bool _spent;
         bool _fromEnemy;
+        bool _fromPlayer;
         float _age;
         Rigidbody _rb;
         Collider _ignore;
@@ -51,12 +52,13 @@ namespace MetalRaptors
         }
 
         public void Launch(Vector3 direction, float speed, float damage, Collider ignore,
-            bool fromEnemy)
+            bool fromEnemy, bool fromPlayer = false)
         {
             _damage = damage;
             _cam = Camera.main;
             _ignore = ignore;
             _fromEnemy = fromEnemy;
+            _fromPlayer = fromPlayer;
 
             _rb = GetComponent<Rigidbody>();
             _rb.useGravity = false;
@@ -131,6 +133,7 @@ namespace MetalRaptors
         void Hit(IDamageable target, Vector3 point, Vector3 travel)
         {
             Sparks.Hit(point, travel);
+            if (target is IScoreTarget scored) scored.MarkStrike(_fromPlayer);
             target.TakeDamage(_damage);
             Spend();
         }

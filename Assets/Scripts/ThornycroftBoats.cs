@@ -18,7 +18,7 @@ namespace MetalRaptors
         const float MinDrift = 45f;
 
         const float Heading = 180f;
-        const float Draft = 1.15f;
+        const float Draft = 1.35f;
         const float PivotAft = 0.3f;
         const float Trim = 3.5f;
 
@@ -43,6 +43,8 @@ namespace MetalRaptors
         static float _waterline;
         static bool _measured;
 
+        public static bool Dark { get; set; }
+
         class Boat
         {
             public Transform root, motion;
@@ -58,6 +60,9 @@ namespace MetalRaptors
         float _halfViewWidth, _cameraDistance;
         float _scale, _length, _beam, _pivot;
         float _wait;
+        bool _halted;
+
+        public void Halt() => _halted = true;
 
         public static ThornycroftBoats Begin(Camera cam, float halfViewWidth, float playPlaneZ,
             float cameraDistance, bool wanted)
@@ -168,7 +173,7 @@ namespace MetalRaptors
                 if (!boat.gone) sailing = true;
             }
 
-            if (sailing) return;
+            if (sailing || _halted) return;
 
             _wait -= dt;
             if (_wait <= 0f) Spawn(eye, onScreen: false);
@@ -239,6 +244,8 @@ namespace MetalRaptors
 
         void MountLamp(Transform motion, float window)
         {
+            if (Dark) return;
+
             var spot = new Vector3(_pivot + LampForward * _scale, (LampHeight - Draft) * _scale, 0f);
             Searchlight lamp = Searchlight.Mount(motion, spot);
             if (lamp == null) return;

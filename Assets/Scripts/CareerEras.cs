@@ -32,8 +32,6 @@ namespace MetalRaptors
         {
             new CareerEra("CHAPTER 1", Chapter1, EraEmblem.Biplane, true),
             new CareerEra("CHAPTER 2", Placeholder, EraEmblem.Fighter, false),
-            new CareerEra("CHAPTER 3", Placeholder, EraEmblem.Jet, false),
-            new CareerEra("FINAL CHAPTER", Placeholder, EraEmblem.Delta, false),
         };
     }
 }

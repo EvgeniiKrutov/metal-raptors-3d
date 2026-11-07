@@ -67,6 +67,7 @@ MonoBehaviour:
     facing: 0
     occlusionSteps: 0
     shadowMapSize: 0
+    shadowLights: 0
   - name: Mobile High
     qualityLevel: Mobile
     maskScale: 0.35
@@ -75,6 +76,7 @@ MonoBehaviour:
     facing: 1
     occlusionSteps: 8
     shadowMapSize: 512
+    shadowLights: 2
   - name: Desktop
     qualityLevel: PC
     maskScale: 0.5
@@ -83,6 +85,7 @@ MonoBehaviour:
     facing: 1
     occlusionSteps: 16
     shadowMapSize: 1024
+    shadowLights: 4
   airHaze: 0.4
   tierOverride: 
   previewInSceneView: 0

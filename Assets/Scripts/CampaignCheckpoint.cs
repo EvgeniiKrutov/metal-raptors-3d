@@ -34,6 +34,7 @@ namespace MetalRaptors
         public int step;
         public bool warnedFirst;
         public bool warnedPair;
+        public int points;
 
         public Vector3 playerPosition;
         public float playerHeading;
