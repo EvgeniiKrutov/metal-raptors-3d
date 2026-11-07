@@ -81,8 +81,8 @@ namespace MetalRaptors
                 case TerrainKind.Flanders:
                     land = new GameObject("Flanders Coast").AddComponent<FlandersTerrain>();
                     break;
-                case TerrainKind.Dolomites:
-                    land = new GameObject("Dolomites").AddComponent<DolomitesTerrain>();
+                case TerrainKind.Vosges:
+                    land = new GameObject("Vosges").AddComponent<VosgesTerrain>();
                     break;
                 default:
                     land = new GameObject("Campaign Land").AddComponent<VerdunTerrain>();

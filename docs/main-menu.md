@@ -299,14 +299,14 @@ column plus one card in the right band — the first screen to use both halves.
   — they name rows the player acts on, so they read as entries, not as captions.
 * The list does **not** wrap. The triangle at either end greys out.
 * `map` picks a `BattleMap` from `BattleMaps.All` — **verdun**, **flanders** and
-  **dolomites**, each a name, a terrain seed and a `TerrainKind`; `weather` picks a `Daytime`,
+  **vosges**, each a name, a terrain seed and a `TerrainKind`; `weather` picks a `Daytime`,
   in the enum's own order. None of the three is persisted: a custom battle's picks are not
   settings, so the screen opens on verdun/morning/story every time the menu is built.
 * Flanders Coast is listed as `flanders` rather than its full name so it fits the 190px
   `SelectorValueWidth` that `verdun` was sized against; the full name is what career's level
-  list tags its row with. `dolomites` (docs/dolomites.md) is the longest value the row
+  list tags its row with. `vosges` (docs/vosges.md) is the longest value the row
   carries and still fits at `ItemSize` 30.
-* Dolomites is no longer custom-battle-only: career levels 6 and 8 fly it (docs/campaign.md).
+* Vosges is no longer custom-battle-only: career levels 6 and 8 fly it (docs/campaign.md).
 * `mode` picks a `BattleShape` — **story** or **battle** — and is the one pick that changes
   the shape of the world rather than its look. See *Story and battle* below.
 * `start` fills in `CustomBattle` and loads the endless `CampaignLevel1` scene, where
@@ -343,7 +343,7 @@ right, the player gets a wall at either end rather than one behind them, the zep
 left edge, ground convoys enter from `WorldRight`, and the HUD objective becomes *hold the
 sector*. None of that is new — `battle` just turns it on for a map the player picked.
 
-**Verdun gets the aerodrome; flanders and dolomites do not.** The field is a Verdun-sector
+**Verdun gets the aerodrome; flanders and vosges do not.** The field is a Verdun-sector
 object with its own placed model, road and `Airfield`, and it is derived from the terrain the
 same way `zeppelins` already is. On the other two maps `battle` is the plain fixed strip: the
 coast and the valley keep their own battlefields, because `CampaignLevelController`'s

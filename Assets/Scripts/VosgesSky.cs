@@ -4,12 +4,12 @@ using UnityEngine.Rendering.Universal;
 
 namespace MetalRaptors
 {
-    public static class DolomitesSky
+    public static class VosgesSky
     {
         public const float FogEnd = 2000f;
         public const float NightFogEnd = 1850f;
 
-        // The valley mist, sized off the ridges' green-to-stone line (docs/dolomites.md).
+        // The valley mist, sized off the ridges' green-to-stone line (docs/vosges.md).
         const float MistTopY = 150f, MistClearY = 330f, MistStrength = 0.3f;
         const float MistFromZ = 500f, MistFullZ = 760f;
 
@@ -204,7 +204,7 @@ namespace MetalRaptors
             RenderSettings.ambientEquatorColor = p.ambientEquator;
             RenderSettings.ambientGroundColor = p.ambientGround;
 
-            if (p.night) NightLightingController.Launch(cam, TerrainKind.Dolomites);
+            if (p.night) NightLightingController.Launch(cam, TerrainKind.Vosges);
         }
 
         static void BuildSkybox(Camera cam, Palette p)
@@ -212,13 +212,13 @@ namespace MetalRaptors
             var shader = Shader.Find("Custom/GradientSkybox");
             if (shader == null)
             {
-                Debug.LogWarning("DolomitesSky: Custom/GradientSkybox not found; using flat sky.");
+                Debug.LogWarning("VosgesSky: Custom/GradientSkybox not found; using flat sky.");
                 cam.clearFlags = CameraClearFlags.SolidColor;
                 cam.backgroundColor = p.haze;
                 return;
             }
 
-            var sky = new Material(shader) { name = "Dolomites Sky (runtime)" };
+            var sky = new Material(shader) { name = "Vosges Sky (runtime)" };
             sky.SetColor("_TopColor", p.zenith);
             sky.SetColor("_HorizonColor", p.haze);
             sky.SetColor("_BottomColor", p.haze);
@@ -264,7 +264,7 @@ namespace MetalRaptors
         static void BuildPostFx(Camera cam, Palette p, Daytime daytime)
         {
             var profile = ScriptableObject.CreateInstance<VolumeProfile>();
-            profile.name = "Dolomites Post FX (runtime)";
+            profile.name = "Vosges Post FX (runtime)";
 
             var bloom = profile.Add<Bloom>();
             bloom.threshold.Override(p.bloomThreshold);
@@ -294,7 +294,7 @@ namespace MetalRaptors
             var tonemapping = profile.Add<Tonemapping>();
             tonemapping.mode.Override(TonemappingMode.ACES);
 
-            var go = new GameObject($"Dolomites Post FX ({DaytimeNames.For(daytime)})");
+            var go = new GameObject($"Vosges Post FX ({DaytimeNames.For(daytime)})");
             var volume = go.AddComponent<Volume>();
             volume.isGlobal = true;
             volume.profile = profile;

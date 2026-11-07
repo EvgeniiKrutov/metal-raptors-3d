@@ -129,7 +129,7 @@ land.
 | --- | --- |
 | `Verdun` | rolling ridge, plus three seeded shell craters — a gaussian dip with a small rim lip either side |
 | `Flanders` | dunes on one side falling through a `SmoothStep` beach to a flat sea, the shoreline seeded |
-| `Dolomites` | sharp triangular peaks (three in front, four behind) over a low base |
+| `Vosges` | sharp triangular peaks (three in front, four behind) over a low base |
 
 Each layer is a triangle strip of 110 columns from the rect's baseline to the sampled height,
 so the whole card costs one mesh and no texture. The back layer is the front tint mixed 62%

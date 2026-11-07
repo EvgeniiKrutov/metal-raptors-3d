@@ -41,7 +41,7 @@ namespace MetalRaptors
 
         public static NightPalette Alpine() => new NightPalette
         {
-            map = TerrainKind.Dolomites,
+            map = TerrainKind.Vosges,
             skyTop = new Color(0.033f, 0.052f, 0.145f),
             skyHorizon = new Color(0.148f, 0.198f, 0.351f),
             ambientSky = new Color(0.220f, 0.288f, 0.544f),

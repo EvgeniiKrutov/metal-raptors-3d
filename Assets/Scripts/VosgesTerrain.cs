@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace MetalRaptors
 {
-    public class DolomitesTerrain : CampaignTerrain
+    public class VosgesTerrain : CampaignTerrain
     {
         public const float ValleyZMax = 520f;
 
@@ -58,11 +58,11 @@ namespace MetalRaptors
             _ox1 = Offset(rng); _oz1 = Offset(rng);
             _ox2 = Offset(rng); _oz2 = Offset(rng);
 
-            _meadowLayer = TerrainSurfaces.GrainLayer("Dolomites (meadow)", MeadowColor, MeadowTile, _seed);
-            _earthLayer = TerrainSurfaces.FlatLayer("Dolomites (earth)", EarthColor, EarthTile);
+            _meadowLayer = TerrainSurfaces.GrainLayer("Vosges (meadow)", MeadowColor, MeadowTile, _seed);
+            _earthLayer = TerrainSurfaces.FlatLayer("Vosges (earth)", EarthColor, EarthTile);
             _wallMat = TerrainSurfaces.FlatMaterial(WallColor);
 
-            DolomitesSky.ApplyFog(daytime, cameraDistance, playPlaneZ);
+            VosgesSky.ApplyFog(daytime, cameraDistance, playPlaneZ);
         }
 
         public override bool InCrater(float worldX, float z)

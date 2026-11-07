@@ -21,19 +21,19 @@ terrains and skies come from the campaign's story source, `Assets/Resources/docs
 | 4 | THE RAVEN | 6 Apr 1917 | `Flanders` | Morning |
 | 5 | FACING BACKWARDS | 21 Jun 1917 | `Flanders` | Midday |
 | 6 | NOTHING BURNS AT NIGHT | 19 Sep 1917 | `Flanders` | Night |
-| 7 | HOHRUPT | 3 Oct 1917 | `Dolomites` | Morning |
-| 8 | TWO FIRES | 24 Mar 1918 | `Dolomites` | Midday |
-| 9 | IRON BIRDS OF PREY | 15 May 1918 | `Dolomites` | Evening |
+| 7 | HOHRUPT | 3 Oct 1917 | `Vosges` | Morning |
+| 8 | TWO FIRES | 24 Mar 1918 | `Vosges` | Midday |
+| 9 | IRON BIRDS OF PREY | 15 May 1918 | `Vosges` | Evening |
 
 The campaign runs **three levels per terrain**, in order — Verdun, then Flanders, then the
-Dolomites — and each block walks the light forward, so a terrain is seen under three different
+Vosges — and each block walks the light forward, so a terrain is seen under three different
 skies before the campaign leaves it. `FACING BACKWARDS` is the scenario's **rear gun** level —
 two pilots with no machines of their own fly one DH.4 two-seater, and the player fights from the
 observer's seat while the photographs it brings back find Wulpendamme, where level 6 goes at
 night.
 
-The scenario's `Mountain` sector is `TerrainKind.Dolomites`, the alpine streamer we already have
-(docs/dolomites.md) — so all three terrain kinds are now flown in career and none is
+The scenario's `Mountain` sector is `TerrainKind.Vosges`, the alpine streamer we already have
+(docs/vosges.md) — so all three terrain kinds are now flown in career and none is
 custom-battle-only.
 
 **Level 1 is written, level 2 is built, level 3 has its map; levels 4–9 are still placeholder.** Level 1 speaks the scenario's three
@@ -105,7 +105,7 @@ scene still carries an orphan serialized `levelNumber` from before this change; 
 it.)
 
 `CampaignTerrain` is now an abstract streamer with a concrete land per kind —
-`VerdunTerrain`, `FlandersTerrain` and `DolomitesTerrain`. `CampaignTerrain.Begin(kind, …)`
+`VerdunTerrain`, `FlandersTerrain` and `VosgesTerrain`. `CampaignTerrain.Begin(kind, …)`
 switches over the kind. The base owns everything about *chunks* (the keep-window,
 time-slicing, terrain object assembly, neighbour links, disposal); a subclass owns everything
 about *ground* (its height scale and world Y offset, how a chunk's heights are filled, how it
@@ -139,7 +139,7 @@ is painted, what it decorates with, and what extra meshes ride along with it).
   bars. Control comes back during the fly-in (docs/level-intro.md).
 - The daytime is authored on the definition: level 1 flies at dawn (`Daytime.Morning`), and
   the nine spread over all four daytimes. Sky, fog and ambient reuse the same sky classes as
-  the fixed terrain levels — `CoastSky` and `DolomitesSky` carry a palette per daytime, which
+  the fixed terrain levels — `CoastSky` and `VosgesSky` carry a palette per daytime, which
   is what lets level 6 fly at night on the coast and level 9 at last light in the mountains.
 - A **custom battle** is the one exception. When `CustomBattle.Requested` is set (the menu's
   custom battle screen did it), the controller builds

@@ -67,7 +67,7 @@ Three of those five want explaining:
 * **Widths scale by half.** A 1.4× `colour` row would be 644px wide against the garage
   column's 592px of inner width, so the arrows would end up over the plane. Text grows by
   1.4 and the columns it sits in by 1.2, which lands the row at 559px and still fits the
-  longest value (`Dolomites`, ~212px at the scaled size).
+  longest value (`Vosges`, ~212px at the scaled size).
 * **The arrows get an invisible pad, not just a bigger glyph.** A 1.4× page triangle is still
   only ~17pt across on a phone. `MenuArrowView.AddTouchPad` parents a transparent
   `raycastTarget` image to the triangle, stretched `ArrowPad` past it on all four sides;

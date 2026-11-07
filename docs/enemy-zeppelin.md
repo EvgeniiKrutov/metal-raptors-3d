@@ -78,7 +78,7 @@ Each gun's cooldown is reloaded **whether or not it fired**, so the rhythm is st
 player coming back into range therefore meets alternating shots rather than a volley.
 
 **The round is built to be seen on every sky.** The skies run from white cloud and pale haze
-(midday, morning, the coast, the Dolomites) through beige-orange evening haze to near-black
+(midday, morning, the coast, the Vosges) through beige-orange evening haze to near-black
 night. No single colour contrasts with all of them, and the shared tan `Bullet.RoundColor`
 disappears into the evening haze in particular. `BuildRound` therefore makes a two-tone round
 from `Bullet.BuildTemplate`:

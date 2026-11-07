@@ -13,12 +13,12 @@ built entirely at runtime (no material/profile assets): `MorningSky`, `MiddaySky
 > owns that map's sea colour.
 > See docs/flanders-coast.md.
 >
-> Dolomites has a third set, as `DolomitesSky`, built the same way — warmer, more saturated
+> Vosges has a third set, as `VosgesSky`, built the same way — warmer, more saturated
 > and more contrasty than the inland skies (sunny northern Italy at altitude), with the
 > longest fog reach in the game (2000) because the background mountains *are* that map's
 > distance, and its sun pinned to a fixed viewport point high enough to clear the peaks
 > rather than riding the horizon. Its table also owns the mountains' rock colours.
-> See docs/dolomites.md.
+> See docs/vosges.md.
 
 1. A gradient skybox (`Custom/GradientSkybox` in `Assets/Resources/Shaders`) with a
    two-part sun (HDR core + atmospheric halo), anchored to a fixed viewport spot — the
@@ -236,8 +236,8 @@ the same value as the distance fog and the sky's horizon band. It runs one event
 `AerialHaze` (`BeforeRenderingTransparents + 1`): `AerialHaze` brightens fogged pixels back up to
 the sky, and mist laid down first would be partly undone by it.
 
-Only `DolomitesSky` attaches one — it is the only map whose mountains cut through the ground
-inside the view (docs/dolomites.md). Sky pixels are skipped, as in `AerialHaze`.
+Only `VosgesSky` attaches one — it is the only map whose mountains cut through the ground
+inside the view (docs/vosges.md). Sky pixels are skipped, as in `AerialHaze`.
 
 ## MorningSky design
 
@@ -387,7 +387,7 @@ power — under dark-violet air.
   carefully tuned `BrightnessAtRange`. It tints in `SetOn` rather than at build time,
   because the plane is built before the sky.
 - **Scope**: the three night skies grade firelight — `NightSky` from its own
-  `FirelightBoost`, `CoastSky` and `DolomitesSky` from a `firelightBoost` on the night
+  `FirelightBoost`, `CoastSky` and `VosgesSky` from a `firelightBoost` on the night
   palette (0 on every day palette, which leaves the gain neutral). Both level controllers
   call `Firelight.Clear()` before the world is built, so a day level never inherits the
   previous night level's grade.

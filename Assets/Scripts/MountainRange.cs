@@ -230,9 +230,9 @@ namespace MetalRaptors
 
         static Texture2D RockGradient(Daytime daytime)
         {
-            Color slope = DolomitesSky.MountainSlope(daytime);
-            Color rock = DolomitesSky.MountainRock(daytime);
-            Color peak = DolomitesSky.MountainPeak(daytime);
+            Color slope = VosgesSky.MountainSlope(daytime);
+            Color rock = VosgesSky.MountainRock(daytime);
+            Color peak = VosgesSky.MountainPeak(daytime);
 
             var tex = new Texture2D(1, GradientRes, TextureFormat.RGBA32, false)
             {

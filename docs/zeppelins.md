@@ -11,7 +11,7 @@ scenery that happens to move.
 right after `SkyFlak.Begin`. `wanted` is `CampaignDefinition.zeppelins`, true on campaign
 **levels 1, 2 and 3** and on a **custom battle flown over Verdun** (`CampaignLevels.Custom`
 reads it off `map.Terrain`) — the airship is a Verdun-sector fixture, so Flanders and the
-Dolomites get none. `Begin` returns null when the flag is off, so a level with no airships
+Vosges get none. `Begin` returns null when the flag is off, so a level with no airships
 builds no GameObject at all.
 
 The arena's `LevelController` does not use it.

@@ -80,7 +80,7 @@ namespace MetalRaptors
             switch (_kind)
             {
                 case TerrainKind.Flanders: return Coast(t, front);
-                case TerrainKind.Dolomites: return Peaks(t, front);
+                case TerrainKind.Vosges: return Peaks(t, front);
                 default: return Craters(t, front);
             }
         }

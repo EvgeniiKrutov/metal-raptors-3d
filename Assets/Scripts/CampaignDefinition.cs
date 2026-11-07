@@ -359,7 +359,7 @@ namespace MetalRaptors
         public static CampaignDefinition Level7 => new CampaignDefinition
         {
             seed = 1310,
-            terrain = TerrainKind.Dolomites,
+            terrain = TerrainKind.Vosges,
             daytime = Daytime.Morning,
             weather = Weather.Calm,
             clouds = new CloudsPart { size = CloudLevel.High },
@@ -380,7 +380,7 @@ namespace MetalRaptors
         public static CampaignDefinition Level8 => new CampaignDefinition
         {
             seed = 1803,
-            terrain = TerrainKind.Dolomites,
+            terrain = TerrainKind.Vosges,
             daytime = Daytime.Midday,
             weather = Weather.Calm,
             clouds = new CloudsPart(),
@@ -400,7 +400,7 @@ namespace MetalRaptors
         public static CampaignDefinition Level9 => new CampaignDefinition
         {
             seed = 1505,
-            terrain = TerrainKind.Dolomites,
+            terrain = TerrainKind.Vosges,
             daytime = Daytime.Evening,
             weather = Weather.Calm,
             clouds = new CloudsPart { size = CloudLevel.High },

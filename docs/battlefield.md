@@ -15,7 +15,7 @@ controllers start it once the camera exists:
   and passing the level's `MinX`/`MaxX`. The flat-slab terrain gets nothing.
 - `CampaignLevelController` — always, seeded from `_level.seed`, with no bounds.
   On Flanders Coast it calls `BeginCoast` instead (see *Coast mode* below), and on
-  Dolomites `BeginValley` (see *Valley mode*).
+  Vosges `BeginValley` (see *Valley mode*).
 
 `Begin` needs the camera's half view width because everything streams around the
 camera, and needs the map bounds because bounded and endless maps populate
@@ -58,8 +58,8 @@ to the next one, so the choice never depends on streaming timing.
 
 ## Valley mode
 
-`Battlefield.BeginValley(cam, halfViewWidth, seed, inCrater, peopleZMax, peopleDensity)` is the Dolomites
-entry point (docs/dolomites.md). It is the ordinary inland battlefield with two switches:
+`Battlefield.BeginValley(cam, halfViewWidth, seed, inCrater, peopleZMax, peopleDensity)` is the Vosges
+entry point (docs/vosges.md). It is the ordinary inland battlefield with two switches:
 
 - **`_placeProps = false`** — no trees and no houses; that map places nothing solid. People,
   blasts and smoke columns all run normally. Splitting the old single `_populate` flag into
@@ -138,7 +138,7 @@ deliberately occupy different slices of it:
 | --- | --- | --- |
 | Ground blasts | 15 – 700 | The whole map, foreground included — shells land under and in front of the plane as well as behind it. |
 | Smoke columns | 140 – 380 | Just behind the play plane, close enough to read as part of the scene rather than horizon decoration. |
-| People | 40 – 700 | The whole map, so squads are seen both in front of and behind the aircraft. The back edge is per-map (`Battlefield.PeopleZMax`); Dolomites pulls it in to 520. |
+| People | 40 – 700 | The whole map, so squads are seen both in front of and behind the aircraft. The back edge is per-map (`Battlefield.PeopleZMax`); Vosges pulls it in to 520. |
 | Scenery props | 20 – 700 | The whole map. Reaching in front of the play plane is deliberate: near trees sweep past the camera for parallax, and the handful that land in the flight lane are the ones a plane can hit. |
 | Tank wrecks | 175 – 650 | Behind the play plane only, so a burning wreck and its smoke never sit on the player's own Z and never obscure the duel. 175 keeps even the near end a tank-length clear of the lane. |
 
@@ -709,7 +709,7 @@ A new squad is placed **500–1100 units past the right view edge** — out wher
 terrain streamer is building chunks, not just over the lip of the frame. The
 margin used to be 60–260, which is under a second of flight: squads visibly
 popped into existence at the screen edge, and on a map with no fog to hide them
-(docs/dolomites.md) that is exactly what it looked like. The window and the squad
+(docs/vosges.md) that is exactly what it looked like. The window and the squad
 count follow from the same two numbers (`ScrollerBehind` = `halfViewWidth + 460`,
 `ScrollerAhead` = `halfViewWidth + 1100`), so the wider band carries
 proportionally more squads and the on-screen density is unchanged; the ahead cull

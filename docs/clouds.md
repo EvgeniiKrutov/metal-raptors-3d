@@ -66,7 +66,7 @@ its own conveyor:
 | --- | --- | --- | --- |
 | near | −0.15 × | 0.85 × | In front of the plane — planes fly *behind* these. |
 | mid | +0.50 × | 1.50 × | Behind the plane. |
-| far | +1.25 × | 2.25 × | Well behind, still in front of the Dolomites ridge line at z 700. |
+| far | +1.25 × | 2.25 × | Well behind, still in front of the Vosges ridge line at z 700. |
 
 Every cloud also gets ± 0.08 × the same distance of **jitter** on top of its layer's depth, so a
 layer is a band rather than a plane and no two clouds share a Z.

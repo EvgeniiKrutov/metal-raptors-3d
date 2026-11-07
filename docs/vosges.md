@@ -1,4 +1,4 @@
-# Dolomites
+# Vosges
 
 The third endless map: an Italian-front alpine valley — a green pasture floor scattered with
 shell holes, with a wall of dark low-poly mountains standing across the back. Custom
@@ -32,9 +32,9 @@ ditching path.
 | File | Role |
 | --- | --- |
 | `CampaignTerrain.cs` | Abstract chunk streamer shared with Verdun and Flanders (docs/campaign.md). |
-| `DolomitesTerrain.cs` | The valley floor: heightmap, craters, painting and grass. |
+| `VosgesTerrain.cs` | The valley floor: heightmap, craters, painting and grass. |
 | `MountainRange.cs` | The three background ridges — camera-followed, streamed in chunk-aligned cells. |
-| `DolomitesSky.cs` | The four alpine daytimes, their fog reach and valley mist, and the mountains' three colours. |
+| `VosgesSky.cs` | The four alpine daytimes, their fog reach and valley mist, and the mountains' three colours. |
 | `TerrainSurfaces.cs` | Terrain layer / flat material helpers, shared with Flanders. |
 
 ## The valley floor
@@ -156,7 +156,7 @@ Sizing the ridges off the land's window would leave the frame's top corners show
 terrain keeps the shared window unchanged, because ridge A hides the ground from `z ≈ 740` back
 and the visible land is well inside it.
 
-## Sky (`DolomitesSky`)
+## Sky (`VosgesSky`)
 
 Sunny northern Italy at altitude: clear air, a high sun, a deeply saturated zenith. Built the
 same way as `CoastSky` — one class with a four-entry palette table, a `Custom/GradientSkybox`
@@ -266,7 +266,7 @@ fire warm through the filter (docs/atmospheres.md).
   **smoke columns** in their usual `z` 140–380 band.
 - **No trees or houses.** `Battlefield`'s single `_populate` switch became `_placeProps` and
   `_placePeople`, since this map is the first that wants one without the other.
-- **Squads stay in the valley.** Their `z` ceiling is `DolomitesTerrain.ValleyZMax` (520)
+- **Squads stay in the valley.** Their `z` ceiling is `VosgesTerrain.ValleyZMax` (520)
   instead of the usual 700, so squads keep to the pasture the player actually looks at.
 - **Blasts are not capped** — they still reach `z = 700`, out to the foot of the mountains.
 
@@ -275,9 +275,9 @@ it is implemented, so adding scenery to this map later needs no new work.
 
 ## Custom battle entry
 
-`BattleMaps.All` gains `dolomites` (seed 1915) as the third map; the selector's `weather` row
-picks its `Daytime` as it does for every map (docs/main-menu.md). `TerrainKind.Dolomites` and
-`TerrainNames.Dolomites` complete the wiring, and `CampaignTerrain.Begin` grew from a two-way
+`BattleMaps.All` gains `vosges` (seed 1915) as the third map; the selector's `weather` row
+picks its `Daytime` as it does for every map (docs/main-menu.md). `TerrainKind.Vosges` and
+`TerrainNames.Vosges` complete the wiring, and `CampaignTerrain.Begin` grew from a two-way
 ternary into a switch over the kind.
 
 The map is **not** available on the fixed-width challenge levels: those build their ground
