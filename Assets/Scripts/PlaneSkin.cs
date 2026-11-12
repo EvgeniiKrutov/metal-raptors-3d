@@ -44,7 +44,16 @@ namespace MetalRaptors
 
         public static readonly PlaneSkin[] FokkerDr1 =
         {
-            new PlaneSkin { id = "red", label = "red", texture = "skins/fokker_dr_1/red" },
+            new PlaneSkin { id = "manfred", label = "manfred", texture = "skins/fokker_dr_1/manfred" },
+            new PlaneSkin
+            {
+                id = "black_white", label = "black-white", texture = "skins/fokker_dr_1/black_white",
+            },
+            new PlaneSkin
+            {
+                id = "red_green", label = "red-green", texture = "skins/fokker_dr_1/red_green",
+            },
+            new PlaneSkin { id = "lothar", label = "lothar", texture = "skins/fokker_dr_1/lothar" },
             new PlaneSkin
             {
                 id = "raven", label = "raven", texture = "skins/fokker_dr_1/raven", locked = true,
@@ -54,6 +63,12 @@ namespace MetalRaptors
         public static readonly PlaneSkin[] AlbatrosD3 =
         {
             new PlaneSkin { id = "plywood", label = "plywood", texture = "skins/albatros_d3/plywood" },
+            new PlaneSkin { id = "violet", label = "violet", texture = "skins/albatros_d3/violet" },
+            new PlaneSkin { id = "lubbert", label = "lubbert", texture = "skins/albatros_d3/lubbert" },
+            new PlaneSkin
+            {
+                id = "black_white", label = "black-white", texture = "skins/albatros_d3/black_white",
+            },
             new PlaneSkin
             {
                 id = "raven", label = "raven", texture = "skins/albatros_d3/raven", locked = true,
@@ -63,6 +78,8 @@ namespace MetalRaptors
         public static readonly PlaneSkin[] FokkerEindecker =
         {
             new PlaneSkin { id = "sand", label = "sand", texture = "skins/fokker_eindecker/sand" },
+            new PlaneSkin { id = "green", label = "green", texture = "skins/fokker_eindecker/green" },
+            new PlaneSkin { id = "white", label = "white", texture = "skins/fokker_eindecker/white" },
             new PlaneSkin
             {
                 id = "raven", label = "raven", texture = "skins/fokker_eindecker/raven", locked = true,
@@ -71,7 +88,18 @@ namespace MetalRaptors
 
         public static readonly PlaneSkin[] AircoDh4 =
         {
+            new PlaneSkin { id = "original", label = "original", texture = "skins/airco_dh4/original" },
             new PlaneSkin { id = "green", label = "green", texture = "skins/airco_dh4/green" },
+            new PlaneSkin
+            {
+                id = "white_blue", label = "white-blue", texture = "skins/airco_dh4/white_blue",
+            },
+            new PlaneSkin { id = "sun", label = "sun", texture = "skins/airco_dh4/sun" },
+        };
+
+        public static readonly PlaneSkin[] GothaG4 =
+        {
+            new PlaneSkin { id = "k2", label = "k2", texture = "skins/gotha_g4/k2", locked = true },
         };
 
         public static PlaneSkin[] Of(PlaneModelConfig plane) =>

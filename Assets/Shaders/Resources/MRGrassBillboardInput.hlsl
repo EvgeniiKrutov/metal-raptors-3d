@@ -72,9 +72,10 @@ half4 TerrainWaveGrass (inout float4 vertex, float waveAmount, half4 color)
     half4 _waveXmove = half4(0.024, 0.04, -0.12, 0.096);
     half4 _waveZmove = half4 (0.006, .02, -0.02, 0.1);
 
+    float3 wavePos = TransformObjectToWorld(vertex.xyz);
     float4 waves;
-    waves = vertex.x * _waveXSize;
-    waves += vertex.z * _waveZSize;
+    waves = wavePos.x * _waveXSize;
+    waves += wavePos.z * _waveZSize;
 
     // Add in time to model them over time
     waves += _WaveAndDistance.x * waveSpeed;

@@ -63,6 +63,9 @@ namespace MetalRaptors
         public static float TreeCellScale =>
             GroundDetail == 0 ? 2.2f : GroundDetail == 1 ? 1.5f : 1f;
 
+        public static float FarGrassDensity =>
+            GroundDetail == 0 ? 0.45f : GroundDetail == 1 ? 0.7f : 1f;
+
         public static float RubbleCellScale =>
             GroundDetail == 0 ? 2.5f : GroundDetail == 1 ? 1.5f : 1f;
 

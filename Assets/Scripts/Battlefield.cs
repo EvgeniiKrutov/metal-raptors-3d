@@ -23,6 +23,7 @@ namespace MetalRaptors
         const float SmokeMargin = 500f;
         const float DryClearance = 2f;
         const int SmokeSiteTries = 3;
+        const float SmokeClearance = 60f;
 
         const float PeopleZMaxDefault = 700f;
         const float BackMargin = 40f;
@@ -44,6 +45,8 @@ namespace MetalRaptors
         bool _explicitBand;
         bool _placeProps = true;
         bool _placePeople = true;
+        bool _blasts = true;
+        bool _smoke = true;
 
         readonly List<Terrain> _terrains = new List<Terrain>();
         readonly Dictionary<int, SmokeColumn> _columns = new Dictionary<int, SmokeColumn>();
@@ -86,13 +89,18 @@ namespace MetalRaptors
                 inCrater, peopleDensity);
 
         public static Battlefield BeginValley(Camera cam, float halfViewWidth, int seed,
-            System.Func<float, float, bool> inCrater, float peopleZMax, float peopleDensity = 1f)
+            System.Func<float, float, bool> inCrater, System.Func<float, float, float, bool> occupied,
+            float peopleZMax, float peopleDensity, bool war)
         {
             var field = Create(cam, halfViewWidth, seed,
                 float.NegativeInfinity, float.PositiveInfinity, inCrater);
             if (field == null) return null;
 
+            field._occupied = occupied;
             field._placeProps = false;
+            field._placePeople = war;
+            field._blasts = war;
+            field._smoke = war;
             field._peopleZMax = peopleZMax;
             field._peopleDensity = peopleDensity;
             field.Populate();
@@ -256,6 +264,7 @@ namespace MetalRaptors
 
         void TickBlasts(float camX)
         {
+            if (!_blasts) return;
             _blastTimer -= Time.deltaTime;
             if (_blastTimer > 0f) return;
             _blastTimer = Random.Range(BlastIntervalMin, BlastIntervalMax);
@@ -266,6 +275,7 @@ namespace MetalRaptors
             if (!SampleGround(x, z, out float y)) return;
 
             float size = Random.Range(BlastSizeMin, BlastSizeMax);
+            if (Occupied(x, z, size)) return;
 
             if (z >= _waterFromZ && y < _seaLevel)
             {
@@ -295,6 +305,7 @@ namespace MetalRaptors
 
         void UpdateColumns(float camX)
         {
+            if (!_smoke) return;
             int first = Mathf.FloorToInt((camX - _halfViewWidth - SmokeMargin) / SmokeCellSize);
             int last = Mathf.FloorToInt((camX + _halfViewWidth + SmokeMargin) / SmokeCellSize);
 
@@ -327,6 +338,7 @@ namespace MetalRaptors
                     if (!InBand(x)) continue;
                     if (!SampleGround(x, z, out float y)) { retry = true; break; }
                     if (y < _seaLevel + DryClearance) continue;
+                    if (Occupied(x, z, SmokeClearance)) continue;
 
                     _columns[cell] = SmokeColumn.Begin(transform, new Vector3(x, y, z), hash);
                     placed = true;

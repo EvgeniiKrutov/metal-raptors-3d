@@ -122,6 +122,13 @@ namespace MetalRaptors
             "between the two cockpits, and the Americans who built it by the thousand called it " +
             "the Flaming Coffin.";
 
+        const string GothaStory =
+            "The bomber that did what the Zeppelins no longer could: cross the Channel in daylight " +
+            "and bring the war to London. Two 260 hp Mercedes pushers swung a 24-metre wing, and a " +
+            "tunnel through the rear fuselage let the gunner fire down into the blind spot every " +
+            "fighter aimed for. On 13 June 1917 fourteen of them killed 162 people in a single " +
+            "afternoon — the deadliest raid on Britain of the whole war.";
+
         public static readonly PlaneModelConfig Sopwith = new PlaneModelConfig
         {
             resourceName   = "sopwith_camel",
@@ -301,8 +308,37 @@ namespace MetalRaptors
             },
         };
 
+        public static readonly PlaneModelConfig GothaG4 = new PlaneModelConfig
+        {
+            resourceName   = "gotha_g4",
+            folder         = PlaneModelConfig.WorldWar1,
+            displayName    = "Gotha G.IV",
+            country        = "Germany",
+            type           = PlaneTypes.Bomber,
+            description    = GothaStory,
+            standUpEuler   = new Vector3(90f, -90f, 0f),
+            rollWheelsDown = true,
+            pitchTrimDeg   = 10f,
+            lengthMeters   = 12.36f,
+            wingspanMeters = 23.7f,
+            heightMeters   = 4.3f,
+            garageZoom     = 1.1f,
+            propPivotNode  = "propHub",
+            propBladesNode = "propBlade",
+            skins          = PlaneSkins.GothaG4,
+            stats = new PlaneStats
+            {
+                maxSpeed      = 220f,
+                rotationSpeed = 70f,
+                mass          = 3.9f,
+                fireRate      = 6f,
+                damage        = 12f,
+                health        = 300f,
+            },
+        };
+
         public static readonly PlaneModelConfig[] All =
-            { Sopwith, Fokker, Albatros, Eindecker, AircoDh4 };
+            { Sopwith, Fokker, Albatros, Eindecker, AircoDh4, GothaG4 };
 
         public static PlaneModelConfig EnemyFor(EnemyRole role) =>
             role == EnemyRole.Scout ? Eindecker : Albatros;

@@ -61,6 +61,7 @@ namespace MetalRaptors
         float _speed, _spacing, _width;
         Color _tint, _glow;
         bool _lowBand;
+        float _lowLift;
         readonly List<Cloud> _clouds = new List<Cloud>();
         readonly List<Layer> _layers = new List<Layer>();
         float _time;
@@ -70,7 +71,7 @@ namespace MetalRaptors
             => Begin(cam, TintFor(daytime), GlowFor(daytime), part, playPlaneZ);
 
         public static CloudSystem Begin(Camera cam, Color tint, Color glow,
-            CloudsPart part, float playPlaneZ, bool lowBand = false)
+            CloudsPart part, float playPlaneZ, bool lowBand = false, float lowLift = 0f)
         {
             var go = new GameObject("Clouds");
             var sys = go.AddComponent<CloudSystem>();
@@ -82,6 +83,7 @@ namespace MetalRaptors
             sys._tint = tint;
             sys._glow = glow;
             sys._lowBand = lowBand;
+            sys._lowLift = lowLift;
             return sys;
         }
 
@@ -154,7 +156,8 @@ namespace MetalRaptors
                 AddLayer(i, playDist, MinAltitude, MaxAltitude);
 
             if (!_lowBand) return;
-            foreach (int i in LowLayers) AddLayer(i, playDist, LowMinAltitude, LowMaxAltitude);
+            foreach (int i in LowLayers)
+                AddLayer(i, playDist, LowMinAltitude + _lowLift, LowMaxAltitude + _lowLift);
         }
 
         void AddLayer(int index, float playDist, float minAltitude, float maxAltitude)

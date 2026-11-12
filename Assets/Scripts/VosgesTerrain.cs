@@ -7,6 +7,9 @@ namespace MetalRaptors
     public class VosgesTerrain : CampaignTerrain
     {
         public const float ValleyZMax = 520f;
+        public const float LandDepth = 1520f;
+        const float NearGrassFrom = 260f, NearGrassTo = 340f;
+        const float NearGrassDistance = 1100f;
 
         const int RowsPerStep = 16;
 
@@ -14,12 +17,20 @@ namespace MetalRaptors
         const float RollPatch = 6f, RollGrain = 1.2f;
         const float BackRise = 30f, BackRiseFrom = 400f;
 
+        const float U = PlaneModelConfig.UnitsPerMeter;
+        const float HillHeight = 12f * U, BumpHeight = 2.4f * U;
+        const float HillRampTo = 500f;
+        const float HillFadeFrom = 1150f, HillFadeTo = 1460f;
+        const float HillWaveX = 900f, HillWaveZ = 650f, HillDetail = 0.45f, HillDetailWeight = 0.25f;
+        const float HillLow = 0.25f, HillHigh = 0.85f;
+        const float TerrainTop = 300f;
+
         const float CraterCell = 128f;
         const float ShellsPerCell = 0.6f, MinesPerCell = 0.13f;
         const float CraterZMin = 20f, CraterZMax = 620f;
         const float MaxCraterReach = 150f;
 
-        const int AlphaRes = 128;
+        const int AlphaRes = 256;
         const int GrassDetailRes = 512;
         const float GrassScarLimit = 0.35f;
 
@@ -29,10 +40,10 @@ namespace MetalRaptors
         static readonly Color MeadowColor = new Color(0.34f, 0.50f, 0.24f);
         static readonly Color EarthColor = new Color(0.40f, 0.32f, 0.23f);
         static readonly Color WallColor = new Color(0.36f, 0.30f, 0.22f);
-        static readonly Color GrassHealthy = new Color(0.36f, 0.60f, 0.26f);
-        static readonly Color GrassDry = new Color(0.50f, 0.62f, 0.30f);
+        static readonly Color GrassHealthy = new Color(0.46f, 0.72f, 0.28f);
+        static readonly Color GrassDry = new Color(0.56f, 0.74f, 0.32f);
 
-        float _r1, _r2, _r3, _ox1, _oz1, _ox2, _oz2;
+        float _r1, _r2, _r3, _ox1, _oz1, _ox2, _oz2, _hx1, _hz1, _hx2, _hz2, _patchOffset;
 
         TerrainLayer _meadowLayer, _earthLayer;
         Material _wallMat;
@@ -44,11 +55,19 @@ namespace MetalRaptors
 
         readonly List<CraterSpec> _craters = new List<CraterSpec>();
         readonly List<CraterSpec> _craterScratch = new List<CraterSpec>();
+        readonly List<VosgesLayout.Pad> _pads = new List<VosgesLayout.Pad>();
 
-        protected override float HeightScale => ProceduralTerrain.HeightScale;
+        Mesh _farGrass;
+        int _farGrassIndex = int.MinValue;
+
+        public VosgesLayout Layout { get; private set; }
+
+        protected override float DetailDistance => NearGrassDistance;
+
+        protected override float HeightScale => TerrainTop;
         protected override float TerrainY => 0f;
         protected override float MinHeight => ProceduralTerrain.MinHeight;
-        protected override float MaxHeight => ProceduralTerrain.MaxHeight;
+        protected override float MaxHeight => TerrainTop;
 
         protected override void Prepare(Daytime daytime, Weather weather,
             float cameraDistance, float playPlaneZ)
@@ -57,13 +76,21 @@ namespace MetalRaptors
             _r1 = Offset(rng); _r2 = Offset(rng); _r3 = Offset(rng);
             _ox1 = Offset(rng); _oz1 = Offset(rng);
             _ox2 = Offset(rng); _oz2 = Offset(rng);
+            _hx1 = Offset(rng); _hz1 = Offset(rng);
+            _hx2 = Offset(rng); _hz2 = Offset(rng);
+            _patchOffset = Offset(rng);
 
             _meadowLayer = TerrainSurfaces.GrainLayer("Vosges (meadow)", MeadowColor, MeadowTile, _seed);
             _earthLayer = TerrainSurfaces.FlatLayer("Vosges (earth)", EarthColor, EarthTile);
             _wallMat = TerrainSurfaces.FlatMaterial(WallColor);
 
+            Layout = new VosgesLayout(_seed, ValleyHeight, BaseHeight, cameraDistance, playPlaneZ);
+
             VosgesSky.ApplyFog(daytime, cameraDistance, playPlaneZ);
         }
+
+        public override bool Occupied(float worldX, float z, float margin) =>
+            Layout != null && Layout.Occupied(worldX, z, margin);
 
         public override bool InCrater(float worldX, float z)
         {
@@ -95,6 +122,13 @@ namespace MetalRaptors
                 StampCrater(metres, index, c);
                 yield return null;
             }
+
+            Layout.PadsForRange(x0 - VosgesLayout.MaxPadReach, x0 + ChunkLength + VosgesLayout.MaxPadReach, _pads);
+            foreach (var pad in _pads)
+            {
+                StampPad(metres, index, pad);
+                yield return null;
+            }
         }
 
         protected override void PaintChunk(TerrainData data, int index)
@@ -120,20 +154,34 @@ namespace MetalRaptors
             }
 
             data.SetAlphamaps(0, 0, alpha);
-            ProceduralTerrain.SetupGrassDetail(data, GrassDetailRes, GrassHealthy, GrassDry);
+            VosgesFarGrass.SetupNear(data, GrassDetailRes, GrassHealthy, GrassDry);
         }
 
         protected override IEnumerable<object> Decorate(TerrainData data, int index)
         {
             foreach (var step in PlantGrass(data, index))
                 yield return step;
+
+            _farGrass = null;
+            _farGrassIndex = index;
+            float x0 = index * ChunkLength;
+            foreach (var step in VosgesFarGrass.Build(data, x0, ChunkLength, Depth, FarGrassSkip,
+                         Hash(_seed, index, 5), GraphicsOptions.FarGrassDensity, _patchOffset, mesh => _farGrass = mesh))
+                yield return step;
         }
+
+        bool FarGrassSkip(float x, float z) => Scar(x, z) > GrassScarLimit || Layout.Bare(x, z);
 
         protected override void AddChunkMeshes(int index, Transform root, float[] cutLine,
             List<Mesh> owned)
         {
             AddMesh(root, "Cut Wall", ProceduralTerrain.BuildCutWallMesh(cutLine, ChunkLength),
                 _wallMat, new Vector3(index * ChunkLength + ChunkLength / 2f, 0f, 0f), owned);
+
+            if (_farGrass != null && _farGrassIndex == index)
+                AddMesh(root, "Far Grass", _farGrass, VosgesFarGrass.SharedMaterial(GrassHealthy, GrassDry),
+                    new Vector3(index * ChunkLength, TerrainY, 0f), owned);
+            _farGrass = null;
         }
 
         void FillRows(float[,] heights, int chunkIndex, int izFrom, int izTo)
@@ -141,25 +189,70 @@ namespace MetalRaptors
             for (int iz = izFrom; iz < izTo; iz++)
             {
                 float z = Depth * iz / (Res - 1);
-                float zEff = Mathf.Max(z, ProceduralTerrain.FrontStrip);
-                float depthRamp = Mathf.SmoothStep(0f, 1f,
-                    Mathf.InverseLerp(ProceduralTerrain.FrontStrip, 240f, zEff));
-                float back = BackRise * Mathf.SmoothStep(0f, 1f,
-                    Mathf.InverseLerp(BackRiseFrom, Depth, z));
 
                 for (int ix = 0; ix < Res; ix++)
+                    heights[iz, ix] = BaseHeight(WorldX(chunkIndex, ix), z);
+            }
+        }
+
+        float BaseHeight(float x, float z)
+        {
+            float mask = Layout != null ? Layout.HillMask(x, z) : 1f;
+            float h = ValleyHeight(x, z);
+            if (mask > 0f) h += Hills(x, z) * mask;
+            return Mathf.Clamp(h, MinHeight, MaxHeight);
+        }
+
+        float Hills(float x, float z)
+        {
+            float zEff = Mathf.Max(z, ProceduralTerrain.FrontStrip);
+            float amp = Mathf.Lerp(BumpHeight, HillHeight, Mathf.SmoothStep(0f, 1f,
+                Mathf.InverseLerp(ProceduralTerrain.FrontStrip, HillRampTo, zEff)));
+            amp *= 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(HillFadeFrom, HillFadeTo, z));
+            if (amp <= 0f) return 0f;
+
+            float n = Mathf.PerlinNoise(x / HillWaveX + _hx1, zEff / HillWaveZ + _hz1) * (1f - HillDetailWeight)
+                      + Mathf.PerlinNoise(x / (HillWaveX * HillDetail) + _hx2, zEff / (HillWaveZ * HillDetail) + _hz2)
+                      * HillDetailWeight;
+            return amp * Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(HillLow, HillHigh, n));
+        }
+
+        float ValleyHeight(float x, float z)
+        {
+            float zEff = Mathf.Max(z, ProceduralTerrain.FrontStrip);
+            float depthRamp = Mathf.SmoothStep(0f, 1f,
+                Mathf.InverseLerp(ProceduralTerrain.FrontStrip, 240f, zEff));
+            float back = BackRise * Mathf.SmoothStep(0f, 1f,
+                Mathf.InverseLerp(BackRiseFrom, Depth, z));
+
+            float h = ProceduralTerrain.BaseLevel + back;
+            h += (Mathf.PerlinNoise(x / 1100f + _r1, 0.5f) - 0.5f) * 2f * RollBroad;
+            h += (Mathf.PerlinNoise(x / 470f + _r2, 0.5f) - 0.5f) * 2f * RollMid;
+            h += (Mathf.PerlinNoise(x / 190f + _r3, 0.5f) - 0.5f) * 2f * RollFine;
+            h += (Mathf.PerlinNoise(x / 210f + _ox1, zEff / 210f + _oz1) - 0.5f)
+                 * 2f * RollPatch * depthRamp;
+            h += (Mathf.PerlinNoise(x / 34f + _ox2, zEff / 34f + _oz2) - 0.5f) * 2f * RollGrain;
+            return Mathf.Clamp(h, MinHeight, MaxHeight);
+        }
+
+        static void StampPad(float[,] heights, int chunkIndex, VosgesLayout.Pad pad)
+        {
+            float chunkX0 = chunkIndex * ChunkLength;
+            float reach = pad.Reach;
+            if (pad.x + reach < chunkX0 || pad.x - reach > chunkX0 + ChunkLength) return;
+
+            int ixMin = Mathf.Max(0, Mathf.FloorToInt((pad.x - reach - chunkX0) / XStep));
+            int ixMax = Mathf.Min(Res - 1, Mathf.CeilToInt((pad.x + reach - chunkX0) / XStep));
+            int izMin = Mathf.Max(0, Mathf.FloorToInt((pad.z - reach) / ZStep));
+            int izMax = Mathf.Min(Res - 1, Mathf.CeilToInt((pad.z + reach) / ZStep));
+
+            for (int iz = izMin; iz <= izMax; iz++)
+            {
+                float z = Depth * iz / (Res - 1);
+                for (int ix = ixMin; ix <= ixMax; ix++)
                 {
-                    float x = WorldX(chunkIndex, ix);
-
-                    float h = ProceduralTerrain.BaseLevel + back;
-                    h += (Mathf.PerlinNoise(x / 1100f + _r1, 0.5f) - 0.5f) * 2f * RollBroad;
-                    h += (Mathf.PerlinNoise(x / 470f + _r2, 0.5f) - 0.5f) * 2f * RollMid;
-                    h += (Mathf.PerlinNoise(x / 190f + _r3, 0.5f) - 0.5f) * 2f * RollFine;
-                    h += (Mathf.PerlinNoise(x / 210f + _ox1, zEff / 210f + _oz1) - 0.5f)
-                         * 2f * RollPatch * depthRamp;
-                    h += (Mathf.PerlinNoise(x / 34f + _ox2, zEff / 34f + _oz2) - 0.5f) * 2f * RollGrain;
-
-                    heights[iz, ix] = h;
+                    float w = pad.Weight(WorldX(chunkIndex, ix), z);
+                    if (w > 0f) heights[iz, ix] = Mathf.Lerp(heights[iz, ix], pad.y, w);
                 }
             }
         }
@@ -217,6 +310,9 @@ namespace MetalRaptors
                     list.Add(NewCrater(mines, cell, radius, depth, 0.45f, 0.3f, 1.7f));
                 }
             }
+
+            for (int i = list.Count - 1; i >= 0; i--)
+                if (Layout.Occupied(list[i].x, list[i].z, list[i].influence)) list.RemoveAt(i);
         }
 
         static CraterSpec NewCrater(System.Random rng, int cell, float radius, float depth,
@@ -258,30 +354,36 @@ namespace MetalRaptors
             int rows = Mathf.Max(1, Mathf.RoundToInt(Depth / ProceduralTerrain.GrassSpacing));
             float cellX = ChunkLength / cols;
             float cellZ = Depth / rows;
+            int grassRows = Mathf.Min(rows, Mathf.CeilToInt(NearGrassTo / cellZ));
             float x0 = index * ChunkLength;
 
             var rng = new System.Random(Hash(_seed, index, 3));
-            var layer = new int[GrassDetailRes, GrassDetailRes];
+            var layers = new int[VosgesFarGrass.Kinds][,];
+            for (int k = 0; k < layers.Length; k++) layers[k] = new int[GrassDetailRes, GrassDetailRes];
 
-            for (int row = 0; row < rows; row++)
+            for (int row = 0; row < grassRows; row++)
             {
                 for (int col = 0; col < cols; col++)
                 {
                     float lx = Mathf.Min((col + (float)rng.NextDouble()) * cellX, ChunkLength);
                     float lz = Mathf.Min((row + (float)rng.NextDouble()) * cellZ, Depth);
                     float xNorm = lx / ChunkLength, zNorm = lz / Depth;
+                    float fade = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(NearGrassFrom, NearGrassTo, lz));
+                    if (fade > 0f && rng.NextDouble() < fade) continue;
 
                     if (data.GetSteepness(xNorm, zNorm) > ProceduralTerrain.GrassMaxSlopeDeg) continue;
                     if (Scar(x0 + lx, lz) > GrassScarLimit) continue;
+                    if (Layout.Bare(x0 + lx, lz)) continue;
 
                     int ix = Mathf.Min(GrassDetailRes - 1, (int)(xNorm * GrassDetailRes));
                     int iz = Mathf.Min(GrassDetailRes - 1, (int)(zNorm * GrassDetailRes));
-                    layer[iz, ix]++;
+                    int kind = VosgesFarGrass.Kind(VosgesFarGrass.Dryness(x0 + lx, lz, _patchOffset), rng);
+                    layers[kind][iz, ix]++;
                 }
                 if (row % 40 == 39) yield return null;
             }
 
-            data.SetDetailLayer(0, 0, 0, layer);
+            for (int k = 0; k < layers.Length; k++) data.SetDetailLayer(0, 0, k, layers[k]);
         }
     }
 }

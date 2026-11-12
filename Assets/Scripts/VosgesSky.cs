@@ -6,12 +6,15 @@ namespace MetalRaptors
 {
     public static class VosgesSky
     {
-        public const float FogEnd = 2000f;
-        public const float NightFogEnd = 1850f;
+        public const float DepthStretch = 1.61f;
+        public const float FogEnd = 2000f * DepthStretch;
+        public const float NightFogEnd = 1850f * DepthStretch;
+        public const float FarClip = 3500f;
+        public const float LowCloudLift = 80f;
 
         // The valley mist, sized off the ridges' green-to-stone line (docs/vosges.md).
         const float MistTopY = 150f, MistClearY = 330f, MistStrength = 0.3f;
-        const float MistFromZ = 500f, MistFullZ = 760f;
+        const float MistFromZ = 1255f, MistFullZ = 1460f;
 
         class Palette
         {
@@ -186,7 +189,7 @@ namespace MetalRaptors
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.Linear;
             RenderSettings.fogColor = p.haze;
-            RenderSettings.fogStartDistance = cameraDistance + p.fogStartOffset;
+            RenderSettings.fogStartDistance = (cameraDistance + p.fogStartOffset) * DepthStretch;
             RenderSettings.fogEndDistance = p.fogEnd;
         }
 

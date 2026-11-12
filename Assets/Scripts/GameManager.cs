@@ -75,8 +75,9 @@ namespace MetalRaptors
         public PlaneSkin SkinFor(PlaneModelConfig plane)
         {
             if (plane == null) return null;
+            if (plane != SelectedPlane) return PlaneSkins.Default(plane);
 
-            string id = PlayerPrefs.GetString(PrefSkinPrefix + plane.resourceName, string.Empty);
+            string id =PlayerPrefs.GetString(PrefSkinPrefix + plane.resourceName, string.Empty);
             PlaneSkin skin = PlaneSkins.ById(plane, id);
             return skin != null && !skin.locked ? skin : PlaneSkins.Default(plane);
         }

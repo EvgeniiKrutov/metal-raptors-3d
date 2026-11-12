@@ -291,8 +291,10 @@ namespace MetalRaptors
             else if (Alpine)
             {
                 MountainRange.Begin(_cam, _level.seed, _level.daytime);
+                if (_terrain is VosgesTerrain valley)
+                    VosgesScenery.Begin(_cam, valley.Layout, _level.daytime != Daytime.Night);
                 Battlefield.BeginValley(_cam, _halfViewWidth, _level.seed, _terrain.InCrater,
-                    VosgesTerrain.ValleyZMax, _level.people);
+                    _terrain.Occupied, VosgesTerrain.ValleyZMax, _level.people, !_level.peaceful);
             }
             else if (Bounded)
             {
@@ -455,9 +457,11 @@ namespace MetalRaptors
 
         CampaignLandOptions BuildLand()
         {
-            if (!Bounded && !_level.aerodrome) return null;
+            float depth = Alpine ? VosgesTerrain.LandDepth : 0f;
+            if (!Bounded && !_level.aerodrome)
+                return depth > 0f ? new CampaignLandOptions { depth = depth } : null;
 
-            var land = new CampaignLandOptions { worldWidth = _level.worldWidth };
+            var land = new CampaignLandOptions { worldWidth = _level.worldWidth, depth = depth };
             if (!_level.aerodrome || !Aerodrome.Measure()) return land;
 
             if (!AerodromeFits)
@@ -505,7 +509,7 @@ namespace MetalRaptors
             _skyZeppelin = SkyZeppelin.Begin(_cam, _halfViewWidth, _halfViewHeight,
                 PlayPlaneZ, CameraDistance, _level.zeppelins);
             Seagulls.Begin(_cam, _halfViewWidth, PlayPlaneZ, CameraDistance,
-                Coast && _level.daytime != Daytime.Night);
+                (Coast || Alpine) && _level.daytime != Daytime.Night);
             _thornycrofts = ThornycroftBoats.Begin(_cam, _halfViewWidth, PlayPlaneZ, CameraDistance, Coast);
             _s150s = S150Boats.Begin(_cam, _cubeTr, _halfViewWidth, PlayPlaneZ, CameraDistance, Coast);
             _monitors = LordCliveShips.Begin(_cam, _halfViewWidth, PlayPlaneZ, CameraDistance, Coast);
@@ -964,7 +968,7 @@ namespace MetalRaptors
                     default: MorningSky.Apply(_cam, _level.weather); break;
                 }
             }
-            _cam.farClipPlane = 2600f;
+            _cam.farClipPlane = Alpine ? VosgesSky.FarClip : 2600f;
 
             LevelCamera.Frame(_cam, CameraDistance, out _halfViewWidth, out _halfViewHeight);
             _baseFov = _cam.fieldOfView;
@@ -984,7 +988,8 @@ namespace MetalRaptors
                     CoastSky.CloudGlow(_level.daytime), _level.clouds, PlayPlaneZ, lowBand: true);
             else if (Alpine)
                 CloudSystem.Begin(_cam, VosgesSky.CloudColor(_level.daytime),
-                    VosgesSky.CloudGlow(_level.daytime), _level.clouds, PlayPlaneZ);
+                    VosgesSky.CloudGlow(_level.daytime), _level.clouds, PlayPlaneZ, lowBand: true,
+                    lowLift: VosgesSky.LowCloudLift);
             else
                 CloudSystem.Begin(_cam, _level.daytime, _level.weather, _level.clouds, PlayPlaneZ);
         }

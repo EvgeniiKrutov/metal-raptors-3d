@@ -67,7 +67,7 @@ stats and its model:
 | plane | skins |
 | --- | --- |
 | Sopwith Camel | `green`, `dark_blue`, `white`, `red` (`dark_blue` is the default companion paint) |
-| Fokker Dr.I | none (`skins` left null) |
+| Fokker Dr.I | `manfred` (all red), `black_white`, `red_green`, `lothar` (yellow, Lothar von Richthofen's 454/17), `raven` (locked) |
 | Albatros D.III | `plywood` |
 | Fokker E.III | none (`skins` left null) |
 

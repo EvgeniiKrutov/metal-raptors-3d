@@ -8,12 +8,13 @@ namespace MetalRaptors
     {
         public const float CellWidth = CampaignTerrain.ChunkLength;
 
-        const float ColStep = CellWidth / 12f;
+        const float ColStep = CellWidth / 7f;
         const float SkirtY = -60f;
-        const float GradientLow = 20f, GradientHigh = 900f;
-        const int GradientRes = 96;
-        const float GreenTop = 0.06f, RockFrom = 0.14f;
-        const float PeakFrom = 0.57f, PeakFull = 0.91f;
+        const float GradientLow = 20f, GradientHigh = 1254f;
+        const int GradientRes = 192;
+        const float GreenTop = 0.0427f, RockFrom = 0.0996f;
+        const float PeakFrom = 0.507f, PeakFull = 0.896f;
+        const float WanderLength = 998f;
 
         struct Ridge
         {
@@ -27,18 +28,18 @@ namespace MetalRaptors
         {
             new Ridge
             {
-                frontZ = 700f, crestZ = 980f, crestJitter = 90f,
-                minCrest = 360f, maxCrest = 650f, wavelength = 900f, salt = 1,
+                frontZ = 1299f, crestZ = 1770f, crestJitter = 142f,
+                minCrest = 384f, maxCrest = 851f, wavelength = 1450f, salt = 1,
             },
             new Ridge
             {
-                frontZ = 950f, crestZ = 1180f, crestJitter = 110f,
-                minCrest = 480f, maxCrest = 760f, wavelength = 1350f, salt = 2,
+                frontZ = 1566f, crestZ = 2095f, crestJitter = 178f,
+                minCrest = 578f, maxCrest = 1028f, wavelength = 2170f, salt = 2,
             },
             new Ridge
             {
-                frontZ = 1180f, crestZ = 1450f, crestJitter = 130f,
-                minCrest = 620f, maxCrest = 900f, wavelength = 1900f, salt = 3,
+                frontZ = 1922f, crestZ = 2530f, crestJitter = 209f,
+                minCrest = 803f, maxCrest = 1254f, wavelength = 3060f, salt = 3,
             },
         };
 
@@ -71,7 +72,8 @@ namespace MetalRaptors
                 for (int octave = 0; octave < 4; octave++)
                     range._phase[layer, octave] = (float)(rng.NextDouble() * 1000.0 + 100.0);
 
-            float depth = Ridges[Ridges.Length - 1].crestZ - cam.transform.position.z;
+            Ridge far = Ridges[Ridges.Length - 1];
+            float depth = far.crestZ + far.crestJitter - cam.transform.position.z;
             range._keep = depth * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad) * cam.aspect
                           + CellWidth;
 
@@ -207,7 +209,7 @@ namespace MetalRaptors
         float CrestZ(int layer, float x)
         {
             Ridge r = Ridges[layer];
-            float wander = Mathf.PerlinNoise(x / 620f + _phase[layer, 3], 0.5f) - 0.5f;
+            float wander = Mathf.PerlinNoise(x / WanderLength + _phase[layer, 3], 0.5f) - 0.5f;
             return r.crestZ + wander * 2f * r.crestJitter;
         }
 
