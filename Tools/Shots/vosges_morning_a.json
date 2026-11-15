@@ -1,0 +1,286 @@
+{
+  "output": "../../Builds/Screenshots/vosges_morning_a.png",
+  "width": 1920,
+  "height": 1080,
+  "supersample": 2,
+  "terrain": "Vosges",
+  "seed": 1917,
+  "daytime": "Morning",
+  "settle": 3,
+  "warmup": 3,
+  "ambientBlasts": false,
+  "ambientFlak": false,
+  "ambientZeppelins": false,
+  "ambientPeople": false,
+  "ambientClouds": true,
+  "ambientGulls": false,
+  "ambientSmoke": false,
+  "ambientCraters": false,
+  "clearNear": 400,
+  "clearHerds": 450,
+  "camera": {
+    "x": -1750,
+    "z": 40,
+    "height": 25,
+    "yaw": -12,
+    "pitch": 4,
+    "roll": 0,
+    "fov": 45
+  },
+  "cows": [
+    {
+      "screenX": 0.88,
+      "distance": 60,
+      "yaw": -70,
+      "brown": false
+    },
+    {
+      "screenX": 0.7,
+      "distance": 82,
+      "yaw": 160,
+      "brown": true
+    },
+    {
+      "screenX": 0.57,
+      "distance": 100,
+      "yaw": -120,
+      "brown": false
+    },
+    {
+      "screenX": 0.16,
+      "distance": 66,
+      "yaw": 60,
+      "brown": true
+    }
+  ],
+  "spruces": [
+    {
+      "screenX": 0.92,
+      "distance": 760,
+      "count": 34,
+      "spread": 340,
+      "depth": 160,
+      "fore": false
+    },
+    {
+      "screenX": 0.7,
+      "distance": 900,
+      "count": 30,
+      "spread": 300,
+      "depth": 180,
+      "fore": false
+    },
+    {
+      "screenX": 0.5,
+      "distance": 1050,
+      "count": 26,
+      "spread": 260,
+      "depth": 160,
+      "fore": false
+    },
+    {
+      "screenX": 0.1,
+      "distance": 1250,
+      "count": 24,
+      "spread": 320,
+      "depth": 160,
+      "fore": false
+    }
+  ],
+  "planes": [
+    {
+      "model": "sopwith_camel",
+      "skin": "green",
+      "screen": [
+        0.7,
+        0.62
+      ],
+      "distance": 320,
+      "course": -75,
+      "climb": 4,
+      "bank": -32,
+      "turn": -10,
+      "speed": 180,
+      "fire": true,
+      "target": 1,
+      "fireFor": 1.0,
+      "fireInterval": 0.13
+    },
+    {
+      "model": "fokker_dr1",
+      "skin": "manfred",
+      "screen": [
+        0.48,
+        0.72
+      ],
+      "distance": 450,
+      "course": -82,
+      "climb": 8,
+      "bank": -40,
+      "turn": -14,
+      "speed": 170
+    },
+    {
+      "model": "fokker_dr1",
+      "skin": "lothar",
+      "screen": [
+        0.73,
+        0.86
+      ],
+      "distance": 470,
+      "course": 70,
+      "climb": 6,
+      "bank": 30,
+      "turn": 10,
+      "speed": 175,
+      "fire": true,
+      "target": 3,
+      "fireFor": 1.0,
+      "fireInterval": 0.13,
+      "aimLag": 0.12
+    },
+    {
+      "model": "sopwith_camel",
+      "skin": "red",
+      "screen": [
+        0.89,
+        0.72
+      ],
+      "distance": 560,
+      "course": 100,
+      "climb": 12,
+      "bank": 55,
+      "turn": 22,
+      "speed": 180
+    }
+  ],
+  "flak": [],
+  "clouds": [
+    {
+      "screen": [
+        0.85,
+        0.9
+      ],
+      "distance": 900,
+      "width": 220,
+      "alpha": 0.3
+    },
+    {
+      "screen": [
+        0.55,
+        0.95
+      ],
+      "distance": 950,
+      "width": 260,
+      "alpha": 0.3
+    },
+    {
+      "screen": [
+        0.28,
+        0.92
+      ],
+      "distance": 880,
+      "width": 200,
+      "alpha": 0.3
+    },
+    {
+      "screen": [
+        0.05,
+        0.85
+      ],
+      "distance": 920,
+      "width": 180,
+      "alpha": 0.3
+    },
+    {
+      "screen": [
+        0.67,
+        0.78
+      ],
+      "distance": 1000,
+      "width": 160,
+      "alpha": 0.25
+    },
+    {
+      "screen": [
+        0.14,
+        0.76
+      ],
+      "distance": 1000,
+      "width": 150,
+      "alpha": 0.25
+    }
+  ],
+  "puffs": [
+    {
+      "screen": [
+        0.6,
+        0.93
+      ],
+      "distance": 520,
+      "width": 46,
+      "alpha": 0.75
+    },
+    {
+      "screen": [
+        0.53,
+        0.88
+      ],
+      "distance": 560,
+      "width": 30,
+      "alpha": 0.7
+    },
+    {
+      "screen": [
+        0.34,
+        0.9
+      ],
+      "distance": 540,
+      "width": 40,
+      "alpha": 0.75
+    },
+    {
+      "screen": [
+        0.2,
+        0.8
+      ],
+      "distance": 600,
+      "width": 34,
+      "alpha": 0.7
+    },
+    {
+      "screen": [
+        0.36,
+        0.84
+      ],
+      "distance": 500,
+      "width": 26,
+      "alpha": 0.7
+    },
+    {
+      "screen": [
+        0.8,
+        0.62
+      ],
+      "distance": 620,
+      "width": 30,
+      "alpha": 0.65
+    }
+  ],
+  "villagers": [
+    {
+      "screenX": 0.13,
+      "distance": 640,
+      "yaw": 90,
+      "count": 3,
+      "spread": 14
+    },
+    {
+      "screenX": 0.3,
+      "distance": 620,
+      "yaw": -90,
+      "count": 2,
+      "spread": 10
+    }
+  ]
+}

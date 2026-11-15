@@ -1,0 +1,192 @@
+{
+  "output": "../../Builds/Screenshots/vosges_evening_top_c.png",
+  "width": 1920,
+  "height": 1080,
+  "supersample": 2,
+  "terrain": "Vosges",
+  "seed": 1917,
+  "daytime": "Evening",
+  "aerodrome": true,
+  "settle": 3,
+  "warmup": 3,
+  "ambientBlasts": false,
+  "ambientFlak": false,
+  "ambientZeppelins": false,
+  "ambientPeople": false,
+  "ambientClouds": false,
+  "ambientGulls": false,
+  "ambientSmoke": false,
+  "ambientCraters": false,
+  "hideSun": true,
+  "clearNear": 900,
+  "camera": {
+    "x": 1260,
+    "z": -120,
+    "height": 295,
+    "yaw": -12,
+    "pitch": -8,
+    "roll": 0,
+    "fov": 56
+  },
+  "planes": [
+    {
+      "model": "sopwith_camel",
+      "skin": "mahogany",
+      "climb": -8,
+      "bank": 0,
+      "speed": 180,
+      "boost": true,
+      "streakWidth": 1.2,
+      "screen": [
+        0.406,
+        0.247
+      ],
+      "distance": 284.8,
+      "course": 165
+    },
+    {
+      "model": "sopwith_camel",
+      "skin": "white",
+      "climb": -8,
+      "bank": 0,
+      "speed": 180,
+      "boost": true,
+      "streakWidth": 1.2,
+      "lead": 0,
+      "slot": [
+        -1.17,
+        0,
+        -0.31
+      ],
+      "course": 165
+    },
+    {
+      "model": "sopwith_camel",
+      "skin": "red",
+      "climb": -8,
+      "bank": 0,
+      "speed": 180,
+      "boost": true,
+      "streakWidth": 1.2,
+      "lead": 0,
+      "slot": [
+        1.77,
+        0,
+        1.99
+      ],
+      "course": 165
+    },
+    {
+      "model": "sopwith_camel",
+      "skin": "dark_blue",
+      "climb": -8,
+      "bank": 0,
+      "speed": 180,
+      "boost": true,
+      "streakWidth": 1.2,
+      "lead": 0,
+      "slot": [
+        -3.7,
+        0,
+        0.53
+      ],
+      "course": 165
+    }
+  ],
+  "clouds": [
+    {
+      "screen": [
+        0.05,
+        0.92
+      ],
+      "distance": 1300,
+      "width": 150,
+      "alpha": 0.28
+    },
+    {
+      "screen": [
+        0.2,
+        0.98
+      ],
+      "distance": 1350,
+      "width": 140,
+      "alpha": 0.26
+    },
+    {
+      "screen": [
+        0.81,
+        0.97
+      ],
+      "distance": 1350,
+      "width": 140,
+      "alpha": 0.26
+    },
+    {
+      "screen": [
+        0.95,
+        0.9
+      ],
+      "distance": 1300,
+      "width": 150,
+      "alpha": 0.28
+    }
+  ],
+  "villagers": [
+    {
+      "screenX": 0.272,
+      "distance": 516,
+      "yaw": 0,
+      "count": 3,
+      "spread": 10
+    },
+    {
+      "screenX": 0.459,
+      "distance": 459,
+      "yaw": -10,
+      "count": 3,
+      "spread": 12
+    },
+    {
+      "screenX": 0.406,
+      "distance": 583,
+      "yaw": 10,
+      "count": 2,
+      "spread": 8
+    },
+    {
+      "screenX": 0.338,
+      "distance": 676,
+      "yaw": 90,
+      "count": 2,
+      "spread": 8
+    },
+    {
+      "screenX": 0.529,
+      "distance": 587,
+      "yaw": -90,
+      "count": 2,
+      "spread": 8
+    },
+    {
+      "screenX": 0.345,
+      "distance": 546,
+      "yaw": 0,
+      "count": 2,
+      "spread": 8
+    },
+    {
+      "screenX": 0.538,
+      "distance": 515,
+      "yaw": 0,
+      "count": 2,
+      "spread": 8
+    },
+    {
+      "screenX": 0.37,
+      "distance": 411,
+      "yaw": 0,
+      "count": 2,
+      "spread": 8
+    }
+  ]
+}

@@ -30,6 +30,10 @@ namespace MetalRaptors
             ? _config.rotationSpeed * Mathf.Deg2Rad * _boost
             : 0f;
 
+        public float BaseSpeed => _config != null ? _config.flySpeed : 0f;
+
+        public float BaseTurnDeg => _config != null ? _config.rotationSpeed : 0f;
+
         public bool Boosting => _boostTarget > 1f;
 
         public bool BarrelRolling => _barrelLeft > 0f;

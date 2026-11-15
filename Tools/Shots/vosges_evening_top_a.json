@@ -1,0 +1,362 @@
+{
+  "output": "../../Builds/Screenshots/vosges_evening_top_a.png",
+  "width": 1920,
+  "height": 1080,
+  "supersample": 2,
+  "terrain": "Vosges",
+  "seed": 1917,
+  "daytime": "Evening",
+  "aerodrome": true,
+  "settle": 3,
+  "warmup": 3,
+  "ambientBlasts": false,
+  "ambientFlak": false,
+  "ambientZeppelins": false,
+  "ambientPeople": false,
+  "ambientClouds": false,
+  "ambientGulls": false,
+  "ambientSmoke": false,
+  "ambientCraters": false,
+  "hideSun": true,
+  "clearNear": 900,
+  "camera": {
+    "x": 1050,
+    "z": -80,
+    "height": 280,
+    "yaw": 0,
+    "pitch": -4,
+    "roll": 0,
+    "fov": 54
+  },
+  "planes": [
+    {
+      "model": "sopwith_camel",
+      "skin": "mahogany",
+      "climb": -8,
+      "bank": 0,
+      "speed": 180,
+      "boost": false,
+      "course": 195,
+      "screen": [
+        0.3713,
+        0.4307
+      ],
+      "distance": 189.5
+    },
+    {
+      "model": "sopwith_camel",
+      "skin": "white",
+      "climb": -8,
+      "bank": 0,
+      "speed": 180,
+      "boost": false,
+      "course": 165,
+      "screen": [
+        0.6287,
+        0.4307
+      ],
+      "distance": 189.5
+    },
+    {
+      "model": "sopwith_camel",
+      "skin": "red",
+      "climb": -8,
+      "bank": 0,
+      "speed": 180,
+      "boost": false,
+      "course": 195,
+      "lead": 0,
+      "slot": [
+        1.045,
+        0.139,
+        0.199
+      ]
+    },
+    {
+      "model": "sopwith_camel",
+      "skin": "dark_blue",
+      "climb": -8,
+      "bank": 0,
+      "speed": 180,
+      "boost": false,
+      "course": 165,
+      "lead": 1,
+      "slot": [
+        -1.045,
+        0.139,
+        0.199
+      ]
+    }
+  ],
+  "clouds": [
+    {
+      "screen": [
+        0.06,
+        0.95
+      ],
+      "distance": 1500,
+      "width": 360,
+      "alpha": 0.4
+    },
+    {
+      "screen": [
+        0.24,
+        0.98
+      ],
+      "distance": 1500,
+      "width": 380,
+      "alpha": 0.4
+    },
+    {
+      "screen": [
+        0.42,
+        0.94
+      ],
+      "distance": 1500,
+      "width": 340,
+      "alpha": 0.4
+    },
+    {
+      "screen": [
+        0.6,
+        0.98
+      ],
+      "distance": 1500,
+      "width": 380,
+      "alpha": 0.4
+    },
+    {
+      "screen": [
+        0.78,
+        0.95
+      ],
+      "distance": 1500,
+      "width": 360,
+      "alpha": 0.4
+    },
+    {
+      "screen": [
+        0.95,
+        0.98
+      ],
+      "distance": 1500,
+      "width": 340,
+      "alpha": 0.4
+    },
+    {
+      "screen": [
+        0.51,
+        0.875
+      ],
+      "distance": 1450,
+      "width": 260,
+      "alpha": 0.38
+    },
+    {
+      "screen": [
+        0.5,
+        0.77
+      ],
+      "distance": 1400,
+      "width": 200,
+      "alpha": 0.35
+    },
+    {
+      "screen": [
+        0.04,
+        0.72
+      ],
+      "distance": 1400,
+      "width": 240,
+      "alpha": 0.36
+    },
+    {
+      "screen": [
+        0.96,
+        0.72
+      ],
+      "distance": 1400,
+      "width": 240,
+      "alpha": 0.36
+    }
+  ],
+  "villagers": [
+    {
+      "screenX": 0.385,
+      "distance": 562,
+      "yaw": 0,
+      "count": 3,
+      "spread": 10
+    },
+    {
+      "screenX": 0.444,
+      "distance": 588,
+      "yaw": 10,
+      "count": 2,
+      "spread": 8
+    },
+    {
+      "screenX": 0.495,
+      "distance": 535,
+      "yaw": -10,
+      "count": 3,
+      "spread": 10
+    },
+    {
+      "screenX": 0.552,
+      "distance": 583,
+      "yaw": 0,
+      "count": 2,
+      "spread": 8
+    },
+    {
+      "screenX": 0.616,
+      "distance": 557,
+      "yaw": -90,
+      "count": 2,
+      "spread": 8
+    },
+    {
+      "screenX": 0.641,
+      "distance": 604,
+      "yaw": 90,
+      "count": 2,
+      "spread": 8
+    },
+    {
+      "screenX": 0.466,
+      "distance": 561,
+      "yaw": 0,
+      "count": 2,
+      "spread": 8
+    },
+    {
+      "screenX": 0.584,
+      "distance": 531,
+      "yaw": 10,
+      "count": 3,
+      "spread": 10
+    }
+  ],
+  "spruces": [
+    {
+      "screenX": -0.01,
+      "distance": 1574,
+      "count": 22,
+      "spread": 150,
+      "depth": 70
+    },
+    {
+      "screenX": 0.128,
+      "distance": 1394,
+      "count": 22,
+      "spread": 150,
+      "depth": 70
+    },
+    {
+      "screenX": 0.266,
+      "distance": 1255,
+      "count": 22,
+      "spread": 150,
+      "depth": 70
+    },
+    {
+      "screenX": 0.405,
+      "distance": 1172,
+      "count": 22,
+      "spread": 150,
+      "depth": 70
+    },
+    {
+      "screenX": 0.543,
+      "distance": 1159,
+      "count": 22,
+      "spread": 150,
+      "depth": 70
+    },
+    {
+      "screenX": 0.681,
+      "distance": 1216,
+      "count": 22,
+      "spread": 150,
+      "depth": 70
+    },
+    {
+      "screenX": 0.819,
+      "distance": 1335,
+      "count": 22,
+      "spread": 150,
+      "depth": 70
+    },
+    {
+      "screenX": 0.958,
+      "distance": 1502,
+      "count": 22,
+      "spread": 150,
+      "depth": 70
+    },
+    {
+      "screenX": -0.01,
+      "distance": 1760,
+      "count": 22,
+      "spread": 150,
+      "depth": 70
+    },
+    {
+      "screenX": 0.107,
+      "distance": 1591,
+      "count": 22,
+      "spread": 150,
+      "depth": 70
+    },
+    {
+      "screenX": 0.23,
+      "distance": 1442,
+      "count": 22,
+      "spread": 150,
+      "depth": 70
+    },
+    {
+      "screenX": 0.353,
+      "distance": 1340,
+      "count": 22,
+      "spread": 150,
+      "depth": 70
+    },
+    {
+      "screenX": 0.477,
+      "distance": 1296,
+      "count": 22,
+      "spread": 150,
+      "depth": 70
+    },
+    {
+      "screenX": 0.6,
+      "distance": 1316,
+      "count": 22,
+      "spread": 150,
+      "depth": 70
+    },
+    {
+      "screenX": 0.723,
+      "distance": 1397,
+      "count": 22,
+      "spread": 150,
+      "depth": 70
+    },
+    {
+      "screenX": 0.847,
+      "distance": 1530,
+      "count": 22,
+      "spread": 150,
+      "depth": 70
+    },
+    {
+      "screenX": 0.97,
+      "distance": 1702,
+      "count": 22,
+      "spread": 150,
+      "depth": 70
+    }
+  ]
+}

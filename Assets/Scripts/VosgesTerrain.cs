@@ -62,6 +62,10 @@ namespace MetalRaptors
 
         public VosgesLayout Layout { get; private set; }
 
+        public static bool SkipCraters;
+
+        bool Arena => _arena != null;
+
         protected override float DetailDistance => NearGrassDistance;
 
         protected override float HeightScale => TerrainTop;
@@ -84,13 +88,15 @@ namespace MetalRaptors
             _earthLayer = TerrainSurfaces.FlatLayer("Vosges (earth)", EarthColor, EarthTile);
             _wallMat = TerrainSurfaces.FlatMaterial(WallColor);
 
-            Layout = new VosgesLayout(_seed, ValleyHeight, BaseHeight, cameraDistance, playPlaneZ);
+            Layout = Arena ? null : new VosgesLayout(_seed, ValleyHeight, BaseHeight, cameraDistance, playPlaneZ);
 
             VosgesSky.ApplyFog(daytime, cameraDistance, playPlaneZ);
         }
 
         public override bool Occupied(float worldX, float z, float margin) =>
-            Layout != null && Layout.Occupied(worldX, z, margin);
+            Arena ? _arena.Occupied(worldX, z, margin) : Layout != null && Layout.Occupied(worldX, z, margin);
+
+        bool Bare(float x, float z) => Arena ? _arena.Covered(x, z) : Layout.Bare(x, z);
 
         public override bool InCrater(float worldX, float z)
         {
@@ -122,6 +128,8 @@ namespace MetalRaptors
                 StampCrater(metres, index, c);
                 yield return null;
             }
+
+            if (Arena) yield break;
 
             Layout.PadsForRange(x0 - VosgesLayout.MaxPadReach, x0 + ChunkLength + VosgesLayout.MaxPadReach, _pads);
             foreach (var pad in _pads)
@@ -170,7 +178,7 @@ namespace MetalRaptors
                 yield return step;
         }
 
-        bool FarGrassSkip(float x, float z) => Scar(x, z) > GrassScarLimit || Layout.Bare(x, z);
+        bool FarGrassSkip(float x, float z) => Scar(x, z) > GrassScarLimit || Bare(x, z);
 
         protected override void AddChunkMeshes(int index, Transform root, float[] cutLine,
             List<Mesh> owned)
@@ -197,7 +205,7 @@ namespace MetalRaptors
 
         float BaseHeight(float x, float z)
         {
-            float mask = Layout != null ? Layout.HillMask(x, z) : 1f;
+            float mask = Arena ? _arena.HillMask(x, z) : Layout != null ? Layout.HillMask(x, z) : 1f;
             float h = ValleyHeight(x, z);
             if (mask > 0f) h += Hills(x, z) * mask;
             return Mathf.Clamp(h, MinHeight, MaxHeight);
@@ -219,6 +227,8 @@ namespace MetalRaptors
 
         float ValleyHeight(float x, float z)
         {
+            if (Arena) return ProceduralTerrain.BaseLevel;
+
             float zEff = Mathf.Max(z, ProceduralTerrain.FrontStrip);
             float depthRamp = Mathf.SmoothStep(0f, 1f,
                 Mathf.InverseLerp(ProceduralTerrain.FrontStrip, 240f, zEff));
@@ -285,6 +295,7 @@ namespace MetalRaptors
         void CratersForRange(float xMin, float xMax, List<CraterSpec> list)
         {
             list.Clear();
+            if (Arena || SkipCraters) return;
             int c0 = Mathf.FloorToInt(xMin / CraterCell);
             int c1 = Mathf.FloorToInt(xMax / CraterCell);
 
@@ -373,7 +384,7 @@ namespace MetalRaptors
 
                     if (data.GetSteepness(xNorm, zNorm) > ProceduralTerrain.GrassMaxSlopeDeg) continue;
                     if (Scar(x0 + lx, lz) > GrassScarLimit) continue;
-                    if (Layout.Bare(x0 + lx, lz)) continue;
+                    if (Bare(x0 + lx, lz)) continue;
 
                     int ix = Mathf.Min(GrassDetailRes - 1, (int)(xNorm * GrassDetailRes));
                     int iz = Mathf.Min(GrassDetailRes - 1, (int)(zNorm * GrassDetailRes));

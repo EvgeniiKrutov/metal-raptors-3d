@@ -7,7 +7,16 @@ namespace MetalRaptors
     {
         public static GameManager Instance { get; private set; }
 
-        public int SelectedPlaneIndex { get; private set; }
+        int _selectedPlane;
+
+        public int SelectedPlaneIndex
+        {
+            get
+            {
+                int index = Mathf.Clamp(_selectedPlane, 0, PlaneModels.All.Length - 1);
+                return PlaneModels.Unlocked(PlaneModels.All[index]) ? index : 0;
+            }
+        }
 
         public PlaneModelConfig SelectedPlane =>
             PlaneModels.All[Mathf.Clamp(SelectedPlaneIndex, 0, PlaneModels.All.Length - 1)];
@@ -67,8 +76,8 @@ namespace MetalRaptors
 
         public void SetSelectedPlane(int index)
         {
-            SelectedPlaneIndex = Mathf.Clamp(index, 0, PlaneModels.All.Length - 1);
-            PlayerPrefs.SetInt(PrefPlane, SelectedPlaneIndex);
+            _selectedPlane = Mathf.Clamp(index, 0, PlaneModels.All.Length - 1);
+            PlayerPrefs.SetInt(PrefPlane, _selectedPlane);
             PlayerPrefs.Save();
         }
 
@@ -79,12 +88,12 @@ namespace MetalRaptors
 
             string id =PlayerPrefs.GetString(PrefSkinPrefix + plane.resourceName, string.Empty);
             PlaneSkin skin = PlaneSkins.ById(plane, id);
-            return skin != null && !skin.locked ? skin : PlaneSkins.Default(plane);
+            return skin != null && !PlaneSkins.IsLocked(skin) ? skin : PlaneSkins.Default(plane);
         }
 
         public void SetSkin(PlaneModelConfig plane, PlaneSkin skin)
         {
-            if (plane == null || skin == null || skin.locked) return;
+            if (plane == null || skin == null || PlaneSkins.IsLocked(skin)) return;
 
             PlayerPrefs.SetString(PrefSkinPrefix + plane.resourceName, skin.id);
             PlayerPrefs.Save();
@@ -138,7 +147,7 @@ namespace MetalRaptors
             HighestUnlockedLevel = PlayerPrefs.GetInt(PrefUnlocked, 1);
             CampaignLevelsCompleted = Mathf.Clamp(PlayerPrefs.GetInt(PrefCampaign, 0),
                 0, CampaignRun.LastLevel);
-            SelectedPlaneIndex = Mathf.Clamp(PlayerPrefs.GetInt(PrefPlane, 0),
+            _selectedPlane = Mathf.Clamp(PlayerPrefs.GetInt(PrefPlane, 0),
                 0, PlaneModels.All.Length - 1);
             int daytime = PlayerPrefs.GetInt(PrefLevel1Daytime, (int)Daytime.Midday);
             Level1Daytime = System.Enum.IsDefined(typeof(Daytime), daytime)

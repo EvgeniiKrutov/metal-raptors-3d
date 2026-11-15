@@ -30,6 +30,8 @@ namespace MetalRaptors
         const float DriftHigh = 0.9f;
         const int DriftBlobsMin = 5, DriftBlobsMax = 9;
 
+        static readonly int EmissionId = Shader.PropertyToID("_EmissionColor");
+
         enum Kind { Crown, Base, Drift }
 
         class Piece
@@ -65,6 +67,13 @@ namespace MetalRaptors
         Color _tint, _glow;
 
         public float FloorY => _eye.y + FloorTop * _halfH;
+
+        public void Flash(Color add)
+        {
+            Color glow = _glow + add;
+            foreach (Material mat in _materials)
+                if (mat != null) mat.SetColor(EmissionId, glow);
+        }
 
         public static ArenaClouds Begin(Vector3 eye, float halfViewWidth, float halfViewHeight,
             float cameraDistance, float playPlaneZ, Color tint, Color glow, float speed)

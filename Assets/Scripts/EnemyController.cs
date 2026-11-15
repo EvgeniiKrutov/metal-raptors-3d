@@ -90,6 +90,15 @@ namespace MetalRaptors
         const float BarLiftMargin = 8f;
 
         const float ScriptRollRate = 300f;
+
+        const float RunLockDeg = 6f;
+        const float AimMaxSec = 2.5f;
+        const float RunMaxSec = 4f;
+        const float TurnDoneSweepDeg = 120f;
+        const float TurnDoneAimDeg = 50f;
+        const float TurnMaxSweepDeg = 330f;
+        const float EdgeTurnRoom = 20f;
+        const float AceSpeedResponse = 2f;
         const float LandReach = 26f;
         const float HomeTimeout = 14f;
 
@@ -137,6 +146,8 @@ namespace MetalRaptors
 
         public bool Blazing { get; private set; }
 
+        public bool Evading => _barrel.Active;
+
         public float BodyLow => _bodyLow;
 
         public float BodyHigh => _bodyHigh;
@@ -148,6 +159,8 @@ namespace MetalRaptors
         static readonly Color SputterColor = new Color(0.92f, 0.92f, 0.9f, 0.6f);
 
         enum AiState { Attack, Fly, Evade, Recover, Return, StrikeAim, StrikeRun, Tail }
+
+        enum RollerLeg { Aim, Run, Away, Turn }
 
         EnemyConfig _config;
         Rigidbody _target;
@@ -202,6 +215,14 @@ namespace MetalRaptors
         readonly EnemyLoop _loop = new EnemyLoop();
         readonly EnemyDepthDodge _dodge = new EnemyDepthDodge();
         readonly EnemyEvade _evade = new EnemyEvade();
+        readonly EnemyBarrel _barrel = new EnemyBarrel();
+        float _barrelHold;
+        RollerLeg _leg;
+        float _legTimer;
+        float _runHeading;
+        float _uTurnDir = 1f;
+        float _turnSwept;
+        float _aceSpeed;
 
         float _deck;
         float _baseZ;
@@ -255,6 +276,7 @@ namespace MetalRaptors
             CurrentHealth = Mathf.Max(1f, config.health);
             _stateTimer = config.attackDuration;
             _speed = config.flySpeed;
+            _aceSpeed = config.flySpeed;
             _baseZ = transform.position.z;
 
             Vector3 to = (target != null ? target.position : Vector3.zero) - transform.position;
@@ -307,6 +329,7 @@ namespace MetalRaptors
             SetStreaks(false);
             _evade.Cancel();
             _loop.Cancel();
+            CancelAbility();
         }
 
         public void SetBounds(float minX, float maxX)
@@ -386,6 +409,7 @@ namespace MetalRaptors
 
             CancelDodge();
             CancelReversal();
+            StopAbility();
             _evade.Cancel();
             EndStrike();
 
@@ -395,6 +419,7 @@ namespace MetalRaptors
             _rb.linearVelocity = Vector3.zero;
 
             _speed = _config.flySpeed;
+            _aceSpeed = _config.flySpeed;
             _engageSpeed = 0f;
             _boost = 1f;
             _angularVelocity = 0f;
@@ -408,11 +433,15 @@ namespace MetalRaptors
             ApplyRotation();
         }
 
-        EnemyRole Role => _config != null ? _config.role : EnemyRole.Fighter;
+        public EnemyRole Role => _config != null ? _config.role : EnemyRole.Fighter;
 
         static EnemyController _runDown;
 
         bool Scouting => Role == EnemyRole.Scout;
+
+        bool Ace => EnemyRoles.IsAce(Role);
+
+        bool Contouring => Scouting || Ace;
 
         public bool RunningDown => _state == AiState.Tail && _runDown == this && _tailLocked;
 
@@ -436,9 +465,9 @@ namespace MetalRaptors
 
         public Rigidbody Body => _rb;
 
-        float GroundRef => Scouting ? _deck : _groundY;
+        float GroundRef => Contouring ? _deck : _groundY;
 
-        float GroundAt(float x) => Scouting ? TerrainAt(x) : _groundY;
+        float GroundAt(float x) => Contouring ? TerrainAt(x) : _groundY;
 
         public void BeginScript()
         {
@@ -448,6 +477,7 @@ namespace MetalRaptors
             _scriptPos = _rb.position;
             CancelDodge();
             CancelReversal();
+            StopAbility();
             _evade.Cancel();
             EndStrike();
             SetStreaks(false);
@@ -534,6 +564,7 @@ namespace MetalRaptors
             TickDodge(dt);
             TickPress(dt);
             TickCircle(dt);
+            TickAbility(dt);
 
             if (_standDown)
             {
@@ -544,7 +575,7 @@ namespace MetalRaptors
             {
                 CancelReversal();
             }
-            else if (!_onCamera && _state != AiState.Recover && !Striking)
+            else if (!_onCamera && !Ace && _state != AiState.Recover && !Striking)
             {
                 _state = AiState.Return;
                 CancelReversal();
@@ -634,6 +665,7 @@ namespace MetalRaptors
 
         void TickFall(float dt)
         {
+            _barrel.Step(dt);
             if (_fallTarget.HasValue)
             {
                 Vector3 target = _fallTarget.Value;
@@ -665,7 +697,7 @@ namespace MetalRaptors
 
         void TickDeck()
         {
-            if (!Scouting)
+            if (!Contouring)
             {
                 _deck = _groundY;
                 return;
@@ -736,7 +768,7 @@ namespace MetalRaptors
 
         bool CheckGroundAvoidance()
         {
-            if (RunningDown && !Scouting) return false;
+            if (RunningDown && !Contouring) return false;
             if (!GroundThreat()) return false;
             if (_state != AiState.Recover) EnterRecover();
             return true;
@@ -834,6 +866,12 @@ namespace MetalRaptors
                 return;
             }
 
+            if (Ace)
+            {
+                TickRoller(dt);
+                return;
+            }
+
             if (WantsStrike())
             {
                 EnterStrike();
@@ -883,11 +921,204 @@ namespace MetalRaptors
             if (_state == AiState.Fly) _flyWeaveT += dt;
         }
 
+        void TickAbility(float dt)
+        {
+            _barrelHold = Mathf.Max(0f, _barrelHold - dt);
+
+            bool rolling = _barrel.Active;
+            _barrel.Step(dt);
+            if (rolling && !_barrel.Active) EndBarrel();
+            else if (WantsBarrel()) BeginBarrel();
+        }
+
+        void CancelAbility()
+        {
+            if (!_barrel.Active) return;
+
+            _barrel.Cancel();
+            _barrelHold = _config.barrelCooldown;
+            SetStreaks(false);
+        }
+
+        void StopAbility()
+        {
+            CancelAbility();
+            _barrel.Stop();
+        }
+
+        void TickRoller(float dt)
+        {
+            if (_state != AiState.Attack)
+            {
+                EnterAttack();
+                return;
+            }
+
+            _legTimer += dt;
+            switch (_leg)
+            {
+                case RollerLeg.Aim:
+                    if (_onCamera && _target != null
+                        && (AimError(RunPoint()) <= RunLockDeg || _legTimer >= AimMaxSec))
+                        BeginRun();
+                    break;
+
+                case RollerLeg.Run:
+                    if (!_onCamera) BeginLeg(RollerLeg.Aim);
+                    else if (Passed() || _legTimer >= RunMaxSec) BeginAway();
+                    break;
+
+                case RollerLeg.Away:
+                    if (_legTimer >= _config.aceAwaySeconds || NearEdge()) BeginTurn();
+                    break;
+
+                case RollerLeg.Turn:
+                    _turnSwept += Mathf.Abs(_angularVelocity) * dt * Mathf.Rad2Deg;
+                    if (TurnedBack()) BeginLeg(RollerLeg.Aim);
+                    break;
+            }
+        }
+
+        void BeginLeg(RollerLeg leg)
+        {
+            _leg = leg;
+            _legTimer = 0f;
+        }
+
+        void BeginRun()
+        {
+            BeginLeg(RollerLeg.Run);
+            _runHeading = HeadingTo(RunPoint());
+        }
+
+        void BeginAway()
+        {
+            BeginLeg(RollerLeg.Away);
+            _runHeading = _heading;
+        }
+
+        void BeginTurn()
+        {
+            BeginLeg(RollerLeg.Turn);
+            _turnSwept = 0f;
+            _uTurnDir = PickTurnSide();
+        }
+
+        Vector2 RunPoint() => ClampToBand(PredictIntercept());
+
+        bool RollerArmed =>
+            _state == AiState.Attack && (_leg == RollerLeg.Aim || _leg == RollerLeg.Run);
+
+        bool Straightening => Ace && _state == AiState.Attack && _leg != RollerLeg.Aim;
+
+        float RollerHeading()
+        {
+            switch (_leg)
+            {
+                case RollerLeg.Run:
+                case RollerLeg.Away:
+                    return _runHeading;
+
+                case RollerLeg.Turn:
+                    return _heading + _uTurnDir * Mathf.PI * 0.5f;
+
+                default:
+                    return _target != null ? HeadingTo(RunPoint()) : _heading;
+            }
+        }
+
+        bool Passed()
+        {
+            if (_target == null) return true;
+
+            var nose = new Vector2(Mathf.Cos(_heading), Mathf.Sin(_heading));
+            return Vector2.Dot((Vector2)_target.position - (Vector2)_rb.position, nose) < 0f;
+        }
+
+        bool NearEdge()
+        {
+            if (!_onCamera) return true;
+
+            float x = _rb.position.x + Mathf.Cos(_heading) * (TurnRadius() + EdgeTurnRoom);
+            return x < _minX || x > _maxX;
+        }
+
+        float TurnRadius() =>
+            FlightSpeed() / Mathf.Max(0.01f, _config.rotationSpeed * Mathf.Deg2Rad);
+
+        float PickTurnSide()
+        {
+            var nose = new Vector2(Mathf.Cos(_heading), Mathf.Sin(_heading));
+            var left = new Vector2(-nose.y, nose.x);
+
+            float toward = 1f;
+            if (_target != null)
+                toward = Vector2.Dot((Vector2)_target.position - (Vector2)_rb.position, left) >= 0f
+                    ? 1f
+                    : -1f;
+
+            if (TurnFits(left, toward)) return toward;
+            if (TurnFits(left, -toward)) return -toward;
+            return left.y >= 0f ? 1f : -1f;
+        }
+
+        bool TurnFits(Vector2 left, float dir)
+        {
+            float r = TurnRadius();
+            float centre = _rb.position.y + left.y * dir * r;
+            return centre - r >= BandFloor() && centre + r <= BandCeiling();
+        }
+
+        bool TurnedBack()
+        {
+            if (_turnSwept >= TurnMaxSweepDeg) return true;
+            if (_target == null) return _turnSwept >= 180f;
+
+            return _turnSwept >= TurnDoneSweepDeg
+                && AimError(_target.position) <= TurnDoneAimDeg;
+        }
+
+        bool WantsBarrel()
+        {
+            if (!Ace || _barrel.Spinning || _barrelHold > 0f || _standDown) return false;
+            if (!_appeared || _target == null || !InFullView()) return false;
+
+            return UnderAim(_config.barrelAimRange, _config.barrelAimCone);
+        }
+
+        bool InFullView()
+        {
+            if (_cam == null) return true;
+
+            Vector3 p = transform.position;
+            var corner = new Vector3(_bodyRadius, _bodyRadius, 0f);
+            return InView(p - corner) && InView(p + corner);
+        }
+
+        bool InView(Vector3 worldPos)
+        {
+            Vector3 vp = _cam.WorldToViewportPoint(worldPos);
+            return vp.z > 0f && vp.x >= 0f && vp.x <= 1f && vp.y >= 0f && vp.y <= 1f;
+        }
+
+        void BeginBarrel()
+        {
+            _barrel.Begin(_config.barrelSeconds, _config.barrelTurns, Mathf.Cos(_heading));
+            SetStreaks(true);
+        }
+
+        void EndBarrel()
+        {
+            SetStreaks(false);
+            _barrelHold = _config.barrelCooldown;
+        }
+
         void EnterAttack()
         {
             _state = AiState.Attack;
             _tailLocked = false;
             _stateTimer = _config.attackDuration;
+            if (Ace) BeginLeg(RollerLeg.Aim);
         }
 
         void EnterTail()
@@ -1296,9 +1527,9 @@ namespace MetalRaptors
 
         float BandFloor()
         {
-            if (Striking) return _groundY + _config.minAltitudeMargin;
+            if (Striking) return GroundRef + _config.minAltitudeMargin;
 
-            if (Scouting) return _deck + _config.safeAltitudeMargin;
+            if (Contouring) return _deck + _config.safeAltitudeMargin;
 
             return Mathf.Max(AltitudeBands.Floor(AltitudeBand.High, _groundY, _ceilingY),
                 _groundY + _config.safeAltitudeMargin);
@@ -1336,19 +1567,21 @@ namespace MetalRaptors
             }
 
             float margin = Mathf.Min(BandPushMargin, (roof - floor) * BandPushFraction);
-            float floorMargin = Scouting
+            float floorMargin = Contouring
                 ? Mathf.Max(margin, _config.safeAltitudeMargin - _config.minAltitudeMargin)
                 : margin;
 
             if (RunningDown) { floorMargin = 0f; margin = 0f; }
 
             return FlightSteering.Contain(heading, _rb.position,
-                _minX, _maxX, _edgeMargin,
+                _minX, _maxX, Straightening ? 0f : _edgeMargin,
                 floor, floorMargin, roof, margin);
         }
 
         float ComputeHeading()
         {
+            if (Ace && _state == AiState.Attack) return RollerHeading();
+
             switch (_state)
             {
                 case AiState.Recover:
@@ -1403,7 +1636,7 @@ namespace MetalRaptors
         bool WantsReversal(float desired)
         {
             if (!_appeared) return false;
-            if (Scouting || _reversalCooldown > 0f || _standDown) return false;
+            if (Scouting || Ace || _reversalCooldown > 0f || _standDown) return false;
             if (_state == AiState.Recover || _state == AiState.Return) return false;
             if (_state == AiState.Tail) return false;
             if (Striking) return false;
@@ -1544,7 +1777,8 @@ namespace MetalRaptors
             float approach = 1f - Mathf.Exp(-(_config.turnResponsiveness / _rb.mass) * dt);
             _angularVelocity += (desiredRate - _angularVelocity) * approach;
             _heading += _angularVelocity * dt;
-            _roll.Tick(dt, _heading, PlaneRoll.Steady(_angularVelocity, maxRate),
+            _roll.Tick(dt, _heading,
+                PlaneRoll.Steady(_angularVelocity, maxRate) && !_barrel.Spinning,
                 _config.rotationSpeed);
             ApplyRotation();
         }
@@ -1589,6 +1823,13 @@ namespace MetalRaptors
 
         float UpdateSpeed(float dt)
         {
+            if (Ace)
+            {
+                float goal = _config.flySpeed * (_onCamera ? 1f : Mathf.Max(1f, _config.aceCatchUp));
+                _aceSpeed = Mathf.Lerp(_aceSpeed, goal, 1f - Mathf.Exp(-AceSpeedResponse * dt));
+                return FlightSpeed();
+            }
+
             float cruise = _config.flySpeed;
 
             if (Scouting)
@@ -1614,6 +1855,8 @@ namespace MetalRaptors
 
         float FlightSpeed()
         {
+            if (Ace) return Mathf.Max(1f, _aceSpeed);
+
             float speed = Mathf.Max(_speed, _engageSpeed) * _boost;
             if (_state == AiState.Return)
                 speed = Mathf.Max(speed, _config.flySpeed * ReturnSpeedFactor);
@@ -1653,7 +1896,8 @@ namespace MetalRaptors
 
         void ApplyRotation()
         {
-            float roll = _roll.Angle + _dodge.Bank + (_fall != null ? _fall.Roll : 0f) + Spin;
+            float roll = _roll.Angle + _dodge.Bank + (_fall != null ? _fall.Roll : 0f) + Spin
+                       + _barrel.Spin;
             transform.rotation = Quaternion.Euler(0f, 0f, _heading * Mathf.Rad2Deg)
                                * Quaternion.Euler(roll, 0f, 0f);
         }
@@ -1696,7 +1940,7 @@ namespace MetalRaptors
 
         void UpdateFiring()
         {
-            if (_dodge.Active) return;
+            if (_dodge.Active || (Ace && !RollerArmed)) return;
 
             if (_state == AiState.StrikeRun)
             {
@@ -1774,15 +2018,15 @@ namespace MetalRaptors
 
         public void MarkStrike(bool byPlayer)
         {
-            if (_dead || _falling || OffPlane || (_scripted && !Exposed)) return;
+            if (_dead || _falling || OffPlane || Evading || (_scripted && !Exposed)) return;
             _byPlayer = byPlayer;
         }
 
         public void TakeDamage(float amount)
         {
-            if (_dead || _falling || OffPlane || (_scripted && !Exposed)) return;
+            if (_dead || _falling || OffPlane || Evading || (_scripted && !Exposed)) return;
             ApplyDamage(amount);
-            if (_falling || _dodge.Active || _scripted) return;
+            if (_falling || _dodge.Active || _scripted || Ace) return;
 
             if (_evadeCooldown <= 0f
                 && (_state == AiState.Attack || _state == AiState.Fly)) EnterEvade(circling: false);
@@ -1797,15 +2041,17 @@ namespace MetalRaptors
             return UnderAim();
         }
 
-        bool UnderAim()
+        bool UnderAim() => UnderAim(_config.dodgeAimRange, _config.dodgeAimCone);
+
+        bool UnderAim(float reach, float cone)
         {
             if (_shooter == null || _target == null || !_shooter.Firing) return false;
 
             Vector2 to = (Vector2)_rb.position - (Vector2)_target.position;
             float range = to.magnitude;
-            if (range < 1f || range > _config.dodgeAimRange) return false;
+            if (range < 1f || range > reach) return false;
 
-            return Vector2.Angle(_target.transform.right, to) <= _config.dodgeAimCone;
+            return Vector2.Angle(_target.transform.right, to) <= cone;
         }
 
         void BeginDodge()
@@ -1833,6 +2079,7 @@ namespace MetalRaptors
             SetStreaks(false);
             CancelReversal();
             CancelDodge();
+            CancelAbility();
 
             if (_scripted)
             {

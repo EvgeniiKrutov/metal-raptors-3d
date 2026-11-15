@@ -12,7 +12,7 @@ namespace MetalRaptors
             All[Mathf.Clamp((int)daytime, 0, All.Length - 1)];
     }
 
-    public enum Weather { Calm }
+    public enum Weather { Calm, Storm }
 
     public enum CloudLevel { Low, Medium, High }
 

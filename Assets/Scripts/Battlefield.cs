@@ -124,6 +124,23 @@ namespace MetalRaptors
             return field;
         }
 
+        public static Battlefield BeginVillage(Camera cam, float halfViewWidth, int seed,
+            float minX, float maxX, System.Func<float, float, float, bool> occupied,
+            float peopleZMax, float peopleDensity, float landDepth)
+        {
+            var field = Create(cam, halfViewWidth, seed, minX, maxX, null);
+            if (field == null) return null;
+
+            field._explicitBand = true;
+            field._occupied = occupied;
+            field._placeProps = false;
+            field._landDepth = landDepth;
+            field._peopleZMax = Mathf.Min(peopleZMax, field.ZBack);
+            field._peopleDensity = peopleDensity;
+            field.Populate();
+            return field;
+        }
+
         public static Battlefield BeginCoast(Camera cam, float halfViewWidth, int seed,
             float seaLevel, float waterFromZ, System.Func<float, float, float, bool> occupied,
             float beachZMax, bool people, float peopleDensity)

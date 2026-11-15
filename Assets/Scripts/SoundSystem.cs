@@ -348,6 +348,14 @@ namespace MetalRaptors
         AudioSource _wind;
         AudioSource _stutter;
 
+        struct AmbientLoop
+        {
+            public AudioSource source;
+            public float volume;
+        }
+
+        readonly List<AmbientLoop> _ambients = new List<AmbientLoop>();
+
         public float WindSwell { get; set; }
 
         bool _armed;
@@ -441,6 +449,31 @@ namespace MetalRaptors
         }
 
         float Gain => _pauseGain.Value * _fadeGain.Value;
+
+        public float SceneGain => Gain * AudioOptions.Scene;
+
+        public void AddAmbient(AudioClip clip, float volume)
+        {
+            if (clip == null || _windStopped) return;
+
+            var source = gameObject.AddComponent<AudioSource>();
+            source.clip = clip;
+            source.loop = true;
+            source.playOnAwake = false;
+            source.spatialBlend = 0f;
+            source.volume = volume * SceneGain;
+            source.Play();
+            _ambients.Add(new AmbientLoop { source = source, volume = volume });
+        }
+
+        public AudioSource AddShotSource()
+        {
+            var source = gameObject.AddComponent<AudioSource>();
+            source.loop = false;
+            source.playOnAwake = false;
+            source.spatialBlend = 0f;
+            return source;
+        }
 
         float EngineGain => Gain * _duck.Value;
 
@@ -540,10 +573,18 @@ namespace MetalRaptors
             if (_wind != null && !_windStopped)
                 _wind.volume = Mathf.Min(1f, WindVolume * (1f + WindSwellGain * WindSwell))
                                * Gain * AudioOptions.Scene;
+
+            if (_windStopped) return;
+            float gain = SceneGain;
+            foreach (AmbientLoop loop in _ambients)
+                if (loop.source != null) loop.source.volume = loop.volume * gain;
         }
 
         void StopWind()
         {
+            foreach (AmbientLoop loop in _ambients)
+                if (loop.source != null) loop.source.Stop();
+
             if (_wind == null || _windStopped) return;
             _windStopped = true;
             _wind.volume = 0f;

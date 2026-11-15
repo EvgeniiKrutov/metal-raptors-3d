@@ -49,6 +49,7 @@ namespace MetalRaptors
         public string journal;
         public float worldWidth;
         public bool aerodrome;
+        public bool villageArena;
         public bool companion;
         public int backCompanions;
         public bool supportCompanion;
@@ -423,6 +424,7 @@ namespace MetalRaptors
         public static CampaignDefinition Custom(BattleMap map, Daytime daytime, BattleShape shape)
         {
             bool fixedGround = shape == BattleShape.Battle;
+            bool village = fixedGround && map.Terrain == TerrainKind.Vosges;
             return new CampaignDefinition
             {
                 seed = map.Seed,
@@ -431,10 +433,21 @@ namespace MetalRaptors
                 weather = Weather.Calm,
                 clouds = new CloudsPart(),
                 zeppelins = map.Terrain == TerrainKind.Verdun,
-                worldWidth = fixedGround ? CustomWorldWidth : 0f,
+                worldWidth = village ? VosgesArena.WorldWidth : fixedGround ? CustomWorldWidth : 0f,
                 aerodrome = fixedGround && map.Terrain == TerrainKind.Verdun,
+                villageArena = village,
             };
         }
+
+        public static CampaignDefinition StormArena(BattleMap map) => new CampaignDefinition
+        {
+            seed = map.Seed,
+            terrain = map.Terrain,
+            daytime = Daytime.Midday,
+            weather = Weather.Storm,
+            clouds = new CloudsPart(),
+            title = "STORM ARENA",
+        };
 
         public static CampaignDefinition ForNumber(int number)
         {

@@ -43,6 +43,7 @@ namespace MetalRaptors
         readonly EnemyConfig _fighter;
         readonly Dictionary<PlaneModelConfig, EnemyConfig> _armed =
             new Dictionary<PlaneModelConfig, EnemyConfig>();
+        readonly Dictionary<EnemyRole, EnemyConfig> _aces = new Dictionary<EnemyRole, EnemyConfig>();
         readonly bool _scoutFixed;
         readonly bool _fighterFixed;
         readonly Rigidbody _player;
@@ -146,7 +147,8 @@ namespace MetalRaptors
                     continue;
                 }
                 _live[i].SetBounds(_minX, _maxX);
-                if (_live[i].transform.position.x < leash) _live[i].Reappear(ahead);
+                if (_live[i].transform.position.x < leash && !EnemyRoles.IsAce(_live[i].Role))
+                    _live[i].Reappear(ahead);
             }
         }
 
@@ -189,6 +191,33 @@ namespace MetalRaptors
                 }
             }
             return spawned;
+        }
+
+        public List<EnemyController> SpawnAces(EnemyRole role, float camX, float halfViewWidth)
+        {
+            var spawned = new List<EnemyController>();
+            if (!EnemyRoles.IsAce(role)) return spawned;
+
+            SetWindow(camX, halfViewWidth);
+
+            PlaneModelConfig plane = PlaneModels.EnemyFor(role);
+            EnemyConfig config = Lifted(AceConfig(role, plane), plane);
+            spawned.Add(SpawnOne(plane, SpawnPoint(camX, halfViewWidth, 0, config,
+                CeilingFor(plane)), config));
+            return spawned;
+        }
+
+        EnemyConfig AceConfig(EnemyRole role, PlaneModelConfig plane)
+        {
+            if (_aces.TryGetValue(role, out EnemyConfig config) && config != null) return config;
+
+            var pilot = _player != null ? _player.GetComponent<CubeController>() : null;
+            config = EnemyConfigs.Ace(role, _fighter, _scout,
+                pilot != null ? pilot.BaseSpeed : 0f, pilot != null ? pilot.BaseTurnDeg : 0f);
+            if (!_fighterFixed) config.fireRate = EnemyConfigs.FireGap(plane, config.fireRate);
+
+            _aces[role] = config;
+            return config;
         }
 
         public void SpawnBehind(EnemyGroup[] groups, float camX, float halfViewWidth, float entryY)
@@ -453,7 +482,7 @@ namespace MetalRaptors
             var go = new GameObject("Enemy");
             go.transform.position = position;
             Transform model = PlaneFactory.BuildPlaneModel(go.transform, plane, mirrored: true,
-                skin: skin ?? PlaneSkins.Enemy(plane, _skin));
+                skin: skin ?? PlaneSkins.RandomEnemy(plane, _skin));
             if (!Mathf.Approximately(ModelScale, 1f)) model.localScale *= ModelScale;
 
             bool gunned = PlaneFactory.GunMuzzleLocal(go, model, plane, out Vector3 gun);

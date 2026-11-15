@@ -151,24 +151,66 @@ namespace MetalRaptors
             },
         };
 
+        static readonly Palette StormPalette = new Palette
+        {
+            haze = new Color(0.50f, 0.53f, 0.56f),
+            zenith = new Color(0.29f, 0.32f, 0.36f),
+            cloud = new Color(0.60f, 0.62f, 0.65f),
+            disc = new Color(0.80f, 0.82f, 0.85f),
+            keyLight = new Color(0.80f, 0.83f, 0.88f),
+            ambientSky = new Color(0.46f, 0.50f, 0.56f),
+            ambientEquator = new Color(0.52f, 0.54f, 0.56f),
+            ambientGround = new Color(0.30f, 0.30f, 0.30f),
+            sea = new Color(0.24f, 0.28f, 0.30f),
+            rayColor = new Color(0.80f, 0.82f, 0.85f),
+            colorFilter = Color.white,
+            shadowTone = new Color(0.30f, 0.34f, 0.40f),
+            highlightTone = new Color(0.74f, 0.76f, 0.78f),
+            horizonFalloff = 1.4f,
+            discFalloff = 120f, discIntensity = 0f,
+            haloFalloff = 4f, haloIntensity = 0f,
+            discViewportX = 0.5f, discLift = 0.8f, anchorDisc = true,
+            lightRotation = Quaternion.Euler(50f, -8f, 0f),
+            lightIntensity = 0.95f,
+            fogStartOffset = 260f, fogEnd = 1300f,
+            rayIntensity = 0f, rayDensity = 0f, rayFalloff = 1f,
+            bloomThreshold = 1.1f, bloomIntensity = 0.45f,
+            temperature = -6f, postExposure = 0.12f, saturation = -32f, contrast = 8f,
+            splitBalance = 0f, vignette = 0.24f, cloudGlow = 0.05f,
+        };
+
+        public static ColorAdjustments Grade { get; private set; }
+
         static Palette For(Daytime daytime) =>
             Palettes[Mathf.Clamp((int)daytime, 0, Palettes.Length - 1)];
+
+        static Palette For(Daytime daytime, Weather weather) =>
+            weather == Weather.Storm ? StormPalette : For(daytime);
 
         public static Color HazeColor(Daytime daytime) => For(daytime).haze;
 
         public static Color CloudColor(Daytime daytime) => For(daytime).cloud;
 
-        public static Color CloudGlow(Daytime daytime)
+        public static Color CloudColor(Daytime daytime, Weather weather) =>
+            For(daytime, weather).cloud;
+
+        public static Color CloudGlow(Daytime daytime) => CloudGlow(daytime, Weather.Calm);
+
+        public static Color CloudGlow(Daytime daytime, Weather weather)
         {
-            Palette p = For(daytime);
+            Palette p = For(daytime, weather);
             return p.haze * p.cloudGlow;
         }
 
         public static Color SeaColor(Daytime daytime) => For(daytime).sea;
 
-        public static void ApplyFog(Daytime daytime, float cameraDistance, float playPlaneZ)
+        public static void ApplyFog(Daytime daytime, float cameraDistance, float playPlaneZ) =>
+            ApplyFog(daytime, Weather.Calm, cameraDistance, playPlaneZ);
+
+        public static void ApplyFog(Daytime daytime, Weather weather, float cameraDistance,
+            float playPlaneZ)
         {
-            Palette p = For(daytime);
+            Palette p = For(daytime, weather);
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.Linear;
             RenderSettings.fogColor = p.haze;
@@ -178,7 +220,7 @@ namespace MetalRaptors
 
         public static void Apply(Camera cam, Daytime daytime, Weather weather)
         {
-            Palette p = For(daytime);
+            Palette p = For(daytime, weather);
 
             BuildSkybox(cam, p);
             TuneKeyLight(p);
@@ -229,8 +271,9 @@ namespace MetalRaptors
             cam.clearFlags = CameraClearFlags.Skybox;
 
             SkyHorizon.AtEyeLevel(cam, sky, p.discViewportX, p.discLift, p.anchorDisc);
-            GodRays.Attach(cam, sky, p.rayColor, p.rayIntensity,
-                density: p.rayDensity, radialFalloff: p.rayFalloff);
+            if (p.rayIntensity > 0f)
+                GodRays.Attach(cam, sky, p.rayColor, p.rayIntensity,
+                    density: p.rayDensity, radialFalloff: p.rayFalloff);
             AerialHaze.Attach(cam, sky);
         }
 
@@ -264,6 +307,7 @@ namespace MetalRaptors
             whiteBalance.temperature.Override(p.temperature);
 
             var grade = profile.Add<ColorAdjustments>();
+            Grade = grade;
             grade.postExposure.Override(p.postExposure);
             grade.colorFilter.Override(p.colorFilter);
             grade.saturation.Override(p.saturation);

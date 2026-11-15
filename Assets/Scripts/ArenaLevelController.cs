@@ -6,7 +6,7 @@ using UnityEngine.Rendering.Universal;
 namespace MetalRaptors
 {
     public class ArenaLevelController : MonoBehaviour, ICampaignScriptHost, IBossHost,
-        IDangerHost
+        IDangerHost, IDevSpawnHost
     {
         public const float CameraDistance = 420f;
         const float PlayPlaneZ = 100f;
@@ -24,6 +24,13 @@ namespace MetalRaptors
         const float RollSpinScale = 1.3f;
         const float RollCooldown = 3f;
         const float StageTwoRollFactor = 0.5f;
+
+        const float TestGothaTop = 0.94f;
+        const float TestGothaCrossSec = 30f;
+        const float TestGothaPauseSec = 2f;
+        const float TestGothaBob = 0.025f;
+        const float TestGothaBobSec = 7f;
+        const float TestGothaTilt = 0.5f;
 
         const float BossEntryMargin = 180f;
         const float BossAhead = 115f;
@@ -94,6 +101,7 @@ namespace MetalRaptors
         DialogueBar _dialogue;
         SoundSystem _sound;
         ArenaClouds _clouds;
+        StormWeather _storm;
         CampaignEnemies _enemies;
         CampaignScriptRunner _runner;
         RavenMoveset _moves;
@@ -138,7 +146,11 @@ namespace MetalRaptors
 
         public bool BossGone => _bossGone;
 
-        string Subtitle => _level.title.ToLowerInvariant();
+        bool Storm => _level.weather == Weather.Storm;
+
+        string Subtitle => Storm
+            ? $"{CustomBattle.Map.Name} | {_level.title.ToLowerInvariant()}"
+            : _level.title.ToLowerInvariant();
 
         public static ArenaLevelController Begin(GameObject owner, CampaignDefinition level,
             int levelNumber)
@@ -152,7 +164,7 @@ namespace MetalRaptors
 
         void Build()
         {
-            CampaignCheckpoint.InCareer = true;
+            CampaignCheckpoint.InCareer = !Storm;
 
             var config = Resources.Load<PlayerConfig>("PlayerConfig");
             if (config == null) config = ScriptableObject.CreateInstance<PlayerConfig>();
@@ -166,14 +178,21 @@ namespace MetalRaptors
             SetupCamera();
 
             _clouds = ArenaClouds.Begin(_camPos, _halfW, _halfH, CameraDistance, PlayPlaneZ,
-                CoastSky.CloudColor(_level.daytime), CoastSky.CloudGlow(_level.daytime),
-                ScrollSpeed);
+                CoastSky.CloudColor(_level.daytime, _level.weather),
+                CoastSky.CloudGlow(_level.daytime, _level.weather), ScrollSpeed);
             SmokeTrail.Wind = Vector2.left * ScrollSpeed;
 
             _floorY = _clouds.FloorY + FloorSkim * _halfH;
             _ceilingY = _camPos.y + _halfH - TopMargin;
             _minX = _camPos.x - _halfW + SideMargin;
             _maxX = _camPos.x + _halfW - SideMargin;
+
+            if (Storm)
+            {
+                _storm = StormWeather.Begin(_cam, _camPos, _halfW, _halfH, CameraDistance,
+                    PlayPlaneZ, _clouds, ScrollSpeed);
+                HangTestGotha();
+            }
 
             SpawnPlayer(config);
             _cubeTr.gameObject.SetActive(false);
@@ -197,6 +216,11 @@ namespace MetalRaptors
             _cubeTr.gameObject.SetActive(true);
             _sound = SoundSystem.Begin(_cube, null);
             _sound.Track(_enemies.Live, boss: true);
+            if (_storm != null)
+            {
+                _storm.Listen(_sound);
+                DevSpawn.Register(this);
+            }
             StartCoroutine(FlyIn());
 
             ScreenFade.EndLoading();
@@ -204,6 +228,7 @@ namespace MetalRaptors
 
         void OnDestroy()
         {
+            DevSpawn.Unregister(this);
             CampaignCheckpoint.InCareer = false;
             SmokeTrail.Wind = Vector2.zero;
             WithdrawSkips();
@@ -233,12 +258,87 @@ namespace MetalRaptors
             _cam.orthographic = false;
             _cam.transform.rotation = Quaternion.identity;
             CoastSky.Apply(_cam, _level.daytime, _level.weather);
-            CoastSky.ApplyFog(_level.daytime, CameraDistance, PlayPlaneZ);
+            CoastSky.ApplyFog(_level.daytime, _level.weather, CameraDistance, PlayPlaneZ);
             _cam.farClipPlane = 2600f;
 
             LevelCamera.Frame(_cam, CameraDistance, out _halfW, out _halfH);
             CutsceneBlur.Focus(CameraDistance);
             _cam.transform.position = _camPos;
+        }
+
+        void HangTestGotha()
+        {
+            PlaneModelConfig plane = PlaneModels.GothaG4;
+            var go = new GameObject("Test Gotha");
+            go.transform.position = new Vector3(_camPos.x, _camPos.y, PlayPlaneZ);
+
+            Transform model = PlaneFactory.BuildPlaneModel(go.transform, plane,
+                skin: PlaneSkins.Default(plane));
+            model.localScale *= PlaneScale;
+
+            foreach (Collider hit in go.GetComponentsInChildren<Collider>(true))
+            {
+                hit.enabled = false;
+                Destroy(hit);
+            }
+
+            foreach (Transform t in model.GetComponentsInChildren<Transform>(true))
+            {
+                if (!t.name.StartsWith(plane.propPivotNode + ".")) continue;
+                if (t.GetComponent<PropellerSpin>() != null) continue;
+
+                var spin = t.gameObject.AddComponent<PropellerSpin>();
+                spin.axisSpace = go.transform;
+                spin.axisInSpace = Vector3.right;
+                spin.straighten = plane.straightenProp;
+            }
+
+            bool any = false;
+            var bounds = new Bounds();
+            foreach (Renderer r in go.GetComponentsInChildren<Renderer>())
+            {
+                if (!any) bounds = r.bounds;
+                else bounds.Encapsulate(r.bounds);
+                any = true;
+            }
+            if (!any) return;
+
+            Vector3 pivot = go.transform.position;
+            float top = _camPos.y + _halfH * (TestGothaTop - TestGothaBob);
+            StartCoroutine(FlyTestGotha(go.transform, bounds.center.x - pivot.x, bounds.extents.x,
+                top - (bounds.max.y - pivot.y)));
+        }
+
+        IEnumerator FlyTestGotha(Transform tr, float centerOffset, float halfSpan, float baseY)
+        {
+            float bob = TestGothaBob * _halfH;
+            float omega = 2f * Mathf.PI / TestGothaBobSec;
+            float from = _camPos.x - _halfW - halfSpan - centerOffset;
+            float to = _camPos.x + _halfW + halfSpan - centerOffset;
+            float speed = (to - from) / TestGothaCrossSec;
+            float z = tr.position.z;
+            float t = 0f;
+
+            while (tr != null)
+            {
+                float x = from;
+                tr.position = new Vector3(x, baseY + Mathf.Sin(t * omega) * bob, z);
+
+                while (tr != null && x < to)
+                {
+                    float dt = Time.deltaTime;
+                    x += speed * dt;
+                    t += dt;
+
+                    float y = baseY + Mathf.Sin(t * omega) * bob;
+                    float climb = Mathf.Cos(t * omega) * bob * omega;
+                    float tilt = Mathf.Atan2(climb, speed) * Mathf.Rad2Deg * TestGothaTilt;
+                    tr.SetPositionAndRotation(new Vector3(x, y, z), Quaternion.Euler(0f, 0f, tilt));
+                    yield return null;
+                }
+
+                for (float w = 0f; w < TestGothaPauseSec; w += Time.deltaTime) yield return null;
+            }
         }
 
         void SpawnPlayer(PlayerConfig config)
@@ -414,6 +514,33 @@ namespace MetalRaptors
                 ? (target.y - (_camPos.y - _halfH)) / (2f * _halfH)
                 : (target.x - (_camPos.x - _halfW)) / (2f * _halfW);
         }
+
+        public bool CanDevSpawn => Storm && !_gameOver && _cube != null && _enemies != null
+                                   && !Cinematic;
+
+        public void DevSpawnPlane(EnemyRole role)
+        {
+            if (!CanDevSpawn) return;
+
+            if (EnemyRoles.IsAce(role))
+            {
+                _enemies.SpawnAces(role, _camPos.x, _halfW);
+                return;
+            }
+
+            _enemies.Spawn(new[] { new EnemyGroup(PlaneModels.EnemyFor(role), 1) },
+                _camPos.x, _halfW);
+        }
+
+        public void DevSpawnTruck() { }
+
+        public void DevSpawnTank() { }
+
+        public bool OffersZeppelin => false;
+
+        public bool ZeppelinAloft => false;
+
+        public void DevSpawnZeppelin() { }
 
         public void ArmSupply(int crates) { }
 

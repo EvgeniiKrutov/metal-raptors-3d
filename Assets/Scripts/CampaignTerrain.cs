@@ -13,6 +13,8 @@ namespace MetalRaptors
         public float roadZ;
         public float roadHalfWidth;
         public Rect hardstanding;
+        public VosgesArena arena;
+        public int marginChunks;
     }
 
     public abstract class CampaignTerrain : MonoBehaviour
@@ -36,6 +38,7 @@ namespace MetalRaptors
         protected float _roadZ;
         protected float _roadHalfWidth;
         protected Rect _hardstanding;
+        protected VosgesArena _arena;
         float _keepBehind, _keepAhead;
         bool _bounded;
         int _firstChunk, _lastChunk;
@@ -116,12 +119,14 @@ namespace MetalRaptors
             _roadZ = options.roadZ;
             _roadHalfWidth = options.roadHalfWidth;
             _hardstanding = options.hardstanding;
+            _arena = options.arena;
 
             if (options.worldWidth <= 0f) return;
 
+            int margin = options.marginChunks > 0 ? options.marginChunks : BoundsMarginChunks;
             _bounded = true;
-            _firstChunk = Mathf.FloorToInt(0f / ChunkLength) - BoundsMarginChunks;
-            _lastChunk = Mathf.FloorToInt(options.worldWidth / ChunkLength) + BoundsMarginChunks;
+            _firstChunk = Mathf.FloorToInt(0f / ChunkLength) - margin;
+            _lastChunk = Mathf.FloorToInt(options.worldWidth / ChunkLength) + margin;
         }
 
         public bool SampleHeight(float x, float z, out float y)
@@ -154,6 +159,17 @@ namespace MetalRaptors
                     StartCoroutine(BuildChunkSliced(i));
                     break;
                 }
+        }
+
+        public void BuildAround(float camX)
+        {
+            StopAllCoroutines();
+            _building = false;
+            foreach (int i in MissingChunks(camX))
+            {
+                var steps = BuildChunk(i);
+                while (steps.MoveNext()) { }
+            }
         }
 
         float KeepLeft => LevelScroll.Sign > 0f ? _keepBehind : _keepAhead;

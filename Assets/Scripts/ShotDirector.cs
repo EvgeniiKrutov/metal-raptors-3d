@@ -124,6 +124,30 @@ namespace MetalRaptors
         const float GullGap = 0.35f;
         const int GullTries = 12;
 
+        const float CowMaxTilt = 18f;
+        const float NormalProbe = 3f;
+        const float DefaultGroveSpread = 120f;
+        const float GroveGap = 4.2f * PlaneModelConfig.UnitsPerMeter;
+        const float GroveClear = 2.2f * PlaneModelConfig.UnitsPerMeter;
+        const float GroveJitter = 0.12f;
+        const int GroveTries = 24;
+        const float ValleyLogReach = 4000f;
+        const float DefaultPuffWidth = 50f;
+        const float DefaultPuffAlpha = 0.7f;
+        const float PuffGlow = 0.25f;
+        const float PuffReach = 0.24f;
+        const int PuffBlobs = 5;
+        const float PuffHaloReach = 0.42f;
+        const int PuffHaloBlobs = 5;
+        const float PuffHaloAlpha = 0.4f;
+        const float PuffHaloLighten = 1.9f;
+        const float VillagerTurn = 25f;
+        const float MillSink = 0.15f * PlaneModelConfig.UnitsPerMeter;
+        const float HouseSink = 0.1f * PlaneModelConfig.UnitsPerMeter;
+        const int FloorProbes = 8;
+        const float FloorReach = 0.7f;
+        static readonly Color PuffColor = new Color(0.16f, 0.15f, 0.15f);
+
         const float FocusPriority = 1000f;
         const float ArenaAltitude = 3000f;
         const float ProbeY = -5000f;
@@ -133,6 +157,21 @@ namespace MetalRaptors
         const float HangarInset = 0.94f;
         const float HangarShadeHeight = 0.56f;
         static readonly Color HangarShade = new Color(0.05f, 0.04f, 0.05f);
+        const float NodeMuzzleClearance = 1.5f;
+        const float DefaultBoltDistance = 1100f;
+        const float DefaultBoltHeight = 900f;
+        const float DefaultRainLength = 34f;
+        const float DefaultRainWidthPx = 1.6f;
+        const float DefaultRainAlpha = 0.25f;
+        const float DefaultRainSlant = 0.15f;
+        const float RainMargin = 0.08f;
+        const float RainSharp = 0.6f;
+        const float RainReferenceHeight = 1080f;
+        static readonly Color RainColor = new Color(0.80f, 0.83f, 0.88f);
+        static readonly Color FireDeep = new Color(1f, 0.2f, 0.02f);
+        static readonly Color FireHot = new Color(1f, 0.44f, 0.05f);
+        const float FireBase = 0.12f;
+        static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
 
         static readonly Quaternion StandUp = Quaternion.Euler(-90f, 0f, 0f);
         static readonly Color BoltColor = new Color(0.96f, 0.76f, 0.38f);
@@ -157,11 +196,19 @@ namespace MetalRaptors
 
         static readonly MethodInfo BuildFigure = typeof(BattlefieldPeople).GetMethod("BuildFigure",
             BindingFlags.NonPublic | BindingFlags.Static);
+        static readonly MethodInfo BuildVillager = typeof(VillagePeople).GetMethod("BuildFigure",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        static readonly FieldInfo SmokeFlag = typeof(Battlefield).GetField("_smoke",
+            BindingFlags.NonPublic | BindingFlags.Instance);
         static readonly FieldInfo BlastTimer = typeof(Battlefield).GetField("_blastTimer",
             BindingFlags.NonPublic | BindingFlags.Instance);
         static readonly FieldInfo FieldPeople = typeof(Battlefield).GetField("_people",
             BindingFlags.NonPublic | BindingFlags.Instance);
         static readonly FieldInfo SeaTimer = typeof(Battlefield).GetField("_seaTimer",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        static readonly int SkySunIntensity = Shader.PropertyToID("_SunIntensity");
+        static readonly int SkyHaloIntensity = Shader.PropertyToID("_HaloIntensity");
+        static readonly FieldInfo VillageArena =typeof(CampaignLevelController).GetField("_villageArena",
             BindingFlags.NonPublic | BindingFlags.Instance);
         const BindingFlags Hidden = BindingFlags.NonPublic | BindingFlags.Instance;
 
@@ -185,6 +232,8 @@ namespace MetalRaptors
             public Vector3[] rearMuzzles;
             public Vector3 rearRest;
             public Vector3 aim;
+            public Vector3 aimPoint;
+            public bool aimed;
             public Vector3 Forward => tr.right;
             public Vector3 Up => tr.up;
             public Vector3 Velocity => tr.right * speed;
@@ -249,6 +298,7 @@ namespace MetalRaptors
         Material _streakMaterial;
         SquadTracers _rifleTracers;
         GameObject _boltTemplate;
+        ArenaClouds _arenaClouds;
         float _clock;
 
         readonly List<Flyer> _flyers = new List<Flyer>();
@@ -259,6 +309,7 @@ namespace MetalRaptors
         readonly List<Airship> _airships = new List<Airship>();
         readonly List<Vessel> _vessels = new List<Vessel>();
         readonly HashSet<MuzzleFlash> _aimedFlashes = new HashSet<MuzzleFlash>();
+        readonly List<Vector4> _structures = new List<Vector4>();
         readonly List<IList> _mutedShells = new List<IList>();
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
@@ -282,6 +333,7 @@ namespace MetalRaptors
             CustomBattle.Request(new BattleMap(TerrainNames.For(terrain), spec.seed, terrain),
                 daytime, spec.aerodrome ? BattleShape.Battle : BattleShape.Story);
             CampaignRun.TakeLaunch();
+            VosgesTerrain.SkipCraters = !spec.ambientCraters;
 
             Application.runInBackground = true;
             Random.InitState(spec.seed);
@@ -354,7 +406,13 @@ namespace MetalRaptors
             Random.InitState(_spec.seed);
             _set = new GameObject("Shot Set").transform;
             Silence();
+            BuildLand();
             Frame();
+            if (_spec.storm.on) ApplyStorm();
+            LogValley();
+            LogArena();
+            if (_spec.hideSun) HideSun();
+            ShadeMountains();
             Focus();
             if (_spec.arena.on) BuildArena();
 
@@ -372,11 +430,18 @@ namespace MetalRaptors
             foreach (ShotGull gull in _spec.gulls) BuildGulls(gull);
             foreach (ShotPlane plane in _spec.planes) _flyers.Add(BuildFlyer(plane));
             foreach (ShotProp prop in _spec.props) BuildProp(prop);
+            foreach (ShotStructure mill in _spec.mills) BuildMill(mill);
+            foreach (ShotStructure hut in _spec.huts) BuildHut(hut);
+            foreach (ShotGrove grove in _spec.spruces) BuildGrove(grove);
+            foreach (ShotCow cow in _spec.cows) BuildCow(cow);
             foreach (ShotZeppelin zeppelin in _spec.zeppelins) BuildZeppelin(zeppelin);
             foreach (ShotCloud cloud in _spec.clouds) BuildCloud(cloud);
+            foreach (ShotCloud puff in _spec.puffs) BuildPuff(puff);
+            foreach (ShotVillager group in _spec.villagers) BuildVillagers(group);
             foreach (ShotSquad squad in _spec.squads) BuildSquad(squad);
             BuildSmoke();
             BuildMist();
+            if (_spec.storm.on) BuildStorm();
             ScheduleBursts();
 
             foreach (Flyer flyer in _flyers)
@@ -420,6 +485,12 @@ namespace MetalRaptors
 
             if (!_spec.ambientBlasts && BlastTimer != null) BlastTimer.SetValue(field, float.MaxValue);
             if (!_spec.ambientBlasts && SeaTimer != null) SeaTimer.SetValue(field, float.MaxValue);
+            if (!_spec.ambientSmoke)
+            {
+                if (SmokeFlag != null) SmokeFlag.SetValue(field, false);
+                foreach (var column in FindObjectsByType<SmokeColumn>(FindObjectsSortMode.None))
+                    Destroy(column.gameObject);
+            }
             if (_spec.ambientPeople || field.People == null) return;
 
             Destroy(field.People.gameObject);
@@ -478,6 +549,129 @@ namespace MetalRaptors
 
         Daytime SpecDaytime => Enum.TryParse(_spec.daytime, true, out Daytime time) ? time : Daytime.Morning;
 
+        Weather SpecWeather => _spec.storm.on ? Weather.Storm : Weather.Calm;
+
+        void ApplyStorm()
+        {
+            foreach (var volume in FindObjectsByType<Volume>(FindObjectsSortMode.None))
+                if (volume.isGlobal) Destroy(volume);
+            foreach (var rays in FindObjectsByType<GodRays>(FindObjectsSortMode.None)) rays.enabled = false;
+
+            CoastSky.Apply(_cam, SpecDaytime, Weather.Storm);
+            CoastSky.ApplyFog(SpecDaytime, Weather.Storm, ArenaDistance, 0f);
+            if (_spec.fogStart >= 0f) RenderSettings.fogStartDistance = _spec.fogStart;
+            if (_spec.fogEnd > 0f) RenderSettings.fogEndDistance = _spec.fogEnd;
+        }
+
+        void BuildStorm()
+        {
+            ShotStorm storm = _spec.storm;
+            Transform eye = _cam.transform;
+            float halfH = ArenaDistance * Mathf.Tan(_cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
+            StormWeather weather = StormWeather.Begin(_cam, eye.position, halfH * _cam.aspect, halfH,
+                ArenaDistance, eye.position.z + ArenaDistance, _arenaClouds, 0f);
+            weather.transform.SetParent(_set, true);
+            weather.Hold();
+
+            Quaternion facing = Quaternion.Euler(0f, _spec.camera.yaw, 0f);
+            for (int i = 0; i < storm.bolts.Length; i++)
+            {
+                if (i >= weather.BoltCount)
+                {
+                    Debug.LogWarning($"ShotDirector: only {weather.BoltCount} lightning bolts fit; extra ones skipped.");
+                    break;
+                }
+
+                ShotLightning bolt = storm.bolts[i];
+                if (bolt.seed != 0) Random.InitState(bolt.seed);
+                float[] screen = bolt.screen != null && bolt.screen.Length >= 2 ? bolt.screen : new[] { 0.5f, 1f };
+                Vector3 top = Air(screen, bolt.distance > 0f ? bolt.distance : DefaultBoltDistance);
+                weather.PoseBolt(i, top, bolt.height > 0f ? bolt.height : DefaultBoltHeight, bolt.far,
+                    bolt.alpha > 0f ? bolt.alpha : 1f, facing);
+                Debug.Log($"ShotDirector: lightning {i} top {top}");
+            }
+
+            if (storm.flash > 0f) weather.HoldFlash(storm.flash);
+            foreach (ShotRain layer in storm.rain) BuildRain(layer);
+        }
+
+        void BuildRain(ShotRain layer)
+        {
+            Shader shader = Shader.Find("Hidden/LightningBolt");
+            if (shader == null)
+            {
+                Debug.LogError("ShotDirector: Hidden/LightningBolt not found; no rain.");
+                return;
+            }
+
+            var mat = new Material(shader) { name = "Shot Rain (runtime)" };
+            mat.SetColor("_Color", RainColor);
+            mat.SetFloat("_Alpha", 1f);
+
+            int count = Mathf.Max(1, layer.count);
+            float near = layer.near > 0f ? layer.near : 60f;
+            float far = layer.far > near ? layer.far : near * 2f;
+            float length = layer.length > 0f ? layer.length : DefaultRainLength;
+            float widthPx = layer.widthPx > 0f ? layer.widthPx : DefaultRainWidthPx;
+            float alpha = layer.alpha > 0f ? layer.alpha : DefaultRainAlpha;
+            float slant = layer.slant != 0f ? layer.slant : DefaultRainSlant;
+
+            Transform eye = _cam.transform;
+            Vector3 right = Vector3.ProjectOnPlane(eye.right, Vector3.up).normalized;
+            Vector3 fall = (Vector3.down - right * slant).normalized;
+            float tanY = Mathf.Tan(_cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
+
+            var vertices = new Vector3[count * 4];
+            var uvs = new Vector2[count * 4];
+            var colors = new Color[count * 4];
+            var indices = new int[count * 6];
+            for (int i = 0; i < count; i++)
+            {
+                float depth = Random.Range(near, far);
+                Vector3 head = _cam.ViewportToWorldPoint(new Vector3(
+                    Random.Range(-RainMargin, 1f + RainMargin), Random.Range(-RainMargin, 1f + RainMargin), depth));
+                Vector3 tail = head - fall * (length * Random.Range(0.75f, 1.25f));
+                Vector3 view = ((head + tail) * 0.5f - eye.position).normalized;
+                Vector3 side = Vector3.Cross(fall, view).normalized;
+                float half = widthPx * 2f * depth * tanY / RainReferenceHeight * 0.5f;
+                float strength = alpha * Random.Range(0.55f, 1f);
+
+                int v = i * 4;
+                vertices[v] = tail - side * half;
+                vertices[v + 1] = tail + side * half;
+                vertices[v + 2] = head + side * half;
+                vertices[v + 3] = head - side * half;
+                uvs[v] = uvs[v + 3] = new Vector2(0f, RainSharp);
+                uvs[v + 1] = uvs[v + 2] = new Vector2(1f, RainSharp);
+                colors[v] = colors[v + 1] = new Color(1f, 1f, 1f, 0f);
+                colors[v + 2] = colors[v + 3] = new Color(1f, 1f, 1f, strength);
+
+                int t = i * 6;
+                indices[t] = v;
+                indices[t + 1] = v + 1;
+                indices[t + 2] = v + 2;
+                indices[t + 3] = v;
+                indices[t + 4] = v + 2;
+                indices[t + 5] = v + 3;
+            }
+
+            var mesh = new Mesh { name = "Shot Rain" };
+            if (vertices.Length > 65535) mesh.indexFormat = IndexFormat.UInt32;
+            mesh.vertices = vertices;
+            mesh.uv = uvs;
+            mesh.colors = colors;
+            mesh.triangles = indices;
+            mesh.RecalculateBounds();
+
+            var go = new GameObject("Shot Rain");
+            go.transform.SetParent(_set, false);
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var renderer = go.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = mat;
+            renderer.shadowCastingMode = ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+        }
+
         void BuildArena()
         {
             ShotArena arena = _spec.arena;
@@ -488,10 +682,18 @@ namespace MetalRaptors
                 eye += new Vector3(arena.eye[0], arena.eye[1], arena.eye[2]);
 
             if (arena.seed != 0) Random.InitState(arena.seed);
+            Color tint = CoastSky.CloudColor(SpecDaytime, SpecWeather);
+            Color glow = CoastSky.CloudGlow(SpecDaytime, SpecWeather);
+            if (arena.cloudColor != null && arena.cloudColor.Length >= 3)
+            {
+                float share = glow.maxColorComponent / Mathf.Max(0.001f, tint.maxColorComponent);
+                tint = new Color(arena.cloudColor[0], arena.cloudColor[1], arena.cloudColor[2]);
+                glow = tint * share;
+            }
             ArenaClouds clouds = ArenaClouds.Begin(eye, halfH * LevelCamera.ReferenceAspect, halfH,
-                ArenaDistance, eye.z + ArenaDistance, CoastSky.CloudColor(SpecDaytime),
-                CoastSky.CloudGlow(SpecDaytime), 0f);
+                ArenaDistance, eye.z + ArenaDistance, tint, glow, 0f);
             clouds.transform.SetParent(_set, true);
+            _arenaClouds = clouds;
             Debug.Log($"ShotDirector: arena eye {eye}, cloud floor y {clouds.FloorY}");
         }
 
@@ -503,6 +705,7 @@ namespace MetalRaptors
                 PlaneSkins.Enemy(config, spec.skin));
             model.localScale *= PlaneModelConfig.LevelScale;
             foreach (Collider col in go.GetComponentsInChildren<Collider>()) Destroy(col);
+            SpinExtraProps(go.transform, model, config);
             if (_spec.planeFill != null && _spec.planeFill.intensity > 0f && !spec.noFill)
                 foreach (Renderer r in go.GetComponentsInChildren<Renderer>()) r.renderingLayerMask |= FillLayer;
 
@@ -521,15 +724,26 @@ namespace MetalRaptors
             flyer.gunSpacing = config == PlaneModels.Eindecker ? 0f
                 : config == PlaneModels.Sopwith ? CamelGunSpacing
                 : config == PlaneModels.Fokker ? TriplaneGunSpacing : GunSpacing;
-            if (spec.rearGun) MountRearGun(flyer, model, config);
+            if (!string.IsNullOrEmpty(spec.gunHinge)) MountNodeGun(flyer, model, config);
+            else if (spec.rearGun) MountRearGun(flyer, model, config);
+            if (spec.aim != null && spec.aim.Length >= 3)
+            {
+                flyer.aimPoint = Air(new[] { spec.aim[0], spec.aim[1] }, spec.aim[2]);
+                flyer.aimed = true;
+            }
 
             if (spec.boost)
             {
                 PlaneFactory.WingTipsLocal(go, model, out Vector3 near, out Vector3 far, config);
-                flyer.tips = new[] { SweptTip(near), SweptTip(far) };
+                var tips = new List<Vector3>();
+                foreach (Vector3 tip in new[] { near, far })
+                    if (spec.streakSide == 0 || Mathf.Sign(tip.z) == Mathf.Sign(spec.streakSide))
+                        tips.Add(SweptTip(tip));
+                flyer.tips = tips.ToArray();
             }
 
-            Vector3? engine = PlaneFactory.EngineLocal(go, model, config);
+            Vector3? engine = string.IsNullOrEmpty(spec.smokeNode)
+                ? PlaneFactory.EngineLocal(go, model, config) : NodeCentre(go.transform, model, spec.smokeNode);
             SmokeTrail smoke = null;
             if (spec.burning || spec.smoking)
             {
@@ -542,7 +756,8 @@ namespace MetalRaptors
                 if (spec.burning) smoke.Ignite(trail);
                 else smoke.Arm(trail);
             }
-            if (spec.burning) PlaneFire.Ignite(go, flyer.size, engine);
+            if (spec.burning)
+                PlaneFire.Ignite(go, flyer.size * (spec.fireScale > 0f ? spec.fireScale : 1f), engine);
 
             float[] screen = spec.screen != null && spec.screen.Length >= 2
                 ? spec.screen : new[] { 0.5f, 0.5f };
@@ -552,6 +767,8 @@ namespace MetalRaptors
             Vector3 level = Vector3.ProjectOnPlane(Vector3.up, forward);
             if (level.sqrMagnitude < 1e-4f) level = frame * Vector3.back;
             Vector3 up = Quaternion.AngleAxis(-spec.bank, forward) * level.normalized;
+            if (spec.slot != null && spec.slot.Length >= 3 && spec.lead >= 0 && spec.lead < _flyers.Count)
+                Formation(_flyers[spec.lead], spec.slot, ref end, ref forward, ref up);
 
             PlanPath(flyer, end, forward, up);
             Place(flyer, _spec.warmup);
@@ -561,6 +778,15 @@ namespace MetalRaptors
             if (spec.hitAge > 0f)
                 Schedule(_spec.warmup - spec.hitAge, () => Hit(flyer));
             return flyer;
+        }
+
+        static void Formation(Flyer lead, float[] slot, ref Vector3 end, ref Vector3 forward, ref Vector3 up)
+        {
+            forward = lead.forwards[0];
+            up = lead.ups[0];
+            Vector3 ahead = Vector3.ProjectOnPlane(forward, Vector3.up).normalized;
+            Vector3 side = Vector3.Cross(Vector3.up, ahead);
+            end = lead.positions[0] + (side * slot[0] + Vector3.up * slot[1] - ahead * slot[2]) * lead.size;
         }
 
         void MountRearGun(Flyer flyer, Transform model, PlaneModelConfig config)
@@ -593,6 +819,72 @@ namespace MetalRaptors
                 hinge.InverseTransformPoint(body.TransformPoint(muzzle - spacing)),
                 hinge.InverseTransformPoint(body.TransformPoint(muzzle + spacing)),
             };
+        }
+
+        void MountNodeGun(Flyer flyer, Transform model, PlaneModelConfig config)
+        {
+            Transform body = flyer.tr;
+            ShotPlane spec = flyer.spec;
+            Transform node = PlaneFactory.FindDeep(model, spec.gunHinge);
+            Transform barrel = string.IsNullOrEmpty(spec.gunBarrel) ? null : PlaneFactory.FindDeep(model, spec.gunBarrel);
+            if (node == null || barrel == null || !MeasureIn(body, barrel, out Bounds bounds))
+            {
+                Debug.LogError($"ShotDirector: {config.resourceName} has no gun {spec.gunHinge} / {spec.gunBarrel}.");
+                return;
+            }
+
+            Vector3 pivot = body.InverseTransformPoint(node.position);
+            int axis = 0;
+            for (int i = 1; i < 3; i++)
+                if (bounds.extents[i] > bounds.extents[axis]) axis = i;
+            Vector3 reach = Vector3.zero;
+            reach[axis] = bounds.extents[axis];
+            Vector3 a = bounds.center + reach, b = bounds.center - reach;
+            Vector3 muzzle = (a - pivot).sqrMagnitude > (b - pivot).sqrMagnitude ? a : b;
+            Vector3 rest = (muzzle - pivot).normalized;
+            muzzle += rest * NodeMuzzleClearance;
+
+            var hinge = new GameObject("Shot Node Gun").transform;
+            hinge.SetParent(model, false);
+            hinge.SetPositionAndRotation(body.TransformPoint(pivot), body.rotation);
+            node.SetParent(hinge, true);
+
+            Vector3 local = hinge.InverseTransformPoint(body.TransformPoint(muzzle));
+            flyer.rearPivot = hinge;
+            flyer.rearRest = rest;
+            flyer.rearMuzzles = new[] { local, local };
+            Debug.Log($"ShotDirector: {spec.gunHinge} pivot {pivot} rest {rest}");
+        }
+
+        static void SpinExtraProps(Transform body, Transform model, PlaneModelConfig config)
+        {
+            if (string.IsNullOrEmpty(config.propPivotNode)) return;
+
+            foreach (Transform t in model.GetComponentsInChildren<Transform>(true))
+            {
+                if (!t.name.StartsWith(config.propPivotNode + ".")) continue;
+                if (t.GetComponent<PropellerSpin>() != null) continue;
+
+                var spin = t.gameObject.AddComponent<PropellerSpin>();
+                spin.axisSpace = body;
+                spin.axisInSpace = Vector3.right;
+                spin.straighten = config.straightenProp;
+            }
+        }
+
+        static Vector3? NodeCentre(Transform body, Transform model, string name)
+        {
+            Transform node = PlaneFactory.FindDeep(model, name);
+            Renderer[] renderers = node != null ? node.GetComponentsInChildren<Renderer>() : new Renderer[0];
+            if (renderers.Length == 0)
+            {
+                Debug.LogError($"ShotDirector: no smoke node {name}.");
+                return null;
+            }
+
+            Bounds bounds = renderers[0].bounds;
+            foreach (Renderer r in renderers) bounds.Encapsulate(r.bounds);
+            return body.InverseTransformPoint(bounds.center);
         }
 
         static bool MeasureIn(Transform body, Transform node, out Bounds bounds)
@@ -691,6 +983,268 @@ namespace MetalRaptors
             Bounds bounds = renderers[0].bounds;
             foreach (Renderer r in renderers) bounds.Encapsulate(r.bounds);
             return body.transform.InverseTransformPoint(bounds.center);
+        }
+
+        void ShadeMountains()
+        {
+            if (_spec.mountainShade <= 0f || MountainRange.Current == null) return;
+
+            var shade = new Color(_spec.mountainShade, _spec.mountainShade, _spec.mountainShade, 1f);
+            var done = new HashSet<Material>();
+            foreach (var r in MountainRange.Current.GetComponentsInChildren<MeshRenderer>())
+                if (r.sharedMaterial != null && done.Add(r.sharedMaterial))
+                    r.sharedMaterial.SetColor(BaseColorId, shade);
+        }
+
+        void BuildLand()
+        {
+            var land = FindFirstObjectByType<CampaignTerrain>();
+            if (land != null) land.BuildAround(_spec.camera.x);
+        }
+
+        static VosgesLayout Valley
+        {
+            get
+            {
+                var valley = FindFirstObjectByType<VosgesTerrain>();
+                return valley != null ? valley.Layout : null;
+            }
+        }
+
+        static void HideSun()
+        {
+            Material sky = RenderSettings.skybox;
+            if (sky != null)
+            {
+                if (sky.HasProperty(SkySunIntensity)) sky.SetFloat(SkySunIntensity, 0f);
+                if (sky.HasProperty(SkyHaloIntensity)) sky.SetFloat(SkyHaloIntensity, 0f);
+            }
+            foreach (var rays in FindObjectsByType<GodRays>(FindObjectsSortMode.None)) rays.enabled = false;
+        }
+
+        void LogArena()
+        {
+            var controller = FindFirstObjectByType<CampaignLevelController>();
+            if (controller == null || VillageArena == null) return;
+            if (VillageArena.GetValue(controller) is VosgesArena arena)
+                Debug.Log($"ShotDirector: village arena origin {arena.Origin} footprint {arena.Footprint} " +
+                          $"road z {arena.RoadZ} half {arena.RoadHalfWidth:F0} lift {arena.RoadLift:F1}");
+        }
+
+        void LogValley()
+        {
+            VosgesLayout layout = Valley;
+            if (layout == null) return;
+
+            float x = _spec.camera.x;
+            for (int cell = Mathf.FloorToInt((x - ValleyLogReach) / layout.VillageCell);
+                 cell <= Mathf.FloorToInt((x + ValleyLogReach) / layout.VillageCell); cell++)
+                if (layout.Village(cell, out var village))
+                    Debug.Log($"ShotDirector: village {cell} model {village.model} at ({village.x:F0}, {village.z:F0}) " +
+                              $"half ({village.halfX:F0}, {village.halfZ:F0}) yaw {village.rotation.eulerAngles.y:F0} " +
+                              $"pad {village.padY:F0}");
+
+            for (int cell = Mathf.FloorToInt((x - ValleyLogReach) / layout.HerdCell);
+                 cell <= Mathf.FloorToInt((x + ValleyLogReach) / layout.HerdCell); cell++)
+                if (layout.Herd(cell, out var herd))
+                    Debug.Log($"ShotDirector: herd {cell} at ({herd.x:F0}, {herd.z:F0}) " +
+                              $"radius ({herd.radiusX:F0}, {herd.radiusZ:F0}) cows {herd.cows.Length}");
+
+            for (int cell = Mathf.FloorToInt((x - ValleyLogReach) / layout.MillCell);
+                 cell <= Mathf.FloorToInt((x + ValleyLogReach) / layout.MillCell); cell++)
+                if (layout.Mill(cell, out var mill))
+                    Debug.Log($"ShotDirector: mill {cell} at ({mill.x:F0}, {mill.z:F0})");
+
+            for (int cell = Mathf.FloorToInt((x - ValleyLogReach) / layout.HouseCell);
+                 cell <= Mathf.FloorToInt((x + ValleyLogReach) / layout.HouseCell); cell++)
+            {
+                var houses = layout.Houses(cell);
+                if (houses == null) continue;
+                foreach (var house in houses)
+                    Debug.Log($"ShotDirector: house {cell} model {house.model} at ({house.x:F0}, {house.z:F0})");
+            }
+
+            Debug.Log($"ShotDirector: camera ground {GroundY(_spec.camera.x, _spec.camera.z):F1}");
+        }
+
+        void BuildCow(ShotCow spec)
+        {
+            Vector3 at = Ground(spec.screenX, spec.distance);
+            VosgesCow.Place(_set, new VosgesLayout.CowSpot
+            {
+                position = at,
+                up = Tilt(GroundNormal(at.x, at.z), CowMaxTilt),
+                yaw = _spec.camera.yaw + spec.yaw,
+                brown = spec.brown,
+                scale = spec.scale > 0f ? spec.scale : 1f,
+            });
+            Debug.Log($"ShotDirector: cow at {at}");
+        }
+
+        void BuildGrove(ShotGrove spec)
+        {
+            VosgesLayout layout = Valley;
+            Vector3 centre = Ground(spec.screenX, spec.distance);
+            Vector3 forward = _cam.transform.forward;
+            forward.y = 0f;
+            forward.Normalize();
+            Vector3 right = Vector3.Cross(Vector3.up, forward);
+            float spread = spec.spread > 0f ? spec.spread : DefaultGroveSpread;
+            float depth = spec.depth > 0f ? spec.depth : spread * 0.5f;
+            float size = spec.scale > 0f ? spec.scale : 1f;
+
+            var placed = new List<Vector3>();
+            for (int i = 0; i < Mathf.Max(1, spec.count); i++)
+                for (int tries = 0; tries < GroveTries; tries++)
+                {
+                    float angle = Random.value * Mathf.PI * 2f;
+                    float reach = Mathf.Sqrt(Random.value);
+                    Vector3 p = centre + right * (Mathf.Cos(angle) * reach * spread)
+                                       + forward * (Mathf.Sin(angle) * reach * depth);
+                    if (Crowded(placed, p)) continue;
+                    if (layout != null && (layout.InVillage(p.x, p.z, GroveClear)
+                                           || layout.InHouse(p.x, p.z, GroveClear)
+                                           || layout.InMill(p.x, p.z, GroveClear))) continue;
+                    if (InStructure(p, GroveClear)) continue;
+
+                    p.y = GroundY(p.x, p.z);
+                    placed.Add(p);
+                    VosgesSpruce.Place(_set, new VosgesLayout.TreeSpot
+                    {
+                        position = p,
+                        yaw = Random.Range(0f, 360f),
+                        model = Random.Range(0, VosgesSpruce.Models),
+                        fore = spec.fore,
+                        scale = size * (1f + Random.Range(-GroveJitter, GroveJitter)),
+                    });
+                    break;
+                }
+        }
+
+        void BuildMill(ShotStructure spec)
+        {
+            VosgesWindmill.Measure();
+            if (!VosgesWindmill.Ready) return;
+
+            const float u = PlaneModelConfig.UnitsPerMeter;
+            Vector3 at = Ground(spec.screenX, spec.distance);
+            var rotation = Quaternion.Euler(0f, VosgesWindmill.FacingYaw + _spec.camera.yaw + spec.yaw, 0f);
+            float radius = VosgesWindmill.Radius * u;
+            float floor = Floor(at, radius);
+            Vector3 offset = rotation * (VosgesWindmill.Centre * u);
+            VosgesWindmill.Place(_set, new VosgesLayout.MillSpot
+            {
+                x = at.x,
+                z = at.z,
+                rotation = rotation,
+                origin = new Vector3(at.x - offset.x, floor - MillSink, at.z - offset.z),
+                radius = radius,
+                padY = floor,
+                phase = Random.Range(0f, 360f),
+            });
+            _structures.Add(new Vector4(at.x, at.y, at.z, radius));
+            Debug.Log($"ShotDirector: mill at {at}");
+        }
+
+        void BuildHut(ShotStructure spec)
+        {
+            VosgesHouse.Measure();
+            if (!VosgesHouse.Has(spec.model)) return;
+
+            const float u = PlaneModelConfig.UnitsPerMeter;
+            Bounds box = VosgesHouse.Footprint(spec.model);
+            Vector3 at = Ground(spec.screenX, spec.distance);
+            var rotation = Quaternion.Euler(0f, VosgesHouse.Facing(spec.model) + _spec.camera.yaw + spec.yaw, 0f);
+            float ex = box.extents.x * u, ez = box.extents.z * u;
+            float radius = Mathf.Sqrt(ex * ex + ez * ez);
+            float floor = Floor(at, radius);
+            Vector3 offset = rotation * new Vector3(box.center.x * u, 0f, box.center.z * u);
+            VosgesHouse.Place(_set, new VosgesLayout.HouseSpot
+            {
+                model = spec.model,
+                x = at.x,
+                z = at.z,
+                rotation = rotation,
+                inverse = Quaternion.Inverse(rotation),
+                origin = new Vector3(at.x - offset.x, floor - box.min.y * u - HouseSink, at.z - offset.z),
+                halfX = ex,
+                halfZ = ez,
+                radius = radius,
+                padY = floor,
+            });
+            _structures.Add(new Vector4(at.x, at.y, at.z, radius));
+            Debug.Log($"ShotDirector: hut {spec.model} at {at}");
+        }
+
+        static float Floor(Vector3 at, float radius)
+        {
+            float floor = GroundY(at.x, at.z);
+            for (int i = 0; i < FloorProbes; i++)
+            {
+                float angle = i * Mathf.PI * 2f / FloorProbes;
+                floor = Mathf.Min(floor, GroundY(at.x + Mathf.Cos(angle) * radius * FloorReach,
+                    at.z + Mathf.Sin(angle) * radius * FloorReach));
+            }
+            return floor;
+        }
+
+        bool InStructure(Vector3 p, float margin)
+        {
+            foreach (Vector4 s in _structures)
+            {
+                float dx = s.x - p.x, dz = s.z - p.z, reach = s.w + margin;
+                if (dx * dx + dz * dz < reach * reach) return true;
+            }
+            return false;
+        }
+
+        static bool Crowded(List<Vector3> placed, Vector3 p)
+        {
+            foreach (Vector3 q in placed)
+            {
+                float dx = q.x - p.x, dz = q.z - p.z;
+                if (dx * dx + dz * dz < GroveGap * GroveGap) return true;
+            }
+            return false;
+        }
+
+        static Vector3 GroundNormal(float x, float z)
+        {
+            float dx = GroundY(x + NormalProbe, z) - GroundY(x - NormalProbe, z);
+            float dz = GroundY(x, z + NormalProbe) - GroundY(x, z - NormalProbe);
+            return new Vector3(-dx, 2f * NormalProbe, -dz).normalized;
+        }
+
+        static Vector3 Tilt(Vector3 normal, float maxAngle)
+        {
+            float angle = Vector3.Angle(Vector3.up, normal);
+            if (angle <= maxAngle) return normal;
+            return Vector3.Slerp(Vector3.up, normal, maxAngle / angle);
+        }
+
+        void ClearHerds()
+        {
+            var scenery = FindFirstObjectByType<VosgesScenery>();
+            if (scenery == null) return;
+
+            Vector3 eye = _cam.transform.position;
+            float reach = _spec.clearHerds;
+            foreach (Transform site in scenery.transform)
+            {
+                if (!_spec.ambientSpruces && site.name.StartsWith("Spruces"))
+                {
+                    Destroy(site.gameObject);
+                    continue;
+                }
+                if (!site.name.StartsWith("Herd")) continue;
+                Renderer[] renderers = site.GetComponentsInChildren<Renderer>();
+                if (renderers.Length == 0) continue;
+                Bounds bounds = renderers[0].bounds;
+                foreach (Renderer r in renderers) bounds.Encapsulate(r.bounds);
+                Vector3 near = bounds.ClosestPoint(new Vector3(eye.x, bounds.center.y, eye.z));
+                Vector2 gap = new Vector2(near.x - eye.x, near.z - eye.z);
+                if (gap.magnitude < reach) Destroy(site.gameObject);
+            }
         }
 
         void LogAerodrome()
@@ -1331,8 +1885,16 @@ namespace MetalRaptors
                 ? spec.screen : new[] { 0.5f, 0.85f };
             Vector3 at = Air(screen, spec.distance > 0f ? spec.distance : 600f);
             float width = spec.width > 0f ? spec.width : DefaultCloudWidth;
-            Color tint = _spec.arena.on ? CoastSky.CloudColor(SpecDaytime) : CloudSystem.TintFor(SpecDaytime);
-            Color glow = _spec.arena.on ? CoastSky.CloudGlow(SpecDaytime) : CloudSystem.GlowFor(SpecDaytime);
+            Color tint = _spec.arena.on
+                ? CoastSky.CloudColor(SpecDaytime, SpecWeather) : CloudSystem.TintFor(SpecDaytime);
+            Color glow = _spec.arena.on
+                ? CoastSky.CloudGlow(SpecDaytime, SpecWeather) : CloudSystem.GlowFor(SpecDaytime);
+            if (spec.color != null && spec.color.Length >= 3)
+            {
+                float share = glow.maxColorComponent / Mathf.Max(0.001f, tint.maxColorComponent);
+                tint = new Color(spec.color[0], spec.color[1], spec.color[2]);
+                glow = tint * share;
+            }
             Material mat = CloudSystem.CloudMaterial(tint, glow,
                 spec.alpha > 0f ? spec.alpha : DefaultCloudAlpha);
 
@@ -1355,6 +1917,75 @@ namespace MetalRaptors
                 renderer.shadowCastingMode = ShadowCastingMode.Off;
                 renderer.receiveShadows = false;
             }
+        }
+
+        void BuildPuff(ShotCloud spec)
+        {
+            float[] screen = spec.screen != null && spec.screen.Length >= 2
+                ? spec.screen : new[] { 0.5f, 0.85f };
+            Vector3 at = Air(screen, spec.distance > 0f ? spec.distance : 500f);
+            float width = spec.width > 0f ? spec.width : DefaultPuffWidth;
+            Color tint = spec.color != null && spec.color.Length >= 3
+                ? new Color(spec.color[0], spec.color[1], spec.color[2]) : PuffColor;
+            float alpha = spec.alpha > 0f ? spec.alpha : DefaultPuffAlpha;
+            Color halo = Color.Lerp(tint * PuffHaloLighten, Color.white, 0.1f);
+            Material core = CloudSystem.CloudMaterial(tint, tint * PuffGlow, alpha);
+            Material outer = CloudSystem.CloudMaterial(halo, halo * PuffGlow, alpha * PuffHaloAlpha);
+
+            var root = new GameObject("Shot Puff").transform;
+            root.SetParent(_set, false);
+            root.SetPositionAndRotation(at, Quaternion.Euler(0f, Random.Range(0f, 360f), 0f));
+            for (int i = 0; i < PuffBlobs; i++) AddPuffBlob(root, core, width, PuffReach, 0.35f, 0.55f);
+            for (int i = 0; i < PuffHaloBlobs; i++) AddPuffBlob(root, outer, width, PuffHaloReach, 0.45f, 0.7f);
+        }
+
+        static void AddPuffBlob(Transform root, Material mat, float width, float reach, float min, float max)
+        {
+            var go = new GameObject("Blob");
+            go.transform.SetParent(root, false);
+            go.transform.localPosition = Random.insideUnitSphere * (reach * width);
+            go.transform.localRotation = Random.rotation;
+            float s = width * Random.Range(min, max);
+            go.transform.localScale = new Vector3(s * Random.Range(0.9f, 1.2f),
+                s * Random.Range(0.85f, 1.1f), s * Random.Range(0.9f, 1.2f));
+            go.AddComponent<MeshFilter>().sharedMesh = BlobMesh.Pick();
+            var renderer = go.AddComponent<MeshRenderer>();
+            if (mat != null) renderer.sharedMaterial = mat;
+            renderer.shadowCastingMode = ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+        }
+
+        void BuildVillagers(ShotVillager spec)
+        {
+            if (BuildVillager == null) return;
+
+            Vector3 forward = _cam.transform.forward;
+            forward.y = 0f;
+            forward.Normalize();
+            Vector3 right = Vector3.Cross(Vector3.up, forward);
+            Vector3 centre = Ground(spec.screenX, spec.distance);
+            var rng = new System.Random(_spec.seed + Mathf.RoundToInt(spec.distance * 10f + spec.screenX * 1000f));
+
+            for (int i = 0; i < Mathf.Max(1, spec.count); i++)
+            {
+                Vector3 p = centre + right * Random.Range(-spec.spread, spec.spread)
+                                   + forward * Random.Range(-spec.spread, spec.spread) * 0.3f;
+                p.y = GroundY(p.x, p.z);
+                var figure = (Transform)BuildVillager.Invoke(null, new object[] { _set, rng });
+                figure.SetPositionAndRotation(p, Quaternion.Euler(0f,
+                    _spec.camera.yaw + spec.yaw + Random.Range(-VillagerTurn, VillagerTurn), 0f));
+            }
+        }
+
+        void LogVillagers()
+        {
+            foreach (var people in FindObjectsByType<VillagePeople>(FindObjectsSortMode.None))
+                foreach (Transform walker in people.transform)
+                {
+                    Vector3 view = _cam.WorldToViewportPoint(walker.position);
+                    if (view.z <= 0f || view.x < 0f || view.x > 1f || view.y < 0f || view.y > 1f) continue;
+                    Debug.Log($"ShotDirector: villager at {walker.position} view ({view.x:F2}, {view.y:F2}, {view.z:F0})");
+                }
         }
 
         void BuildMist()
@@ -1481,10 +2112,14 @@ namespace MetalRaptors
                 if (vessel.root != null)
                     vessel.root.position = vessel.end + Vector3.right * (vessel.speed * (remaining + StepSec));
             if (_spec.clearNear > 0f) ClearNear();
+            if (_spec.clearHerds > 0f || !_spec.ambientSpruces) ClearHerds();
 
             if (!last) return;
+            LogVillagers();
             foreach (Flyer flyer in _flyers)
                 if (!flyer.spec.sharpProp) BlurPropeller(flyer);
+            foreach (Flyer flyer in _flyers)
+                if (flyer.spec.fireGlow > 0f) GlowFire(flyer);
             foreach (Flyer flyer in _flyers)
                 if (flyer.tips != null)
                     foreach (Vector3 tip in flyer.tips) BuildStreak(flyer, tip);
@@ -1498,6 +2133,27 @@ namespace MetalRaptors
             foreach (Rifleman man in _riflemen)
                 if (Random.value < RifleFlashShare)
                     Flash(man.muzzle, man.aim, Vector3.up, RifleFlashSize);
+        }
+
+        static void GlowFire(Flyer flyer)
+        {
+            float[] tint = flyer.spec.fireColor;
+            bool custom = tint != null && tint.Length >= 6;
+            Color deep = custom ? new Color(tint[0], tint[1], tint[2]) : FireDeep;
+            Color hot = custom ? new Color(tint[3], tint[4], tint[5]) : FireHot;
+            int index = 0;
+            foreach (PlaneFire fire in flyer.tr.GetComponentsInChildren<PlaneFire>())
+            {
+                fire.enabled = false;
+                foreach (Renderer r in fire.GetComponentsInChildren<Renderer>())
+                {
+                    Material mat = r.sharedMaterial;
+                    if (mat == null) continue;
+                    Color color = Color.Lerp(deep, hot, index++ % 3 / 2f);
+                    mat.SetColor(BaseColorId, color * FireBase);
+                    mat.SetColor(EmissionColorId, color * flyer.spec.fireGlow);
+                }
+            }
         }
 
         static Vector3 SweptTip(Vector3 tip) => tip - new Vector3(Mathf.Abs(tip.z) * StreakSweepBack, 0f, 0f);
@@ -1543,8 +2199,12 @@ namespace MetalRaptors
 
         void BlurPropeller(Flyer flyer)
         {
-            var spin = flyer.tr.GetComponentInChildren<PropellerSpin>();
-            if (spin == null) return;
+            foreach (PropellerSpin spin in flyer.tr.GetComponentsInChildren<PropellerSpin>())
+                BlurPropeller(spin);
+        }
+
+        void BlurPropeller(PropellerSpin spin)
+        {
             spin.enabled = false;
 
             Vector3 axis = (spin.axisSpace != null
@@ -1767,8 +2427,8 @@ namespace MetalRaptors
         void AimRearGun(Flyer flyer)
         {
             Vector3 pivot = flyer.rearPivot.position;
-            Vector3 goal = TryMark(flyer, out Flyer mark)
-                ? AimPoint(flyer, mark, pivot) : pivot - flyer.Forward * 400f;
+            Vector3 goal = flyer.aimed ? flyer.aimPoint
+                : TryMark(flyer, out Flyer mark) ? AimPoint(flyer, mark, pivot) : pivot - flyer.Forward * 400f;
             Vector3 rest = flyer.tr.TransformDirection(flyer.rearRest);
             flyer.aim = (goal - pivot).normalized;
             flyer.rearPivot.rotation = Quaternion.FromToRotation(rest, flyer.aim) * flyer.tr.rotation;
@@ -1780,10 +2440,12 @@ namespace MetalRaptors
             bool rear = flyer.rearPivot != null;
             Vector3 muzzle = rear ? RearPoint(flyer) : GunPoint(flyer);
 
-            Vector3 aimAt = muzzle + (rear ? flyer.aim : flyer.Forward) * 400f;
+            Vector3 aimAt = flyer.aimed && !rear ? flyer.aimPoint
+                : muzzle + (rear ? flyer.aim : flyer.Forward) * 400f;
             float life = BoltLife;
             bool strike = false;
-            if (TryMark(flyer, out Flyer mark))
+            Flyer mark = null;
+            if (!flyer.aimed && TryMark(flyer, out mark))
             {
                 strike = flyer.spec.hitEvery > 0 && ++flyer.shots % flyer.spec.hitEvery == 0;
                 aimAt = strike ? StrikePoint(flyer, mark, muzzle) : AimPoint(flyer, mark, muzzle);
@@ -1940,8 +2602,19 @@ namespace MetalRaptors
             return point;
         }
 
-        static float GroundY(float x, float z) =>
-            Battlefield.Current != null && Battlefield.Current.SampleGround(x, z, out float y)
-                ? y : ProceduralTerrain.BaseLevel;
+        static float GroundY(float x, float z)
+        {
+            if (Battlefield.Current != null && Battlefield.Current.SampleGround(x, z, out float y)) return y;
+
+            foreach (Terrain terrain in Terrain.activeTerrains)
+            {
+                if (terrain == null || terrain.terrainData == null) continue;
+                Vector3 origin = terrain.transform.position;
+                Vector3 size = terrain.terrainData.size;
+                if (x < origin.x || x > origin.x + size.x || z < origin.z || z > origin.z + size.z) continue;
+                return terrain.SampleHeight(new Vector3(x, 0f, z)) + origin.y;
+            }
+            return ProceduralTerrain.BaseLevel;
+        }
     }
 }

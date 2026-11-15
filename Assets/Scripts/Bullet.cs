@@ -125,7 +125,8 @@ namespace MetalRaptors
             if (target == null) return false;
 
             var player = target as CubeController;
-            if (!_fromEnemy) return player == null;
+            if (!_fromEnemy)
+                return player == null && !(target is EnemyController enemy && enemy.Evading);
 
             return player != null && !player.Evading;
         }

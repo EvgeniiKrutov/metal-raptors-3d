@@ -186,6 +186,36 @@ namespace MetalRaptors
         [Tooltip("Hard cap on speed as a multiple of flySpeed.")]
         public float maxSpeedMultiplier = 1.6f;
 
+        [Header("Roller: stats")]
+        [Tooltip("Hit points of the Dr.I roller.")]
+        public float aceHealth = 90f;
+
+        [Tooltip("Turn rate as a multiple of the player's own, so the ace always out-turns them.")]
+        public float aceTurnFactor = 1.1f;
+
+        [Header("Roller: barrel roll")]
+        [Tooltip("Seconds one barrel roll lasts; player bullets pass through meanwhile.")]
+        public float barrelSeconds = 2.5f;
+
+        [Tooltip("Full turns spun during one barrel roll.")]
+        public float barrelTurns = 1f;
+
+        [Tooltip("Seconds after a roll ends before the next roll is available.")]
+        public float barrelCooldown = 6f;
+
+        [Tooltip("The roll starts only while the firing player is this close, units.")]
+        public float barrelAimRange = 600f;
+
+        [Tooltip("The roll starts only inside this cone around the firing player's nose, degrees.")]
+        public float barrelAimCone = 22f;
+
+        [Header("Roller: attack passes")]
+        [Tooltip("Seconds of straight flight after passing the player, before the U-turn.")]
+        public float aceAwaySeconds = 3f;
+
+        [Tooltip("Speed multiple used only while off screen, to get back into the fight.")]
+        public float aceCatchUp = 1.35f;
+
         [Header("Body (legacy)")]
         [Tooltip("Unused: the enemy is now the Albatros D.III model, sized to the player's plane. " +
                  "Kept only so the existing asset still deserializes cleanly.")]
@@ -210,6 +240,25 @@ namespace MetalRaptors
                 : ScriptableObject.CreateInstance<EnemyConfig>();
 
             config.role = role;
+            return config;
+        }
+
+        public static EnemyConfig Ace(EnemyRole role, EnemyConfig fighter, EnemyConfig scout,
+            float playerSpeed, float playerTurnDeg)
+        {
+            EnemyConfig config = Object.Instantiate(fighter);
+            config.role = role;
+            config.health = config.aceHealth;
+            if (playerSpeed > 0f) config.flySpeed = playerSpeed;
+            if (playerTurnDeg > 0f)
+                config.rotationSpeed = Mathf.Max(config.rotationSpeed,
+                    playerTurnDeg * config.aceTurnFactor);
+
+            if (scout != null)
+            {
+                config.minAltitudeMargin = scout.minAltitudeMargin;
+                config.safeAltitudeMargin = scout.safeAltitudeMargin;
+            }
             return config;
         }
 
@@ -250,7 +299,12 @@ namespace MetalRaptors
         public static void SpawnBand(EnemyConfig config, float groundY, float ceilingY,
             out float minY, out float maxY)
         {
-            if (config.role == EnemyRole.Scout)
+            if (EnemyRoles.IsAce(config.role))
+            {
+                minY = groundY + config.safeAltitudeMargin;
+                maxY = ceilingY;
+            }
+            else if (config.role == EnemyRole.Scout)
             {
                 minY = groundY + config.safeAltitudeMargin;
                 maxY = Mathf.Min(groundY + config.deckCeilingMargin,

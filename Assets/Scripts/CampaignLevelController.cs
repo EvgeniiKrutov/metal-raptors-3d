@@ -64,6 +64,7 @@ namespace MetalRaptors
         const float ArenaHoldSec = 0.4f;
         const float ArenaInSec = 1.2f;
         const string SkipCaption = "SKIP TO BOSS ARENA";
+        const string StormSkipCaption = "SKIP TO STORM ARENA";
 
         const float RaidSoundFadeSec = 1.5f;
         const float RaidFadeSec = 2.5f;
@@ -140,6 +141,7 @@ namespace MetalRaptors
         CampaignEnemies _enemies;
         CampaignConvoy _convoy;
         Airfield _airfield;
+        VosgesArena _villageArena;
         SkyZeppelin _skyZeppelin;
         EnemyZeppelin _zeppelin;
         CompanionFlight _wing;
@@ -235,6 +237,16 @@ namespace MetalRaptors
             _launched = CampaignRun.TakeLaunch();
             _revealAt = Time.realtimeSinceStartup + (_launched ? MinLoadSec : 0f);
             _levelNumber = CampaignRun.Level;
+            if (CustomBattle.Requested && CustomBattle.Storm)
+            {
+                _level = CampaignLevels.StormArena(CustomBattle.Map);
+                PilotProfile.BeginRun(false, 0);
+                CampaignCheckpoint.Clear();
+                CampaignCheckpoint.InCareer = false;
+                HandOffToArena();
+                return;
+            }
+
             _level = CustomBattle.Requested
                 ? CampaignLevels.Custom(CustomBattle.Map, CustomBattle.Daytime, CustomBattle.Shape)
                 : CampaignLevels.ForNumber(_levelNumber);
@@ -291,10 +303,20 @@ namespace MetalRaptors
             else if (Alpine)
             {
                 MountainRange.Begin(_cam, _level.seed, _level.daytime);
-                if (_terrain is VosgesTerrain valley)
-                    VosgesScenery.Begin(_cam, valley.Layout, _level.daytime != Daytime.Night);
-                Battlefield.BeginValley(_cam, _halfViewWidth, _level.seed, _terrain.InCrater,
-                    _terrain.Occupied, VosgesTerrain.ValleyZMax, _level.people, !_level.peaceful);
+                if (_villageArena != null)
+                {
+                    VosgesArenaScenery.Build(_villageArena, _terrain, _level.daytime != Daytime.Night,
+                        _level.seed);
+                    Battlefield.BeginVillage(_cam, _halfViewWidth, _level.seed, WorldLeft, WorldRight,
+                        _villageArena.Occupied, VosgesTerrain.ValleyZMax, _level.people, CampaignTerrain.Depth);
+                }
+                else
+                {
+                    if (_terrain is VosgesTerrain valley)
+                        VosgesScenery.Begin(_cam, valley.Layout, _level.daytime != Daytime.Night);
+                    Battlefield.BeginValley(_cam, _halfViewWidth, _level.seed, _terrain.InCrater,
+                        _terrain.Occupied, VosgesTerrain.ValleyZMax, _level.people, !_level.peaceful);
+                }
             }
             else if (Bounded)
             {
@@ -358,6 +380,7 @@ namespace MetalRaptors
             if (_resume != null) Resume();
 
             if (CustomBattle.Requested) DevSpawn.Register(this);
+            if (CustomBattle.OffersStorm) DevSkip.Offer(StormSkipCaption, SkipToStorm);
             if (!CustomBattle.Requested && !string.IsNullOrEmpty(_level.arenaScript))
                 DevSkip.Offer(SkipCaption, SkipToArena);
 
@@ -368,6 +391,7 @@ namespace MetalRaptors
         {
             DevSpawn.Unregister(this);
             DevSkip.Withdraw(SkipToArena);
+            DevSkip.Withdraw(SkipToStorm);
             DevSkip.Withdraw(SkipToRaid);
             DevSkip.Withdraw(SkipWave);
             DevSkip.Withdraw(DestroyGun);
@@ -394,6 +418,19 @@ namespace MetalRaptors
                 points = PilotProfile.RunPoints,
             });
             LoadArena();
+        }
+
+        void SkipToStorm()
+        {
+            if (_handedOff || !CustomBattle.OffersStorm) return;
+
+            _gameOver = true;
+            StopScript();
+            StopWeapons();
+            if (_sound != null) _sound.FadeOut(ArenaOutSec);
+
+            CustomBattle.EnterStorm();
+            ScreenFade.Load(SceneNames.CampaignLevel1, null, ArenaOutSec, ArenaHoldSec, ArenaInSec);
         }
 
         void HandOffToArena()
@@ -462,6 +499,16 @@ namespace MetalRaptors
                 return depth > 0f ? new CampaignLandOptions { depth = depth } : null;
 
             var land = new CampaignLandOptions { worldWidth = _level.worldWidth, depth = depth };
+            if (Alpine && _level.villageArena)
+            {
+                _villageArena = VosgesArena.Load(WorldRight, PlayPlaneZ, ProceduralTerrain.BaseLevel);
+                if (_villageArena == null) return land;
+
+                land.arena = _villageArena;
+                land.marginChunks = VosgesArena.MarginChunks;
+                return land;
+            }
+
             if (!_level.aerodrome || !Aerodrome.Measure()) return land;
 
             if (!AerodromeFits)
@@ -674,9 +721,11 @@ namespace MetalRaptors
             }
 
             if (_convoy == null)
-                _convoy = new CampaignConvoy(_cube.GetComponent<Rigidbody>(), _terrain, PlayPlaneZ,
-                    ApronEndX > 0f ? AerodromeRoad.SurfaceLift : 0f);
+                _convoy = new CampaignConvoy(_cube.GetComponent<Rigidbody>(), _terrain, PlayPlaneZ, RoadLift);
         }
+
+        float RoadLift => ApronEndX > 0f ? AerodromeRoad.SurfaceLift
+            : _villageArena != null ? _villageArena.RoadLift : 0f;
 
         float ConvoyEdgeX => Bounded ? WorldRight : _camBasePos.x + _halfViewWidth;
 
@@ -1252,6 +1301,12 @@ namespace MetalRaptors
             if (!CanDevSpawn) return;
 
             EnsureEnemies();
+            if (EnemyRoles.IsAce(role))
+            {
+                _enemies.SpawnAces(role, _camBasePos.x, _halfViewWidth);
+                return;
+            }
+
             _enemies.Spawn(new[] { new EnemyGroup(PlaneModels.EnemyFor(role), 1) },
                 _camBasePos.x, _halfViewWidth);
         }

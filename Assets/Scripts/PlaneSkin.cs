@@ -10,7 +10,7 @@ namespace MetalRaptors
 
         public string texture;
 
-        public bool locked;
+        public int unlockLevel;
     }
 
     public static class PlaneSkins
@@ -38,7 +38,7 @@ namespace MetalRaptors
             },
             new PlaneSkin
             {
-                id = "white", label = "white", texture = "skins/sopwith_camel/white", locked = true,
+                id = "white", label = "white", texture = "skins/sopwith_camel/white", unlockLevel = 7,
             },
         };
 
@@ -56,7 +56,7 @@ namespace MetalRaptors
             new PlaneSkin { id = "lothar", label = "lothar", texture = "skins/fokker_dr_1/lothar" },
             new PlaneSkin
             {
-                id = "raven", label = "raven", texture = "skins/fokker_dr_1/raven", locked = true,
+                id = "raven", label = "raven", texture = "skins/fokker_dr_1/raven", unlockLevel = 4,
             },
         };
 
@@ -71,7 +71,7 @@ namespace MetalRaptors
             },
             new PlaneSkin
             {
-                id = "raven", label = "raven", texture = "skins/albatros_d3/raven", locked = true,
+                id = "raven", label = "raven", texture = "skins/albatros_d3/raven", unlockLevel = 4,
             },
         };
 
@@ -82,7 +82,7 @@ namespace MetalRaptors
             new PlaneSkin { id = "white", label = "white", texture = "skins/fokker_eindecker/white" },
             new PlaneSkin
             {
-                id = "raven", label = "raven", texture = "skins/fokker_eindecker/raven", locked = true,
+                id = "raven", label = "raven", texture = "skins/fokker_eindecker/raven", unlockLevel = 4,
             },
         };
 
@@ -99,7 +99,7 @@ namespace MetalRaptors
 
         public static readonly PlaneSkin[] GothaG4 =
         {
-            new PlaneSkin { id = "k2", label = "k2", texture = "skins/gotha_g4/k2", locked = true },
+            new PlaneSkin { id = "k2", label = "k2", texture = "skins/gotha_g4/k2", unlockLevel = 9 },
         };
 
         public static PlaneSkin[] Of(PlaneModelConfig plane) =>
@@ -107,7 +107,8 @@ namespace MetalRaptors
 
         public static bool Selectable(PlaneModelConfig plane) => Of(plane).Length > 1;
 
-        public static bool IsLocked(PlaneSkin skin) => skin != null && skin.locked;
+        public static bool IsLocked(PlaneSkin skin) =>
+            skin != null && skin.unlockLevel > 0 && !CampaignProgress.IsCompleted(skin.unlockLevel);
 
         public const string CompanionId = "dark_blue";
 
@@ -116,6 +117,27 @@ namespace MetalRaptors
 
         public static PlaneSkin Enemy(PlaneModelConfig plane, string id) =>
             ById(plane, id) ?? Default(plane);
+
+        public const string RavenId = "raven";
+
+        public static PlaneSkin RandomEnemy(PlaneModelConfig plane, string id)
+        {
+            if (!string.IsNullOrEmpty(id)) return Enemy(plane, id);
+
+            PlaneSkin[] skins = Of(plane);
+            int count = 0;
+            foreach (PlaneSkin skin in skins)
+                if (skin.id != RavenId) count++;
+
+            int pick = Random.Range(0, count);
+            foreach (PlaneSkin skin in skins)
+            {
+                if (skin.id == RavenId) continue;
+                if (pick-- == 0) return skin;
+            }
+
+            return Default(plane);
+        }
 
         public static PlaneSkin Default(PlaneModelConfig plane)
         {

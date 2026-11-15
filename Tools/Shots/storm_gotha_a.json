@@ -1,0 +1,255 @@
+{
+  "width": 1920,
+  "height": 1080,
+  "supersample": 2,
+  "terrain": "Flanders",
+  "seed": 1604,
+  "daytime": "Morning",
+  "settle": 3,
+  "warmup": 3,
+  "ambientBlasts": false,
+  "ambientFlak": false,
+  "ambientZeppelins": false,
+  "ambientPeople": false,
+  "ambientClouds": false,
+  "ambientShips": false,
+  "ambientGulls": false,
+  "arena": {
+    "on": true,
+    "distance": 420,
+    "fov": 60,
+    "eye": [
+      0,
+      130,
+      0
+    ],
+    "seed": 1604
+  },
+  "storm": {
+    "on": true,
+    "flash": 0.18,
+    "bolts": [
+      {
+        "screen": [
+          0.31,
+          1.08
+        ],
+        "distance": 800,
+        "height": 1000,
+        "alpha": 1.0,
+        "far": 0.0,
+        "seed": 31
+      },
+      {
+        "screen": [
+          0.86,
+          1.04
+        ],
+        "distance": 1700,
+        "height": 1300,
+        "alpha": 0.6,
+        "far": 0.9,
+        "seed": 77
+      }
+    ],
+    "rain": [
+      {
+        "near": 120,
+        "far": 260,
+        "count": 260,
+        "length": 50,
+        "widthPx": 2.4,
+        "alpha": 0.26,
+        "slant": 0.25
+      },
+      {
+        "near": 260,
+        "far": 650,
+        "count": 1100,
+        "length": 45,
+        "widthPx": 1.6,
+        "alpha": 0.22,
+        "slant": 0.25
+      },
+      {
+        "near": 650,
+        "far": 1300,
+        "count": 2200,
+        "length": 40,
+        "widthPx": 1.2,
+        "alpha": 0.14,
+        "slant": 0.25
+      }
+    ]
+  },
+  "camera": {
+    "x": 0,
+    "z": 0,
+    "height": 0,
+    "yaw": 0,
+    "pitch": 24,
+    "roll": 0,
+    "fov": 50
+  },
+  "output": "../../Builds/Screenshots/storm_gotha_a.png",
+  "planes": [
+    {
+      "model": "gotha_g4",
+      "skin": "k2",
+      "screen": [
+        0.52,
+        0.58
+      ],
+      "distance": 235,
+      "course": 165,
+      "climb": 6,
+      "bank": 0,
+      "speed": 140,
+      "fire": true,
+      "target": 0,
+      "fireFor": 1.0,
+      "fireInterval": 0.13,
+      "flashScale": 0.2,
+      "gunHinge": "gunFront_tilt",
+      "gunBarrel": "gunFront_barrel",
+      "aim": [
+        1.25,
+        0.8,
+        600
+      ],
+      "smoking": true,
+      "smokeNode": "nacelle",
+      "smokeColor": [
+        0.16,
+        0.16,
+        0.18,
+        0.65
+      ],
+      "smokeScale": 0.45
+    }
+  ],
+  "clouds": [
+    {
+      "screen": [
+        0.06,
+        0.95
+      ],
+      "distance": 700,
+      "width": 300,
+      "alpha": 0.5,
+      "color": [
+        0.24,
+        0.26,
+        0.29
+      ]
+    },
+    {
+      "screen": [
+        0.3,
+        0.99
+      ],
+      "distance": 760,
+      "width": 340,
+      "alpha": 0.5,
+      "color": [
+        0.22,
+        0.24,
+        0.27
+      ]
+    },
+    {
+      "screen": [
+        0.55,
+        0.97
+      ],
+      "distance": 720,
+      "width": 320,
+      "alpha": 0.5,
+      "color": [
+        0.23,
+        0.25,
+        0.28
+      ]
+    },
+    {
+      "screen": [
+        0.8,
+        0.99
+      ],
+      "distance": 780,
+      "width": 340,
+      "alpha": 0.5,
+      "color": [
+        0.22,
+        0.24,
+        0.27
+      ]
+    },
+    {
+      "screen": [
+        0.97,
+        0.93
+      ],
+      "distance": 700,
+      "width": 300,
+      "alpha": 0.5,
+      "color": [
+        0.24,
+        0.26,
+        0.29
+      ]
+    },
+    {
+      "screen": [
+        0.42,
+        0.88
+      ],
+      "distance": 850,
+      "width": 260,
+      "alpha": 0.4,
+      "color": [
+        0.27,
+        0.29,
+        0.32
+      ]
+    },
+    {
+      "screen": [
+        0.15,
+        0.84
+      ],
+      "distance": 900,
+      "width": 240,
+      "alpha": 0.35,
+      "color": [
+        0.29,
+        0.31,
+        0.34
+      ]
+    },
+    {
+      "screen": [
+        0.7,
+        0.86
+      ],
+      "distance": 880,
+      "width": 250,
+      "alpha": 0.38,
+      "color": [
+        0.28,
+        0.3,
+        0.33
+      ]
+    }
+  ],
+  "planeFill": {
+    "intensity": 3.2,
+    "yaw": 130,
+    "pitch": -6,
+    "color": [
+      0.72,
+      0.82,
+      1.0
+    ]
+  }
+}

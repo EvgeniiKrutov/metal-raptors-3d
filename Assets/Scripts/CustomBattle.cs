@@ -49,16 +49,29 @@ namespace MetalRaptors
         public static BattleMap Map { get; private set; } = BattleMaps.All[0];
         public static Daytime Daytime { get; private set; } = Daytime.Morning;
         public static BattleShape Shape { get; private set; } = BattleShape.Story;
+        public static bool Storm { get; private set; }
+
+        public static bool OffersStorm => Requested && !Storm && Map.Terrain == TerrainKind.Vosges;
 
         public static void Request(BattleMap map, Daytime daytime, BattleShape shape)
         {
             Requested = true;
+            Storm = false;
             Map = map;
             Daytime = daytime;
             Shape = shape;
             CampaignRun.RequestLaunch();
         }
 
-        public static void Clear() => Requested = false;
+        public static void EnterStorm()
+        {
+            if (Requested) Storm = true;
+        }
+
+        public static void Clear()
+        {
+            Requested = false;
+            Storm = false;
+        }
     }
 }

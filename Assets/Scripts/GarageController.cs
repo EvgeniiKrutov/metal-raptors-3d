@@ -137,7 +137,14 @@ namespace MetalRaptors
         void Step(int delta)
         {
             int count = PlaneModels.All.Length;
-            _index = ((_index + delta) % count + count) % count;
+            int index = _index;
+            for (int i = 0; i < count; i++)
+            {
+                index = ((index + delta) % count + count) % count;
+                if (PlaneModels.Unlocked(PlaneModels.All[index])) break;
+            }
+
+            _index = index;
             Refresh();
         }
 

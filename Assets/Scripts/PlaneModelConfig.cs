@@ -85,6 +85,8 @@ namespace MetalRaptors
 
         public PlaneSkin[] skins;
 
+        public int unlockLevel;
+
         public PlaneStats stats;
     }
 
@@ -326,6 +328,7 @@ namespace MetalRaptors
             propPivotNode  = "propHub",
             propBladesNode = "propBlade",
             skins          = PlaneSkins.GothaG4,
+            unlockLevel    = 9,
             stats = new PlaneStats
             {
                 maxSpeed      = 220f,
@@ -340,8 +343,12 @@ namespace MetalRaptors
         public static readonly PlaneModelConfig[] All =
             { Sopwith, Fokker, Albatros, Eindecker, AircoDh4, GothaG4 };
 
+        public static bool Unlocked(PlaneModelConfig plane) =>
+            plane != null
+            && (plane.unlockLevel <= 0 || CampaignProgress.IsCompleted(plane.unlockLevel));
+
         public static PlaneModelConfig EnemyFor(EnemyRole role) =>
-            role == EnemyRole.Scout ? Eindecker : Albatros;
+            EnemyRoles.IsAce(role) ? Fokker : role == EnemyRole.Scout ? Eindecker : Albatros;
 
         public static PlaneModelConfig ById(string id)
         {

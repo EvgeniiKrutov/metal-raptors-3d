@@ -124,6 +124,7 @@ namespace MetalRaptors
         RectTransform _spawnRt;
         SpawnAction _scoutSpawn;
         SpawnAction _fighterSpawn;
+        SpawnAction _rollerSpawn;
         SpawnAction _truckSpawn;
         SpawnAction _tankSpawn;
         SpawnAction _zeppelinSpawn;
@@ -355,6 +356,8 @@ namespace MetalRaptors
                 () => DevSpawn.Spawn(EnemyRole.Scout), ref y);
             _fighterSpawn = CreateSpawnButton(go.transform, "SPAWN FIGHTER",
                 () => DevSpawn.Spawn(EnemyRole.Fighter), ref y);
+            _rollerSpawn = CreateSpawnButton(go.transform, "SPAWN ROLLER",
+                () => DevSpawn.Spawn(EnemyRole.Roller), ref y);
             _truckSpawn = CreateSpawnButton(go.transform, "SPAWN TRUCK",
                 DevSpawn.SpawnTruck, ref y);
             _tankSpawn = CreateSpawnButton(go.transform, "SPAWN TANK",
@@ -515,6 +518,7 @@ namespace MetalRaptors
 
             Countdown(_scoutSpawn);
             Countdown(_fighterSpawn);
+            Countdown(_rollerSpawn);
             Countdown(_truckSpawn);
             Countdown(_tankSpawn);
             Countdown(_zeppelinSpawn);
@@ -624,6 +628,7 @@ namespace MetalRaptors
 
             ResetSpawn(_scoutSpawn);
             ResetSpawn(_fighterSpawn);
+            ResetSpawn(_rollerSpawn);
             ResetSpawn(_truckSpawn);
             ResetSpawn(_tankSpawn);
         }
