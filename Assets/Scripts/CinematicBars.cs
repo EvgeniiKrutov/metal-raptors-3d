@@ -11,6 +11,7 @@ namespace MetalRaptors
         public const float SlideSec = 0.5f;
 
         const int SortingOrder = 150;
+        public const int DialogueOrder = SortingOrder + 1;
 
         static readonly Color Ink = new Color(0f, 0f, 0f, 1f);
 
@@ -21,7 +22,7 @@ namespace MetalRaptors
         float _slide;
         float _target;
 
-        public static CinematicBars Create(Transform parent)
+        public static CinematicBars Create(Transform parent, int order = SortingOrder)
         {
             var go = new GameObject("Cinematic Bars", typeof(RectTransform), typeof(Canvas));
             go.transform.SetParent(parent, false);
@@ -34,7 +35,7 @@ namespace MetalRaptors
 
             var canvas = go.GetComponent<Canvas>();
             canvas.overrideSorting = true;
-            canvas.sortingOrder = SortingOrder;
+            canvas.sortingOrder = order;
 
             var bars = go.AddComponent<CinematicBars>();
             bars._top = Bar(go.transform, "Top Bar", 1f);
@@ -68,6 +69,12 @@ namespace MetalRaptors
         public void Snap()
         {
             _slide = _target = 1f;
+            Apply();
+        }
+
+        public void Clear()
+        {
+            _slide = _target = 0f;
             Apply();
         }
 

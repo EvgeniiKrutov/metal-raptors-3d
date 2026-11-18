@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using Unity.Profiling;
 using UnityEngine;
-using UnityEngine.Events;
 using UnityEngine.InputSystem;
 using UnityEngine.Profiling;
 using UnityEngine.SceneManagement;
@@ -14,14 +13,21 @@ namespace MetalRaptors
     {
         const float RefreshInterval = 0.25f;
 
-        const float PanelWidth = 300f;
-        const float PanelInset = 24f;
-        const float PadX = 18f;
-        const float PadY = 16f;
+        const int ColumnCount = 3;
+        const float ColumnWidth = 280f;
+        const float ColumnGap = 28f;
+        const float PadX = 22f;
+        const float PadY = 18f;
+        const float PanelWidth = ColumnCount * ColumnWidth + (ColumnCount - 1) * ColumnGap + 2f * PadX;
+
+        const int HeaderSize = 16;
+        const float HeaderHeight = 22f;
+        const float HeaderToColumns = 18f;
 
         const int TitleSize = 15;
         const float TitleRowHeight = 20f;
-        const float TitleToRows = 14f;
+        const float TitleToRows = 12f;
+        const float SubTitleTop = 6f;
 
         const int RowSize = 18;
         const float RowHeight = 24f;
@@ -32,17 +38,22 @@ namespace MetalRaptors
 
         const float MeterWarn = 0.7f;
 
-        const float SpawnRuleGap = 12f;
-        const float SpawnCaptionGap = 8f;
-        const float SpawnButtonHeight = 30f;
-        const float SpawnButtonGap = 8f;
-        const int SpawnFontSize = 14;
-        const float LevelButtonStep = SpawnButtonHeight + SpawnButtonGap;
+        const float ButtonHeight = 30f;
+        const float ButtonGap = 8f;
+        const int ButtonFontSize = 14;
+        const float ButtonStep = ButtonHeight + ButtonGap;
 
-        const string FireOffCaption = "AERODROME FIRE   OFF";
-        const string FireOnCaption = "AERODROME FIRE   ON";
+        const float BoxSize = 16f;
+        const float BoxStroke = 2f;
+        const float BoxInset = 4f;
+        const float BoxLeft = 10f;
+        const float CheckTextLeft = 36f;
 
-        static readonly Color PanelColor = new Color(0.04f, 0.05f, 0.07f, 0.84f);
+        const string IdleStatus = "TAB";
+        const string FrozenStatus = "FROZEN   TAB";
+        const string EmptyCaption = "--";
+
+        static readonly Color PanelColor = new Color(0.04f, 0.05f, 0.07f, 0.90f);
         static readonly Color TitleColor = new Color(0.52f, 0.58f, 0.66f, 1f);
         static readonly Color LabelColor = new Color(0.60f, 0.66f, 0.74f, 1f);
         static readonly Color ValueColor = new Color(0.92f, 0.95f, 1f, 1f);
@@ -51,6 +62,7 @@ namespace MetalRaptors
         static readonly Color MeterMid = new Color(0.94f, 0.76f, 0.30f, 1f);
         static readonly Color MeterHigh = new Color(0.90f, 0.32f, 0.26f, 1f);
         static readonly Color SpawnPendingColor = new Color(0.94f, 0.76f, 0.30f, 1f);
+        static readonly Color BoxHoleColor = new Color(0.06f, 0.07f, 0.09f, 1f);
 
         struct Row
         {
@@ -59,9 +71,24 @@ namespace MetalRaptors
             public Image FillImage;
         }
 
+        class Block
+        {
+            public RectTransform Rt;
+            public float Height;
+            public Func<bool> Visible;
+            public bool Shown = true;
+        }
+
+        class Check
+        {
+            public Func<bool> Get;
+            public Image Mark;
+            public bool On;
+        }
+
         class SpawnAction
         {
-            public System.Action Release;
+            public Action Release;
             public string Caption;
             public Button Button;
             public Text Label;
@@ -83,6 +110,14 @@ namespace MetalRaptors
 
         GameObject _panel;
         RectTransform _panelRt;
+        Text _status;
+        bool _statusFrozen;
+
+        readonly List<Block>[] _blocks = new List<Block>[ColumnCount];
+        readonly RectTransform[] _columns = new RectTransform[ColumnCount];
+        readonly RectTransform[] _dividers = new RectTransform[ColumnCount - 1];
+        readonly List<Check> _checks = new List<Check>();
+
         Row _cpu;
         Row _gpu;
         Row _tris;
@@ -90,47 +125,16 @@ namespace MetalRaptors
         Row _fps;
         Row _wave;
 
-        GameObject _fireSection;
-        Text _fireLabel;
-        float _fireHeight;
-        bool _fireShown;
-        bool _fireOn;
-
-        GameObject _levelSection;
-        RectTransform _levelRt;
-        float _levelHeight;
-
-        GameObject _skipSection;
-        RectTransform _skipRt;
         Text _skipLabel;
-        bool _skipShown;
-
-        GameObject _jumpSection;
-        RectTransform _jumpRt;
         Text _jumpLabel;
-        bool _jumpShown;
-
-        GameObject _finalSection;
-        RectTransform _finalRt;
         Text _finalLabel;
-        bool _finalShown;
 
-        GameObject _careerSection;
-        RectTransform _careerRt;
-        float _careerHeight;
-        bool _careerShown;
-
-        GameObject _spawnSection;
-        RectTransform _spawnRt;
         SpawnAction _scoutSpawn;
         SpawnAction _fighterSpawn;
-        SpawnAction _rollerSpawn;
+        SpawnAction _duelistSpawn;
         SpawnAction _truckSpawn;
         SpawnAction _tankSpawn;
         SpawnAction _zeppelinSpawn;
-        float _statsHeight;
-        float _spawnPanelHeight;
-        float _zeppelinPanelHeight;
         bool _spawnShown;
         bool _zeppelinShown;
 
@@ -206,202 +210,39 @@ namespace MetalRaptors
 
             var background = go.GetComponent<Image>();
             background.color = PanelColor;
-            background.raycastTarget = false;
+            background.raycastTarget = true;
 
-            var rt = background.rectTransform;
-            rt.anchorMin = new Vector2(1f, 1f);
-            rt.anchorMax = new Vector2(1f, 1f);
-            rt.pivot = new Vector2(1f, 1f);
-            rt.anchoredPosition = new Vector2(-PanelInset, -PanelInset);
+            _panelRt = background.rectTransform;
+            _panelRt.anchorMin = new Vector2(0.5f, 0.5f);
+            _panelRt.anchorMax = new Vector2(0.5f, 0.5f);
+            _panelRt.pivot = new Vector2(0.5f, 0.5f);
+            _panelRt.anchoredPosition = Vector2.zero;
 
-            Transform content = CreateContent(rt);
+            Transform content = CreateContent(_panelRt);
 
-            UIFactory.CreateLabel(content, "DEV STATS", TitleSize, 0f, TitleRowHeight,
-                TitleColor, UIFactory.BoldFont);
+            UIFactory.CreateLabel(content, "DEV MENU", HeaderSize, 0f, HeaderHeight,
+                ValueColor, UIFactory.BoldFont);
 
-            UIFactory.CreateLabel(content, "TAB", TitleSize, 0f, TitleRowHeight,
-                TitleColor, UIFactory.MediumFont).alignment = TextAnchor.MiddleRight;
-
-            float y = -(TitleRowHeight + TitleToRows);
-            _cpu = CreateRow(content, "CPU", ref y, true);
-            _gpu = CreateRow(content, "GPU", ref y, true);
-            _tris = CreateRow(content, "TRIS", ref y, false);
-            _ram = CreateRow(content, "RAM", ref y, false);
-            _fps = CreateRow(content, "FPS", ref y, false);
-            _wave = CreateRow(content, "WAVE", ref y, false);
-
-            _panelRt = rt;
-            _statsHeight = -y - RowGap + 2f * PadY;
-            BuildFireSection(content, y);
-            BuildSkipSection(content, y);
-            BuildCareerSection(content, y);
-            BuildSpawnSection(content, y);
-            rt.sizeDelta = new Vector2(PanelWidth, _statsHeight);
-        }
-
-        static RectTransform CreateSection(Transform content, string name)
-        {
-            var go = new GameObject(name, typeof(RectTransform));
-            go.transform.SetParent(content, false);
-
-            var rt = (RectTransform)go.transform;
-            rt.anchorMin = Vector2.zero;
-            rt.anchorMax = Vector2.one;
-            rt.pivot = new Vector2(0.5f, 1f);
-            rt.offsetMin = Vector2.zero;
-            rt.offsetMax = Vector2.zero;
-            return rt;
-        }
-
-        void BuildFireSection(Transform content, float y)
-        {
-            RectTransform rt = CreateSection(content, "Aerodrome");
-            _fireSection = rt.gameObject;
-            float top = y;
-
-            UIFactory.CreateRule(rt, y, new Vector2(PanelWidth - 2f * PadX, 1f), MeterTrackColor);
-            y -= SpawnRuleGap;
-
-            UIFactory.CreateLabel(rt, "AERODROME", TitleSize, y, TitleRowHeight,
+            _status = UIFactory.CreateLabel(content, IdleStatus, TitleSize, 0f, HeaderHeight,
                 TitleColor, UIFactory.MediumFont);
-            y -= TitleRowHeight + SpawnCaptionGap;
+            _status.alignment = TextAnchor.MiddleRight;
 
-            Button button = CreateButton(rt, FireOffCaption, ref y);
-            button.onClick.AddListener(ToggleFire);
-            _fireLabel = button.GetComponentInChildren<Text>();
-            _fireLabel.color = ValueColor;
+            UIFactory.CreateRule(content, -(HeaderHeight + HeaderToColumns * 0.5f),
+                new Vector2(PanelWidth - 2f * PadX, 1f), MeterTrackColor);
 
-            _fireHeight = top - y - SpawnButtonGap + RowGap;
-            _fireSection.SetActive(false);
-        }
-
-        void BuildSkipSection(Transform content, float y)
-        {
-            RectTransform rt = CreateSection(content, "Level");
-            _levelSection = rt.gameObject;
-            _levelRt = rt;
-            float top = y;
-
-            UIFactory.CreateRule(rt, y, new Vector2(PanelWidth - 2f * PadX, 1f), MeterTrackColor);
-            y -= SpawnRuleGap;
-
-            UIFactory.CreateLabel(rt, "LEVEL", TitleSize, y, TitleRowHeight,
-                TitleColor, UIFactory.MediumFont);
-            y -= TitleRowHeight + SpawnCaptionGap;
-
-            _levelHeight = top - y;
-            _levelSection.SetActive(false);
-
-            _skipRt = CreateSection(content, "Level Skip");
-            _skipSection = _skipRt.gameObject;
-            _skipLabel = CreateLevelButton(_skipRt, y, DevSkip.Run);
-
-            _jumpRt = CreateSection(content, "Level Jump");
-            _jumpSection = _jumpRt.gameObject;
-            _jumpLabel = CreateLevelButton(_jumpRt, y, DevJump.Run);
-
-            _finalRt = CreateSection(content, "Level Final");
-            _finalSection = _finalRt.gameObject;
-            _finalLabel = CreateLevelButton(_finalRt, y, DevFinalJump.Run);
-        }
-
-        static Text CreateLevelButton(RectTransform section, float y, UnityAction run)
-        {
-            Button button = CreateButton(section, string.Empty, ref y);
-            button.onClick.AddListener(run);
-            Text label = button.GetComponentInChildren<Text>();
-            label.color = ValueColor;
-            section.gameObject.SetActive(false);
-            return label;
-        }
-
-        void BuildCareerSection(Transform content, float y)
-        {
-            RectTransform rt = CreateSection(content, "Career");
-            _careerSection = rt.gameObject;
-            _careerRt = rt;
-            float top = y;
-
-            UIFactory.CreateRule(rt, y, new Vector2(PanelWidth - 2f * PadX, 1f), MeterTrackColor);
-            y -= SpawnRuleGap;
-
-            UIFactory.CreateLabel(rt, "CAREER", TitleSize, y, TitleRowHeight,
-                TitleColor, UIFactory.MediumFont);
-            y -= TitleRowHeight + SpawnCaptionGap;
-
-            Button button = CreateButton(rt, "RESET CAREER", ref y);
-            button.onClick.AddListener(DevCareerReset.Run);
-            button.GetComponentInChildren<Text>().color = ValueColor;
-
-            _careerHeight = top - y - SpawnButtonGap + RowGap;
-            _careerSection.SetActive(false);
-        }
-
-        void BuildSpawnSection(Transform content, float y)
-        {
-            RectTransform rt = CreateSection(content, "Spawn");
-            GameObject go = rt.gameObject;
-            _spawnSection = go;
-            _spawnRt = rt;
-
-            UIFactory.CreateRule(go.transform, y, new Vector2(PanelWidth - 2f * PadX, 1f),
-                MeterTrackColor);
-            y -= SpawnRuleGap;
-
-            UIFactory.CreateLabel(go.transform, "SPAWN", TitleSize, y, TitleRowHeight,
-                TitleColor, UIFactory.MediumFont);
-            y -= TitleRowHeight + SpawnCaptionGap;
-
-            _scoutSpawn = CreateSpawnButton(go.transform, "SPAWN SCOUT",
-                () => DevSpawn.Spawn(EnemyRole.Scout), ref y);
-            _fighterSpawn = CreateSpawnButton(go.transform, "SPAWN FIGHTER",
-                () => DevSpawn.Spawn(EnemyRole.Fighter), ref y);
-            _rollerSpawn = CreateSpawnButton(go.transform, "SPAWN ROLLER",
-                () => DevSpawn.Spawn(EnemyRole.Roller), ref y);
-            _truckSpawn = CreateSpawnButton(go.transform, "SPAWN TRUCK",
-                DevSpawn.SpawnTruck, ref y);
-            _tankSpawn = CreateSpawnButton(go.transform, "SPAWN TANK",
-                DevSpawn.SpawnTank, ref y);
-
-            _spawnPanelHeight = -y - SpawnButtonGap + 2f * PadY;
-
-            _zeppelinSpawn = CreateSpawnButton(go.transform, "SPAWN ZEPPELIN",
-                DevSpawn.SpawnZeppelin, ref y);
-            _zeppelinSpawn.Button.gameObject.SetActive(false);
-            _zeppelinPanelHeight = -y - SpawnButtonGap + 2f * PadY;
-
-            go.SetActive(false);
-        }
-
-        static Button CreateButton(Transform parent, string caption, ref float y)
-        {
-            Button button = UIFactory.CreateButton(parent, caption, Vector2.zero, null,
-                new Vector2(0f, SpawnButtonHeight), fontSize: SpawnFontSize);
-
-            var rt = (RectTransform)button.transform;
-            rt.anchorMin = new Vector2(0f, 1f);
-            rt.anchorMax = new Vector2(1f, 1f);
-            rt.pivot = new Vector2(0.5f, 1f);
-            rt.sizeDelta = new Vector2(0f, SpawnButtonHeight);
-            rt.anchoredPosition = new Vector2(0f, y);
-            y -= SpawnButtonHeight + SpawnButtonGap;
-            return button;
-        }
-
-        SpawnAction CreateSpawnButton(Transform parent, string caption, System.Action release,
-            ref float y)
-        {
-            Button button = CreateButton(parent, caption, ref y);
-
-            var action = new SpawnAction
+            float top = -(HeaderHeight + HeaderToColumns);
+            for (int i = 0; i < ColumnCount; i++)
             {
-                Release = release,
-                Caption = caption,
-                Button = button,
-                Label = button.GetComponentInChildren<Text>(),
-            };
-            button.onClick.AddListener(() => BeginSpawn(action));
-            return action;
+                _blocks[i] = new List<Block>();
+                _columns[i] = CreateColumn(content, i, top);
+            }
+
+            for (int i = 0; i < ColumnCount - 1; i++) _dividers[i] = CreateDivider(content, i, top);
+
+            BuildPerformance();
+            BuildLevel();
+            BuildPlane();
+            Layout();
         }
 
         static Transform CreateContent(RectTransform panel)
@@ -416,6 +257,226 @@ namespace MetalRaptors
             rt.offsetMin = new Vector2(PadX, PadY);
             rt.offsetMax = new Vector2(-PadX, -PadY);
             return go.transform;
+        }
+
+        static RectTransform CreateColumn(Transform content, int index, float top)
+        {
+            var go = new GameObject($"Column {index}", typeof(RectTransform));
+            go.transform.SetParent(content, false);
+
+            var rt = (RectTransform)go.transform;
+            rt.anchorMin = new Vector2(0f, 1f);
+            rt.anchorMax = new Vector2(0f, 1f);
+            rt.pivot = new Vector2(0f, 1f);
+            rt.sizeDelta = new Vector2(ColumnWidth, 0f);
+            rt.anchoredPosition = new Vector2(index * (ColumnWidth + ColumnGap), top);
+            return rt;
+        }
+
+        static RectTransform CreateDivider(Transform content, int index, float top)
+        {
+            var go = new GameObject("Divider", typeof(Image));
+            go.transform.SetParent(content, false);
+
+            var img = go.GetComponent<Image>();
+            img.color = MeterTrackColor;
+            img.raycastTarget = false;
+
+            RectTransform rt = img.rectTransform;
+            rt.anchorMin = new Vector2(0f, 1f);
+            rt.anchorMax = new Vector2(0f, 1f);
+            rt.pivot = new Vector2(0.5f, 1f);
+            rt.sizeDelta = new Vector2(1f, 0f);
+            rt.anchoredPosition = new Vector2((index + 1) * ColumnWidth + index * ColumnGap + ColumnGap * 0.5f, top);
+            return rt;
+        }
+
+        Block AddBlock(int column, string name, float height, Func<bool> visible = null)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(_columns[column], false);
+
+            var rt = (RectTransform)go.transform;
+            rt.anchorMin = new Vector2(0f, 1f);
+            rt.anchorMax = new Vector2(1f, 1f);
+            rt.pivot = new Vector2(0.5f, 1f);
+            rt.sizeDelta = new Vector2(0f, height);
+
+            var block = new Block { Rt = rt, Height = height, Visible = visible };
+            _blocks[column].Add(block);
+            return block;
+        }
+
+        void AddTitle(int column, string caption)
+        {
+            Block block = AddBlock(column, caption, TitleRowHeight + TitleToRows);
+            UIFactory.CreateLabel(block.Rt, caption, TitleSize, 0f, TitleRowHeight,
+                TitleColor, UIFactory.MediumFont);
+        }
+
+        void AddSubTitle(int column, string caption, Func<bool> visible)
+        {
+            Block block = AddBlock(column, caption, SubTitleTop + TitleRowHeight + ButtonGap, visible);
+            UIFactory.CreateLabel(block.Rt, caption, TitleSize, -SubTitleTop, TitleRowHeight,
+                TitleColor, UIFactory.MediumFont);
+        }
+
+        void BuildPerformance()
+        {
+            AddTitle(0, "PERFORMANCE");
+
+            Block block = AddBlock(0, "Stats", 0f);
+            float y = 0f;
+            _cpu = CreateRow(block.Rt, "CPU", ref y, true);
+            _gpu = CreateRow(block.Rt, "GPU", ref y, true);
+            _tris = CreateRow(block.Rt, "TRIS", ref y, false);
+            _ram = CreateRow(block.Rt, "RAM", ref y, false);
+            _fps = CreateRow(block.Rt, "FPS", ref y, false);
+            _wave = CreateRow(block.Rt, "WAVE", ref y, false);
+            block.Height = -y;
+        }
+
+        void BuildLevel()
+        {
+            AddTitle(1, "LEVEL");
+
+            Block empty = AddBlock(1, "Empty", ButtonStep, () => !AnyLevelTool);
+            UIFactory.CreateLabel(empty.Rt, EmptyCaption, RowSize, 0f, ButtonHeight,
+                TitleColor, UIFactory.MediumFont);
+
+            _skipLabel = AddLevelButton("Skip", () => DevSkip.Available, DevSkip.Run);
+            _jumpLabel = AddLevelButton("Jump", () => DevJump.Available, DevJump.Run);
+            _finalLabel = AddLevelButton("Final", () => DevFinalJump.Available, DevFinalJump.Run);
+
+            AddCheck(1, "AERODROME FIRE", () => Aerodrome.Current != null && Aerodrome.Current.Burning,
+                SetFire, () => Aerodrome.Current != null);
+
+            AddSubTitle(1, "SPAWN", () => DevSpawn.Available);
+
+            Block row = AddBlock(1, "Spawn Row 1", ButtonStep, () => DevSpawn.Available);
+            _scoutSpawn = CreateSpawnButton(row.Rt, "SCOUT", 0, () => DevSpawn.Spawn(EnemyRole.Scout));
+            _fighterSpawn = CreateSpawnButton(row.Rt, "FIGHTER", 1, () => DevSpawn.Spawn(EnemyRole.Fighter));
+
+            row = AddBlock(1, "Spawn Row 2", ButtonStep, () => DevSpawn.Available);
+            _duelistSpawn = CreateSpawnButton(row.Rt, "DUELIST", 0, () => DevSpawn.Spawn(EnemyRole.Duelist));
+            _truckSpawn = CreateSpawnButton(row.Rt, "TRUCK", 1, DevSpawn.SpawnTruck);
+
+            row = AddBlock(1, "Spawn Row 3", ButtonStep, () => DevSpawn.Available);
+            _tankSpawn = CreateSpawnButton(row.Rt, "TANK", 0, DevSpawn.SpawnTank);
+            _zeppelinSpawn = CreateSpawnButton(row.Rt, "ZEPPELIN", 1, DevSpawn.SpawnZeppelin);
+            _zeppelinSpawn.Button.gameObject.SetActive(false);
+
+            Block career = AddBlock(1, "Career", ButtonStep, () => DevCareerReset.Available);
+            Button reset = CreateButton(career.Rt, "RESET CAREER");
+            reset.onClick.AddListener(() => RunAndClose(DevCareerReset.Run));
+            reset.GetComponentInChildren<Text>().color = ValueColor;
+        }
+
+        void BuildPlane()
+        {
+            AddTitle(2, "PLANE");
+            AddCheck(2, "INVULNERABLE", () => DevCheats.Invulnerable, on => DevCheats.Invulnerable = on);
+            AddCheck(2, "HIGH DAMAGE   ×10", () => DevCheats.HighDamage, on => DevCheats.HighDamage = on);
+            AddCheck(2, "SPEED   ×1.5", () => DevCheats.FastSpeed, on => DevCheats.FastSpeed = on);
+            AddCheck(2, "FAST RELOAD", () => DevCheats.FastReload, on => DevCheats.FastReload = on);
+        }
+
+        static bool AnyLevelTool => DevSkip.Available || DevJump.Available || DevFinalJump.Available
+            || Aerodrome.Current != null || DevSpawn.Available || DevCareerReset.Available;
+
+        Text AddLevelButton(string name, Func<bool> visible, Action run)
+        {
+            Block block = AddBlock(1, name, ButtonStep, visible);
+            Button button = CreateButton(block.Rt, string.Empty);
+            button.onClick.AddListener(() => RunAndClose(run));
+
+            Text label = button.GetComponentInChildren<Text>();
+            label.color = ValueColor;
+            return label;
+        }
+
+        void AddCheck(int column, string caption, Func<bool> get, Action<bool> set,
+            Func<bool> visible = null)
+        {
+            Block block = AddBlock(column, caption, ButtonStep, visible);
+            Button button = CreateButton(block.Rt, caption);
+
+            Text label = button.GetComponentInChildren<Text>();
+            label.color = ValueColor;
+            label.alignment = TextAnchor.MiddleLeft;
+            label.rectTransform.offsetMin = new Vector2(CheckTextLeft, 0f);
+
+            Image frame = CreateSquare(button.transform, BoxSize, LabelColor);
+            RectTransform frameRt = frame.rectTransform;
+            frameRt.anchorMin = new Vector2(0f, 0.5f);
+            frameRt.anchorMax = new Vector2(0f, 0.5f);
+            frameRt.anchoredPosition = new Vector2(BoxLeft + BoxSize * 0.5f, 0f);
+
+            CreateSquare(frame.transform, BoxSize - 2f * BoxStroke, BoxHoleColor);
+            Image mark = CreateSquare(frame.transform, BoxSize - 2f * BoxInset, MeterLow);
+            mark.enabled = false;
+
+            _checks.Add(new Check { Get = get, Mark = mark });
+            button.onClick.AddListener(() => set(!get()));
+        }
+
+        static Image CreateSquare(Transform parent, float size, Color color)
+        {
+            var go = new GameObject("Box", typeof(Image));
+            go.transform.SetParent(parent, false);
+
+            var img = go.GetComponent<Image>();
+            img.color = color;
+            img.raycastTarget = false;
+
+            RectTransform rt = img.rectTransform;
+            rt.anchorMin = new Vector2(0.5f, 0.5f);
+            rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = new Vector2(size, size);
+            rt.anchoredPosition = Vector2.zero;
+            return img;
+        }
+
+        static Button CreateButton(Transform parent, string caption)
+        {
+            Button button = UIFactory.CreateButton(parent, caption, Vector2.zero, null,
+                new Vector2(0f, ButtonHeight), fontSize: ButtonFontSize);
+
+            var rt = (RectTransform)button.transform;
+            rt.anchorMin = new Vector2(0f, 1f);
+            rt.anchorMax = new Vector2(1f, 1f);
+            rt.pivot = new Vector2(0.5f, 1f);
+            rt.sizeDelta = new Vector2(0f, ButtonHeight);
+            rt.anchoredPosition = Vector2.zero;
+            return button;
+        }
+
+        static Button CreateHalfButton(Transform parent, string caption, int side)
+        {
+            Button button = CreateButton(parent, caption);
+
+            var rt = (RectTransform)button.transform;
+            rt.anchorMin = new Vector2(side * 0.5f, 1f);
+            rt.anchorMax = new Vector2(side * 0.5f + 0.5f, 1f);
+            rt.sizeDelta = new Vector2(-ButtonGap * 0.5f, ButtonHeight);
+            rt.anchoredPosition = new Vector2(side == 0 ? -ButtonGap * 0.25f : ButtonGap * 0.25f, 0f);
+            return button;
+        }
+
+        SpawnAction CreateSpawnButton(Transform parent, string caption, int side, Action release)
+        {
+            Button button = CreateHalfButton(parent, caption, side);
+
+            var action = new SpawnAction
+            {
+                Release = release,
+                Caption = caption,
+                Button = button,
+                Label = button.GetComponentInChildren<Text>(),
+            };
+            button.onClick.AddListener(() => BeginSpawn(action));
+            return action;
         }
 
         static Row CreateRow(Transform content, string label, ref float y, bool withMeter)
@@ -475,22 +536,47 @@ namespace MetalRaptors
         void Update()
         {
             Keyboard kb = Keyboard.current;
-            if (kb != null && kb.tabKey.wasPressedThisFrame) SetVisible(!_visible);
+            if (kb != null && kb.tabKey.wasPressedThisFrame)
+            {
+                if (_visible) Close();
+                else Open();
+            }
 
-            TickFire();
-            TickSkip();
-            TickCareer();
+            if (DevFreeze.Active && (!_visible || GameMenu.IsOpen || !DevFreeze.CanFreeze)) Close();
+
             TickSpawn();
             TickNight(kb);
 
             if (!_visible) return;
 
+            TickBlocks();
+            TickLabels();
             Sample();
 
             _elapsed += Time.unscaledDeltaTime;
             if (_elapsed < RefreshInterval) return;
 
             Refresh();
+        }
+
+        void Open()
+        {
+            SetVisible(true);
+            if (DevFreeze.CanFreeze) DevFreeze.Begin();
+            TickBlocks();
+            TickLabels();
+        }
+
+        void Close()
+        {
+            SetVisible(false);
+            DevFreeze.End();
+        }
+
+        void RunAndClose(Action run)
+        {
+            Close();
+            run();
         }
 
         void SetVisible(bool visible)
@@ -508,43 +594,91 @@ namespace MetalRaptors
             _elapsed = 0f;
         }
 
-        void TickSpawn()
+        void TickBlocks()
         {
-            bool available = DevSpawn.Available;
-            bool zeppelin = DevSpawn.ZeppelinOffered;
-            if (available != _spawnShown || zeppelin != _zeppelinShown)
-                ShowSpawnSection(available, zeppelin);
-            if (!available) return;
-
-            Countdown(_scoutSpawn);
-            Countdown(_fighterSpawn);
-            Countdown(_rollerSpawn);
-            Countdown(_truckSpawn);
-            Countdown(_tankSpawn);
-            Countdown(_zeppelinSpawn);
-
-            if (zeppelin && _zeppelinSpawn.Remaining <= 0f)
-                _zeppelinSpawn.Button.interactable = DevSpawn.ZeppelinReady;
-        }
-
-        void TickFire()
-        {
-            Aerodrome field = Aerodrome.Current;
-            bool shown = field != null;
-            bool on = shown && field.Burning;
-
-            if (shown != _fireShown)
+            bool changed = false;
+            for (int c = 0; c < ColumnCount; c++)
             {
-                _fireShown = shown;
-                if (_fireSection != null) _fireSection.SetActive(shown);
-                Layout();
+                List<Block> blocks = _blocks[c];
+                for (int i = 0; i < blocks.Count; i++)
+                {
+                    Block block = blocks[i];
+                    bool shown = block.Visible == null || block.Visible();
+                    if (shown == block.Shown) continue;
+
+                    block.Shown = shown;
+                    changed = true;
+                }
             }
 
-            if (on == _fireOn || _fireLabel == null) return;
+            if (changed) Layout();
+        }
 
-            _fireOn = on;
-            _fireLabel.text = on ? FireOnCaption : FireOffCaption;
-            _fireLabel.color = on ? SpawnPendingColor : ValueColor;
+        void Layout()
+        {
+            float tallest = 0f;
+            for (int c = 0; c < ColumnCount; c++)
+            {
+                float y = 0f;
+                List<Block> blocks = _blocks[c];
+                for (int i = 0; i < blocks.Count; i++)
+                {
+                    Block block = blocks[i];
+                    block.Rt.gameObject.SetActive(block.Shown);
+                    if (!block.Shown) continue;
+
+                    block.Rt.anchoredPosition = new Vector2(0f, y);
+                    block.Rt.sizeDelta = new Vector2(0f, block.Height);
+                    y -= block.Height;
+                }
+
+                tallest = Mathf.Max(tallest, -y);
+            }
+
+            float columns = Mathf.Max(0f, tallest - ButtonGap);
+            for (int i = 0; i < _dividers.Length; i++) _dividers[i].sizeDelta = new Vector2(1f, columns);
+
+            _panelRt.sizeDelta = new Vector2(PanelWidth,
+                2f * PadY + HeaderHeight + HeaderToColumns + columns);
+        }
+
+        void TickLabels()
+        {
+            SetCaption(_skipLabel, DevSkip.Available, DevSkip.Caption);
+            SetCaption(_jumpLabel, DevJump.Available, DevJump.Caption);
+            SetCaption(_finalLabel, DevFinalJump.Available, DevFinalJump.Caption);
+
+            bool frozen = DevFreeze.Active;
+            if (frozen != _statusFrozen)
+            {
+                _statusFrozen = frozen;
+                _status.text = frozen ? FrozenStatus : IdleStatus;
+                _status.color = frozen ? SpawnPendingColor : TitleColor;
+            }
+
+            for (int i = 0; i < _checks.Count; i++)
+            {
+                Check check = _checks[i];
+                bool on = check.Get();
+                if (on == check.On) continue;
+
+                check.On = on;
+                check.Mark.enabled = on;
+            }
+        }
+
+        static void SetCaption(Text label, bool shown, string caption)
+        {
+            if (!shown) return;
+
+            string text = caption ?? string.Empty;
+            if (label.text != text) label.text = text;
+        }
+
+        static void SetFire(bool on)
+        {
+            Aerodrome field = Aerodrome.Current;
+            if (field != null) field.SetBurning(on);
         }
 
         static void TickNight(Keyboard kb)
@@ -557,78 +691,36 @@ namespace MetalRaptors
 #endif
         }
 
-        void TickSkip()
+        void TickSpawn()
         {
-            bool skip = DevSkip.Available;
-            bool jump = DevJump.Available;
-            bool final = DevFinalJump.Available;
-            if (skip == _skipShown && jump == _jumpShown && final == _finalShown) return;
+            bool available = DevSpawn.Available;
+            bool zeppelin = DevSpawn.ZeppelinOffered;
+            if (available != _spawnShown || zeppelin != _zeppelinShown) ShowSpawn(available, zeppelin);
+            if (!available) return;
 
-            _skipShown = skip;
-            _jumpShown = jump;
-            _finalShown = final;
-            if (_levelSection != null) _levelSection.SetActive(skip || jump || final);
-            if (_skipSection != null) _skipSection.SetActive(skip);
-            if (_jumpSection != null) _jumpSection.SetActive(jump);
-            if (_finalSection != null) _finalSection.SetActive(final);
-            if (skip && _skipLabel != null) _skipLabel.text = DevSkip.Caption;
-            if (jump && _jumpLabel != null) _jumpLabel.text = DevJump.Caption;
-            if (final && _finalLabel != null) _finalLabel.text = DevFinalJump.Caption;
-            Layout();
+            Countdown(_scoutSpawn);
+            Countdown(_fighterSpawn);
+            Countdown(_duelistSpawn);
+            Countdown(_truckSpawn);
+            Countdown(_tankSpawn);
+            Countdown(_zeppelinSpawn);
+
+            if (zeppelin && _zeppelinSpawn.Remaining <= 0f)
+                _zeppelinSpawn.Button.interactable = DevSpawn.ZeppelinReady;
         }
 
-        void TickCareer()
-        {
-            bool shown = DevCareerReset.Available;
-            if (shown == _careerShown) return;
-
-            _careerShown = shown;
-            if (_careerSection != null) _careerSection.SetActive(shown);
-            Layout();
-        }
-
-        static void ToggleFire()
-        {
-            Aerodrome field = Aerodrome.Current;
-            if (field != null) field.SetBurning(!field.Burning);
-        }
-
-        void Layout()
-        {
-            float fire = _fireShown ? _fireHeight : 0f;
-            float skipButton = _skipShown ? LevelButtonStep : 0f;
-            float jumpButton = _jumpShown ? LevelButtonStep : 0f;
-            float finalButton = _finalShown ? LevelButtonStep : 0f;
-            float skip = _skipShown || _jumpShown || _finalShown
-                ? _levelHeight + skipButton + jumpButton + finalButton - SpawnButtonGap + RowGap
-                : 0f;
-            float career = _careerShown ? _careerHeight : 0f;
-            if (_levelRt != null) _levelRt.offsetMax = new Vector2(0f, -fire);
-            if (_skipRt != null) _skipRt.offsetMax = new Vector2(0f, -fire);
-            if (_jumpRt != null) _jumpRt.offsetMax = new Vector2(0f, -(fire + skipButton));
-            if (_finalRt != null) _finalRt.offsetMax = new Vector2(0f, -(fire + skipButton + jumpButton));
-            if (_careerRt != null) _careerRt.offsetMax = new Vector2(0f, -(fire + skip));
-            if (_spawnRt != null) _spawnRt.offsetMax = new Vector2(0f, -(fire + skip + career));
-            if (_panelRt != null)
-                _panelRt.sizeDelta = new Vector2(PanelWidth, fire + skip + career
-                    + (!_spawnShown ? _statsHeight
-                        : _zeppelinShown ? _zeppelinPanelHeight : _spawnPanelHeight));
-        }
-
-        void ShowSpawnSection(bool shown, bool zeppelin)
+        void ShowSpawn(bool shown, bool zeppelin)
         {
             _spawnShown = shown;
             _zeppelinShown = zeppelin;
-            if (_spawnSection != null) _spawnSection.SetActive(shown);
-            if (_zeppelinSpawn != null) _zeppelinSpawn.Button.gameObject.SetActive(zeppelin);
-            Layout();
+            _zeppelinSpawn.Button.gameObject.SetActive(zeppelin);
 
             if (!zeppelin) ResetSpawn(_zeppelinSpawn);
             if (shown) return;
 
             ResetSpawn(_scoutSpawn);
             ResetSpawn(_fighterSpawn);
-            ResetSpawn(_rollerSpawn);
+            ResetSpawn(_duelistSpawn);
             ResetSpawn(_truckSpawn);
             ResetSpawn(_tankSpawn);
         }
@@ -645,7 +737,7 @@ namespace MetalRaptors
 
         void Countdown(SpawnAction action)
         {
-            if (action == null || action.Remaining <= 0f) return;
+            if (action == null || action.Remaining <= 0f || DevFreeze.Active) return;
 
             action.Remaining -= Time.unscaledDeltaTime;
             if (action.Remaining > 0f)

@@ -8,7 +8,8 @@ namespace MetalRaptors
     {
         const string ModelResource = "objects/machines/flak_18";
         const float M = PlaneModelConfig.UnitsPerMeter;
-        const float ModelScale = M * PlaneModelConfig.LevelScale;
+        const float Grow = 1.1f;
+        const float ModelScale = M * PlaneModelConfig.LevelScale * Grow;
 
         const float BaseWidth = 7f, BaseHigh = 1f, BaseDeep = 6f;
         const float CarriageWidth = 2.6f, CarriageHigh = 1.8f, CarriageDeep = 2.4f;
@@ -47,8 +48,8 @@ namespace MetalRaptors
         const float RelightSec = 8f;
 
         const float FlakGapMin = 0.75f, FlakGapMax = 1.1f;
-        const float FlakWarnSec = 0.55f;
-        const float FlakReachMin = 0.3f, FlakReachMax = 1.1f;
+        const float FlakWarnSec = 0.85f;
+        const float FlakReachMin = 0f, FlakReachMax = 0.35f;
         const float FlakRadius = 0.6f;
         const float FlakDamage = 7f;
         const float FlakDepthFront = 10f, FlakDepthBack = 25f;
@@ -116,6 +117,9 @@ namespace MetalRaptors
         float _lampHealth = LampHealth;
         float _relightIn;
         float _flakIn;
+        bool _dayFlak;
+        bool _quiet;
+        float _dayGapMin, _dayGapMax;
 
         public bool Down => _down;
 
@@ -155,17 +159,26 @@ namespace MetalRaptors
             return gun;
         }
 
-        public static float ClearSpot(CampaignTerrain terrain, float x, float z)
+        public Vector3 Muzzle => MuzzlePoint;
+
+        public static float ClearSpot(CampaignTerrain terrain, float x, float z) =>
+            ClearSpot(terrain, x, z, ClearMargin);
+
+        public static float ClearSpot(CampaignTerrain terrain, float x, float z, float margin) =>
+            ClearSpot(terrain, x, z, margin, float.MinValue, float.MaxValue);
+
+        public static float ClearSpot(CampaignTerrain terrain, float x, float z, float margin,
+            float min, float max)
         {
-            if (terrain == null || !terrain.Occupied(x, z, ClearMargin)) return x;
+            if (terrain == null || !terrain.Occupied(x, z, margin)) return x;
 
             for (int i = 1; i <= ClearTries; i++)
             {
                 float right = x + i * ClearStep;
-                if (!terrain.Occupied(right, z, ClearMargin)) return right;
+                if (right <= max && !terrain.Occupied(right, z, margin)) return right;
 
                 float left = x - i * ClearStep;
-                if (!terrain.Occupied(left, z, ClearMargin)) return left;
+                if (left >= min && !terrain.Occupied(left, z, margin)) return left;
             }
             return x;
         }
@@ -444,6 +457,19 @@ namespace MetalRaptors
             }
         }
 
+        public void ArmFlak(float gapMin, float gapMax)
+        {
+            _dayFlak = !_lamped;
+            _dayGapMin = Mathf.Max(0.1f, gapMin);
+            _dayGapMax = Mathf.Max(_dayGapMin, gapMax);
+            _flakIn = Random.Range(_dayGapMin, _dayGapMax);
+        }
+
+        public void Silence(bool quiet) => _quiet = quiet;
+
+        bool InReach(Vector3 point) =>
+            ((Vector2)point - (Vector2)MuzzlePoint).sqrMagnitude <= BeamReach * BeamReach;
+
         public void Track(bool on)
         {
             bool next = on && Lit;
@@ -559,7 +585,11 @@ namespace MetalRaptors
                 MinElevation, MaxElevation);
             Aim();
 
-            if (firing && Sees(_target.position, 0f)) Fire(dt);
+            if (_dayFlak)
+            {
+                if (firing && !_quiet && InReach(_target.position)) Fire(dt);
+            }
+            else if (firing && Sees(_target.position, 0f)) Fire(dt);
         }
 
         bool Ground()
@@ -639,7 +669,7 @@ namespace MetalRaptors
         {
             _flakIn -= dt;
             if (_flakIn > 0f) return;
-            _flakIn = Random.Range(FlakGapMin, FlakGapMax);
+            _flakIn = _dayFlak ? Random.Range(_dayGapMin, _dayGapMax) : Random.Range(FlakGapMin, FlakGapMax);
 
             Vector3 muzzle = MuzzlePoint;
             Vector3 plane = _target.position;

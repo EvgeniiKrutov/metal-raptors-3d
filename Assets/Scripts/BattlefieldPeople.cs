@@ -134,7 +134,7 @@ namespace MetalRaptors
         float Density => Mathf.Max(0.1f, _field.PeopleDensity);
         float Spacing => GroupSpacing / Density;
 
-        float ScrollerBehind => _field.HalfViewWidth + CullMargin;
+        float ScrollerBehind => _field.HalfViewWidth + CullMargin + LevelScroll.Lookback;
         float ScrollerAhead => _field.HalfViewWidth + ScrollerLeadMax;
 
         int TargetGroupCount()

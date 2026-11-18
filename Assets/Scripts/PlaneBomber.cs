@@ -50,7 +50,7 @@ namespace MetalRaptors
 
         public void Request()
         {
-            if (!IsReady || _config == null || GameMenu.IsOpen || LevelBriefing.IsOpen) return;
+            if (!IsReady || _config == null || GameMenu.IsOpen || LevelBriefing.IsOpen || DevFreeze.Active) return;
 
             _cooldown = Mathf.Max(0.01f, _config.bombCooldown);
             Release();
@@ -58,9 +58,9 @@ namespace MetalRaptors
 
         void Update()
         {
-            if (_config == null || GameMenu.IsOpen || LevelBriefing.IsOpen) return;
+            if (_config == null || GameMenu.IsOpen || LevelBriefing.IsOpen || DevFreeze.Active) return;
 
-            _cooldown = Mathf.Max(0f, _cooldown - Time.deltaTime);
+            _cooldown = Mathf.Max(0f, _cooldown - Time.deltaTime * DevCheats.CooldownFactor);
 
             var kb = Keyboard.current;
             if (kb != null && kb.hKey.wasPressedThisFrame) Request();
@@ -74,7 +74,7 @@ namespace MetalRaptors
             go.name = "Bomb";
             go.SetActive(true);
             go.GetComponent<Bomb>().Launch(_rb != null ? _rb.linearVelocity : Vector3.zero,
-                _config.bombDamage, _config.bombBlastRadius, _planeCollider, Report);
+                _config.bombDamage * DevCheats.DamageFactor, _config.bombBlastRadius, _planeCollider, Report);
         }
 
         void Report(Vector3 position, float radius) => OnDetonated?.Invoke(position, radius);

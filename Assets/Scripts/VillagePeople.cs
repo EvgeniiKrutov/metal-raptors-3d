@@ -24,6 +24,10 @@ namespace MetalRaptors
         const float StraightChance = 0.8f;
         const float StraightDot = 0.3f;
         const float Lift = 0.05f;
+        const float RunFactor = 3f;
+        const float RunStepFactor = 1.6f;
+
+        static readonly List<VillagePeople> Live = new List<VillagePeople>();
 
         static readonly Color[] Shirts =
         {
@@ -87,6 +91,56 @@ namespace MetalRaptors
         Transform _village;
         WalkGraph _graph;
         readonly List<Walker> _walkers = new List<Walker>();
+        bool _panic;
+        Vector3 _danger;
+
+        void OnEnable() => Live.Add(this);
+
+        void OnDisable() => Live.Remove(this);
+
+        public static void PanicNear(Vector3 point, float reach)
+        {
+            foreach (VillagePeople people in Live)
+            {
+                if (people == null || people._village == null) continue;
+
+                Vector3 gap = people._village.position - point;
+                gap.y = 0f;
+                if (gap.sqrMagnitude <= reach * reach) people.Panic(point);
+            }
+        }
+
+        public void Panic(Vector3 point)
+        {
+            _panic = true;
+            _danger = point;
+            foreach (var w in _walkers)
+            {
+                w.halt = 0f;
+                int previous = w.from;
+                w.from = w.to;
+                w.to = Flee(w.from, previous);
+            }
+        }
+
+        int Flee(int at, int previous)
+        {
+            int[] links = _graph.links[at];
+            if (links.Length == 0) return previous;
+
+            int best = links[0];
+            float far = float.MinValue;
+            foreach (int n in links)
+            {
+                Vector3 gap = World(n) - _danger;
+                gap.y = 0f;
+                float d = gap.sqrMagnitude;
+                if (d <= far) continue;
+                far = d;
+                best = n;
+            }
+            return best;
+        }
 
         public static VillagePeople Begin(Transform parent, Transform village, WalkGraph graph, int seed)
         {
@@ -161,7 +215,8 @@ namespace MetalRaptors
                 float want = Mathf.Atan2(d.x, d.z) * Mathf.Rad2Deg;
                 w.heading = Mathf.MoveTowardsAngle(w.heading, want, TurnRate * dt);
                 float rad = w.heading * Mathf.Deg2Rad;
-                float step = Mathf.Min(w.speed * dt, d.magnitude);
+                float pace = _panic ? w.speed * RunFactor : w.speed;
+                float step = Mathf.Min(pace * dt, d.magnitude);
                 w.position.x += Mathf.Sin(rad) * step;
                 w.position.z += Mathf.Cos(rad) * step;
 
@@ -170,7 +225,8 @@ namespace MetalRaptors
                 float done = Vector2.Distance(new Vector2(a.x, a.z), new Vector2(w.position.x, w.position.z));
                 w.position.y = Mathf.Lerp(a.y, target.y, total > 0.01f ? Mathf.Clamp01(done / total) : 1f);
 
-                w.stepPhase += StepRateBase * w.speed / StepSpeedReference * Mathf.PI * dt;
+                w.stepPhase += StepRateBase * w.speed / StepSpeedReference * Mathf.PI * dt
+                               * (_panic ? RunStepFactor : 1f);
                 Pose(w, Mathf.Abs(Mathf.Sin(w.stepPhase)) * HopHeight);
             }
         }
@@ -179,6 +235,12 @@ namespace MetalRaptors
         {
             int previous = w.from;
             w.from = w.to;
+            if (_panic)
+            {
+                w.to = Flee(w.from, previous);
+                return;
+            }
+
             w.to = NextNode(w.from, previous);
             if (Random.value < HaltChance) w.halt = Random.Range(HaltMin, HaltMax);
         }

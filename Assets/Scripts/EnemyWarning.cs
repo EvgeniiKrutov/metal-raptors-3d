@@ -14,6 +14,8 @@ namespace MetalRaptors
         public const float Seconds = AppearSec + HoldSec + FadeSec;
 
         public const string ZeppelinText = "ZEPPELIN INCOMING";
+        public const string GunText = "ANTI-AIRCRAFT GUN AHEAD";
+        public const string GunsText = "ANTI-AIRCRAFT GUNS AHEAD";
 
         const string SupplyText = "SUPPLY CRATE INCOMING";
 

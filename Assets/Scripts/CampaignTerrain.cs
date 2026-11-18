@@ -62,6 +62,16 @@ namespace MetalRaptors
         protected abstract float MaxHeight { get; }
         protected virtual float DetailDistance => ProceduralTerrain.GrassViewDistance;
 
+        protected virtual void ChunkReady(int index, TerrainData data) { }
+
+        protected bool ChunkData(int index, out TerrainData data)
+        {
+            data = null;
+            if (!_chunks.TryGetValue(index, out var chunk) || chunk.data == null) return false;
+            data = chunk.data;
+            return true;
+        }
+
         protected abstract void Prepare(Daytime daytime, Weather weather,
             float cameraDistance, float playPlaneZ);
         protected abstract IEnumerator FillHeights(float[,] metres, int index);
@@ -97,7 +107,8 @@ namespace MetalRaptors
             land._terrainMat = new Material(NightReceivers.TerrainLit);
             land.Prepare(daytime, weather, cameraDistance, playPlaneZ);
 
-            float keep = ProceduralTerrain.FogEndDistance(cameraDistance, playPlaneZ, Depth);
+            float keep = ProceduralTerrain.FogEndDistance(cameraDistance, playPlaneZ, Depth)
+                         * LevelCamera.FightZoomOut;
             land._keepBehind = keep + ChunkLength * 0.5f;
             land._keepAhead = keep + ChunkLength * 1.5f;
 
@@ -172,9 +183,11 @@ namespace MetalRaptors
             }
         }
 
-        float KeepLeft => LevelScroll.Sign > 0f ? _keepBehind : _keepAhead;
+        public bool TwoWay { get; set; }
 
-        float KeepRight => LevelScroll.Sign > 0f ? _keepAhead : _keepBehind;
+        float KeepLeft => LevelScroll.Sign > 0f && !TwoWay ? _keepBehind : _keepAhead;
+
+        float KeepRight => LevelScroll.Sign > 0f || TwoWay ? _keepAhead : _keepBehind;
 
         int FirstChunk(float camX) => _bounded
             ? _firstChunk
@@ -187,6 +200,17 @@ namespace MetalRaptors
         IEnumerable<int> MissingChunks(float camX)
         {
             int first = FirstChunk(camX), last = LastChunk(camX);
+            if (TwoWay && !_bounded)
+            {
+                int mid = Mathf.Clamp(Mathf.FloorToInt(camX / ChunkLength), first, last);
+                for (int d = 0; mid - d >= first || mid + d <= last; d++)
+                {
+                    if (mid + d <= last && !_chunks.ContainsKey(mid + d)) yield return mid + d;
+                    if (d > 0 && mid - d >= first && !_chunks.ContainsKey(mid - d)) yield return mid - d;
+                }
+                yield break;
+            }
+
             if (LevelScroll.Sign < 0f)
             {
                 for (int i = last; i >= first; i--)
@@ -280,6 +304,18 @@ namespace MetalRaptors
             LinkNeighbors(index - 1);
             LinkNeighbors(index);
             LinkNeighbors(index + 1);
+            ChunkReady(index, data);
+        }
+
+        protected bool ChunkLive(int index, TerrainData data) =>
+            _chunks.TryGetValue(index, out var chunk) && chunk.data == data;
+
+        protected bool AttachMesh(int index, TerrainData data, string name, Mesh mesh, Material material,
+            Vector3 position)
+        {
+            if (mesh == null || !_chunks.TryGetValue(index, out var chunk) || chunk.data != data) return false;
+            AddMesh(chunk.root.transform, name, mesh, material, position, chunk.meshes);
+            return true;
         }
 
         protected static void AddMesh(Transform parent, string name, Mesh mesh, Material material,

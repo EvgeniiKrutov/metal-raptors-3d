@@ -27,6 +27,14 @@ namespace MetalRaptors
         [Tooltip("Hard cap on total speed as a multiple of flySpeed.")]
         public float maxSpeedMultiplier = 1.6f;
 
+        public float energyGravity = 80f;
+
+        public float energyDrag = 0.8f;
+
+        public float energyMinFraction = 0.6f;
+
+        public float energyMaxFraction = 1.45f;
+
         [Tooltip("How quickly the turn rate eases toward the target (sibling: 5.0). " +
                  "Used together with mass as turnResponsiveness / mass.")]
         public float turnResponsiveness = 5f;

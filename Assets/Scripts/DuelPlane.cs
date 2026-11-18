@@ -2,15 +2,16 @@ using UnityEngine;
 
 namespace MetalRaptors
 {
-    public enum DuelRole { Escort, Peel, Hunt, Break, Cross, Level, Form, Support, Idle }
+    public enum DuelRole { Escort, Peel, Hunt, Break, Cross, Level, Form, Support, Idle, Cruise }
 
     public class DuelPlane : MonoBehaviour
     {
         const string ShotClip = "Sounds/bullet_shot_1";
 
-        public const float CruiseSpeed = 175f;
+        public const float BaseCruiseSpeed = 175f;
+        public const float CruiseSpeed = BaseCruiseSpeed * FlightPace.Fast;
 
-        const float PaceRate = 60f;
+        const float PaceRate = 60f * FlightPace.Fast;
         const float PilotGain = 5f;
 
         const float BankPerDepthSpeed = 0.40f;
@@ -19,11 +20,36 @@ namespace MetalRaptors
         const float BankResponse = 4.5f;
 
         const float StationResponse = 1.8f;
-        const float StationCloseSpeed = 220f;
+        const float StationCloseSpeed = 220f * FlightPace.Fast;
         const float TrackFilter = 8f;
         const float WobbleHz = 0.19f;
         const float WobbleRise = 4f;
         const float WobbleDrift = 5f;
+
+        const float FreeGain = 0.6f;
+        const float FreeLag = 0.4f;
+        const float FreeTrackLag = 0.08f;
+        const float FreeSeparation = 85f;
+        const float FreeRepel = 3f;
+        const float LiftShare = 0.5f;
+        const float FreeTurnMax = 1.4f;
+        const float FreeMinPace = 0.6f;
+        const float FreeMaxPace = 1.25f;
+        const float FreeAccel = 45f * FlightPace.Fast;
+        const float FreeCrossMax = 0.5f;
+        const float MateSeparation = 95f;
+        const float SeparationLift = 1f;
+        const float JoinWobbleSec = 1.5f;
+        const float FreeClimbMax = 0.45f;
+        const float FreeBankDeg = 40f;
+        const float FreeBankRadius = 380f;
+        const float FreeBankResponse = 2.5f;
+        const float FreeBankRate = 45f;
+        const float FreeRateLag = 0.25f;
+        const float BankKnee = 0.15f;
+        const float FreeBlendSec = 0.5f;
+        const float FreeJump = 1500f;
+        const float FollowVelLag = 0.1f;
 
         const float PeelClimbDeg = 24f;
 
@@ -61,7 +87,7 @@ namespace MetalRaptors
         const float RestMin = 0.9f;
         const float RestMax = 1.9f;
         const float MuzzleClearance = 6f;
-        const float TracerSpeed = 430f;
+        const float TracerSpeed = 430f * FlightPace.Fast;
         const float ShotVolume = 0.045f;
 
         const float SupportLeash = 900f;
@@ -77,7 +103,7 @@ namespace MetalRaptors
         const float SideMargin = 200f;
         const float FloorMargin = 100f;
         const float CeilingMargin = 100f;
-        const float ClampSpeed = 120f;
+        const float ClampSpeed = 120f * FlightPace.Fast;
 
         const float FallDiveDeg = PlaneFall.DiveDeg;
         const float FallSpinDeg = PlaneFall.RollRateDeg;
@@ -93,6 +119,40 @@ namespace MetalRaptors
         Vector3 _stationOffset;
         Vector3 _station;
         bool _hasStation;
+        float _facing = 1f;
+
+        Transform _leader;
+        Vector3 _slot;
+        Vector3 _slotFrom;
+        Vector3 _slotTo;
+        float _slotAge;
+        float _slotSec = 0.01f;
+        bool _slotLift;
+        bool _manualFollow;
+        Quaternion _slaveFromRot;
+        Vector3 _slaveFlat = Vector3.right;
+        float _slaveAge;
+        float _slaveBlendSec;
+        Vector3 _followVel;
+        Vector3 _lastPos;
+        bool _tracked;
+        System.Collections.Generic.List<DuelPlane> _mates;
+        int _freeFrames;
+        bool _free;
+        bool _freeLive;
+        float _freeAge;
+        float _freeHeading;
+        float _freeSpeed;
+        float _freePace;
+        float _freeClimb;
+        float _freeBank;
+        Vector3 _freeTargetPrev;
+        Vector3 _freeTargetVel;
+        float _freeTrackHeading;
+        float _freeTrackRate;
+        float _freeYawRate;
+        Vector3 _freeLeaderPrev;
+        Quaternion _freeFromRot;
         Vector2 _crossPoint;
         bool _hasCrossPoint;
 
@@ -155,6 +215,10 @@ namespace MetalRaptors
 
         public bool IsFalling => _falling;
 
+        public bool Slaved => _leader != null;
+
+        Vector3 StationOffset => new Vector3(_stationOffset.x * _facing, _stationOffset.y, _stationOffset.z);
+
         public bool Levelled =>
             Mathf.Abs(Mathf.DeltaAngle(_heading * Mathf.Rad2Deg, 0f)) <= LevelToleranceDeg;
 
@@ -166,7 +230,7 @@ namespace MetalRaptors
             {
                 if (_escort == null) return true;
 
-                Vector2 gap = (Vector2)(_escort.position + _stationOffset)
+                Vector2 gap = (Vector2)(_escort.position + StationOffset)
                             - (Vector2)transform.position;
                 return gap.sqrMagnitude <= FormReach * FormReach;
             }
@@ -238,8 +302,103 @@ namespace MetalRaptors
             _mark = mark;
         }
 
+        public void SetFacing(float facing) => _facing = facing < 0f ? -1f : 1f;
+
+        public void Slave(Transform leader, Vector3 slot, float blendSec)
+        {
+            if (_falling || leader == null) return;
+
+            _leader = leader;
+            _slaveAge = 0f;
+            _slaveBlendSec = Mathf.Max(0.01f, blendSec);
+            _slaveFromRot = transform.rotation;
+            _slot = OffsetFrom(leader);
+            Reslot(slot, blendSec);
+            _role = DuelRole.Idle;
+            _opponent = null;
+            _escort = null;
+            _mark = null;
+            _burstLeft = 0;
+            _depthDuration = 0f;
+        }
+
+        public void Reslot(Vector3 slot, float seconds, bool lift = false)
+        {
+            _slotFrom = _slot;
+            _slotTo = slot;
+            _slotAge = 0f;
+            _slotSec = Mathf.Max(0.01f, seconds);
+            _slotLift = lift;
+        }
+
+        public void SetManualFollow(bool on) => _manualFollow = on;
+
+        public float SlotGap { get; private set; }
+
+        public void Join(Transform leader, Vector3 slot, System.Collections.Generic.List<DuelPlane> mates)
+        {
+            if (_falling || leader == null) return;
+
+            _leader = leader;
+            _slot = slot;
+            _slotFrom = slot;
+            _slotTo = slot;
+            _slotAge = 0f;
+            _slotSec = 0.01f;
+            _slotLift = false;
+            _slaveAge = 0f;
+            _slaveBlendSec = JoinWobbleSec;
+            _slaveFromRot = transform.rotation;
+            _mates = mates;
+            _free = true;
+            _freeLive = false;
+            _role = DuelRole.Idle;
+            _opponent = null;
+            _escort = null;
+            _mark = null;
+            _burstLeft = 0;
+            _depthDuration = 0f;
+            SlotGap = float.MaxValue;
+        }
+
+        public void SetFreeFollow(bool on, float settleSec)
+        {
+            if (on == _free) return;
+
+            _free = on;
+            _freeLive = false;
+            if (!on && _leader != null && !_falling) Reslave(settleSec);
+        }
+
+        void Reslave(float seconds)
+        {
+            Vector3 to = _slotTo;
+            _slaveAge = 0f;
+            _slaveBlendSec = Mathf.Max(0.01f, seconds);
+            _slaveFromRot = transform.rotation;
+            _slot = OffsetFrom(_leader);
+            Reslot(to, seconds);
+        }
+
+        public void FollowNow(float dt)
+        {
+            if (_leader == null || _falling || dt <= 0f) return;
+            FollowLeader(dt);
+        }
+
+        Vector3 OffsetFrom(Transform leader)
+        {
+            Vector3 forward = leader.rotation * Vector3.right;
+            var flat = new Vector3(forward.x, 0f, forward.z);
+            flat = flat.sqrMagnitude > 1e-4f ? flat.normalized : Vector3.right;
+            var side = new Vector3(-flat.z, 0f, flat.x);
+            Vector3 gap = transform.position - leader.position;
+            return new Vector3(Vector3.Dot(gap, flat), gap.y, Vector3.Dot(gap, side));
+        }
+
         public void SetEscort(Transform target, Vector3 offset)
         {
+            if (_leader != null) return;
             _escort = target;
             _stationOffset = offset;
             _hasStation = false;
@@ -247,7 +406,7 @@ namespace MetalRaptors
 
         public void SetRole(DuelRole role, DuelPlane opponent, float crossSide = 1f)
         {
-            if (_falling) return;
+            if (_falling || _leader != null) return;
 
             _role = role;
             _opponent = opponent;
@@ -271,6 +430,7 @@ namespace MetalRaptors
 
         public void SetDepth(float z, float seconds)
         {
+            if (_leader != null) return;
             _depthFrom = _z;
             _depthTo = z;
             _depthTime = 0f;
@@ -333,6 +493,8 @@ namespace MetalRaptors
         {
             if (_falling) return;
 
+            _leader = null;
+            _free = false;
             _falling = true;
             _role = DuelRole.Idle;
             _opponent = null;
@@ -351,7 +513,19 @@ namespace MetalRaptors
             float dt = Time.deltaTime;
             if (dt <= 0f) return;
 
+            Vector3 here = transform.position;
+            if (_tracked)
+                _followVel = Vector3.Lerp(_followVel, (here - _lastPos) / dt, 1f - Mathf.Exp(-dt / FollowVelLag));
+            _lastPos = here;
+            _tracked = true;
+
             _roleTime += dt;
+
+            if (_leader != null && !_falling)
+            {
+                if (!_manualFollow) FollowLeader(dt);
+                return;
+            }
 
             Vector3 pos = transform.position;
             float previousZ = _z;
@@ -371,6 +545,212 @@ namespace MetalRaptors
             if (_falling) { TickWreck(pos); return; }
             if (_role == DuelRole.Hunt) UpdateGun(dt);
             else if (_role == DuelRole.Support) UpdateSupportGun(dt);
+        }
+
+        void FollowLeader(float dt)
+        {
+            _slaveAge += dt;
+            _wobbleTime += dt;
+
+            Vector3 forward = _leader.rotation * Vector3.right;
+            var flat = new Vector3(forward.x, 0f, forward.z);
+            if (flat.sqrMagnitude > 1e-4f) _slaveFlat = flat.normalized;
+
+            _slotAge += dt;
+            float slotT = Mathf.Clamp01(_slotAge / _slotSec);
+            float slotK = Mathf.SmoothStep(0f, 1f, slotT);
+            float liftK = !_slotLift ? slotK
+                : Mathf.Abs(_slotTo.y) >= Mathf.Abs(_slotFrom.y)
+                    ? Mathf.SmoothStep(0f, 1f, slotT / LiftShare)
+                    : Mathf.SmoothStep(0f, 1f, (slotT - (1f - LiftShare)) / LiftShare);
+            _slot = new Vector3(Mathf.Lerp(_slotFrom.x, _slotTo.x, slotK),
+                Mathf.Lerp(_slotFrom.y, _slotTo.y, liftK),
+                Mathf.Lerp(_slotFrom.z, _slotTo.z, slotK));
+
+            float k = Mathf.SmoothStep(0f, 1f, _slaveAge / _slaveBlendSec);
+            float phase = (_wobbleTime + _wobblePhase) * Mathf.PI * 2f * WobbleHz;
+            var side = new Vector3(-_slaveFlat.z, 0f, _slaveFlat.x);
+            Vector3 pos = _leader.position + _slaveFlat * _slot.x + Vector3.up * _slot.y + side * _slot.z
+                          + (new Vector3(0f, Mathf.Sin(phase) * WobbleRise, 0f)
+                             + _slaveFlat * (Mathf.Sin(phase * 0.61f) * WobbleDrift)) * k;
+
+            Vector3 before = transform.position;
+            if (_free)
+            {
+                FlyFree(pos, dt);
+                pos = transform.position;
+            }
+            else
+            {
+                transform.position = pos;
+                transform.rotation = Quaternion.Slerp(_slaveFromRot, _leader.rotation, k);
+            }
+
+            Vector3 nose = _free ? transform.rotation * Vector3.right : forward;
+            Vector2 move = (Vector2)(pos - before) / dt;
+            if (move.sqrMagnitude > 1f) _speed = move.magnitude;
+            if (Mathf.Abs(nose.x) > 0.2f)
+            {
+                _heading = Mathf.Atan2(nose.y, nose.x);
+                _roll.Settle(_heading);
+            }
+            _bank = 0f;
+            _angularVelocity = 0f;
+            _z = pos.z;
+            _depthTo = pos.z;
+        }
+
+        Vector3 Approach(Vector3 gap, float pace)
+        {
+            var flatVel = new Vector2(_freeTargetVel.x, _freeTargetVel.z);
+            float trackSpeed = flatVel.magnitude;
+            float climb = _freeTargetVel.y + gap.y * FreeGain;
+            if (trackSpeed < 1f)
+            {
+                Vector3 plain = _freeTargetVel + gap * FreeGain;
+                plain.y = climb;
+                return plain;
+            }
+
+            Vector2 along = flatVel / trackSpeed;
+            var across = new Vector2(-along.y, along.x);
+            var flatGap = new Vector2(gap.x, gap.z);
+            float forward = Mathf.Clamp(trackSpeed + Vector2.Dot(flatGap, along) * FreeGain,
+                pace * FreeMinPace, pace * FreeMaxPace);
+            float sideways = Mathf.Clamp(Vector2.Dot(flatGap, across) * FreeGain,
+                -pace * FreeCrossMax, pace * FreeCrossMax);
+            Vector2 flat = along * forward + across * sideways;
+            return new Vector3(flat.x, climb, flat.y);
+        }
+
+        Vector3 Repel(Vector3 other, float reach, float side)
+        {
+            Vector3 away = transform.position - other;
+            float apart = away.magnitude;
+            if (apart >= reach) return Vector3.zero;
+
+            Vector3 dir = apart > 0.01f ? away / apart : Vector3.zero;
+            dir.y += side * SeparationLift;
+            return dir.normalized * ((reach - apart) * FreeRepel);
+        }
+
+        float SideFrom(DuelPlane mate)
+        {
+            float dy = _slotTo.y - mate._slotTo.y;
+            if (Mathf.Abs(dy) > 1f) return Mathf.Sign(dy);
+            float dx = _slotTo.x - mate._slotTo.x;
+            if (Mathf.Abs(dx) > 1f) return Mathf.Sign(dx);
+            return _wobblePhase >= mate._wobblePhase ? 1f : -1f;
+        }
+
+        public static float BankShape(float turn)
+        {
+            float x = Mathf.Clamp(turn, -1f, 1f);
+            return x * x * x / (x * x + BankKnee * BankKnee) * (1f + BankKnee * BankKnee);
+        }
+
+        void FlyFree(Vector3 target, float dt)
+        {
+            Vector3 leader = _leader.position;
+            if (!_freeLive)
+            {
+                _freeLive = true;
+                _freeAge = 0f;
+                _freeFrames = 0;
+                _freeTargetPrev = target;
+                _freeTargetVel = _followVel;
+                _freeTrackHeading = Mathf.Atan2(_followVel.z, _followVel.x);
+                _freeTrackRate = 0f;
+                _freeYawRate = 0f;
+                _freeLeaderPrev = leader;
+                float flatSpeed = new Vector2(_followVel.x, _followVel.z).magnitude;
+                _freePace = Mathf.Max(flatSpeed, CruiseSpeed * FreeMinPace);
+                _freeSpeed = Mathf.Clamp(flatSpeed, CruiseSpeed * FreeMinPace, CruiseSpeed * FreeMaxPace);
+                _freeClimb = _followVel.y;
+                _freeBank = 0f;
+                _freeFromRot = transform.rotation;
+
+                Vector3 nose = transform.rotation * Vector3.right;
+                _freeHeading = flatSpeed > 20f ? Mathf.Atan2(_followVel.z, _followVel.x)
+                    : nose.x * nose.x + nose.z * nose.z > 1e-4f ? Mathf.Atan2(nose.z, nose.x)
+                    : _facing > 0f ? 0f : Mathf.PI;
+            }
+            _freeAge += dt;
+            _freeFrames++;
+
+            float track = 1f - Mathf.Exp(-dt / FreeTrackLag);
+            Vector3 targetVel = (target - _freeTargetPrev) / dt;
+            _freeTargetPrev = target;
+            bool fresh = _freeFrames == 2;
+            if (fresh && targetVel.sqrMagnitude < FreeJump * FreeJump)
+            {
+                _freeTargetVel = targetVel;
+                _freeTrackHeading = Mathf.Atan2(targetVel.z, targetVel.x);
+            }
+            else if (_freeFrames > 2 && targetVel.sqrMagnitude < FreeJump * FreeJump)
+            {
+                _freeTargetVel = Vector3.Lerp(_freeTargetVel, targetVel, track);
+            }
+
+            if (_freeFrames > 2 && _freeTargetVel.x * _freeTargetVel.x + _freeTargetVel.z * _freeTargetVel.z > 1f)
+            {
+                float trackHeading = Mathf.Atan2(_freeTargetVel.z, _freeTargetVel.x);
+                float trackRate = Mathf.DeltaAngle(_freeTrackHeading * Mathf.Rad2Deg, trackHeading * Mathf.Rad2Deg)
+                                  * Mathf.Deg2Rad / dt;
+                _freeTrackHeading = trackHeading;
+                _freeTrackRate = Mathf.Lerp(_freeTrackRate, Mathf.Clamp(trackRate, -FreeTurnMax, FreeTurnMax),
+                    1f - Mathf.Exp(-dt / FreeRateLag));
+            }
+
+            Vector3 leaderVel = (leader - _freeLeaderPrev) / dt;
+            _freeLeaderPrev = leader;
+            float leaderPace = new Vector2(leaderVel.x, leaderVel.z).magnitude;
+            if (leaderPace < FreeJump) _freePace = Mathf.Lerp(_freePace, leaderPace, track);
+
+            float pace = Mathf.Max(1f, _freePace);
+            Vector3 gap = target - transform.position;
+            SlotGap = gap.magnitude;
+            Vector3 want = Approach(gap, pace);
+
+            float leaderSide = Mathf.Abs(_slotTo.y) > 1f ? Mathf.Sign(_slotTo.y)
+                : transform.position.y >= leader.y ? 1f : -1f;
+            want += Repel(leader, FreeSeparation, leaderSide);
+            if (_mates != null)
+            {
+                foreach (DuelPlane mate in _mates)
+                {
+                    if (mate == null || mate == this || mate._falling) continue;
+                    want += Repel(mate.transform.position, MateSeparation, SideFrom(mate));
+                }
+            }
+
+            var flatWant = new Vector2(want.x, want.z);
+            float speedWant = Mathf.Clamp(flatWant.magnitude, pace * FreeMinPace, pace * FreeMaxPace);
+            float headingWant = flatWant.sqrMagnitude > 1f ? Mathf.Atan2(flatWant.y, flatWant.x) : _freeHeading;
+
+            float turn = Mathf.DeltaAngle(_freeHeading * Mathf.Rad2Deg, headingWant * Mathf.Rad2Deg) * Mathf.Deg2Rad;
+            float rate = Mathf.Clamp(_freeTrackRate + turn / FreeLag, -FreeTurnMax, FreeTurnMax);
+            _freeHeading += rate * dt;
+
+            float ease = 1f - Mathf.Exp(-dt / FreeLag);
+            _freeSpeed += Mathf.Clamp((speedWant - _freeSpeed) * ease, -FreeAccel * dt, FreeAccel * dt);
+            float climbWant = Mathf.Clamp(want.y, -_freeSpeed * FreeClimbMax, _freeSpeed * FreeClimbMax);
+            _freeClimb += (climbWant - _freeClimb) * ease;
+
+            transform.position += new Vector3(Mathf.Cos(_freeHeading) * _freeSpeed, _freeClimb,
+                Mathf.Sin(_freeHeading) * _freeSpeed) * dt;
+
+            _freeYawRate = Mathf.Lerp(_freeYawRate, rate, 1f - Mathf.Exp(-dt / FreeRateLag));
+            float curvature = _freeYawRate / Mathf.Max(1f, _freeSpeed);
+            float bank = FreeBankDeg * BankShape(curvature * FreeBankRadius);
+            float eased = Mathf.Lerp(_freeBank, bank, 1f - Mathf.Exp(-FreeBankResponse * dt));
+            _freeBank = Mathf.MoveTowards(_freeBank, eased, FreeBankRate * dt);
+            float pitch = Mathf.Atan2(_freeClimb, _freeSpeed) * Mathf.Rad2Deg;
+
+            Quaternion rot = Quaternion.Euler(0f, -_freeHeading * Mathf.Rad2Deg, 0f)
+                             * Quaternion.Euler(0f, 0f, pitch)
+                             * Quaternion.Euler(_freeBank, 0f, 0f);
+            transform.rotation = Quaternion.Slerp(_freeFromRot, rot, Mathf.SmoothStep(0f, 1f, _freeAge / FreeBlendSec));
         }
 
         void TickWreck(Vector3 pos)
@@ -443,7 +823,7 @@ namespace MetalRaptors
             _wobbleTime += dt;
             float phase = (_wobbleTime + _wobblePhase) * Mathf.PI * 2f * WobbleHz;
 
-            Vector3 station = _escort.position + _stationOffset
+            Vector3 station = _escort.position + StationOffset
                 + new Vector3(Mathf.Sin(phase * 0.61f) * WobbleDrift,
                               Mathf.Sin(phase) * WobbleRise, 0f);
             station.z = pos.z;
@@ -508,7 +888,7 @@ namespace MetalRaptors
         {
             if (_escort == null) return CruiseSpeed;
 
-            float behind = _escort.position.x + _stationOffset.x - pos.x;
+            float behind = (_escort.position.x + StationOffset.x - pos.x) * _facing;
             return _leadSpeed + Mathf.Clamp(behind * FormGain, -FormTrim, FormPush);
         }
 
@@ -598,6 +978,9 @@ namespace MetalRaptors
                 case DuelRole.Level:
                     return 0f;
 
+                case DuelRole.Cruise:
+                    return _facing < 0f ? Mathf.PI : 0f;
+
                 case DuelRole.Form:
                     return FormHeading(pos);
 
@@ -643,10 +1026,10 @@ namespace MetalRaptors
         {
             if (_escort == null) return 0f;
 
-            Vector3 station = _escort.position + _stationOffset;
-            float ahead = Mathf.Max(FormLookahead, station.x - pos.x);
+            Vector3 station = _escort.position + StationOffset;
+            float ahead = Mathf.Max(FormLookahead, (station.x - pos.x) * _facing);
             float rise = Mathf.Clamp(station.y - pos.y, -ahead, ahead);
-            return Mathf.Atan2(rise, ahead);
+            return Mathf.Atan2(rise, ahead * _facing);
         }
 
         void AimCross(float side)

@@ -108,7 +108,14 @@ namespace MetalRaptors
 
         public static IEnumerable<object> Build(TerrainData data, float x0, float width, float depth,
             System.Func<float, float, bool> skip, int seed, float density, float patchOffset,
-            System.Action<Mesh> done)
+            System.Action<Mesh> done, System.Func<float, float, bool> anySlope = null) =>
+            Build(data, x0, width, depth, 0f, width, ZFrom, depth, skip, seed, density, patchOffset, done,
+                anySlope);
+
+        public static IEnumerable<object> Build(TerrainData data, float x0, float width, float depth,
+            float xFrom, float xTo, float zFrom, float zTo,
+            System.Func<float, float, bool> skip, int seed, float density, float patchOffset,
+            System.Action<Mesh> done, System.Func<float, float, bool> anySlope = null)
         {
             var rng = new System.Random(seed);
             var verts = new List<Vector3>();
@@ -118,15 +125,17 @@ namespace MetalRaptors
             float thin = 1f / Mathf.Sqrt(Mathf.Max(0.05f, density));
             int counted = 0;
 
-            float z = ZFrom;
-            float end = Mathf.Min(ZTo, depth);
+            float z = Mathf.Max(ZFrom, zFrom);
+            float end = Mathf.Min(ZTo, Mathf.Min(depth, zTo));
+            float left = Mathf.Max(0f, xFrom);
+            float right = Mathf.Min(width, xTo);
             while (z < end)
             {
                 float t = Mathf.InverseLerp(ZFrom, ZTo, z);
                 float spacing = ProceduralTerrain.GrassSpacing * Mathf.Lerp(SpacingNear, SpacingFar, t) * thin;
                 float size = Mathf.Lerp(SizeNear, SizeFar, t);
 
-                for (float lx = 0f; lx < width; lx += spacing)
+                for (float lx = left; lx < right; lx += spacing)
                 {
                     float px = lx + (float)rng.NextDouble() * spacing;
                     float pz = z + (float)rng.NextDouble() * spacing;
@@ -134,14 +143,15 @@ namespace MetalRaptors
                     int tuftSeed = rng.Next();
 
                     if (++counted % TuftsPerStep == 0) yield return null;
-                    if (px >= width || pz >= end) continue;
+                    if (px >= right || pz >= end) continue;
 
                     float keep = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(ZFrom, FadeInTo, pz))
                                  * (1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(BackFadeFrom, ZTo, pz)));
                     if (roll > keep) continue;
 
                     float xn = px / width, zn = pz / depth;
-                    if (data.GetSteepness(xn, zn) > ProceduralTerrain.GrassMaxSlopeDeg) continue;
+                    if (data.GetSteepness(xn, zn) > ProceduralTerrain.GrassMaxSlopeDeg
+                        && (anySlope == null || !anySlope(x0 + px, pz))) continue;
                     if (skip(x0 + px, pz)) continue;
 
                     var at = new Vector3(px, data.GetInterpolatedHeight(xn, zn), pz);

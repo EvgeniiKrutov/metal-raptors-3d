@@ -701,8 +701,10 @@ namespace MetalRaptors
         {
             PlaneModelConfig config = PlaneModels.ById(spec.model) ?? PlaneModels.Sopwith;
             var go = new GameObject($"Shot {config.resourceName} {_flyers.Count}");
-            Transform model = PlaneFactory.BuildPlaneModel(go.transform, config, false,
-                PlaneSkins.Enemy(config, spec.skin));
+            PlaneSkin skin = string.IsNullOrEmpty(spec.skin) && PlaneSkins.RandomPainted(config)
+                ? PlaneSkins.RandomEnemy(config, null)
+                : PlaneSkins.Enemy(config, spec.skin);
+            Transform model = PlaneFactory.BuildPlaneModel(go.transform, config, false, skin);
             model.localScale *= PlaneModelConfig.LevelScale;
             foreach (Collider col in go.GetComponentsInChildren<Collider>()) Destroy(col);
             SpinExtraProps(go.transform, model, config);

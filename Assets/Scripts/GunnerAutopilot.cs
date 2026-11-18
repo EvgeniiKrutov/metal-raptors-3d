@@ -139,7 +139,7 @@ namespace MetalRaptors
 
         public void Request()
         {
-            if (!IsReady || GameMenu.IsOpen || LevelBriefing.IsOpen || !_plane.Steerable) return;
+            if (!IsReady || GameMenu.IsOpen || LevelBriefing.IsOpen || DevFreeze.Active || !_plane.Steerable) return;
 
             float y = _plane.transform.position.y;
             _diveFloorY = _deck != null ? _deck() : _centreY - _halfHeight;
@@ -154,8 +154,8 @@ namespace MetalRaptors
 
         void Update()
         {
-            if (GameMenu.IsOpen || LevelBriefing.IsOpen) return;
-            if (_phase == DivePhase.Off) _cooldown = Mathf.Max(0f, _cooldown - Time.deltaTime);
+            if (GameMenu.IsOpen || LevelBriefing.IsOpen || DevFreeze.Active) return;
+            if (_phase == DivePhase.Off) _cooldown = Mathf.Max(0f, _cooldown - Time.deltaTime * DevCheats.CooldownFactor);
 
             var kb = Keyboard.current;
             if (kb != null && kb.rKey.wasPressedThisFrame) Request();

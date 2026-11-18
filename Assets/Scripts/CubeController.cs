@@ -27,7 +27,13 @@ namespace MetalRaptors
         public float EnginePitch { get; set; } = 1f;
 
         public float MaxTurnRate => _config != null
-            ? _config.rotationSpeed * Mathf.Deg2Rad * _boost
+            ? _config.rotationSpeed * Mathf.Deg2Rad * _boost * EnergyTurnFactor
+            : 0f;
+
+        public bool Energy { get; set; } = true;
+
+        public float FlightSpeed => _config != null
+            ? _energy.Speed * _boost * DevCheats.SpeedFactor
             : 0f;
 
         public float BaseSpeed => _config != null ? _config.flySpeed : 0f;
@@ -36,7 +42,7 @@ namespace MetalRaptors
 
         public bool Boosting => _boostTarget > 1f;
 
-        public bool BarrelRolling => _barrelLeft > 0f;
+        public bool BarrelRolling => _barrel.Active;
 
         public bool Evading => (BarrelRolling || _evadeGrace > 0f) && !_falling;
 
@@ -69,8 +75,6 @@ namespace MetalRaptors
         const float BoostResponse = 3.5f;
         const float BoostSnap = 0.001f;
 
-        const float BarrelTurn = 360f;
-        const float BarrelMinRate = 40f;
 
         const float GroundProbe = 500f;
         const float GroundSkim = 14f;
@@ -86,11 +90,14 @@ namespace MetalRaptors
         PlaneFire _fire;
         Vector3? _engine;
         readonly PlaneRoll _roll = new PlaneRoll(false);
+        PlaneEnergy _energy;
+        float _lean;
 
         float _heading;
         float _angularVelocity;
         float _speed;
         bool _active;
+        bool _scripted;
         bool _controlled = true;
         bool _falling;
         PlaneFall _fall;
@@ -102,9 +109,7 @@ namespace MetalRaptors
         float _boostTarget = 1f;
         bool _cinematic;
 
-        float _barrelAngle;
-        float _barrelLeft;
-        float _barrelRate;
+        readonly EnemyBarrel _barrel = new EnemyBarrel();
         float _evadeGrace;
         float _barrelGrace;
 
@@ -153,7 +158,7 @@ namespace MetalRaptors
 
             CurrentHealth = Mathf.Max(1f, config.health);
             MaxHealth = CurrentHealth;
-            _speed = config.flySpeed;
+            ResetEnergy();
 
             _rb = GetComponent<Rigidbody>();
             _rb.useGravity = false;
@@ -177,13 +182,11 @@ namespace MetalRaptors
             if (local.HasValue && _smoke != null) _smoke.Mount = local.Value;
         }
 
-        public bool BeginBarrelRoll(float rateDeg, float grace)
+        public bool BeginBarrelRoll(float seconds, float turns, float grace)
         {
             if (!_active || _falling || BarrelRolling) return false;
 
-            _barrelRate = Mathf.Max(BarrelMinRate, rateDeg);
-            _barrelLeft = BarrelTurn / _barrelRate;
-            _barrelAngle = 0f;
+            _barrel.Begin(seconds, turns, Mathf.Cos(_heading));
             _barrelGrace = Mathf.Max(0f, grace);
             return true;
         }
@@ -196,15 +199,8 @@ namespace MetalRaptors
                 return;
             }
 
-            _barrelLeft -= dt;
-            if (_barrelLeft <= 0f)
-            {
-                _barrelLeft = 0f;
-                _barrelAngle = 0f;
-                _evadeGrace = _barrelGrace;
-                return;
-            }
-            _barrelAngle += _barrelRate * dt;
+            _barrel.Step(dt);
+            if (!BarrelRolling) _evadeGrace = _barrelGrace;
         }
 
         public void Restore(float headingRad, float health)
@@ -213,6 +209,7 @@ namespace MetalRaptors
             _targetHeading = headingRad;
             _angularVelocity = 0f;
             _roll.Settle(headingRad);
+            ResetEnergy();
             CurrentHealth = Mathf.Clamp(health, 1f, MaxHealth);
             if (CurrentHealth < SmokeHealthThreshold && _smoke != null) _smoke.Arm(ExplosionSize);
             ApplyRotation();
@@ -232,7 +229,44 @@ namespace MetalRaptors
             _targetHeading = headingRad;
             _angularVelocity = 0f;
             _roll.Settle(headingRad);
+            ResetEnergy();
             ApplyRotation();
+        }
+
+        public bool Scripted => _scripted;
+
+        public void BeginScripted()
+        {
+            if (!_active || _falling || _rb == null) return;
+
+            _scripted = true;
+            _turnSec = 0f;
+            _barrel.Stop();
+            _angularVelocity = 0f;
+            _rb.linearVelocity = Vector3.zero;
+            _rb.interpolation = RigidbodyInterpolation.None;
+            _rb.isKinematic = true;
+        }
+
+        public void Pose(Vector3 position, Quaternion rotation)
+        {
+            if (!_scripted) return;
+
+            transform.SetPositionAndRotation(position, rotation);
+            _rb.position = position;
+            _rb.rotation = rotation;
+        }
+
+        public void EndScripted(Vector3 position, float headingRad)
+        {
+            if (!_scripted) return;
+
+            _scripted = false;
+            _rb.isKinematic = false;
+            _rb.interpolation = RigidbodyInterpolation.Interpolate;
+            _rb.constraints |= RigidbodyConstraints.FreezePositionZ;
+            Warp(position, headingRad);
+            _rb.linearVelocity = new Vector3(Mathf.Cos(headingRad), Mathf.Sin(headingRad), 0f) * CruiseSpeed;
         }
 
         public void BeginHover(float speed, float floorY)
@@ -243,6 +277,7 @@ namespace MetalRaptors
             _heading = 0f;
             _targetHeading = 0f;
             _angularVelocity = 0f;
+            ResetEnergy();
 
             Vector3 v = _rb != null ? _rb.linearVelocity : Vector3.zero;
             _hoverVelocity = new Vector2(v.x, v.y);
@@ -289,8 +324,7 @@ namespace MetalRaptors
             _turnLean = Quaternion.Inverse(Quaternion.Euler(0f, _turnFrom > 0f ? 0f : 180f, 0f))
                         * transform.rotation;
             _angularVelocity = 0f;
-            _barrelLeft = 0f;
-            _barrelAngle = 0f;
+            _barrel.Stop();
             _rb.constraints &= ~RigidbodyConstraints.FreezePositionZ;
             return true;
         }
@@ -330,12 +364,13 @@ namespace MetalRaptors
 
         void FixedUpdate()
         {
-            if (!_active || _config == null) return;
+            if (!_active || _config == null || _scripted) return;
 
             float dt = Time.fixedDeltaTime;
 
             if (_falling)
             {
+                SettleLean(dt);
                 _fall.Step(_rb, dt);
                 _heading = _fall.Heading;
                 ApplyRotation();
@@ -344,6 +379,7 @@ namespace MetalRaptors
 
             if (_hover)
             {
+                SettleLean(dt);
                 Hover(dt);
                 return;
             }
@@ -354,11 +390,21 @@ namespace MetalRaptors
 
             if (TurningBack)
             {
+                SettleLean(dt);
                 TurnBack(dt);
                 return;
             }
 
             _windBlend = Mathf.MoveTowards(_windBlend, 1f, dt / WindReturnSec);
+
+            float cruise = _config.flySpeed;
+            bool pinned = _rb.position.y >= _ceilingY && Mathf.Sin(_heading) > 0f;
+            _energy.Step(_heading, cruise, EnergyActive && !pinned ? _config.energyGravity : 0f,
+                _config.energyDrag, cruise * _config.energyMinFraction,
+                cruise * _config.energyMaxFraction, dt);
+            float noseDown = EnergyActive
+                ? PlaneEnergy.NoseDownRate(_heading, _energy.Speed, cruise, _config.energyMinFraction)
+                : 0f;
 
             float maxRate = MaxTurnRate;
             float desiredRate;
@@ -371,6 +417,7 @@ namespace MetalRaptors
                         _rb.mass / Mathf.Max(0.0001f, _config.turnResponsiveness), _angularVelocity)
                     : 0f;
                 steady = PlaneRoll.Steady(desiredRate, maxRate);
+                desiredRate += noseDown;
             }
             else
             {
@@ -378,7 +425,7 @@ namespace MetalRaptors
                 bool left  = kb != null && (kb.aKey.isPressed || kb.leftArrowKey.isPressed);
                 bool right = kb != null && (kb.dKey.isPressed || kb.rightArrowKey.isPressed);
 
-                desiredRate = (left ? maxRate : 0f) - (right ? maxRate : 0f);
+                desiredRate = (left ? maxRate : 0f) - (right ? maxRate : 0f) + noseDown;
                 steady = !left && !right;
             }
 
@@ -390,10 +437,12 @@ namespace MetalRaptors
             _angularVelocity += (desiredRate - _angularVelocity) * approach;
             _heading += _angularVelocity * dt;
             AdvanceBarrelRoll(dt);
-            if (!BarrelRolling) _roll.Tick(dt, _heading, steady, _config.rotationSpeed);
+            _roll.Tick(dt, _heading, steady && !_barrel.Spinning, _config.rotationSpeed);
+            _lean = FlightSmoothing.StepLean(_lean, _barrel.Spinning ? 0f : _angularVelocity,
+                maxRate, _roll.Angle, dt);
             ApplyRotation();
 
-            _speed = CruiseSpeed;
+            _speed = FlightSpeed;
             Vector3 vel = new Vector3(Mathf.Cos(_heading), Mathf.Sin(_heading), 0f) * _speed
                           + new Vector3(_windDrift.x, _windDrift.y, 0f) * _windBlend;
 
@@ -412,7 +461,7 @@ namespace MetalRaptors
 
             if (GroundUnder(pos, out float deck) && pos.y < deck)
             {
-                if (!_cinematic) { Crash(); return; }
+                if (!_cinematic && !DevCheats.Invulnerable) { Crash(); return; }
 
                 pos.y = deck;
                 clamped = true;
@@ -491,6 +540,7 @@ namespace MetalRaptors
             _targetHeading = _heading;
             _angularVelocity = 0f;
             _roll.Settle(_heading);
+            ResetEnergy();
 
             Vector3 pos = _rb.position;
             _rb.position = new Vector3(pos.x, pos.y, _turnZ);
@@ -583,11 +633,27 @@ namespace MetalRaptors
             PlaneScrapes.SetGroundCollisions(!value);
         }
 
-        float CruiseSpeed => _config.flySpeed * _boost;
+        float CruiseSpeed => _config.flySpeed * _boost * DevCheats.SpeedFactor;
+
+        bool EnergyActive => Energy && !_cinematic;
+
+        float EnergyTurnFactor => Mathf.Max(1f, _energy.Speed / Mathf.Max(0.0001f, _config.flySpeed));
+
+        void ResetEnergy()
+        {
+            if (_config == null) return;
+
+            _energy.Reset(_config.flySpeed);
+            _speed = CruiseSpeed;
+            _lean = 0f;
+        }
+
+        void SettleLean(float dt) =>
+            _lean -= _lean * (1f - Mathf.Exp(-FlightSmoothing.LeanResponse * dt));
 
         void ApplyRotation()
         {
-            float roll = _roll.Angle + _barrelAngle + _bank + _windRoll * _windBlend
+            float roll = _roll.Angle + _barrel.Spin + _bank + _lean + _windRoll * _windBlend
                          + (_fall != null ? _fall.Roll : 0f);
             float pitch = _heading * Mathf.Rad2Deg + _windPitch * _windBlend;
             transform.rotation = Quaternion.Euler(0f, 0f, pitch) * Quaternion.Euler(roll, 0f, 0f);
@@ -595,7 +661,7 @@ namespace MetalRaptors
 
         public void TakeDamage(float amount)
         {
-            if (!_active || _falling) return;
+            if (!_active || _falling || DevCheats.Invulnerable) return;
             CurrentHealth = Mathf.Max(0f, CurrentHealth - amount);
             OnDamaged?.Invoke();
             if (CurrentHealth < SmokeHealthThreshold && _smoke != null) _smoke.Arm(ExplosionSize);
@@ -646,15 +712,14 @@ namespace MetalRaptors
             _windDrift = Vector2.zero;
             _windPitch = 0f;
             _windRoll = 0f;
-            _barrelLeft = 0f;
-            _barrelAngle = 0f;
+            _barrel.Stop();
             _evadeGrace = 0f;
             OnShotDown?.Invoke();
 
             if (_smoke != null) _smoke.Ignite(ExplosionSize);
             _fire = PlaneFire.Ignite(gameObject, ExplosionSize, _engine);
 
-            _fall = PlaneFall.Begin(_rb, _heading, Mathf.Max(_speed, CruiseSpeed));
+            _fall = PlaneFall.Begin(_rb, _heading, Mathf.Max(1f, _speed));
         }
 
         void OnTriggerEnter(Collider other)
@@ -672,7 +737,7 @@ namespace MetalRaptors
 
             if (collision.gameObject.GetComponentInParent<EnemyController>() != null) return;
 
-            if (_cinematic) { Scrape(); return; }
+            if (_cinematic || DevCheats.Invulnerable) { Scrape(); return; }
 
             Crash();
         }

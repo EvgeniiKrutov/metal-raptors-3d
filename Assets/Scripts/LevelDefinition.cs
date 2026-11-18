@@ -20,7 +20,6 @@ namespace MetalRaptors
     {
         public CloudLevel speed = CloudLevel.Medium;
         public CloudLevel frequency = CloudLevel.Medium;
-        public CloudLevel size = CloudLevel.Medium;
     }
 
     public enum TerrainKind

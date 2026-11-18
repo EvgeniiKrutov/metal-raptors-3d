@@ -39,6 +39,7 @@ namespace MetalRaptors
         public bool gunner;
         public bool stealth;
         public bool lowSky;
+        public float skyTop;
         public string arenaScript;
         public CampaignOutroLine[] arenaLines;
         public string bossMusic;
@@ -63,6 +64,7 @@ namespace MetalRaptors
         public float scoutFireCone;
         public float fighterShotsPerSec;
         public string enemySkin;
+        public string[] duelistSkins;
         public int supplyDrops;
         public float supplyHealthFraction = 0.3f;
         public float supplyHeal = 55f;
@@ -190,6 +192,15 @@ namespace MetalRaptors
             new CampaignOutroLine("marchand", "l5_after3"),
             new CampaignOutroLine("you", "l5_after4"),
             new CampaignOutroLine("marchand", "l5_after5"),
+        };
+
+        static CampaignOutroLine[] Outro7 => new[]
+        {
+            new CampaignOutroLine("lasalle", "l7_after1"),
+            new CampaignOutroLine("marchand", "l7_after2"),
+            new CampaignOutroLine("roussel", "l7_after3"),
+            new CampaignOutroLine("you", "l7_after4"),
+            new CampaignOutroLine("roussel", "l7_after5"),
         };
 
         static CampaignOutroLine[] OutroLorem(int level) => new[]
@@ -322,6 +333,7 @@ namespace MetalRaptors
             plane = PlaneModels.AircoDh4,
             skin = "green",
             gunner = true,
+            skyTop = 650f,
             flak = 1.25f,
             enemyRotationScale = 1.02f,
             scoutShotsPerSec = 3f,
@@ -348,6 +360,7 @@ namespace MetalRaptors
             skin = "mahogany",
             stealth = true,
             lowSky = true,
+            skyTop = 650f,
             flak = 0f,
             enemyRotationScale = 0.91f,
             supplyDrops = 11,
@@ -364,18 +377,23 @@ namespace MetalRaptors
             terrain = TerrainKind.Vosges,
             daytime = Daytime.Morning,
             weather = Weather.Calm,
-            clouds = new CloudsPart { size = CloudLevel.High },
+            clouds = new CloudsPart(),
             script = "level7",
             plane = PlaneModels.Sopwith,
             skin = "green",
             companion = true,
+            backCompanions = 2,
+            supportCompanion = true,
             flak = 1.5f,
             enemyRotationScale = 1.03f,
-            supplyDrops = 1,
+            duelistSkins = new[] { "black_white", "red_green" },
+            supplyDrops = 6,
+            companionFoe = PlaneModels.Albatros,
+            companionPilots = new[] { "crane", "roussel", "marchand" },
             title = "HOHRUPT",
             dateline = "3 October 1917 — Hohrupt, upper Fecht valley — low grey morning",
             lore = Lore2,
-            outro = OutroLorem(7),
+            outro = Outro7,
             journal = JournalLorem,
         };
 
@@ -405,7 +423,7 @@ namespace MetalRaptors
             terrain = TerrainKind.Vosges,
             daytime = Daytime.Evening,
             weather = Weather.Calm,
-            clouds = new CloudsPart { size = CloudLevel.High },
+            clouds = new CloudsPart(),
             script = "level9",
             plane = PlaneModels.Sopwith,
             skin = "green",

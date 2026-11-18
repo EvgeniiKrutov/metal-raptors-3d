@@ -33,6 +33,8 @@ namespace MetalRaptors
         const int AlphaRes = 256;
         const int GrassDetailRes = 512;
         const float GrassScarLimit = 0.35f;
+        const float RegrowWeight = 0.1f;
+        const int RegrowSalt = 11;
 
         const float MeadowTile = ChunkLength / 6f;
         const float EarthTile = ChunkLength / 8f;
@@ -56,6 +58,9 @@ namespace MetalRaptors
         readonly List<CraterSpec> _craters = new List<CraterSpec>();
         readonly List<CraterSpec> _craterScratch = new List<CraterSpec>();
         readonly List<VosgesLayout.Pad> _pads = new List<VosgesLayout.Pad>();
+        readonly List<VosgesLayout.Pad> _mounds = new List<VosgesLayout.Pad>();
+        readonly Dictionary<int, int> _stamped = new Dictionary<int, int>();
+        readonly Dictionary<int, List<VosgesLayout.Pad>> _regrow = new Dictionary<int, List<VosgesLayout.Pad>>();
 
         Mesh _farGrass;
         int _farGrassIndex = int.MinValue;
@@ -137,6 +142,127 @@ namespace MetalRaptors
                 StampPad(metres, index, pad);
                 yield return null;
             }
+
+            int stamped = _mounds.Count;
+            for (int i = 0; i < stamped; i++) StampPad(metres, index, _mounds[i]);
+            _stamped[index] = stamped;
+        }
+
+        public void Raise(VosgesLayout.Pad mound)
+        {
+            _mounds.Add(mound);
+
+            int first = Mathf.FloorToInt((mound.x - mound.Reach) / ChunkLength);
+            int last = Mathf.FloorToInt((mound.x + mound.Reach) / ChunkLength);
+            for (int index = first; index <= last; index++)
+                if (ChunkData(index, out TerrainData data)) CatchUp(index, data);
+        }
+
+        protected override void ChunkReady(int index, TerrainData data) => CatchUp(index, data);
+
+        void CatchUp(int index, TerrainData data)
+        {
+            int from = _stamped.TryGetValue(index, out int done) ? done : 0;
+            for (int i = from; i < _mounds.Count; i++)
+                if (Restamp(data, index, _mounds[i])) Regrow(index, data, _mounds[i]);
+            _stamped[index] = _mounds.Count;
+        }
+
+        void Regrow(int index, TerrainData data, VosgesLayout.Pad pad)
+        {
+            if (_regrow.TryGetValue(index, out var pads))
+            {
+                pads.Add(pad);
+                return;
+            }
+            _regrow[index] = new List<VosgesLayout.Pad> { pad };
+            StartCoroutine(Regrow(index, data));
+        }
+
+        IEnumerator Regrow(int index, TerrainData data)
+        {
+            yield return null;
+            if (!_regrow.TryGetValue(index, out var pads)) yield break;
+            _regrow.Remove(index);
+            if (!ChunkLive(index, data)) yield break;
+
+            float x0 = index * ChunkLength;
+            float xFrom = float.MaxValue, xTo = float.MinValue, zFrom = float.MaxValue, zTo = float.MinValue;
+            foreach (var pad in pads)
+            {
+                float reach = pad.Reach;
+                xFrom = Mathf.Min(xFrom, pad.x - reach - x0);
+                xTo = Mathf.Max(xTo, pad.x + reach - x0);
+                zFrom = Mathf.Min(zFrom, pad.z - reach);
+                zTo = Mathf.Max(zTo, pad.z + reach);
+            }
+
+            if (zFrom < NearGrassTo)
+            {
+                foreach (var step in PlantGrass(data, index))
+                {
+                    yield return step;
+                    if (!ChunkLive(index, data)) yield break;
+                }
+            }
+
+            Mesh grass = null;
+            foreach (var step in VosgesFarGrass.Build(data, x0, ChunkLength, Depth, xFrom, xTo, zFrom, zTo,
+                         (x, z) => Unraised(pads, x, z) || FarGrassSkip(x, z), Hash(_seed, index, RegrowSalt),
+                         GraphicsOptions.FarGrassDensity, _patchOffset, mesh => grass = mesh, OnMound))
+            {
+                yield return step;
+                if (!ChunkLive(index, data)) yield break;
+            }
+
+            if (!AttachMesh(index, data, "Mound Grass", grass, VosgesFarGrass.SharedMaterial(GrassHealthy, GrassDry),
+                    new Vector3(x0, TerrainY, 0f)) && grass != null)
+                Destroy(grass);
+        }
+
+        bool OnMound(float x, float z)
+        {
+            foreach (var pad in _mounds)
+                if (pad.Weight(x, z) > 0f) return true;
+            return false;
+        }
+
+        static bool Unraised(List<VosgesLayout.Pad> pads, float x, float z)
+        {
+            foreach (var pad in pads)
+                if (pad.Weight(x, z) >= RegrowWeight) return false;
+            return true;
+        }
+
+        bool Restamp(TerrainData data, int index, VosgesLayout.Pad pad)
+        {
+            float chunkX0 = index * ChunkLength;
+            float reach = pad.Reach;
+            if (pad.x + reach < chunkX0 || pad.x - reach > chunkX0 + ChunkLength) return false;
+
+            int ixMin = Mathf.Max(0, Mathf.FloorToInt((pad.x - reach - chunkX0) / XStep));
+            int ixMax = Mathf.Min(Res - 1, Mathf.CeilToInt((pad.x + reach - chunkX0) / XStep));
+            int izMin = Mathf.Max(1, Mathf.FloorToInt((pad.z - reach) / ZStep));
+            int izMax = Mathf.Min(Res - 1, Mathf.CeilToInt((pad.z + reach) / ZStep));
+            if (ixMin > ixMax || izMin > izMax) return false;
+
+            float[,] patch = data.GetHeights(ixMin, izMin, ixMax - ixMin + 1, izMax - izMin + 1);
+            float scale = HeightScale, baseY = TerrainY;
+            for (int iz = izMin; iz <= izMax; iz++)
+            {
+                float z = Depth * iz / (Res - 1);
+                for (int ix = ixMin; ix <= ixMax; ix++)
+                {
+                    float w = pad.Weight(WorldX(index, ix), z);
+                    if (w <= 0f) continue;
+
+                    float metres = patch[iz - izMin, ix - ixMin] * scale + baseY;
+                    metres = Mathf.Clamp(Mathf.Lerp(metres, pad.y, w), MinHeight, MaxHeight);
+                    patch[iz - izMin, ix - ixMin] = (metres - baseY) / scale;
+                }
+            }
+            data.SetHeights(ixMin, izMin, patch);
+            return true;
         }
 
         protected override void PaintChunk(TerrainData data, int index)
@@ -174,7 +300,8 @@ namespace MetalRaptors
             _farGrassIndex = index;
             float x0 = index * ChunkLength;
             foreach (var step in VosgesFarGrass.Build(data, x0, ChunkLength, Depth, FarGrassSkip,
-                         Hash(_seed, index, 5), GraphicsOptions.FarGrassDensity, _patchOffset, mesh => _farGrass = mesh))
+                         Hash(_seed, index, 5), GraphicsOptions.FarGrassDensity, _patchOffset, mesh => _farGrass = mesh,
+                         OnMound))
                 yield return step;
         }
 
@@ -382,7 +509,8 @@ namespace MetalRaptors
                     float fade = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(NearGrassFrom, NearGrassTo, lz));
                     if (fade > 0f && rng.NextDouble() < fade) continue;
 
-                    if (data.GetSteepness(xNorm, zNorm) > ProceduralTerrain.GrassMaxSlopeDeg) continue;
+                    if (data.GetSteepness(xNorm, zNorm) > ProceduralTerrain.GrassMaxSlopeDeg
+                        && !OnMound(x0 + lx, lz)) continue;
                     if (Scar(x0 + lx, lz) > GrassScarLimit) continue;
                     if (Bare(x0 + lx, lz)) continue;
 

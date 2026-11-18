@@ -93,7 +93,7 @@ namespace MetalRaptors
         void Update()
         {
             _aimHold = Mathf.Max(0f, _aimHold - Time.deltaTime);
-            if (GameMenu.IsOpen || LevelBriefing.IsOpen) return;
+            if (GameMenu.IsOpen || LevelBriefing.IsOpen || DevFreeze.Active) return;
 
             _cooldown -= Time.deltaTime;
 
@@ -123,7 +123,7 @@ namespace MetalRaptors
                 _spread = Mathf.Min(1f, _spread + Time.deltaTime / SpreadGrowSec);
             if (_cooldown > 0f) return;
 
-            _cooldown = Mathf.Max(0.01f, _config.fireRate);
+            _cooldown = Mathf.Max(0.01f, _config.fireRate * DevCheats.FireIntervalFactor);
             if (Jamming()) Jam();
             else Fire();
         }
@@ -192,7 +192,7 @@ namespace MetalRaptors
                 transform.rotation * Quaternion.Euler(0f, 0f, -90f));
             go.name = "Bullet";
             go.SetActive(true);
-            go.GetComponent<Bullet>().Launch(dir, _config.bulletSpeed, _config.damage,
+            go.GetComponent<Bullet>().Launch(dir, _config.bulletSpeed, _config.damage * DevCheats.DamageFactor,
                 _planeCollider, fromEnemy: false, fromPlayer: true);
 
             MuzzleFlash.Spawn(_flashPoint.position, dir, _bodyRadius);
@@ -212,7 +212,7 @@ namespace MetalRaptors
             var go = Instantiate(_bulletTemplate, from, Quaternion.Euler(0f, 0f, angle - 90f));
             go.name = "Bullet";
             go.SetActive(true);
-            go.GetComponent<Bullet>().Launch(shot, _config.bulletSpeed, _config.damage,
+            go.GetComponent<Bullet>().Launch(shot, _config.bulletSpeed, _config.damage * DevCheats.DamageFactor,
                 _planeCollider, fromEnemy: false, fromPlayer: true);
 
             MuzzleFlash.Spawn(from, dir, _bodyRadius * TurretFlashScale);

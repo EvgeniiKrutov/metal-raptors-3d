@@ -90,6 +90,36 @@ namespace MetalRaptors
         bool FinaleDone { get; }
     }
 
+    public interface IValleyHost
+    {
+        void AwaitVillage();
+        bool VillageEntered { get; }
+        float WarnGuns(bool village);
+        void PlaceBattery(bool village);
+        bool BatteryInView { get; }
+        void LockBattery(bool village);
+        bool BatteryDown { get; }
+        bool BatterySkipped { get; }
+        void ReleaseBattery(bool village);
+        void BeginBombRun();
+        bool BombRunDone { get; }
+        void DownWingman();
+        bool WingmanDown { get; }
+    }
+
+    public interface IWingHost
+    {
+        void BeginFight();
+        void EndFight();
+    }
+
+    public interface ISettleHost
+    {
+        void BeginSettle();
+        bool Settled { get; }
+        void EndSettle();
+    }
+
     public class CampaignScriptRunner : MonoBehaviour
     {
         const float HoldMin = 0.8f;
@@ -107,6 +137,8 @@ namespace MetalRaptors
         int _start;
         int _firstSay = -1;
         bool _resumed;
+        bool _settling;
+        bool _fighting;
 
         public static string WaveStatus { get; private set; }
 
@@ -187,10 +219,13 @@ namespace MetalRaptors
                 CampaignStep step = steps[index];
                 if (!Running) yield break;
 
+                if (!Fights(step.op) && !Neutral(step.op)) Fight(false);
+
                 if (step.op != CampaignOp.Say)
                 {
                     _resumed = false;
                     if (step.op != CampaignOp.Turn) yield return CloseBar();
+                    EndSettle();
                 }
 
                 switch (step.op)
@@ -205,17 +240,21 @@ namespace MetalRaptors
 
                     case CampaignOp.Spawn:
                         yield return Warn(step.groups);
+                        Fight(true);
                         _host.SpawnWave(step.groups, step.spread);
                         break;
 
                     case CampaignOp.Wave:
                         yield return Warn(step.groups);
+                        Fight(true);
                         _host.SpawnWave(step.groups, step.spread);
                         yield return WaitForClear();
+                        if (!FightAhead(index + 1)) Fight(false);
                         break;
 
                     case CampaignOp.WaitClear:
                         yield return WaitForClear();
+                        if (!FightAhead(index + 1)) Fight(false);
                         break;
 
                     case CampaignOp.Supply:
@@ -228,11 +267,15 @@ namespace MetalRaptors
 
                     case CampaignOp.Zeppelin:
                         yield return Wait(_host.WarnZeppelin());
+                        Fight(true);
                         if (_host.SpawnZeppelin()) yield return Zeppelin(step, index);
+                        if (!FightAhead(index + 1)) Fight(false);
                         break;
 
                     case CampaignOp.Onslaught:
+                        Fight(true);
                         yield return Onslaught(step, index);
+                        if (!FightAhead(index + 1)) Fight(false);
                         break;
 
                     case CampaignOp.Formation:
@@ -337,6 +380,45 @@ namespace MetalRaptors
                         while (Running && !finaleHost.FinaleDone) yield return null;
                         break;
 
+                    case CampaignOp.Village:
+                        if (_host is IValleyHost villageHost)
+                        {
+                            villageHost.AwaitVillage();
+                            while (Running && !villageHost.VillageEntered) yield return null;
+                        }
+                        break;
+
+                    case CampaignOp.Battery:
+                        yield return Battery(step);
+                        break;
+
+                    case CampaignOp.Settle:
+                        if (_host is ISettleHost settleHost)
+                        {
+                            settleHost.BeginSettle();
+                            _settling = true;
+                            while (Running && !settleHost.Settled) yield return null;
+                        }
+                        break;
+
+                    case CampaignOp.BombRun:
+                        if (_host is IValleyHost runHost)
+                        {
+                            runHost.BeginBombRun();
+                            while (Running && !runHost.BombRunDone) yield return null;
+                        }
+                        break;
+
+                    case CampaignOp.Wingman:
+                        if (_host is IValleyHost wingHost)
+                        {
+                            yield return Wait(step.seconds);
+                            if (!Running) yield break;
+                            wingHost.DownWingman();
+                            while (Running && !wingHost.WingmanDown) yield return null;
+                        }
+                        break;
+
                     case CampaignOp.Raid:
                         if (!Running) yield break;
                         if (_host is IRaidHost raidHost) raidHost.BeginRaid();
@@ -350,6 +432,45 @@ namespace MetalRaptors
             }
 
             yield return CloseBar();
+            EndSettle();
+            Fight(false);
+        }
+
+        static bool Fights(CampaignOp op) =>
+            op == CampaignOp.Wave || op == CampaignOp.Spawn || op == CampaignOp.WaitClear
+            || op == CampaignOp.Onslaught || op == CampaignOp.Zeppelin;
+
+        static bool Neutral(CampaignOp op) =>
+            op == CampaignOp.Wait || op == CampaignOp.Supply || op == CampaignOp.Foe
+            || op == CampaignOp.Warn || op == CampaignOp.Danger || op == CampaignOp.Unlock
+            || op == CampaignOp.Jams;
+
+        bool FightAhead(int from)
+        {
+            CampaignStep[] steps = _script.Steps;
+            for (int i = from; i < steps.Length; i++)
+            {
+                if (Fights(steps[i].op)) return true;
+                if (!Neutral(steps[i].op)) return false;
+            }
+            return false;
+        }
+
+        void Fight(bool on)
+        {
+            if (_fighting == on) return;
+            _fighting = on;
+            if (!(_host is IWingHost wing)) return;
+
+            if (on) wing.BeginFight();
+            else wing.EndFight();
+        }
+
+        void EndSettle()
+        {
+            if (!_settling) return;
+            _settling = false;
+            if (_host is ISettleHost settleHost) settleHost.EndSettle();
         }
 
         IEnumerator CloseBar()
@@ -517,7 +638,7 @@ namespace MetalRaptors
         bool Skipped()
         {
             if (Time.frameCount == _skipFrame) return false;
-            if (GameMenu.IsOpen || LevelBriefing.IsOpen || ScreenFade.IsBusy) return false;
+            if (GameMenu.IsOpen || LevelBriefing.IsOpen || DevFreeze.Active || ScreenFade.IsBusy) return false;
             if (!MenuInput.ReadSkip()) return false;
 
             _skipFrame = Time.frameCount;
@@ -593,6 +714,42 @@ namespace MetalRaptors
             yield return Reinforce(step.groups);
             _host.ArmSupply(0);
             if (Running) host.UnlockArena();
+        }
+
+        IEnumerator Battery(CampaignStep step)
+        {
+            if (!(_host is IValleyHost host)) yield break;
+
+            yield return Wait(host.WarnGuns(step.village));
+            if (!Running) yield break;
+
+            host.PlaceBattery(step.village);
+            while (Running && !host.BatteryInView) yield return null;
+            if (!Running) yield break;
+
+            host.LockBattery(step.village);
+            Fight(true);
+            if (step.count > 0) _host.ArmSupply(step.count);
+
+            if (step.waves != null)
+                foreach (EnemyGroup[] wave in step.waves)
+                {
+                    if (!Running || host.BatterySkipped) break;
+                    yield return Warn(wave);
+                    if (!Running || host.BatterySkipped) break;
+
+                    _host.SpawnWave(wave);
+                    yield return null;
+                    while (Running && _host.EnemiesAlive > 0 && !host.BatterySkipped) yield return null;
+                }
+
+            while (Running && !host.BatteryDown && !host.BatterySkipped) yield return null;
+            while (Running && _host.EnemiesAlive > 0) yield return null;
+            if (!Running) yield break;
+
+            Fight(false);
+            if (step.village) _host.ArmSupply(0);
+            host.ReleaseBattery(step.village);
         }
 
         IEnumerator Reinforce(EnemyGroup[] groups)

@@ -5,7 +5,6 @@ namespace MetalRaptors
     public class EnemyBarrel
     {
         const float FullTurn = 360f;
-        const float Ramp = 0.2f;
         const float MinUnwindRate = 180f;
         const float MinUnwindSec = 0.35f;
         const float MaxUnwindSec = 1.2f;
@@ -51,7 +50,7 @@ namespace MetalRaptors
 
             _t += dt;
             float u = Mathf.Clamp01(_t / _seconds);
-            Spin = _dir * FullTurn * _turns * Profile(u);
+            Spin = _dir * FullTurn * _turns * FlightSmoothing.RollProfile(u);
             if (u < 1f) return;
 
             Spin = 0f;
@@ -111,23 +110,12 @@ namespace MetalRaptors
             return FullTurn * _turns / _seconds * Slope(u);
         }
 
-        static float Profile(float u)
-        {
-            float peak = 1f / (1f - Ramp);
-            if (u < Ramp) return 0.5f * peak * u * u / Ramp;
-            if (u > 1f - Ramp)
-            {
-                float v = 1f - u;
-                return 1f - 0.5f * peak * v * v / Ramp;
-            }
-            return peak * (u - 0.5f * Ramp);
-        }
-
         static float Slope(float u)
         {
-            float peak = 1f / (1f - Ramp);
-            if (u < Ramp) return peak * u / Ramp;
-            if (u > 1f - Ramp) return peak * (1f - u) / Ramp;
+            const float ramp = FlightSmoothing.RollRamp;
+            float peak = 1f / (1f - ramp);
+            if (u < ramp) return peak * u / ramp;
+            if (u > 1f - ramp) return peak * (1f - u) / ramp;
             return peak;
         }
     }

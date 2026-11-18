@@ -208,7 +208,9 @@ namespace MetalRaptors
                 Quaternion.FromToRotation(Vector3.up, dir));
             go.name = "VehicleShell";
             go.SetActive(true);
-            go.GetComponent<Bullet>().Launch(dir, speed, damage, _collider, fromEnemy: true);
+            var round = go.GetComponent<Bullet>();
+            round.Launch(dir, speed, damage, _collider, fromEnemy: true);
+            round.Tail();
 
             MuzzleFlash.Spawn(muzzle, dir, flashSize);
             if (_shotClip != null) _audio.PlayOneShot(_shotClip, ShotVolume * AudioOptions.Scene);

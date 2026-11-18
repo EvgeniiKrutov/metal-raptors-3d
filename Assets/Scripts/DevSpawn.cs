@@ -153,4 +153,73 @@ namespace MetalRaptors
 
         public static void Run() => _reset?.Invoke();
     }
+
+    public static class DevCheats
+    {
+        public static bool Invulnerable { get; set; }
+
+        public static bool HighDamage { get; set; }
+
+        public static bool FastSpeed { get; set; }
+
+        public static bool FastReload { get; set; }
+
+        public static float DamageFactor => HighDamage ? 10f : 1f;
+
+        public static float SpeedFactor => FastSpeed ? 1.5f : 1f;
+
+        public static float FireIntervalFactor => FastReload ? 0.5f : 1f;
+
+        public static float CooldownFactor => FastReload ? 4f : 1f;
+
+        [UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void Reset()
+        {
+            Invulnerable = false;
+            HighDamage = false;
+            FastSpeed = false;
+            FastReload = false;
+        }
+    }
+
+    public static class DevFreeze
+    {
+        static System.Func<bool> _host;
+
+        public static bool Active { get; private set; }
+
+        public static bool CanFreeze => _host != null && _host() && !LevelOutro.IsOpen;
+
+        public static void Offer(System.Func<bool> allowed) => _host = allowed;
+
+        public static void Withdraw(System.Func<bool> allowed)
+        {
+            if (_host == allowed) _host = null;
+        }
+
+        public static void Begin()
+        {
+            Active = true;
+            UnityEngine.Time.timeScale = 0f;
+        }
+
+        public static void End()
+        {
+            if (!Active) return;
+
+            Active = false;
+            if (!GameMenu.IsOpen && !LevelBriefing.IsOpen && !LevelOutro.IsOpen) CutscenePause.Restore();
+        }
+
+        [UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void Clear()
+        {
+            Active = false;
+            _host = null;
+        }
+
+        [UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.BeforeSceneLoad)]
+        static void Install() =>
+            UnityEngine.SceneManagement.SceneManager.sceneLoaded += (scene, mode) => Active = false;
+    }
 }

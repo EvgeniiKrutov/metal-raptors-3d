@@ -14,7 +14,7 @@ namespace MetalRaptors
 
         public static bool Halted => Menu || ScreenFade.IsBusy;
 
-        static bool Menu => GameMenu.IsOpen || LevelBriefing.IsOpen || LevelOutro.IsOpen;
+        static bool Menu => GameMenu.IsOpen || LevelBriefing.IsOpen || LevelOutro.IsOpen || DevFreeze.Active;
 
         public static void Hold(float scale)
         {

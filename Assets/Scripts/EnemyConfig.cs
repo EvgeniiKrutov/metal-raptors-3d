@@ -186,14 +186,22 @@ namespace MetalRaptors
         [Tooltip("Hard cap on speed as a multiple of flySpeed.")]
         public float maxSpeedMultiplier = 1.6f;
 
-        [Header("Roller: stats")]
-        [Tooltip("Hit points of the Dr.I roller.")]
-        public float aceHealth = 90f;
+        public float energyMinFraction = 0.6f;
+
+        [Header("Duelist: stats")]
+        [Tooltip("Hit points of the Dr.I duelist.")]
+        public float aceHealth = 108f;
+
+        [Tooltip("Cruise speed as a multiple of the player's base speed.")]
+        public float aceSpeedFactor = 1.05f;
+
+        [Tooltip("Bullet damage as a multiple of the fighter's.")]
+        public float aceDamageFactor = 1.1f;
 
         [Tooltip("Turn rate as a multiple of the player's own, so the ace always out-turns them.")]
         public float aceTurnFactor = 1.1f;
 
-        [Header("Roller: barrel roll")]
+        [Header("Duelist: barrel roll")]
         [Tooltip("Seconds one barrel roll lasts; player bullets pass through meanwhile.")]
         public float barrelSeconds = 2.5f;
 
@@ -209,7 +217,7 @@ namespace MetalRaptors
         [Tooltip("The roll starts only inside this cone around the firing player's nose, degrees.")]
         public float barrelAimCone = 22f;
 
-        [Header("Roller: attack passes")]
+        [Header("Duelist: attack passes")]
         [Tooltip("Seconds of straight flight after passing the player, before the U-turn.")]
         public float aceAwaySeconds = 3f;
 
@@ -230,7 +238,7 @@ namespace MetalRaptors
         public const string ScoutAsset = "EnemyScoutConfig";
         public const string FighterAsset = "EnemyFighterConfig";
 
-        public static EnemyConfig Load(EnemyRole role)
+        public static EnemyConfig Load(EnemyRole role, float pace = 1f)
         {
             var asset = Resources.Load<EnemyConfig>(
                 role == EnemyRole.Scout ? ScoutAsset : FighterAsset);
@@ -240,6 +248,7 @@ namespace MetalRaptors
                 : ScriptableObject.CreateInstance<EnemyConfig>();
 
             config.role = role;
+            FlightPace.Apply(config, pace);
             return config;
         }
 
@@ -249,7 +258,8 @@ namespace MetalRaptors
             EnemyConfig config = Object.Instantiate(fighter);
             config.role = role;
             config.health = config.aceHealth;
-            if (playerSpeed > 0f) config.flySpeed = playerSpeed;
+            config.damage *= config.aceDamageFactor;
+            config.flySpeed = (playerSpeed > 0f ? playerSpeed : config.flySpeed) * config.aceSpeedFactor;
             if (playerTurnDeg > 0f)
                 config.rotationSpeed = Mathf.Max(config.rotationSpeed,
                     playerTurnDeg * config.aceTurnFactor);

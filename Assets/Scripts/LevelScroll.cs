@@ -8,13 +8,18 @@ namespace MetalRaptors
 
         public static float Velocity { get; private set; }
 
+        public static float Lookback { get; private set; }
+
         public static void Reset()
         {
             Sign = 1f;
             Velocity = 0f;
+            Lookback = 0f;
         }
 
         public static void Face(float sign) => Sign = sign < 0f ? -1f : 1f;
+
+        public static void AllowLookback(float distance) => Lookback = Mathf.Max(0f, distance);
 
         public static void Track(float velocity) => Velocity = velocity;
 

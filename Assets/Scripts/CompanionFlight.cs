@@ -28,8 +28,8 @@ namespace MetalRaptors
 
         const float PaceFilter = 3f;
         const float PaceGain = 0.35f;
-        const float PaceTrim = 55f;
-        const float PacePush = 90f;
+        const float PaceTrim = 55f * FlightPace.Fast;
+        const float PacePush = 90f * FlightPace.Fast;
         const float PaceCeiling = 1.6f;
 
         const float FoeEntryMargin = 160f;
@@ -44,6 +44,12 @@ namespace MetalRaptors
         const float HuntMax = 9f;
         const float CrossSeconds = 1.6f;
 
+        const float KillGap = 1f;
+
+        const float ArrowTip = 95f;
+        const float ArrowBack = 120f;
+        const float ArrowArm = 90f;
+
         const float BackSpread = 190f;
         const float BackRise = 130f;
         const float SupportStationAhead = 40f;
@@ -55,6 +61,13 @@ namespace MetalRaptors
         const float BumpDepthBand = 40f;
 
         enum Phase { Escort, Peel, Duel, Align, Roll, Form, Close }
+
+        class Doomed
+        {
+            public DuelPlane foe;
+            public System.Action after;
+            public bool revocable;
+        }
 
         class BackPair
         {
@@ -99,6 +112,12 @@ namespace MetalRaptors
         float _regroupTime;
         bool _parade;
         float _paradeTime;
+        bool _slaved;
+        float _facing = 1f;
+        bool _fight;
+        readonly List<Doomed> _doomed = new List<Doomed>();
+        float _doomIn;
+        float _lastKill = -999f;
 
         float _camX;
         float _camY;
@@ -110,6 +129,150 @@ namespace MetalRaptors
         float _ceilingY;
 
         public PlaneModelConfig FoePlane => _foePlane;
+
+        public bool Slaved => _slaved;
+
+        public bool CompanionGone => _companion == null;
+
+        public float Facing
+        {
+            set
+            {
+                float facing = value < 0f ? -1f : 1f;
+                _facing = facing;
+                if (_companion != null) _companion.SetFacing(facing);
+                foreach (BackPair pair in _backs)
+                    if (pair.friend != null) pair.friend.SetFacing(facing);
+            }
+        }
+
+        public void Close(float seconds)
+        {
+            if (_companion == null && _backs.Count == 0) return;
+
+            _slaved = true;
+            _regrouping = false;
+            _parade = false;
+
+            DropFoe();
+
+            if (_companion != null)
+            {
+                _companion.SetMark(null);
+                _companion.Slave(_player, Slot(0), seconds);
+            }
+
+            for (int i = 0; i < _backs.Count; i++)
+            {
+                BackPair pair = _backs[i];
+                DropBackFoe(pair);
+                pair.formed = true;
+                if (pair.friend != null) pair.friend.Slave(_player, Slot(i + 1), seconds);
+            }
+        }
+
+        public void Join()
+        {
+            if (_companion == null && _backs.Count == 0) return;
+
+            _slaved = true;
+            _regrouping = false;
+            _parade = false;
+
+            DropFoe();
+
+            var mates = new List<DuelPlane>();
+            if (_companion != null) mates.Add(_companion);
+            foreach (BackPair pair in _backs)
+                if (pair.friend != null) mates.Add(pair.friend);
+
+            if (_companion != null)
+            {
+                _companion.SetMark(null);
+                _companion.Join(_player, Slot(0), mates);
+            }
+
+            for (int i = 0; i < _backs.Count; i++)
+            {
+                BackPair pair = _backs[i];
+                DropBackFoe(pair);
+                pair.formed = true;
+                if (pair.friend != null) pair.friend.Join(_player, Slot(i + 1), mates);
+            }
+        }
+
+        public bool Joined(float reach)
+        {
+            if (_companion != null && !_companion.IsFalling && _companion.SlotGap > reach) return false;
+            foreach (BackPair pair in _backs)
+                if (pair.friend != null && !pair.friend.IsFalling && pair.friend.SlotGap > reach) return false;
+            return true;
+        }
+
+        public void Arrow(float seconds)
+        {
+            if (_companion != null) _companion.Reslot(ArrowSlot(0), seconds, true);
+            for (int i = 0; i < _backs.Count; i++)
+                if (_backs[i].friend != null) _backs[i].friend.Reslot(ArrowSlot(i + 1), seconds, true);
+        }
+
+        public void Unarrow(float seconds)
+        {
+            if (_companion != null) _companion.Reslot(Slot(0), seconds, true);
+            for (int i = 0; i < _backs.Count; i++)
+                if (_backs[i].friend != null) _backs[i].friend.Reslot(Slot(i + 1), seconds, true);
+        }
+
+        public void ManualFollow(bool on)
+        {
+            if (_companion != null) _companion.SetManualFollow(on);
+            foreach (BackPair pair in _backs)
+                if (pair.friend != null) pair.friend.SetManualFollow(on);
+        }
+
+        public void FreeFollow(bool on, float settleSec)
+        {
+            if (_companion != null) _companion.SetFreeFollow(on, settleSec);
+            foreach (BackPair pair in _backs)
+                if (pair.friend != null) pair.friend.SetFreeFollow(on, settleSec);
+        }
+
+        public void Follow(float dt)
+        {
+            if (_companion != null) _companion.FollowNow(dt);
+            foreach (BackPair pair in _backs)
+                if (pair.friend != null) pair.friend.FollowNow(dt);
+        }
+
+        public void ArrowSlots(List<Vector3> into)
+        {
+            if (_companion != null && !_companion.IsFalling) into.Add(ArrowSlot(0));
+            for (int i = 0; i < _backs.Count; i++)
+                if (_backs[i].friend != null && !_backs[i].friend.IsFalling) into.Add(ArrowSlot(i + 1));
+        }
+
+        Vector3 ArrowSlot(int index)
+        {
+            switch (_level.CompanionPilot(index))
+            {
+                case "roussel": return new Vector3(0f, 0f, -ArrowTip);
+                case "crane": return new Vector3(-ArrowBack, 0f, ArrowArm);
+                case "marchand": return new Vector3(-ArrowBack, 0f, -ArrowTip - ArrowArm);
+                default: return Slot(index);
+            }
+        }
+
+        public void Planes(List<Transform> into)
+        {
+            if (_companion != null && !_companion.IsFalling) into.Add(_companion.transform);
+            foreach (BackPair pair in _backs)
+                if (pair.friend != null && !pair.friend.IsFalling) into.Add(pair.friend.transform);
+        }
+
+        public void DownCompanion()
+        {
+            if (_companion != null && !_companion.IsFalling) _companion.Kill();
+        }
 
         CompanionFlight(CampaignDefinition level, PlayerConfig playerFlight, Transform player,
             float playZ, float groundY, float worldTop, float cameraDistance,
@@ -223,8 +386,121 @@ namespace MetalRaptors
                 return;
             }
 
+            if (!_fight)
+            {
+                pair.friend.SetRole(DuelRole.Cruise, null);
+                return;
+            }
+
             SpawnBackFoe(pair, at + new Vector3(BackSpread, 0f, 0f), playerFlight);
             BeginBackDuel(pair);
+        }
+
+        bool Gathered => _flyIn || _parade || _regrouping;
+
+        public void BeginFight()
+        {
+            _fight = true;
+            _doomed.RemoveAll(doomed => doomed.revocable);
+            if (_standDown || _slaved || Gathered) return;
+
+            foreach (BackPair pair in _backs)
+            {
+                if (pair.friend == null || pair.foe != null) continue;
+
+                SpawnBackFoe(pair, BackFoeEntry(pair), _flight);
+                if (pair.foe == null) continue;
+                if (pair.peeling) pair.foe.SetRole(DuelRole.Hunt, pair.friend);
+                else BeginBackDuel(pair);
+            }
+
+            if (_support || _companion == null || _foe != null) return;
+            if (_phase != Phase.Peel && _phase != Phase.Duel) return;
+
+            SpawnFoe();
+            if (_phase == Phase.Duel) BeginDuel();
+        }
+
+        public void EndFight()
+        {
+            _fight = false;
+
+            foreach (BackPair pair in _backs)
+            {
+                DuelPlane foe = pair.foe;
+                if (foe == null) continue;
+
+                Doom(foe, KillGap, () =>
+                {
+                    if (pair.foe != foe) return;
+                    pair.foe = null;
+                    if (foe != null) pair.wreck = foe;
+                    pair.peeling = false;
+                    pair.crossing = false;
+                    if (pair.friend != null) pair.friend.SetRole(DuelRole.Cruise, null);
+                }, true);
+            }
+
+            DuelPlane own = _foe;
+            if (own == null) return;
+
+            Doom(own, KillGap, () =>
+            {
+                if (_foe != own) return;
+                _foe = null;
+                if (own != null) _wreck = own;
+                _crossing = false;
+                if (_companion != null && (_phase == Phase.Peel || _phase == Phase.Duel))
+                    _companion.SetRole(DuelRole.Cruise, null);
+            }, true);
+        }
+
+        void Doom(DuelPlane foe, float delay, System.Action after, bool revocable = false)
+        {
+            if (foe == null || foe.IsFalling)
+            {
+                after?.Invoke();
+                return;
+            }
+
+            if (!InView(foe.transform.position))
+            {
+                Object.Destroy(foe.gameObject);
+                after?.Invoke();
+                return;
+            }
+
+            if (_doomed.Count == 0) _doomIn = Mathf.Max(delay, _lastKill + KillGap - Time.time);
+            _doomed.Add(new Doomed { foe = foe, after = after, revocable = revocable });
+        }
+
+        void TickDoomed(float dt)
+        {
+            if (_doomed.Count == 0) return;
+
+            _doomIn -= dt;
+            if (_doomIn > 0f) return;
+
+            Doomed next = _doomed[0];
+            _doomed.RemoveAt(0);
+
+            bool shot = next.foe != null && !next.foe.IsFalling;
+            if (shot)
+            {
+                next.foe.Kill();
+                _lastKill = Time.time;
+            }
+            next.after?.Invoke();
+            _doomIn = shot ? KillGap : 0f;
+        }
+
+        void DropFoe()
+        {
+            DuelPlane foe = _foe;
+            if (foe == null) return;
+
+            _foe = null;
+            Doom(foe, 0f, () => { if (foe != null) _wreck = foe; });
         }
 
         Vector3 BackFoeEntry(BackPair pair) => new Vector3(_camX + _halfView + FoeEntryMargin,
@@ -243,6 +519,7 @@ namespace MetalRaptors
                 pair.friend.SetRole(DuelRole.Peel, null);
                 pair.friend.SetDepth(_playZ + Depth, PeelSeconds);
 
+                if (!_fight || pair.foe != null) continue;
                 SpawnBackFoe(pair, BackFoeEntry(pair), _flight);
                 if (pair.foe != null) pair.foe.SetRole(DuelRole.Hunt, pair.friend);
             }
@@ -277,7 +554,18 @@ namespace MetalRaptors
             for (int i = 0; i < _backs.Count; i++)
             {
                 BackPair pair = _backs[i];
-                if (pair.friend == null || pair.foe == null) continue;
+                if (pair.friend == null) continue;
+                if (pair.foe == null)
+                {
+                    if (!pair.peeling) continue;
+
+                    pair.roleTimer -= dt;
+                    if (pair.roleTimer > 0f) continue;
+
+                    pair.peeling = false;
+                    pair.friend.SetRole(DuelRole.Cruise, null);
+                    continue;
+                }
 
                 pair.roleTimer -= dt;
                 if (pair.roleTimer > 0f) continue;
@@ -357,7 +645,7 @@ namespace MetalRaptors
             _halfHeight = halfViewHeight * _depthScale;
 
             ApplyView();
-            if (_standDown) return;
+            if (_standDown || _slaved) return;
 
             ApplyBand();
             ApplyPace();
@@ -373,6 +661,8 @@ namespace MetalRaptors
             if (_companion != null) _companion.SetView(minX, maxX, minY, maxY);
             if (_foe != null) _foe.SetView(minX, maxX, minY, maxY);
             if (_wreck != null) _wreck.SetView(minX, maxX, minY, maxY);
+            foreach (Doomed doomed in _doomed)
+                if (doomed.foe != null) doomed.foe.SetView(minX, maxX, minY, maxY);
 
             foreach (BackPair pair in _backs)
             {
@@ -398,7 +688,9 @@ namespace MetalRaptors
                 if (_support)
                 {
                     float play = _halfView / _depthScale;
-                    _companion.SetBounds(_camX - play * BandBehind, _camX + play * BandAhead,
+                    float behind = _facing < 0f ? BandAhead : BandBehind;
+                    float ahead = _facing < 0f ? BandBehind : BandAhead;
+                    _companion.SetBounds(_camX - play * behind, _camX + play * ahead,
                         _floorY, _ceilingY);
                 }
                 else
@@ -417,7 +709,8 @@ namespace MetalRaptors
 
         void ApplyPace()
         {
-            float pace = Mathf.Clamp(_camSpeed, DuelPlane.CruiseSpeed,
+            float floor = _flight != null ? Mathf.Clamp01(_flight.energyMinFraction) : 1f;
+            float pace = Mathf.Clamp(_camSpeed, DuelPlane.CruiseSpeed * floor,
                 DuelPlane.CruiseSpeed * PaceCeiling);
             float cruise = pace + Mathf.Clamp((StationX - CentreX) * PaceGain, -PaceTrim, PacePush);
 
@@ -435,7 +728,7 @@ namespace MetalRaptors
         {
             get
             {
-                if (_standDown || _companion == null) return true;
+                if (_standDown || _slaved || _companion == null) return true;
                 if (_phase != Phase.Escort && _phase != Phase.Peel && _phase != Phase.Duel)
                     return false;
                 return !_parade || BacksFormed;
@@ -456,7 +749,7 @@ namespace MetalRaptors
         {
             get
             {
-                if (_standDown || _companion == null) return true;
+                if (_standDown || _slaved || _companion == null) return true;
                 if (!_regrouping) return false;
                 if (_regroupTime >= FormLimit) return true;
                 if (_regroupTime < CloseSeconds) return false;
@@ -513,18 +806,11 @@ namespace MetalRaptors
 
         void DropBackFoe(BackPair pair)
         {
-            if (pair.foe == null) return;
+            DuelPlane foe = pair.foe;
+            if (foe == null) return;
 
-            if (InView(pair.foe.transform.position))
-            {
-                pair.foe.Kill();
-                pair.wreck = pair.foe;
-            }
-            else
-            {
-                Object.Destroy(pair.foe.gameObject);
-            }
             pair.foe = null;
+            Doom(foe, 0f, () => { if (foe != null) pair.wreck = foe; });
         }
 
         bool InView(Vector3 pos) =>
@@ -561,7 +847,7 @@ namespace MetalRaptors
         {
             if (value == _cinematic) return;
             _cinematic = value;
-            if (_standDown || _companion == null) return;
+            if (_standDown || _slaved || _companion == null) return;
 
             if (!value && (_flyIn || _parade)) BreakFormation();
 
@@ -626,7 +912,8 @@ namespace MetalRaptors
 
         public void Tick(float dt)
         {
-            if (_standDown || _companion == null) return;
+            TickDoomed(dt);
+            if (_standDown || _slaved || _companion == null) return;
 
             TickBack(dt);
             if (_regrouping) TickRegroup(dt);
@@ -676,7 +963,7 @@ namespace MetalRaptors
 
         public bool CheckBump(Transform playerTr)
         {
-            if (_companion == null || playerTr == null || _standDown) return false;
+            if (_companion == null || playerTr == null || _standDown || _slaved) return false;
             if (Time.time - _bumpTime < BumpCooldown) return false;
 
             Vector3 pos = _companion.transform.position;
@@ -698,9 +985,7 @@ namespace MetalRaptors
             {
                 if (pair.foe == null) continue;
 
-                pair.foe.Kill();
-                pair.wreck = pair.foe;
-                pair.foe = null;
+                DropBackFoe(pair);
 
                 SpawnBackFoe(pair, BackFoeEntry(pair), _flight);
                 BeginBackDuel(pair);
@@ -744,12 +1029,7 @@ namespace MetalRaptors
             _phase = Phase.Align;
             _phaseTimer = AlignLimit;
 
-            if (_foe != null)
-            {
-                _foe.Kill();
-                _wreck = _foe;
-                _foe = null;
-            }
+            DropFoe();
 
             _companion.HoldDepth();
             _companion.SetRole(DuelRole.Level, null);
@@ -790,7 +1070,7 @@ namespace MetalRaptors
 
         void SpawnFoe()
         {
-            if (_foe != null) return;
+            if (_foe != null || !_fight) return;
 
             float y = Mathf.Clamp(_player.position.y + Random.Range(-FoeEntryRise, FoeEntryRise),
                 _floorY, _ceilingY);
@@ -812,7 +1092,8 @@ namespace MetalRaptors
             _crossing = false;
             _companionHunts = true;
             _roleTimer = Random.Range(HuntMin, HuntMax);
-            ApplyRoles();
+            if (_foe == null) _companion.SetRole(DuelRole.Cruise, null);
+            else ApplyRoles();
         }
 
         void TickDuel(float dt)

@@ -14,13 +14,13 @@ namespace MetalRaptors
         const float BaseAlpha = 0.5f;
         const int BlobCountMin = 5, BlobCountMax = 9;
 
-        static readonly float[] LayerDepth = { -0.15f, 0.5f, 1.25f };
+        static readonly float[] LayerDepth = { 0f, 0.5f, 1.25f };
         static readonly float[] LayerFade = { 1f, 0.85f, 0.7f };
         static readonly int[] LowLayers = { 1, 2 };
 
         static readonly float[] DriftSpeed = { 6f, 12f, 24f };
         static readonly float[] Spacing = { 440f, 250f, 135f };
-        static readonly float[] CloudWidth = { 45f, 80f, 130f };
+        const float WidthMin = 80f, WidthMax = 120f;
 
         static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
         static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
@@ -58,13 +58,15 @@ namespace MetalRaptors
 
         Camera _cam;
         float _playPlaneZ;
-        float _speed, _spacing, _width;
+        float _speed, _spacing;
         Color _tint, _glow;
         bool _lowBand;
         float _lowLift;
         readonly List<Cloud> _clouds = new List<Cloud>();
         readonly List<Layer> _layers = new List<Layer>();
         float _time;
+
+        public float TopAltitude { get; set; } = MaxAltitude;
 
         public static CloudSystem Begin(Camera cam, Daytime daytime, Weather weather,
             CloudsPart part, float playPlaneZ)
@@ -79,7 +81,6 @@ namespace MetalRaptors
             sys._playPlaneZ = playPlaneZ;
             sys._speed = DriftSpeed[(int)part.speed];
             sys._spacing = Spacing[(int)part.frequency];
-            sys._width = CloudWidth[(int)part.size];
             sys._tint = tint;
             sys._glow = glow;
             sys._lowBand = lowBand;
@@ -153,7 +154,7 @@ namespace MetalRaptors
 
             float playDist = Mathf.Max(1f, _playPlaneZ - _cam.transform.position.z);
             for (int i = 0; i < LayerDepth.Length; i++)
-                AddLayer(i, playDist, MinAltitude, MaxAltitude);
+                AddLayer(i, playDist, MinAltitude, Mathf.Max(MinAltitude, TopAltitude));
 
             if (!_lowBand) return;
             foreach (int i in LowLayers)
@@ -215,12 +216,12 @@ namespace MetalRaptors
 
         void SpawnCloud(Layer layer, float x, float eyeY)
         {
-            float width = _width * layer.grade * Random.Range(0.7f, 1.4f);
+            float width = Random.Range(WidthMin, WidthMax) * layer.grade;
             var root = new GameObject("Cloud");
             root.transform.SetParent(transform, false);
             root.transform.position = new Vector3(x,
                 eyeY + (Random.Range(layer.minAltitude, layer.maxAltitude) - eyeY) * layer.grade,
-                _playPlaneZ + layer.depth + Random.Range(-layer.jitter, layer.jitter));
+                _playPlaneZ + layer.depth + Random.Range(Mathf.Max(-layer.jitter, -layer.depth), layer.jitter));
 
             var mat = BuildMaterial(layer.fade);
             int count = Random.Range(BlobCountMin, BlobCountMax + 1);

@@ -43,8 +43,8 @@ namespace MetalRaptors
             _root.pivot = new Vector2(0f, 0.5f);
             _root.sizeDelta = new Vector2(width, height);
             _root.anchoredPosition = new Vector2(
-                HudTheme.ColumnLeft + HudTheme.BarWidth + HudTheme.BarHeight * GapShare,
-                -HudTheme.ColumnTop - HudTheme.BarHeight * 0.5f);
+                HudTheme.ClusterRight + HudTheme.BarHeight * GapShare,
+                HudTheme.DialCentre.y);
 
             _group = go.GetComponent<CanvasGroup>();
             _group.alpha = 0f;

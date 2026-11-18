@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace MetalRaptors
 {
@@ -6,6 +7,14 @@ namespace MetalRaptors
     public class Bullet : MonoBehaviour
     {
         public const int Layer = 12;
+
+        const float TailLengths = 12f;
+        const float TailWidth = 0.9f;
+        const float TailStep = 0.6f;
+        const float TailAlpha = 0.55f;
+        const float TailNightAlpha = 0.25f;
+
+        static readonly Color TailColor = new Color(0.80f, 0.80f, 0.78f);
 
         const float MaxLife = 6f;
         const float HitRadius = 3f;
@@ -16,6 +25,8 @@ namespace MetalRaptors
 
         static readonly RaycastHit[] Sweep = new RaycastHit[8];
 
+        static Material _tailMaterial;
+
         float _damage;
         Camera _cam;
         bool _wasOnScreen;
@@ -25,6 +36,7 @@ namespace MetalRaptors
         float _age;
         Rigidbody _rb;
         Collider _ignore;
+        TrailRenderer _tail;
 
         public static GameObject BuildTemplate(Color color)
         {
@@ -68,6 +80,73 @@ namespace MetalRaptors
             _rb.linearVelocity = direction * speed;
         }
 
+        public void Tail()
+        {
+            if (_tail != null || _rb == null) return;
+
+            Material material = TailMaterial();
+            float speed = _rb.linearVelocity.magnitude;
+            if (material == null || speed < 1f) return;
+
+            Vector3 size = transform.lossyScale;
+
+            var go = new GameObject("Tail");
+            go.transform.SetParent(transform, false);
+            go.transform.localPosition = Vector3.down;
+
+            _tail = go.AddComponent<TrailRenderer>();
+            _tail.time = TailLengths * size.y * 2f / speed;
+            _tail.widthCurve = new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(1f, 0f));
+            _tail.widthMultiplier = size.x * TailWidth;
+            _tail.colorGradient = TailGradient(NightLightingController.Running ? TailNightAlpha : TailAlpha);
+            _tail.minVertexDistance = TailStep;
+            _tail.autodestruct = false;
+            _tail.alignment = LineAlignment.View;
+            _tail.numCapVertices = 0;
+            _tail.sharedMaterial = material;
+            _tail.shadowCastingMode = ShadowCastingMode.Off;
+            _tail.receiveShadows = false;
+            _tail.lightProbeUsage = LightProbeUsage.Off;
+            _tail.reflectionProbeUsage = ReflectionProbeUsage.Off;
+        }
+
+        static Gradient TailGradient(float alpha)
+        {
+            var gradient = new Gradient();
+            gradient.SetKeys(
+                new[] { new GradientColorKey(TailColor, 0f), new GradientColorKey(TailColor, 1f) },
+                new[]
+                {
+                    new GradientAlphaKey(alpha, 0f),
+                    new GradientAlphaKey(alpha * 0.55f, 0.35f),
+                    new GradientAlphaKey(0f, 1f),
+                });
+            return gradient;
+        }
+
+        static Material TailMaterial()
+        {
+            if (_tailMaterial != null) return _tailMaterial;
+
+            var shader = Shader.Find("Hidden/RoundTail");
+            if (shader == null) return null;
+
+            _tailMaterial = new Material(shader) { name = "Round Tail (runtime)" };
+            return _tailMaterial;
+        }
+
+        void Vanish()
+        {
+            if (_tail != null)
+            {
+                _tail.transform.SetParent(null, true);
+                _tail.emitting = false;
+                Destroy(_tail.gameObject, _tail.time);
+                _tail = null;
+            }
+            Destroy(gameObject);
+        }
+
         void FixedUpdate()
         {
             if (_spent || _rb == null) return;
@@ -102,7 +181,7 @@ namespace MetalRaptors
         void Update()
         {
             _age += Time.deltaTime;
-            if (_age > MaxLife) { Destroy(gameObject); return; }
+            if (_age > MaxLife) { Vanish(); return; }
 
             if (_cam == null) return;
 
@@ -112,7 +191,7 @@ namespace MetalRaptors
                          && vp.y > -0.05f && vp.y < 1.05f;
 
             if (onScreen) _wasOnScreen = true;
-            else if (_wasOnScreen) Destroy(gameObject);
+            else if (_wasOnScreen) Vanish();
         }
 
         void OnCollisionEnter(Collision collision)
@@ -142,7 +221,7 @@ namespace MetalRaptors
         void Spend()
         {
             _spent = true;
-            Destroy(gameObject);
+            Vanish();
         }
     }
 }

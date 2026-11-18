@@ -4,11 +4,11 @@ namespace MetalRaptors
     {
         Scout,
         Fighter,
-        Roller,
+        Duelist,
     }
 
     public static class EnemyRoles
     {
-        public static bool IsAce(EnemyRole role) => role == EnemyRole.Roller;
+        public static bool IsAce(EnemyRole role) => role == EnemyRole.Duelist;
     }
 }

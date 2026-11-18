@@ -8,7 +8,8 @@ namespace MetalRaptors
     {
         Wait, Say, Wave, Spawn, WaitClear, Supply, Foe, Zeppelin, Onslaught, Formation, Warn,
         Danger, Arena, Boss, Duel, Escape, Raid, Unlock, Jams, Boost, Turn, Assault, Disarm, Finish,
-        Stealth, Patrol, Lull, Backup, AaGun, Tunnel, Uboat
+        Stealth, Patrol, Lull, Backup, AaGun, Tunnel, Uboat,
+        Village, Battery, BombRun, Wingman, Settle
     }
 
     public class CampaignStep
@@ -19,6 +20,8 @@ namespace MetalRaptors
         public string text;
         public EnemyGroup[] groups;
         public EnemyGroup[] hit;
+        public EnemyGroup[][] waves;
+        public bool village;
         public PlaneModelConfig plane;
         public int count;
         public bool air;
@@ -56,7 +59,8 @@ namespace MetalRaptors
         {
             Steps = steps;
             foreach (CampaignStep step in steps)
-                if (step.op == CampaignOp.Supply || (step.op == CampaignOp.AaGun && step.count > 0))
+                if (step.op == CampaignOp.Supply
+                    || ((step.op == CampaignOp.AaGun || step.op == CampaignOp.Battery) && step.count > 0))
                 {
                     HasSupply = true;
                     break;
@@ -201,6 +205,12 @@ namespace MetalRaptors
                         count = Mathf.Max(0, Mathf.RoundToInt(Number(step, "supply", 0f))),
                     };
                 case "uboat": return new CampaignStep { op = CampaignOp.Uboat };
+                case "village": return new CampaignStep { op = CampaignOp.Village };
+                case "battery": return ParseBattery(step, origin, index);
+                case "bombrun": return new CampaignStep { op = CampaignOp.BombRun };
+                case "settle": return new CampaignStep { op = CampaignOp.Settle };
+                case "wingman":
+                    return new CampaignStep { op = CampaignOp.Wingman, seconds = Seconds(step) };
                 case "tunnel": return new CampaignStep { op = CampaignOp.Tunnel };
                 case "finish": return new CampaignStep { op = CampaignOp.Finish };
                 default:
@@ -322,12 +332,34 @@ namespace MetalRaptors
             };
         }
 
+        static CampaignStep ParseBattery(Dictionary<string, object> step, string origin, int index)
+        {
+            var waves = new List<EnemyGroup[]>();
+            if (Value(step, "waves") is List<object> list)
+                foreach (object entry in list)
+                {
+                    List<EnemyGroup> groups = GroupsFrom(entry as List<object>, origin, index);
+                    if (groups.Count > 0) waves.Add(groups.ToArray());
+                }
+
+            return new CampaignStep
+            {
+                op = CampaignOp.Battery,
+                waves = waves.ToArray(),
+                village = Value(step, "village") is bool walled && walled,
+                count = Mathf.Max(0, Mathf.RoundToInt(Number(step, "supply", 0f))),
+            };
+        }
+
         static List<EnemyGroup> Groups(Dictionary<string, object> step, string origin, int index,
-            string key = "enemies")
+            string key = "enemies") =>
+            GroupsFrom(Value(step, key) as List<object>, origin, index);
+
+        static List<EnemyGroup> GroupsFrom(List<object> list, string origin, int index)
         {
             var groups = new List<EnemyGroup>();
 
-            if (Value(step, key) is List<object> list)
+            if (list != null)
             {
                 foreach (object entry in list)
                 {

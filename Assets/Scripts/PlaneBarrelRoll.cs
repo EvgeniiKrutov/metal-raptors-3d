@@ -5,6 +5,10 @@ namespace MetalRaptors
 {
     public class PlaneBarrelRoll : MonoBehaviour
     {
+        public const float DuelistSeconds = 2.5f;
+        const float FullTurn = 360f;
+        const float MinRollRate = 40f;
+
         public float Charge => _config == null
             ? 1f
             : IsRunning
@@ -27,15 +31,18 @@ namespace MetalRaptors
         CubeController _plane;
         WingStreaks _trails;
         float _spinScale = 1f;
+        bool _rateRoll;
         float _cooldown;
         bool _wasRolling;
 
         public void Initialize(PlayerConfig config, CubeController plane, Transform model,
-            float spinScale = 1f, bool streaks = true, PlaneModelConfig planeModel = null)
+            float spinScale = 1f, bool streaks = true, PlaneModelConfig planeModel = null,
+            bool rateRoll = false)
         {
             _config = config;
             _plane = plane;
             _spinScale = Mathf.Max(0.01f, spinScale);
+            _rateRoll = rateRoll;
             if (streaks) _trails = WingStreaks.Mount(gameObject, model, null, planeModel);
         }
 
@@ -49,12 +56,14 @@ namespace MetalRaptors
 
         public void Request()
         {
-            if (!IsReady || IsRunning || GameMenu.IsOpen || LevelBriefing.IsOpen) return;
-            if (_plane == null || !_plane.BeginBarrelRoll(RollRate, _config.rollGrace)) return;
+            if (!IsReady || IsRunning || GameMenu.IsOpen || LevelBriefing.IsOpen || DevFreeze.Active) return;
+            if (_plane == null || !_plane.BeginBarrelRoll(RollSeconds, 1f, _config.rollGrace)) return;
 
             _wasRolling = true;
             if (_trails != null) _trails.SetEmitting(this, true);
         }
+
+        float RollSeconds => _rateRoll ? FullTurn / Mathf.Max(MinRollRate, RollRate) : DuelistSeconds;
 
         float RollRate => _config == null
             ? 0f
@@ -62,7 +71,7 @@ namespace MetalRaptors
 
         void Update()
         {
-            if (_config == null || GameMenu.IsOpen || LevelBriefing.IsOpen) return;
+            if (_config == null || GameMenu.IsOpen || LevelBriefing.IsOpen || DevFreeze.Active) return;
 
             if (_wasRolling)
             {
@@ -70,7 +79,7 @@ namespace MetalRaptors
                 return;
             }
 
-            _cooldown = Mathf.Max(0f, _cooldown - Time.deltaTime);
+            _cooldown = Mathf.Max(0f, _cooldown - Time.deltaTime * DevCheats.CooldownFactor);
 
             var kb = Keyboard.current;
             if (kb != null && kb.bKey.wasPressedThisFrame) { Request(); return; }

@@ -160,7 +160,7 @@ namespace MetalRaptors
 
         bool TappedKey()
         {
-            if (!_repairs || GameMenu.IsOpen || LevelBriefing.IsOpen) return false;
+            if (!_repairs || GameMenu.IsOpen || LevelBriefing.IsOpen || DevFreeze.Active) return false;
 
             var kb = Keyboard.current;
             return kb != null && kb.hKey.wasPressedThisFrame;

@@ -70,13 +70,13 @@ namespace MetalRaptors
 
         public void Toggle()
         {
-            if (GameMenu.IsOpen || LevelBriefing.IsOpen) return;
+            if (GameMenu.IsOpen || LevelBriefing.IsOpen || DevFreeze.Active) return;
             SetOn(!_on);
         }
 
         void Update()
         {
-            if (GameMenu.IsOpen || LevelBriefing.IsOpen) return;
+            if (GameMenu.IsOpen || LevelBriefing.IsOpen || DevFreeze.Active) return;
 
             var kb = Keyboard.current;
             if (kb != null && kb.tKey.wasPressedThisFrame) SetOn(!_on);

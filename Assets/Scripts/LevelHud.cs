@@ -12,6 +12,7 @@ namespace MetalRaptors
         const string BombHint = "H to bomb  •  ";
         const string BoostHint = "R to boost  •  ";
         const string RollHint = "B to roll  •  ";
+        const string LightHint = "T for light  •  ";
 
         const string ArenaKeyHint = "W A S D to fly  •  F to fire  •  B to roll  •  ";
 
@@ -26,8 +27,6 @@ namespace MetalRaptors
         const string RepairTouchHint = "PLANE DAMAGED  •  TAP FIX ×";
         static readonly Color RepairColor = new Color(0.42f, 0.95f, 0.5f, 1f);
 
-        const float BossGap = 0.35f;
-
         readonly CubeController _plane;
         readonly PlaneShooter _shooter;
         readonly PlaneBomber _bomber;
@@ -37,22 +36,18 @@ namespace MetalRaptors
         readonly RearGun _gun;
         readonly GunnerAutopilot _pilot;
 
-        readonly HealthBar _health;
+        readonly HealthDial _health;
         readonly HealthBar _airfieldBar;
         readonly Airfield _airfield;
-        readonly CooldownSquare _bombSquare;
-        readonly CooldownSquare _boostSquare;
-        readonly CooldownSquare _rollSquare;
-        readonly CooldownSquare _diveSquare;
-        readonly CooldownSquare _fireSquare;
-        readonly CooldownSquare _fixSquare;
-        readonly CooldownSquare _lightSquare;
-        readonly List<CooldownSquare> _column = new List<CooldownSquare>();
+        readonly SkillDial _bombDial;
+        readonly SkillDial _boostDial;
+        readonly SkillDial _rollDial;
+        readonly SkillDial _diveDial;
+        readonly SkillDial _fireDial;
+        readonly SkillDial _fixDial;
+        readonly SkillDial _lightDial;
+        readonly List<SkillDial> _cluster = new List<SkillDial>();
         readonly List<PlaneAbility> _needs = new List<PlaneAbility>();
-        readonly float _columnX;
-        readonly float _columnTop;
-        readonly float _bossDrop;
-        bool _bossShown;
 
         readonly Text _hint;
         readonly Text _jam;
@@ -68,8 +63,6 @@ namespace MetalRaptors
         readonly bool _arena;
         bool _disarmed;
         Camera _cam;
-
-        public Vector2 BossSlot { get; }
 
         public LevelHud(Transform parent, string objective, CubeController plane,
             PlaneShooter shooter, PlaneBomber bomber, PlaneBoost boost, PlaneBarrelRoll roll,
@@ -90,50 +83,31 @@ namespace MetalRaptors
             _roll = roll;
             _searchlight = searchlight;
 
-            float x = HudTheme.ColumnLeft;
-            float y = HudTheme.ColumnTop;
-
-            _health = new HealthBar(parent, new Vector2(x, -y));
-            y += HudTheme.BarHeight + HudTheme.BarToColumn;
-
-            if (arena)
-            {
-                float above = y;
-                y += HudTheme.BarHeight * BossGap;
-                BossSlot = new Vector2(x, -y);
-                y += HudTheme.BarHeight + HudTheme.BarToColumn;
-                _bossDrop = y - above;
-            }
+            _health = new HealthDial(parent, HudTheme.DialCentre);
 
             if (_airfield != null)
-            {
-                _airfieldBar = new HealthBar(parent, new Vector2(x, -y), AirfieldCaption);
-                y += HudTheme.BarHeight + HudTheme.BarToColumn;
-            }
-
-            _columnX = x;
-            _columnTop = y;
+                _airfieldBar = new HealthBar(parent, AirfieldCaption, HudTheme.Fill);
 
             if (!arena)
             {
-                _bombSquare = Square(parent, HudTheme.Label("H", "BOMB"), RequestBomb,
-                    PlaneAbility.Bomb);
-                _boostSquare = Square(parent, HudTheme.Label("R", "BOOST"), RequestBoost,
-                    PlaneAbility.Boost);
+                _bombDial = Skill(parent, HudIcon.Bomb, RequestBomb, PlaneAbility.Bomb);
+                _boostDial = Skill(parent, HudIcon.Boost, RequestBoost, PlaneAbility.Boost);
             }
             if (pilot != null)
-                _diveSquare = Square(parent, HudTheme.Label("R", "DIVE"), RequestDive,
-                    PlaneAbility.Dive);
+                _diveDial = Skill(parent, HudIcon.Dive, RequestDive, PlaneAbility.Dive);
             if (!arena || _roll != null)
-                _rollSquare = Square(parent, HudTheme.Label("B", "ROLL"), RequestRoll,
-                    PlaneAbility.Roll);
-            if (HudTheme.IsTouch)
-                _fireSquare = Square(parent, "FIRE", null, PlaneAbility.None, holdable: true);
+                _rollDial = Skill(parent, HudIcon.Roll, RequestRoll, PlaneAbility.Roll);
             if (HudTheme.IsTouch && gun != null)
-                _fixSquare = Square(parent, "FIX", RequestFix, PlaneAbility.None);
+                _fixDial = Skill(parent, HudIcon.Fix, RequestFix, PlaneAbility.None);
             if (_searchlight != null)
-                _lightSquare = Square(parent, HudTheme.Label("T", "LIGHT"), ToggleLight,
-                    PlaneAbility.None);
+                _lightDial = Skill(parent, HudIcon.Light, ToggleLight, PlaneAbility.None);
+
+            if (HudTheme.IsTouch)
+            {
+                _fireDial = new SkillDial(parent, HudTheme.SkillAnchor, HudIcon.Fire,
+                    HudTheme.FireSize, null, holdable: true);
+                _fireDial.Place(HudTheme.FireCentre);
+            }
 
             Layout();
 
@@ -146,8 +120,13 @@ namespace MetalRaptors
             }
 
             if (HudTheme.IsTouch && onPause != null)
-                new CooldownSquare(parent, new Vector2(-HudTheme.ColumnRight, -HudTheme.ColumnTop),
-                    "P", onPause, fromRight: true);
+            {
+                float half = HudTheme.SkillSize * 0.5f;
+                var pause = new SkillDial(parent, Vector2.one, HudIcon.Pause, HudTheme.SkillSize,
+                    onPause);
+                pause.Place(new Vector2(-(HudTheme.ColumnRight + half),
+                    -(HudTheme.ColumnTop + half)));
+            }
 
             _hint = UIFactory.CreateText(parent, HintText(), HudTheme.HintSize, Vector2.zero,
                 Vector2.zero);
@@ -187,35 +166,39 @@ namespace MetalRaptors
             return label;
         }
 
-        CooldownSquare Square(Transform parent, string label, System.Action onPress,
-            PlaneAbility needs, bool holdable = false)
+        SkillDial Skill(Transform parent, HudIcon icon, System.Action onPress, PlaneAbility needs)
         {
-            var square = new CooldownSquare(parent, Vector2.zero, label, onPress, holdable);
-            square.Root.SetActive(Has(needs));
-            _column.Add(square);
+            var dial = new SkillDial(parent, HudTheme.SkillAnchor, icon, HudTheme.SkillSize,
+                onPress);
+            dial.Root.SetActive(Has(needs));
+            _cluster.Add(dial);
             _needs.Add(needs);
-            return square;
+            return dial;
         }
 
         bool Has(PlaneAbility needs) => (_abilities & needs) == needs;
 
-        public void ShowBossSlot()
-        {
-            if (_bossShown) return;
-
-            _bossShown = true;
-            Layout();
-        }
-
         void Layout()
         {
-            float y = _columnTop - (_bossShown ? 0f : _bossDrop);
-            for (int i = 0; i < _column.Count; i++)
+            int shown = 0;
+            for (int i = 0; i < _cluster.Count; i++)
+                if (Has(_needs[i])) shown++;
+
+            Vector2 hub = HudTheme.SkillHub;
+            float orbit = HudTheme.SkillOrbit;
+            float step = HudTheme.SkillStep;
+            float turn = HudTheme.SkillTurn;
+
+            int slot = 0;
+            for (int i = 0; i < _cluster.Count; i++)
             {
                 if (!Has(_needs[i])) continue;
 
-                _column[i].Place(new Vector2(_columnX, -y));
-                y += HudTheme.SquarePitch;
+                float angle = (HudTheme.SkillMid + (slot - (shown - 1) * 0.5f) * step)
+                              * Mathf.Deg2Rad;
+                _cluster[i].Place(hub
+                    + new Vector2(Mathf.Cos(angle), turn * Mathf.Sin(angle)) * orbit);
+                slot++;
             }
         }
 
@@ -233,6 +216,7 @@ namespace MetalRaptors
             if (Has(PlaneAbility.Bomb)) keys += BombHint;
             if (Has(PlaneAbility.Boost)) keys += BoostHint;
             if (Has(PlaneAbility.Roll)) keys += RollHint;
+            if (_searchlight != null) keys += LightHint;
             return keys + _objective;
         }
 
@@ -243,12 +227,12 @@ namespace MetalRaptors
 
             _abilities |= fresh;
 
-            for (int i = 0; i < _column.Count; i++)
+            for (int i = 0; i < _cluster.Count; i++)
             {
                 if ((_needs[i] & fresh) == PlaneAbility.None) continue;
 
-                if (curtain != null) curtain.Reveal(_column[i].Root);
-                else _column[i].Root.SetActive(true);
+                if (curtain != null) curtain.Reveal(_cluster[i].Root);
+                else _cluster[i].Root.SetActive(true);
             }
 
             Layout();
@@ -259,32 +243,33 @@ namespace MetalRaptors
         {
             _disarmed = true;
 
-            foreach (CooldownSquare square in new[] { _diveSquare, _fireSquare })
+            foreach (SkillDial dial in new[] { _diveDial, _fireDial })
             {
-                if (square == null) continue;
+                if (dial == null) continue;
 
-                if (curtain != null) curtain.Withdraw(square.Root);
-                else square.Root.SetActive(false);
+                if (curtain != null) curtain.Withdraw(dial.Root);
+                else dial.Root.SetActive(false);
             }
         }
 
         public void Tick()
         {
-            if (_bombSquare != null && _bomber != null)
-                _bombSquare.Set(_bomber.Charge, _bomber.IsReady);
-            if (_boostSquare != null && _boost != null)
-                _boostSquare.Set(_boost.Charge, _boost.IsReady || _boost.IsRunning);
-            if (_rollSquare != null && _roll != null)
-                _rollSquare.Set(_roll.Charge, _roll.IsReady || _roll.IsRunning);
-            if (_diveSquare != null && _pilot != null)
-                _diveSquare.Set(_pilot.Charge, _pilot.IsReady || _pilot.IsRunning);
-            if (_fireSquare != null && _shooter != null)
+            if (_bombDial != null && _bomber != null)
+                _bombDial.Set(_bomber.Charge, _bomber.IsReady);
+            if (_boostDial != null && _boost != null)
+                _boostDial.Set(_boost.Charge, _boost.IsReady || _boost.IsRunning);
+            if (_rollDial != null && _roll != null)
+                _rollDial.Set(_roll.Charge, _roll.IsReady || _roll.IsRunning);
+            if (_diveDial != null && _pilot != null)
+                _diveDial.Set(_pilot.Charge, _pilot.IsReady || _pilot.IsRunning);
+            if (_fireDial != null && _shooter != null)
             {
-                _fireSquare.Set(0f, _shooter.IsReady);
-                _shooter.SetHeld(_fireSquare.Held);
+                _fireDial.Set(0f, _shooter.IsReady);
+                _shooter.SetHeld(_fireDial.Held);
             }
-            if (_lightSquare != null && _searchlight != null)
-                _lightSquare.Set(0f, _searchlight.IsOn);
+            if (_lightDial != null && _searchlight != null)
+                _lightDial.Set(0f, _searchlight.IsOn);
+            if (_fixDial != null) _fixDial.Set(0f, true);
             if (_health != null && _plane != null)
                 _health.Set(_plane.CurrentHealth, _plane.MaxHealth);
 
@@ -301,8 +286,8 @@ namespace MetalRaptors
             if (_repair == null) return;
 
             int taps = _supply != null && _supply.Repairing && _gun.Ready ? _supply.RepairLeft : 0;
-            if (_fixSquare != null && _fixSquare.Root.activeSelf != taps > 0)
-                _fixSquare.Root.SetActive(taps > 0);
+            if (_fixDial != null && _fixDial.Root.activeSelf != taps > 0)
+                _fixDial.Root.SetActive(taps > 0);
             if (taps == _repairShown) return;
 
             _repairShown = taps;
@@ -326,7 +311,7 @@ namespace MetalRaptors
         {
             if (_stick == null || _plane == null) return;
 
-            bool steerable = _plane.Steerable && !GameMenu.IsOpen && !_disarmed;
+            bool steerable = _plane.Steerable && !GameMenu.IsOpen && !DevFreeze.Active && !_disarmed;
             _stick.SetVisible(steerable);
 
             if (_gun != null)

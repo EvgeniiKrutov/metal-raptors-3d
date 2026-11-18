@@ -448,8 +448,9 @@ namespace MetalRaptors
                 Quaternion.FromToRotation(Vector3.up, dir));
             go.name = "ZeppelinRound";
             go.SetActive(true);
-            go.GetComponent<Bullet>().Launch(dir, BulletSpeed, BulletDamage, _collider,
-                fromEnemy: true);
+            var round = go.GetComponent<Bullet>();
+            round.Launch(dir, BulletSpeed, BulletDamage, _collider, fromEnemy: true);
+            round.Tail();
 
             MuzzleFlash.Spawn(start, dir, FlashSize);
             if (_shotClip != null) _audio.PlayOneShot(_shotClip, ShotVolume * AudioOptions.Scene);

@@ -526,7 +526,7 @@ namespace MetalRaptors
 
         void UpdatePause(float dt)
         {
-            bool wantPause = GameMenu.IsOpen && !_gameOver;
+            bool wantPause = (GameMenu.IsOpen || DevFreeze.Active) && !_gameOver;
 
             if (wantPause && !_paused)
             {

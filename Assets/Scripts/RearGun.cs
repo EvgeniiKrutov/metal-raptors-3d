@@ -251,7 +251,7 @@ namespace MetalRaptors
 
         static float Keys()
         {
-            if (GameMenu.IsOpen || LevelBriefing.IsOpen) return 0f;
+            if (GameMenu.IsOpen || LevelBriefing.IsOpen || DevFreeze.Active) return 0f;
 
             var kb = Keyboard.current;
             if (kb == null) return 0f;

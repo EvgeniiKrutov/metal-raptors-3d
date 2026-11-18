@@ -17,6 +17,8 @@ namespace MetalRaptors
         const float FlickerDepth = 0.32f;
         const float GrowSec = 0.6f;
         const float Emission = 3.2f;
+        const float HouseSpreadSec = 1.6f;
+        const float HouseSmokeAlpha = 0.8f;
 
         const float SmokeEvery = 0.07f;
         const float SmokeLife = 7f;
@@ -66,9 +68,13 @@ namespace MetalRaptors
         float _size;
         float _age;
         float _smokeIn;
+        int _patches = Patches;
+        float _smokeEvery = SmokeEvery;
+        float _smokeAlpha = 1f;
+        float _spreadSec = SpreadSec;
         NightLight2D _light;
 
-        public static PhosphorusFire Begin(Vector3 centre, float size, int seed)
+        public static PhosphorusFire Begin(Vector3 centre, float size, int seed, float density = 1f)
         {
             var go = new GameObject("Phosphorus Fire");
             go.transform.position = centre;
@@ -76,61 +82,95 @@ namespace MetalRaptors
             var fire = go.AddComponent<PhosphorusFire>();
             fire._size = Mathf.Max(10f, size);
             fire._rng = new System.Random(seed);
+            float share = Mathf.Clamp(density, 0.1f, 1f);
+            fire._patches = Mathf.Max(4, Mathf.RoundToInt(Patches * share));
+            fire._smokeEvery = SmokeEvery / share;
             fire.Build();
             NightLights.Flash(centre, LightColor, FlashIntensity, fire._size * FlashRadius, FlashSec, 10);
             return fire;
         }
 
+        public static PhosphorusFire House(Vector3 centre, IReadOnlyList<Vector3> spots, float size, int seed,
+            float smoke)
+        {
+            var go = new GameObject("Phosphorus Fire");
+            go.transform.position = centre;
+
+            var fire = go.AddComponent<PhosphorusFire>();
+            fire._size = Mathf.Max(10f, size);
+            fire._rng = new System.Random(seed);
+            fire._smokeEvery = SmokeEvery / Mathf.Clamp(smoke, 0.05f, 1f);
+            fire._smokeAlpha = HouseSmokeAlpha;
+            fire._spreadSec = HouseSpreadSec;
+
+            float far = 1f;
+            Vector3 first = spots.Count > 0 ? spots[0] : centre;
+            foreach (Vector3 spot in spots) far = Mathf.Max(far, (spot - first).magnitude);
+            foreach (Vector3 spot in spots) fire.Kindle(spot - centre, (spot - first).magnitude / far);
+            if (fire._spots.Count == 0) fire.Kindle(Vector3.zero, 0f);
+            fire.Lamp();
+
+            NightLights.Flash(first, LightColor, FlashIntensity, fire._size * FlashRadius, FlashSec, 10);
+            return fire;
+        }
+
         void Build()
         {
-            var shader = NightReceivers.Lit;
-
-            for (int p = 0; p < Patches; p++)
+            for (int p = 0; p < _patches; p++)
             {
-                float reach = p == 0 ? 0f : Mathf.Sqrt((float)p / (Patches - 1));
+                float reach = p == 0 ? 0f : Mathf.Sqrt((float)p / (_patches - 1));
                 float turn = Range(0f, Mathf.PI * 2f);
-                var spot = new Vector3(Mathf.Cos(turn) * reach * ReachX * _size, 0f,
-                    Mathf.Sin(turn) * reach * ReachZ * _size);
-                _spots.Add(spot);
-
-                for (int i = 0; i < FlamesPerPatch; i++)
-                {
-                    var go = new GameObject("White Flame");
-                    go.transform.SetParent(transform, false);
-                    go.transform.localPosition = spot + new Vector3(
-                        Range(-FlameJitter, FlameJitter) * _size,
-                        Range(FlameRiseMin, FlameRiseMax) * _size,
-                        Range(-FlameJitter, FlameJitter) * _size);
-                    go.transform.localRotation = Quaternion.Euler(Range(0f, 360f), Range(0f, 360f),
-                        Range(0f, 360f));
-                    go.transform.localScale = Vector3.zero;
-
-                    go.AddComponent<MeshFilter>().sharedMesh = BlobMesh.Pick();
-                    var renderer = go.AddComponent<MeshRenderer>();
-                    renderer.shadowCastingMode = ShadowCastingMode.Off;
-                    renderer.receiveShadows = false;
-
-                    Material mat = null;
-                    if (shader != null)
-                    {
-                        mat = new Material(shader);
-                        mat.EnableKeyword("_EMISSION");
-                        mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
-                        renderer.sharedMaterial = mat;
-                    }
-
-                    _flames.Add(new Flame
-                    {
-                        tr = go.transform,
-                        mat = mat,
-                        scale = _size * Range(FlameSizeMin, FlameSizeMax),
-                        hz = Range(FlickerHzMin, FlickerHzMax),
-                        phase = Range(0f, Mathf.PI * 2f),
-                        at = reach * SpreadSec,
-                    });
-                }
+                Kindle(new Vector3(Mathf.Cos(turn) * reach * ReachX * _size, 0f,
+                    Mathf.Sin(turn) * reach * ReachZ * _size), reach);
             }
+            Lamp();
+        }
 
+        void Kindle(Vector3 spot, float reach)
+        {
+            var shader = NightReceivers.Lit;
+            _spots.Add(spot);
+
+            for (int i = 0; i < FlamesPerPatch; i++)
+            {
+                var go = new GameObject("White Flame");
+                go.transform.SetParent(transform, false);
+                go.transform.localPosition = spot + new Vector3(
+                    Range(-FlameJitter, FlameJitter) * _size,
+                    Range(FlameRiseMin, FlameRiseMax) * _size,
+                    Range(-FlameJitter, FlameJitter) * _size);
+                go.transform.localRotation = Quaternion.Euler(Range(0f, 360f), Range(0f, 360f),
+                    Range(0f, 360f));
+                go.transform.localScale = Vector3.zero;
+
+                go.AddComponent<MeshFilter>().sharedMesh = BlobMesh.Pick();
+                var renderer = go.AddComponent<MeshRenderer>();
+                renderer.shadowCastingMode = ShadowCastingMode.Off;
+                renderer.receiveShadows = false;
+
+                Material mat = null;
+                if (shader != null)
+                {
+                    mat = new Material(shader);
+                    mat.EnableKeyword("_EMISSION");
+                    mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+                    renderer.sharedMaterial = mat;
+                }
+
+                _flames.Add(new Flame
+                {
+                    tr = go.transform,
+                    mat = mat,
+                    scale = _size * Range(FlameSizeMin, FlameSizeMax),
+                    hz = Range(FlickerHzMin, FlickerHzMax),
+                    phase = Range(0f, Mathf.PI * 2f),
+                    at = reach * _spreadSec,
+                });
+            }
+        }
+
+        void Lamp()
+        {
             var lamp = new GameObject("Phosphorus Light");
             lamp.transform.SetParent(transform, false);
             lamp.transform.localPosition = Vector3.up * (_size * LightLift);
@@ -166,7 +206,7 @@ namespace MetalRaptors
                 flame.mat.SetColor(EmissionColorId, c * Emission);
             }
 
-            float spread = Mathf.Clamp01(_age / SpreadSec);
+            float spread = Mathf.Clamp01(_age / _spreadSec);
             if (_light != null)
             {
                 float flicker = 1f + LightFlicker * (Mathf.PerlinNoise(now * 3f, 0.4f) * 2f - 1f);
@@ -177,7 +217,7 @@ namespace MetalRaptors
             _smokeIn -= dt;
             if (_smokeIn <= 0f)
             {
-                _smokeIn = SmokeEvery;
+                _smokeIn = _smokeEvery;
                 EmitPuff(spread);
             }
 
@@ -204,7 +244,9 @@ namespace MetalRaptors
             if (shader != null)
             {
                 mat = new Material(shader);
-                mat.SetColor(BaseColorId, Smoke);
+                Color tint = Smoke;
+                tint.a *= _smokeAlpha;
+                mat.SetColor(BaseColorId, tint);
                 mat.EnableKeyword("_EMISSION");
                 mat.SetColor(EmissionColorId, new Color(Smoke.r, Smoke.g, Smoke.b) * SmokeGlow);
                 UIFactory.MakeTransparent(mat);
@@ -246,7 +288,7 @@ namespace MetalRaptors
 
                 if (puff.mat == null) continue;
                 Color c = Smoke;
-                c.a *= 1f - k * k;
+                c.a *= _smokeAlpha * (1f - k * k);
                 puff.mat.SetColor(BaseColorId, c);
             }
         }

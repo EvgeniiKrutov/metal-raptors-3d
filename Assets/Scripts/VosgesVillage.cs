@@ -15,6 +15,8 @@ namespace MetalRaptors
         public const int Models = 7;
 
         const string ChurchNode = "tower";
+        const string ChurchGroup = "Church";
+        const string HousesGroup = "Houses";
         static readonly string[] WalkPrefixes = { "road_", "lane_", "path_" };
         const float TopNormal = 0.7f;
         const float TopBand = 0.02f;
@@ -27,6 +29,7 @@ namespace MetalRaptors
         static readonly Vector3[] Churches = new Vector3[Models];
         static readonly WalkGraph[] Graphs = new WalkGraph[Models];
         static readonly ModelCover[] Covers = new ModelCover[Models];
+        static readonly Bounds[][] Buildings = new Bounds[Models][];
         static bool _measured;
         static bool _warnedReadable;
 
@@ -63,9 +66,40 @@ namespace MetalRaptors
                 Churches[i] = church;
                 Graphs[i] = BuildGraph(view);
                 Covers[i] = ModelCover.Build(view, box);
+                Buildings[i] = MeasureBuildings(view);
                 ModelProbe.Close(view);
             }
         }
+
+        static Bounds[] MeasureBuildings(GameObject view)
+        {
+            var found = new List<Bounds>();
+
+            Transform church = PlaneFactory.FindDeep(view.transform, ChurchGroup);
+            if (church != null && Measure(church, out Bounds hall)) found.Add(hall);
+
+            Transform houses = PlaneFactory.FindDeep(view.transform, HousesGroup);
+            if (houses != null)
+                for (int i = 0; i < houses.childCount; i++)
+                    if (Measure(houses.GetChild(i), out Bounds house)) found.Add(house);
+
+            return found.ToArray();
+        }
+
+        static bool Measure(Transform node, out Bounds box)
+        {
+            box = default;
+            Renderer[] renderers = node.GetComponentsInChildren<Renderer>(true);
+            if (renderers.Length == 0) return false;
+
+            box = renderers[0].bounds;
+            for (int i = 1; i < renderers.Length; i++) box.Encapsulate(renderers[i].bounds);
+            box.center = ModelProbe.Local(box.center);
+            return true;
+        }
+
+        public static Bounds[] BuildingsOf(int model) =>
+            Has(model) && Buildings[model] != null ? Buildings[model] : new Bounds[0];
 
         public static bool Has(int model) =>
             model >= 0 && model < Models && Prefabs[model] != null;

@@ -48,7 +48,7 @@ namespace MetalRaptors
 
         public DialogueBar(Transform parent)
         {
-            _bars = CinematicBars.Create(parent);
+            _bars = CinematicBars.Create(parent, CinematicBars.DialogueOrder);
             _voice = new DialogueVoice(_bars.transform);
 
             _row = new GameObject("Radio Line", typeof(RectTransform));

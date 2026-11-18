@@ -49,7 +49,7 @@ namespace MetalRaptors
 
         public void Request()
         {
-            if (!IsReady || _running > 0f || GameMenu.IsOpen || LevelBriefing.IsOpen) return;
+            if (!IsReady || _running > 0f || GameMenu.IsOpen || LevelBriefing.IsOpen || DevFreeze.Active) return;
             Begin();
         }
 
@@ -64,7 +64,7 @@ namespace MetalRaptors
 
         void Update()
         {
-            if (_config == null || GameMenu.IsOpen || LevelBriefing.IsOpen) return;
+            if (_config == null || GameMenu.IsOpen || LevelBriefing.IsOpen || DevFreeze.Active) return;
 
             if (_running > 0f)
             {
@@ -73,7 +73,7 @@ namespace MetalRaptors
                 return;
             }
 
-            _cooldown = Mathf.Max(0f, _cooldown - Time.deltaTime);
+            _cooldown = Mathf.Max(0f, _cooldown - Time.deltaTime * DevCheats.CooldownFactor);
 
             var kb = Keyboard.current;
             if (kb != null && kb.rKey.wasPressedThisFrame) Request();

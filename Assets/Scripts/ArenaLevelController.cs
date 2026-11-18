@@ -107,7 +107,7 @@ namespace MetalRaptors
         RavenMoveset _moves;
 
         EnemyController _boss;
-        BossHealthBar _bossBar;
+        HealthBar _bossBar;
         CinematicBars _entryBars;
         CinematicBars _rageBars;
         PlaneModelConfig _bossPlane;
@@ -122,6 +122,7 @@ namespace MetalRaptors
 
         bool _entering = true;
         bool _gameOver;
+        System.Func<bool> _freezeGate;
         bool _outro;
         bool _failed;
         float _camShake;
@@ -202,6 +203,7 @@ namespace MetalRaptors
             _enemies = new CampaignEnemies(_cube.GetComponent<Rigidbody>(),
                 _floorY - EnemyFloorDrop, _camPos.y + _halfH, _level);
             _enemies.ModelScale = PlaneScale;
+            _enemies.BossFight = true;
 
             if (HasBossMusic) MusicPlayer.Instance.Prewarm(_level.bossMusic);
             StartCoroutine(Load());
@@ -223,18 +225,22 @@ namespace MetalRaptors
             }
             StartCoroutine(FlyIn());
 
+            _freezeGate = CanPause;
+            DevFreeze.Offer(_freezeGate);
+
             ScreenFade.EndLoading();
         }
 
         void OnDestroy()
         {
+            DevFreeze.Withdraw(_freezeGate);
             DevSpawn.Unregister(this);
             CampaignCheckpoint.InCareer = false;
             SmokeTrail.Wind = Vector2.zero;
             WithdrawSkips();
         }
 
-        static float ScrollSpeed => DuelPlane.CruiseSpeed * CloudSpeedFactor;
+        static float ScrollSpeed => DuelPlane.BaseCruiseSpeed * CloudSpeedFactor;
 
         bool HasBossMusic => MusicPlayer.Instance != null && !string.IsNullOrEmpty(_level.bossMusic);
 
@@ -250,7 +256,8 @@ namespace MetalRaptors
 
             if (_cam == null)
             {
-                _halfH = CameraDistance * Mathf.Tan(LevelCamera.BaseFieldOfView * 0.5f * Mathf.Deg2Rad);
+                _halfH = CameraDistance * Mathf.Tan(LevelCamera.BaseFieldOfView * 0.5f * Mathf.Deg2Rad)
+                         * LevelCamera.FightZoomOut;
                 _halfW = _halfH * LevelCamera.ReferenceAspect;
                 return;
             }
@@ -261,7 +268,7 @@ namespace MetalRaptors
             CoastSky.ApplyFog(_level.daytime, _level.weather, CameraDistance, PlayPlaneZ);
             _cam.farClipPlane = 2600f;
 
-            LevelCamera.Frame(_cam, CameraDistance, out _halfW, out _halfH);
+            LevelCamera.Frame(_cam, CameraDistance, LevelCamera.FightZoomOut, out _halfW, out _halfH);
             CutsceneBlur.Focus(CameraDistance);
             _cam.transform.position = _camPos;
         }
@@ -379,7 +386,7 @@ namespace MetalRaptors
             _shooter.Stop();
 
             _roll = go.AddComponent<PlaneBarrelRoll>();
-            _roll.Initialize(flight, _cube, model, RollSpinScale, streaks: false);
+            _roll.Initialize(flight, _cube, model, RollSpinScale, streaks: false, rateRoll: true);
             _roll.Stop();
         }
 
@@ -430,9 +437,11 @@ namespace MetalRaptors
             if (MenuInput.ReadCancel()) TryPause();
         }
 
+        bool CanPause() => !_gameOver && !GameMenu.IsOpen && !LevelBriefing.IsOpen && !ScreenFade.IsBusy;
+
         void TryPause()
         {
-            if (_gameOver || GameMenu.IsOpen || LevelBriefing.IsOpen || ScreenFade.IsBusy) return;
+            if (!CanPause()) return;
             GameMenu.Open(GameMenuKind.Pause, Subtitle, _hud);
         }
 
@@ -693,8 +702,7 @@ namespace MetalRaptors
             if (_roll != null) _roll.Resume();
             if (_boss == null) return;
 
-            _bossBar = new BossHealthBar(_hud.transform, _hudView.BossSlot, _bossName);
-            _hudView.ShowBossSlot();
+            _bossBar = new HealthBar(_hud.transform, _bossName, HudTheme.Boss);
             _bossBar.Set(_boss.CurrentHealth, _bossMax);
             if (HasBossMusic) MusicPlayer.Instance.Play(_level.bossMusic);
 

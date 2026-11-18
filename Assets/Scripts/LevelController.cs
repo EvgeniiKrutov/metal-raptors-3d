@@ -62,6 +62,7 @@ namespace MetalRaptors
         float _halfViewHeight;
         float _halfViewWidth;
         bool _gameOver;
+        System.Func<bool> _freezeGate;
         bool _playerFalling;
         float _camShake;
         Vector3 _camBasePos;
@@ -69,6 +70,9 @@ namespace MetalRaptors
 
         void Start()
         {
+            _freezeGate = CanPause;
+            DevFreeze.Offer(_freezeGate);
+
             _level = Levels.ForNumber(levelNumber);
 
             var config = Resources.Load<PlayerConfig>("PlayerConfig");
@@ -138,7 +142,7 @@ namespace MetalRaptors
             var plane = PlaneFactory.BuildPlaneModel(go.transform, planeModel,
                 skin: GameManager.CurrentSkin);
 
-            PlayerConfig flight = PlaneLoadout.Build(config, planeModel);
+            PlayerConfig flight = PlaneLoadout.Build(config, planeModel, FlightPace.Fast);
 
             _cube = go.AddComponent<CubeController>();
             _cubeTr = go.transform;
@@ -178,8 +182,8 @@ namespace MetalRaptors
 
         void SpawnEnemies()
         {
-            _scoutConfig = EnemyConfigs.Load(EnemyRole.Scout);
-            _fighterConfig = EnemyConfigs.Load(EnemyRole.Fighter);
+            _scoutConfig = EnemyConfigs.Load(EnemyRole.Scout, FlightPace.Fast);
+            _fighterConfig = EnemyConfigs.Load(EnemyRole.Fighter, FlightPace.Fast);
 
             var playerBody = _cube.GetComponent<Rigidbody>();
             float aiGroundY = VerdunLand ? ProceduralTerrain.MaxHeight : GroundY;
@@ -194,7 +198,7 @@ namespace MetalRaptors
                     var go = new GameObject("Enemy");
                     go.transform.position = RandomEnemySpawn(aiGroundY, config, ceilingY);
                     PlaneFactory.BuildPlaneModel(go.transform, group.plane, mirrored: true,
-                        skin: PlaneSkins.Default(group.plane));
+                        skin: PlaneSkins.EnemyPaint(group.plane));
 
                     var enemy = go.AddComponent<EnemyController>();
                     enemy.Initialize(config, playerBody,
@@ -277,11 +281,15 @@ namespace MetalRaptors
             if (MenuInput.ReadCancel()) TryPause();
         }
 
+        bool CanPause() => !_gameOver && !GameMenu.IsOpen && !ScreenFade.IsBusy;
+
         void TryPause()
         {
-            if (_gameOver || GameMenu.IsOpen || ScreenFade.IsBusy) return;
+            if (!CanPause()) return;
             GameMenu.Open(GameMenuKind.Pause, Subtitle, _hud);
         }
+
+        void OnDestroy() => DevFreeze.Withdraw(_freezeGate);
 
         string Subtitle => $"level {levelNumber} | {TerrainNames.For(_level.terrain.kind)}";
 

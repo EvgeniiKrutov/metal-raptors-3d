@@ -18,6 +18,10 @@ MonoBehaviour:
   diveAcceleration: 90
   speedDrag: 0.9
   maxSpeedMultiplier: 1.6
+  energyGravity: 80
+  energyDrag: 0.8
+  energyMinFraction: 0.6
+  energyMaxFraction: 1.45
   turnResponsiveness: 5
   health: 100
   damage: 10

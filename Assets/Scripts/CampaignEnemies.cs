@@ -7,6 +7,8 @@ namespace MetalRaptors
     {
         const float SpawnAhead = 110f;
         const float SpawnStagger = 90f;
+        const float SpawnGapShare = 1.25f;
+        const int ApartTries = 8, ApartRolls = 4;
         const float WindowMargin = 70f;
         const float EdgeMargin = 90f;
         const float CeilingPad = 160f;
@@ -49,6 +51,7 @@ namespace MetalRaptors
         readonly Rigidbody _player;
         readonly float _groundY;
         readonly string _skin;
+        readonly string[] _duelistSkins;
 
         float _minX;
         float _maxX;
@@ -64,7 +67,11 @@ namespace MetalRaptors
 
         public bool Pursuit { get; set; }
 
+        public bool BossFight { get; set; }
+
         public PlaneModelConfig PacedPlane { get; set; }
+
+        public bool Duelists { get; set; }
 
         public float PursuitMinY { get; set; }
 
@@ -97,17 +104,18 @@ namespace MetalRaptors
         }
 
         public CampaignEnemies(Rigidbody player, float groundY, float worldTop,
-            CampaignDefinition level)
+            CampaignDefinition level, float pace = 1f)
         {
             _player = player;
             _groundY = groundY;
             WorldTop = worldTop;
 
-            _scout = EnemyConfigs.Load(EnemyRole.Scout);
-            _fighter = EnemyConfigs.Load(EnemyRole.Fighter);
+            _scout = EnemyConfigs.Load(EnemyRole.Scout, pace);
+            _fighter = EnemyConfigs.Load(EnemyRole.Fighter, pace);
 
             if (level == null) return;
             _skin = level.enemySkin;
+            _duelistSkins = level.duelistSkins;
             EnemyConfigs.Scale(_scout, level.enemyRotationScale);
             EnemyConfigs.Scale(_fighter, level.enemyRotationScale);
             _scoutFixed = level.scoutShotsPerSec > 0f;
@@ -184,10 +192,9 @@ namespace MetalRaptors
 
                 for (int i = 0; i < group.count; i++, index++)
                 {
-                    EnemyConfig config = Lifted(Base(group.plane),
-                        group.plane);
+                    EnemyConfig config = Lifted(WaveConfig(group.plane), group.plane);
                     spawned.Add(SpawnOne(group.plane, SpawnPoint(camX, halfViewWidth, index, config,
-                        CeilingFor(group.plane)), config));
+                        CeilingFor(group.plane), Gap(group.plane)), config));
                 }
             }
             return spawned;
@@ -203,9 +210,14 @@ namespace MetalRaptors
             PlaneModelConfig plane = PlaneModels.EnemyFor(role);
             EnemyConfig config = Lifted(AceConfig(role, plane), plane);
             spawned.Add(SpawnOne(plane, SpawnPoint(camX, halfViewWidth, 0, config,
-                CeilingFor(plane)), config));
+                CeilingFor(plane), Gap(plane)), config));
             return spawned;
         }
+
+        EnemyConfig WaveConfig(PlaneModelConfig plane) =>
+            Duelists && plane == PlaneModels.EnemyFor(EnemyRole.Duelist)
+                ? AceConfig(EnemyRole.Duelist, plane)
+                : Base(plane);
 
         EnemyConfig AceConfig(EnemyRole role, PlaneModelConfig plane)
         {
@@ -246,7 +258,8 @@ namespace MetalRaptors
                         y = EnemyPursuit.Apart(Mathf.Clamp(y, PursuitMinY, PursuitMaxY),
                             PursuitMinY, PursuitMaxY, PursuitSpacing);
 
-                    SpawnOne(group.plane, BehindPoint(index, y), sneak: group.sneak, high: group.high);
+                    SpawnOne(group.plane, BehindPoint(index, y, Gap(group.plane)), sneak: group.sneak,
+                        high: group.high);
                     index++;
                 }
             }
@@ -270,7 +283,7 @@ namespace MetalRaptors
             float low = next.high ? Mathf.Clamp(PursuitMidY, PursuitMinY, PursuitMaxY) : PursuitMinY;
             float y = EnemyPursuit.Apart(Random.Range(low, PursuitMaxY), PursuitMinY, PursuitMaxY,
                 PursuitSpacing);
-            SpawnOne(next.plane, BehindPoint(0, y), sneak: next.sneak, high: next.high);
+            SpawnOne(next.plane, BehindPoint(0, y, Gap(next.plane)), sneak: next.sneak, high: next.high);
         }
 
         int Pursuers
@@ -284,10 +297,46 @@ namespace MetalRaptors
             }
         }
 
-        Vector3 BehindPoint(int index, float y)
+        Vector3 BehindPoint(int index, float y, float gap)
         {
             float z = _player != null ? _player.position.z : 0f;
-            return new Vector3(_camX - Facing * (_halfWidth + SpawnAhead + index * SpawnStagger), y, z);
+            var at = new Vector3(_camX - Facing * (_halfWidth + SpawnAhead + index * SpawnStagger), y, z);
+            return Apart(at, gap, y, y, false, new Vector2(-Facing, 0f));
+        }
+
+        float Gap(PlaneModelConfig plane) =>
+            plane != null ? plane.OnScreenSize * ModelScale * SpawnGapShare : 0f;
+
+        Vector3 Apart(Vector3 at, float gap, float rollFrom, float rollTo, bool rollX, Vector2 push)
+        {
+            if (gap <= 0f) return at;
+
+            for (int i = 0; i < ApartTries; i++)
+            {
+                if (!Crowded(at, gap)) break;
+
+                if (i < ApartRolls && rollTo > rollFrom)
+                {
+                    float value = Random.Range(rollFrom, rollTo);
+                    if (rollX) at.x = value;
+                    else at.y = value;
+                }
+                else
+                {
+                    at += (Vector3)(push * gap);
+                }
+            }
+            return at;
+        }
+
+        bool Crowded(Vector3 at, float gap)
+        {
+            foreach (EnemyController enemy in _live)
+            {
+                if (enemy == null || !enemy.IsAlive) continue;
+                if (((Vector2)enemy.transform.position - (Vector2)at).sqrMagnitude < gap * gap) return true;
+            }
+            return false;
         }
 
         public void SpawnSpread(EnemyGroup[] groups, Vector3 camPos, float halfViewWidth,
@@ -312,7 +361,7 @@ namespace MetalRaptors
                     EnemyConfig config = Lifted(Base(group.plane),
                         group.plane);
                     SpawnOne(group.plane, SpreadPoint(camPos, halfViewWidth, halfViewHeight, edge,
-                        config, CeilingFor(group.plane)), config);
+                        config, CeilingFor(group.plane), Gap(group.plane)), config);
                 }
             }
         }
@@ -328,7 +377,7 @@ namespace MetalRaptors
         }
 
         Vector3 SpreadPoint(Vector3 camPos, float halfViewWidth, float halfViewHeight,
-            SpawnEdge edge, EnemyConfig config, float ceilingY)
+            SpawnEdge edge, EnemyConfig config, float ceilingY, float gap)
         {
             EnemyConfigs.SpawnBand(config, _groundY, ceilingY, out float minY, out float maxY);
             maxY = Mathf.Max(minY, Mathf.Min(maxY, WorldTop - CeilingPad));
@@ -353,13 +402,13 @@ namespace MetalRaptors
                 float to = camPos.x + halfViewWidth * SpreadTopTo;
 
                 if (y <= ceilingY && from <= to)
-                    return new Vector3(Random.Range(from, to), y, z);
+                    return Apart(new Vector3(Random.Range(from, to), y, z), gap, from, to, true, Vector2.up);
 
                 if (y > ceilingY) low = high;
             }
 
-            return new Vector3(camPos.x + halfViewWidth + SpawnAhead + extra,
-                Random.Range(low, high), z);
+            return Apart(new Vector3(camPos.x + halfViewWidth + SpawnAhead + extra,
+                Random.Range(low, high), z), gap, low, high, false, Vector2.right);
         }
 
         public void Capture(List<PlaneSnapshot> into)
@@ -482,7 +531,7 @@ namespace MetalRaptors
             var go = new GameObject("Enemy");
             go.transform.position = position;
             Transform model = PlaneFactory.BuildPlaneModel(go.transform, plane, mirrored: true,
-                skin: skin ?? PlaneSkins.RandomEnemy(plane, _skin));
+                skin: skin ?? EnemySkin(plane));
             if (!Mathf.Approximately(ModelScale, 1f)) model.localScale *= ModelScale;
 
             bool gunned = PlaneFactory.GunMuzzleLocal(go, model, plane, out Vector3 gun);
@@ -496,6 +545,7 @@ namespace MetalRaptors
             Vector3? engine = PlaneFactory.EngineLocal(go, model, plane);
 
             var enemy = go.AddComponent<EnemyController>();
+            enemy.BossFight = BossFight;
             enemy.Initialize(config, _player, _minX, _maxX, _groundY, CeilingFor(plane),
                 EdgeMargin);
             if (gunned) enemy.MountGun(gun);
@@ -512,6 +562,12 @@ namespace MetalRaptors
                 }, sneak, high, Facing);
             return enemy;
         }
+
+        PlaneSkin EnemySkin(PlaneModelConfig plane) =>
+            string.IsNullOrEmpty(_skin) && _duelistSkins != null
+            && plane == PlaneModels.EnemyFor(EnemyRole.Duelist)
+                ? PlaneSkins.RandomOf(plane, _duelistSkins)
+                : PlaneSkins.RandomEnemy(plane, _skin);
 
         public void DismissAll()
         {
@@ -533,15 +589,15 @@ namespace MetalRaptors
         }
 
         Vector3 SpawnPoint(float camX, float halfViewWidth, int index, EnemyConfig config,
-            float ceilingY)
+            float ceilingY, float gap)
         {
             EnemyConfigs.SpawnBand(config, _groundY, ceilingY, out float minY, out float maxY);
             maxY = Mathf.Max(minY, Mathf.Min(maxY, WorldTop - CeilingPad));
 
             float z = _player != null ? _player.position.z : 0f;
 
-            return new Vector3(camX + halfViewWidth + SpawnAhead + index * SpawnStagger,
-                Random.Range(minY, maxY), z);
+            return Apart(new Vector3(camX + halfViewWidth + SpawnAhead + index * SpawnStagger,
+                Random.Range(minY, maxY), z), gap, minY, maxY, false, Vector2.right);
         }
 
         void OnDestroyed(EnemyController enemy)

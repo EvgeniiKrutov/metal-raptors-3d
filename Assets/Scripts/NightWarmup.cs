@@ -13,7 +13,7 @@ namespace MetalRaptors
         {
             if (player == null) yield break;
 
-            var enemies = new CampaignEnemies(player, groundY, worldTop, level)
+            var enemies = new CampaignEnemies(player, groundY, worldTop, level, FlightPace.Fast)
             {
                 ModelScale = PlaneModelConfig.LevelScale,
             };

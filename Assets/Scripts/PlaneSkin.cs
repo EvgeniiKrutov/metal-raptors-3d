@@ -120,6 +120,18 @@ namespace MetalRaptors
 
         public const string RavenId = "raven";
 
+        public static bool RandomPainted(PlaneModelConfig plane) =>
+            plane == PlaneModels.Albatros || plane == PlaneModels.Eindecker;
+
+        public static PlaneSkin EnemyPaint(PlaneModelConfig plane) =>
+            RandomPainted(plane) ? RandomEnemy(plane, null) : Default(plane);
+
+        public static PlaneSkin RandomOf(PlaneModelConfig plane, string[] ids)
+        {
+            if (ids == null || ids.Length == 0) return RandomEnemy(plane, null);
+            return ById(plane, ids[Random.Range(0, ids.Length)]) ?? RandomEnemy(plane, null);
+        }
+
         public static PlaneSkin RandomEnemy(PlaneModelConfig plane, string id)
         {
             if (!string.IsNullOrEmpty(id)) return Enemy(plane, id);

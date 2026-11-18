@@ -13,6 +13,13 @@ namespace MetalRaptors
         const float RecoverSideBias = 15f;
         const float RunDownClearance = 30f;
         const float RunDownLookaheadSec = 0.6f;
+        const int UrgencyProbeSteps = 8;
+        const float UrgencyLeadSec = 0.4f;
+        const float UrgencyMinLookSec = 0.6f;
+        const float UrgencyMaxLookSec = 2.2f;
+        const float UrgencyBlendGain = 1.5f;
+        const float UrgencyReversalCancel = 0.5f;
+        const float AvoidClimbDeg = 35f;
         const float CeilingMargin = 130f;
         const float ReturnSpeedFactor = 1.35f;
         const float BreakRoomCap = 300f;
@@ -124,6 +131,8 @@ namespace MetalRaptors
 
         public float MaxTurnRate => _config != null ? _config.rotationSpeed * Mathf.Deg2Rad : 0f;
 
+        public float EnergySpeed => _energy.Speed;
+
         public bool Exposed { get; set; }
 
         public bool Throttling { get; set; }
@@ -146,6 +155,8 @@ namespace MetalRaptors
 
         public bool Blazing { get; private set; }
 
+        public bool BossFight { get; set; }
+
         public bool Evading => _barrel.Active;
 
         public float BodyLow => _bodyLow;
@@ -160,7 +171,7 @@ namespace MetalRaptors
 
         enum AiState { Attack, Fly, Evade, Recover, Return, StrikeAim, StrikeRun, Tail }
 
-        enum RollerLeg { Aim, Run, Away, Turn }
+        enum DuelistLeg { Aim, Run, Away, Turn }
 
         EnemyConfig _config;
         Rigidbody _target;
@@ -211,13 +222,17 @@ namespace MetalRaptors
         SmokeTrail _sputter;
         PlaneFire _fire;
         readonly PlaneRoll _roll = new PlaneRoll(true);
+        PlaneEnergy _energy;
+        float _lean;
+        float _urgency;
+        float _avoidHeading;
 
         readonly EnemyLoop _loop = new EnemyLoop();
         readonly EnemyDepthDodge _dodge = new EnemyDepthDodge();
         readonly EnemyEvade _evade = new EnemyEvade();
         readonly EnemyBarrel _barrel = new EnemyBarrel();
         float _barrelHold;
-        RollerLeg _leg;
+        DuelistLeg _leg;
         float _legTimer;
         float _runHeading;
         float _uTurnDir = 1f;
@@ -277,6 +292,7 @@ namespace MetalRaptors
             _stateTimer = config.attackDuration;
             _speed = config.flySpeed;
             _aceSpeed = config.flySpeed;
+            _energy.Reset(config.flySpeed);
             _baseZ = transform.position.z;
 
             Vector3 to = (target != null ? target.position : Vector3.zero) - transform.position;
@@ -420,9 +436,11 @@ namespace MetalRaptors
 
             _speed = _config.flySpeed;
             _aceSpeed = _config.flySpeed;
+            _energy.Reset(_config.flySpeed);
             _engageSpeed = 0f;
             _boost = 1f;
             _angularVelocity = 0f;
+            _lean = 0f;
             _heading = _target != null
                 ? Mathf.Atan2(_target.position.y - pos.y, _target.position.x - pos.x)
                 : Mathf.PI;
@@ -494,6 +512,7 @@ namespace MetalRaptors
             _scriptPos = new Vector3(position.x, position.y, _baseZ);
             _heading = headingRad;
             _angularVelocity = 0f;
+            _lean = 0f;
             _roll.Settle(headingRad);
             ApplyRotation();
         }
@@ -508,6 +527,7 @@ namespace MetalRaptors
             _heading = headingRad;
             _roll.Flip(headingRad, ScriptRollRate);
             _roll.Tick(dt, headingRad, false, ScriptRollRate);
+            StepLean(MaxTurnRate, dt);
             ApplyRotation();
         }
 
@@ -519,6 +539,7 @@ namespace MetalRaptors
             _rb.isKinematic = false;
             _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
             _speed = _config.flySpeed;
+            _energy.Reset(_config.flySpeed);
             _rb.linearVelocity = new Vector3(Mathf.Cos(_heading), Mathf.Sin(_heading), 0f) * _speed;
 
             _onCamera = true;
@@ -566,6 +587,9 @@ namespace MetalRaptors
             TickCircle(dt);
             TickAbility(dt);
 
+            _avoidHeading = AvoidHeading();
+            _urgency = GroundUrgency();
+
             if (_standDown)
             {
                 if (_state != AiState.Fly) EnterFly(transform.position.x, track: false);
@@ -586,10 +610,15 @@ namespace MetalRaptors
                 if (!Reversing) TickState(dt);
             }
 
+            if (Reversing && _urgency > UrgencyReversalCancel) CancelReversal();
+
             if (Reversing) DriveReversal(dt);
             else
             {
                 float desired = Contain(ComputeHeading());
+                if (_urgency > 0f && _state != AiState.Recover)
+                    desired =Mathf.LerpAngle(desired * Mathf.Rad2Deg, _avoidHeading * Mathf.Rad2Deg,
+                        Mathf.SmoothStep(0f, 1f, _urgency * UrgencyBlendGain)) * Mathf.Deg2Rad;
                 if (WantsReversal(desired)) BeginReversal(desired);
                 else SteerToHeading(KeepNoseUp(ChooseTurn(desired, dt)), dt);
             }
@@ -666,6 +695,7 @@ namespace MetalRaptors
         void TickFall(float dt)
         {
             _barrel.Step(dt);
+            _lean -= _lean * (1f - Mathf.Exp(-FlightSmoothing.LeanResponse * dt));
             if (_fallTarget.HasValue)
             {
                 Vector3 target = _fallTarget.Value;
@@ -770,8 +800,50 @@ namespace MetalRaptors
         {
             if (RunningDown && !Contouring) return false;
             if (!GroundThreat()) return false;
-            if (_state != AiState.Recover) EnterRecover();
+            if (_state == AiState.Recover) return true;
+            if (_urgency < 1f) return false;
+
+            EnterRecover();
             return true;
+        }
+
+        float GroundUrgency()
+        {
+            float margin = RunningDown ? _bodyRadius + RunDownClearance
+                : Striking ? _config.minAltitudeMargin
+                : _config.safeAltitudeMargin;
+
+            Vector2 start = _rb.position;
+            if (start.y - GroundRef < margin) return 1f;
+
+            float maxRateDeg = Mathf.Max(1f, _config.rotationSpeed * Mathf.Max(TurnBoost(), _boost));
+            float gap = Mathf.Abs(Mathf.DeltaAngle(_heading * Mathf.Rad2Deg, _avoidHeading * Mathf.Rad2Deg));
+            float lookahead = Mathf.Clamp(gap / maxRateDeg + UrgencyLeadSec,
+                UrgencyMinLookSec, UrgencyMaxLookSec);
+
+            float speed = FlightSpeed();
+            float step = lookahead / UrgencyProbeSteps;
+            var line = new Vector2(Mathf.Cos(_heading), Mathf.Sin(_heading));
+            Vector2 arc = start;
+            float h = _heading;
+
+            for (int i = 1; i <= UrgencyProbeSteps; i++)
+            {
+                float t = i * step;
+                h += _angularVelocity * step;
+                arc += new Vector2(Mathf.Cos(h), Mathf.Sin(h)) * (speed * step);
+                Vector2 straight = start + line * (speed * t);
+
+                if (arc.y - GroundAt(arc.x) < margin || straight.y - GroundAt(straight.x) < margin)
+                    return 1f - t / lookahead;
+            }
+            return 0f;
+        }
+
+        float AvoidHeading()
+        {
+            float climb = AvoidClimbDeg * Mathf.Deg2Rad;
+            return ClearerSide() >= 0f ? climb : Mathf.PI - climb;
         }
 
         bool GroundThreat()
@@ -957,29 +1029,29 @@ namespace MetalRaptors
             _legTimer += dt;
             switch (_leg)
             {
-                case RollerLeg.Aim:
+                case DuelistLeg.Aim:
                     if (_onCamera && _target != null
                         && (AimError(RunPoint()) <= RunLockDeg || _legTimer >= AimMaxSec))
                         BeginRun();
                     break;
 
-                case RollerLeg.Run:
-                    if (!_onCamera) BeginLeg(RollerLeg.Aim);
+                case DuelistLeg.Run:
+                    if (!_onCamera) BeginLeg(DuelistLeg.Aim);
                     else if (Passed() || _legTimer >= RunMaxSec) BeginAway();
                     break;
 
-                case RollerLeg.Away:
+                case DuelistLeg.Away:
                     if (_legTimer >= _config.aceAwaySeconds || NearEdge()) BeginTurn();
                     break;
 
-                case RollerLeg.Turn:
+                case DuelistLeg.Turn:
                     _turnSwept += Mathf.Abs(_angularVelocity) * dt * Mathf.Rad2Deg;
-                    if (TurnedBack()) BeginLeg(RollerLeg.Aim);
+                    if (TurnedBack()) BeginLeg(DuelistLeg.Aim);
                     break;
             }
         }
 
-        void BeginLeg(RollerLeg leg)
+        void BeginLeg(DuelistLeg leg)
         {
             _leg = leg;
             _legTimer = 0f;
@@ -987,39 +1059,39 @@ namespace MetalRaptors
 
         void BeginRun()
         {
-            BeginLeg(RollerLeg.Run);
+            BeginLeg(DuelistLeg.Run);
             _runHeading = HeadingTo(RunPoint());
         }
 
         void BeginAway()
         {
-            BeginLeg(RollerLeg.Away);
+            BeginLeg(DuelistLeg.Away);
             _runHeading = _heading;
         }
 
         void BeginTurn()
         {
-            BeginLeg(RollerLeg.Turn);
+            BeginLeg(DuelistLeg.Turn);
             _turnSwept = 0f;
             _uTurnDir = PickTurnSide();
         }
 
         Vector2 RunPoint() => ClampToBand(PredictIntercept());
 
-        bool RollerArmed =>
-            _state == AiState.Attack && (_leg == RollerLeg.Aim || _leg == RollerLeg.Run);
+        bool DuelistArmed =>
+            _state == AiState.Attack && (_leg == DuelistLeg.Aim || _leg == DuelistLeg.Run);
 
-        bool Straightening => Ace && _state == AiState.Attack && _leg != RollerLeg.Aim;
+        bool Straightening => Ace && _state == AiState.Attack && _leg != DuelistLeg.Aim;
 
-        float RollerHeading()
+        float DuelistHeading()
         {
             switch (_leg)
             {
-                case RollerLeg.Run:
-                case RollerLeg.Away:
+                case DuelistLeg.Run:
+                case DuelistLeg.Away:
                     return _runHeading;
 
-                case RollerLeg.Turn:
+                case DuelistLeg.Turn:
                     return _heading + _uTurnDir * Mathf.PI * 0.5f;
 
                 default:
@@ -1118,7 +1190,7 @@ namespace MetalRaptors
             _state = AiState.Attack;
             _tailLocked = false;
             _stateTimer = _config.attackDuration;
-            if (Ace) BeginLeg(RollerLeg.Aim);
+            if (Ace) BeginLeg(DuelistLeg.Aim);
         }
 
         void EnterTail()
@@ -1580,7 +1652,7 @@ namespace MetalRaptors
 
         float ComputeHeading()
         {
-            if (Ace && _state == AiState.Attack) return RollerHeading();
+            if (Ace && _state == AiState.Attack) return DuelistHeading();
 
             switch (_state)
             {
@@ -1637,6 +1709,7 @@ namespace MetalRaptors
         {
             if (!_appeared) return false;
             if (Scouting || Ace || _reversalCooldown > 0f || _standDown) return false;
+            if (_urgency > UrgencyReversalCancel) return false;
             if (_state == AiState.Recover || _state == AiState.Return) return false;
             if (_state == AiState.Tail) return false;
             if (Striking) return false;
@@ -1656,11 +1729,13 @@ namespace MetalRaptors
 
         void DriveReversal(float dt)
         {
+            float before = _heading;
             _loop.Step(dt);
             _heading = _loop.Heading;
 
-            _angularVelocity = 0f;
+            _angularVelocity = dt > 0f ? (_heading - before) / dt : 0f;
             _roll.Tick(dt, _heading, false, _config.rotationSpeed);
+            StepLean(_config.rotationSpeed * Mathf.Deg2Rad, dt);
             ApplyRotation();
         }
 
@@ -1765,22 +1840,49 @@ namespace MetalRaptors
             float boost = Mathf.Max(TurnBoost(), _boost);
             float maxRate = _config.rotationSpeed * Mathf.Deg2Rad * boost;
 
+            targetHeading = CapSlowClimb(targetHeading);
             float error = Mathf.DeltaAngle(_heading * Mathf.Rad2Deg, targetHeading * Mathf.Rad2Deg)
                         * Mathf.Deg2Rad;
             if (_turnDir != 0f && Mathf.Sign(error) != _turnDir)
                 error += _turnDir * Mathf.PI * 2f;
 
             float rawRate = dt > 0f ? error / dt : 0f;
+            rawRate += PlaneEnergy.NoseDownRate(_heading, _energy.Speed, _config.flySpeed,
+                _config.energyMinFraction);
             float limit = TurnLimitAt(_heading, Mathf.Sign(rawRate), maxRate);
             float desiredRate = Mathf.Clamp(rawRate, -limit, limit);
 
-            float approach = 1f - Mathf.Exp(-(_config.turnResponsiveness / _rb.mass) * dt);
-            _angularVelocity += (desiredRate - _angularVelocity) * approach;
+            _angularVelocity = FlightSmoothing.StepTurnRate(_angularVelocity, desiredRate,
+                _config.turnResponsiveness / _rb.mass, maxRate, dt);
             _heading += _angularVelocity * dt;
             _roll.Tick(dt, _heading,
                 PlaneRoll.Steady(_angularVelocity, maxRate) && !_barrel.Spinning,
                 _config.rotationSpeed);
+            StepLean(maxRate, dt);
             ApplyRotation();
+        }
+
+        float CapSlowClimb(float target)
+        {
+            if (_state == AiState.Recover) return target;
+
+            float strength = PlaneEnergy.Strength(_heading, _energy.Speed, _config.flySpeed,
+                _config.energyMinFraction);
+            if (strength <= 0f) return target;
+
+            bool right = Mathf.Cos(_heading) >= 0f;
+            if ((Mathf.Cos(target) >= 0f) != right) return target;
+
+            float cap = Mathf.Lerp(90f, PlaneEnergy.StallPitchDeg, strength) * Mathf.Deg2Rad;
+            if (Mathf.Sin(target) <= Mathf.Sin(cap)) return target;
+            return right ? cap : Mathf.PI - cap;
+        }
+
+        void StepLean(float maxRate, float dt)
+        {
+            bool still = _barrel.Spinning || _dodge.Active;
+            _lean = FlightSmoothing.StepLean(_lean, still ? 0f : _angularVelocity,
+                Mathf.Max(0.0001f, maxRate), _roll.Angle, dt);
         }
 
         float TurnBoost()
@@ -1823,25 +1925,20 @@ namespace MetalRaptors
 
         float UpdateSpeed(float dt)
         {
+            float cruise = _config.flySpeed;
+            bool pinned = _rb.position.y >= _ceilingY && Mathf.Sin(_heading) > 0f;
+            _energy.Step(_heading, cruise, pinned ? 0f : _config.diveAcceleration, _config.speedDrag,
+                cruise * _config.energyMinFraction, TopSpeed, dt);
+
             if (Ace)
             {
-                float goal = _config.flySpeed * (_onCamera ? 1f : Mathf.Max(1f, _config.aceCatchUp));
+                float goal = cruise * (_onCamera ? 1f : Mathf.Max(1f, _config.aceCatchUp))
+                             * (_energy.Speed / Mathf.Max(0.0001f, cruise));
                 _aceSpeed = Mathf.Lerp(_aceSpeed, goal, 1f - Mathf.Exp(-AceSpeedResponse * dt));
                 return FlightSpeed();
             }
 
-            float cruise = _config.flySpeed;
-
-            if (Scouting)
-            {
-                _speed = cruise;
-            }
-            else
-            {
-                _speed += -Mathf.Sin(_heading) * _config.diveAcceleration * dt;
-                _speed -= (_speed - cruise) * _config.speedDrag * dt;
-                _speed = Mathf.Clamp(_speed, cruise, TopSpeed);
-            }
+            _speed = _energy.Speed;
 
             _engageSpeed = Mathf.Lerp(_engageSpeed,
                 Mathf.Max(EngageTarget(), StationTarget()),
@@ -1896,7 +1993,7 @@ namespace MetalRaptors
 
         void ApplyRotation()
         {
-            float roll = _roll.Angle + _dodge.Bank + (_fall != null ? _fall.Roll : 0f) + Spin
+            float roll = _roll.Angle + _lean + _dodge.Bank + (_fall != null ? _fall.Roll : 0f) + Spin
                        + _barrel.Spin;
             transform.rotation = Quaternion.Euler(0f, 0f, _heading * Mathf.Rad2Deg)
                                * Quaternion.Euler(roll, 0f, 0f);
@@ -1940,7 +2037,7 @@ namespace MetalRaptors
 
         void UpdateFiring()
         {
-            if (_dodge.Active || (Ace && !RollerArmed)) return;
+            if (_dodge.Active || (Ace && !DuelistArmed)) return;
 
             if (_state == AiState.StrikeRun)
             {
@@ -1975,7 +2072,9 @@ namespace MetalRaptors
                 * Quaternion.Euler(0f, 0f, -90f));
             go.name = "EnemyBullet";
             go.SetActive(true);
-            go.GetComponent<Bullet>().Launch(dir, bulletSpeed, damage, _collider, fromEnemy: true);
+            var round = go.GetComponent<Bullet>();
+            round.Launch(dir, bulletSpeed, damage, _collider, fromEnemy: true);
+            if (!BossFight) round.Tail();
 
             MuzzleFlash.Spawn(muzzle, dir, _bodyRadius);
             if (_shotClip != null) _audio.PlayOneShot(_shotClip, ShotVolume * AudioOptions.Scene);
