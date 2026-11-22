@@ -19,6 +19,7 @@ namespace MetalRaptors
         public float breakSeconds;
         public float jitterAmplitude;
         public float jitterHz;
+        public float extendSeconds;
     }
 
     public class EnemyEvade
@@ -52,6 +53,7 @@ namespace MetalRaptors
         float _t;
         float _jitter;
         float _jitterTimer;
+        float _extendOut = ExtendOut;
 
         public void Begin(EvadePlan plan, float heading, Vector2 self, Vector2 target)
         {
@@ -60,9 +62,10 @@ namespace MetalRaptors
             _t = 0f;
             _jitter = 0f;
             _jitterTimer = 0f;
+            _extendOut = plan.extendSeconds > 0f ? plan.extendSeconds : ExtendOut;
 
             Move = plan.move;
-            Seconds = Length(plan.move, plan.breakSeconds);
+            Seconds = Length(plan.move, plan.breakSeconds, _extendOut);
             Active = true;
             Heading = heading;
 
@@ -81,14 +84,14 @@ namespace MetalRaptors
 
         public void Cancel() => Active = false;
 
-        static float Length(EvadeMove move, float breakSeconds)
+        static float Length(EvadeMove move, float breakSeconds, float extendOut)
         {
             switch (move)
             {
                 case EvadeMove.Scissors: return ScissorsCrosses * ScissorsPhase;
                 case EvadeMove.Chandelle: return ChandelleUp + ChandelleOver;
                 case EvadeMove.SplitDive: return SplitDown + SplitBack;
-                case EvadeMove.Extend: return ExtendOut + ExtendBack;
+                case EvadeMove.Extend: return extendOut + ExtendBack;
                 default: return breakSeconds;
             }
         }
@@ -120,7 +123,7 @@ namespace MetalRaptors
                     break;
 
                 case EvadeMove.Extend:
-                    Heading = _t < ExtendOut ? Flattened(awayHeading) : towardHeading;
+                    Heading = _t < _extendOut ? Flattened(awayHeading) : towardHeading;
                     break;
 
                 default:

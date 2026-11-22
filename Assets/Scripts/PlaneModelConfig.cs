@@ -29,6 +29,8 @@ namespace MetalRaptors
 
         public EnemyRole enemyRole = EnemyRole.Fighter;
 
+        public PilotLevel pilot = PilotLevel.Regular;
+
         public string description;
 
         public Vector3 standUpEuler;
@@ -175,6 +177,7 @@ namespace MetalRaptors
             country        = "Germany",
             type           = PlaneTypes.Fighter,
             enemyRole      = EnemyRole.Scout,
+            pilot          = PilotLevel.Veteran,
             description    = FokkerStory,
             standUpEuler   = new Vector3(90f, -90f, 0f),
             rollWheelsDown = true,
@@ -212,6 +215,7 @@ namespace MetalRaptors
             displayName    = "Albatros D.III",
             country        = "Germany",
             type           = PlaneTypes.Fighter,
+            pilot          = PilotLevel.Regular,
             description    = AlbatrosStory,
             standUpEuler   = new Vector3(90f, -90f, 0f),
             rollWheelsDown = true,
@@ -224,6 +228,7 @@ namespace MetalRaptors
             propBladesNode = "prop",
             gunLift        = 0.080f,
             gunSetback     = 0.142f,
+            hitboxNode     = "fuselage_shell",
             skins          = PlaneSkins.AlbatrosD3,
             stats = new PlaneStats
             {
@@ -245,6 +250,7 @@ namespace MetalRaptors
             country        = "Germany",
             type           = PlaneTypes.Scout,
             enemyRole      = EnemyRole.Scout,
+            pilot          = PilotLevel.Rookie,
             description    = EindeckerStory,
             standUpEuler   = new Vector3(90f, -90f, 0f),
             rollWheelsDown = true,

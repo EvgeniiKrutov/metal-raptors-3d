@@ -10,6 +10,8 @@ namespace MetalRaptors
     {
         public event Action OnCrashed;
 
+        public bool Wrecked { get; private set; }
+
         public event Action OnShotDown;
 
         public event Action OnDamaged;
@@ -37,6 +39,17 @@ namespace MetalRaptors
             : 0f;
 
         public float BaseSpeed => _config != null ? _config.flySpeed : 0f;
+
+        public float SpeedFraction => _config != null && _config.flySpeed > 0f
+            ? FlightSpeed / (_config.flySpeed * DevCheats.SpeedFactor)
+            : 1f;
+
+        public float MinSpeedFraction => _config != null ? _config.energyMinFraction : 0.6f;
+
+        public float DiveSpeedFraction => _config != null ? _config.energyMaxFraction : 1.45f;
+
+        public float TopSpeedFraction => DiveSpeedFraction
+                                         * (_config != null ? Mathf.Max(1f, _config.boostMultiplier) : 1f);
 
         public float BaseTurnDeg => _config != null ? _config.rotationSpeed : 0f;
 
@@ -461,7 +474,7 @@ namespace MetalRaptors
 
             if (GroundUnder(pos, out float deck) && pos.y < deck)
             {
-                if (!_cinematic && !DevCheats.Invulnerable) { Crash(); return; }
+                if (!_cinematic && !DevCheats.Invulnerable) { Crash(true); return; }
 
                 pos.y = deck;
                 clamped = true;
@@ -739,15 +752,17 @@ namespace MetalRaptors
 
             if (_cinematic || DevCheats.Invulnerable) { Scrape(); return; }
 
-            Crash();
+            Crash(collision.gameObject.layer == ProceduralTerrain.GroundLayer);
         }
 
-        void Crash()
+        void Crash(bool grounded)
         {
             if (!_active) return;
             _active = false;
 
             Explosion.Spawn(transform.position, ExplosionSize);
+            Wrecked = PlaneWreck.Spawn(gameObject, transform.position,
+                _rb != null ? _rb.linearVelocity : Vector3.zero, grounded);
             StartCoroutine(HideModelAfter(Explosion.RemovalDelay));
 
             OnCrashed?.Invoke();

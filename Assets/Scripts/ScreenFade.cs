@@ -39,6 +39,19 @@ namespace MetalRaptors
             Rig().Begin(change, null, outSec, 0f, FadeSec);
         }
 
+        public static void Swap(Action change, float outSec, float holdSec)
+        {
+            if (change == null) return;
+
+            if (_busy)
+            {
+                change();
+                return;
+            }
+
+            Rig().Begin(change, null, outSec, Mathf.Max(0f, holdSec), FadeSec);
+        }
+
         public static void Load(string scene, Action atBlack = null) =>
             Load(scene, atBlack, FadeSec, 0f, FadeSec);
 

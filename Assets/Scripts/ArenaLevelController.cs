@@ -6,8 +6,18 @@ using UnityEngine.Rendering.Universal;
 namespace MetalRaptors
 {
     public class ArenaLevelController : MonoBehaviour, ICampaignScriptHost, IBossHost,
-        IDangerHost, IDevSpawnHost
+        IDangerHost, IDevSpawnHost, IRecoverHost
     {
+        const float RecoverShare = 0.5f;
+
+        public void Recover()
+        {
+            if (_gameOver || _cube == null || _cube.CurrentHealth <= 0f) return;
+
+            float floor = _cube.MaxHealth * RecoverShare;
+            if (_cube.CurrentHealth < floor) _cube.Heal(floor - _cube.CurrentHealth);
+        }
+
         public const float CameraDistance = 420f;
         const float PlayPlaneZ = 100f;
         const float CamZ = PlayPlaneZ - CameraDistance;
@@ -358,6 +368,7 @@ namespace MetalRaptors
             var model = PlaneFactory.BuildPlaneModel(go.transform, planeModel,
                 skin: _level.PlayerSkin);
             model.localScale *= PlaneScale;
+            WreckSource.Attach(go, model, planeModel, _level.PlayerSkin);
 
             PlayerConfig flight = PlaneLoadout.Build(config, planeModel);
             flight.rollCooldown = RollCooldown;
@@ -957,7 +968,8 @@ namespace MetalRaptors
             if (first && _sound != null) _sound.EnterGameOver();
             if (first) StopBossMusic(MusicPlayer.FadeOutSec);
 
-            StartCoroutine(FailAfter(Explosion.Duration));
+            StartCoroutine(FailAfter(Explosion.Duration
+                                     + (_cube != null && _cube.Wrecked ? PlaneWreck.ViewHold : 0f)));
         }
 
         IEnumerator FailAfter(float delay)

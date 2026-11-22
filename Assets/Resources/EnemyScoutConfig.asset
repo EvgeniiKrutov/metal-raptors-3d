@@ -39,8 +39,6 @@ MonoBehaviour:
   threatRange: 340
   threatCone: 18
   threatTailAngle: 115
-  engageRange: 380
-  engageFactor: 1.15
   engageResponse: 2
   catchUpTurnMultiplier: 1.6
   recoverBoost: 1.35

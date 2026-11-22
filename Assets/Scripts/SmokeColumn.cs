@@ -62,7 +62,7 @@ namespace MetalRaptors
         float Wind => _follows ? WindX * _scale * TrailWindFactor : WindX;
 
         public static SmokeColumn Begin(Transform parent, Vector3 position, int seed,
-            float scale = 1f, bool prewarm = true)
+            float scale = 1f, bool prewarm = true, bool ember = true)
         {
             var go = new GameObject("Smoke Column");
             go.transform.SetParent(parent, false);
@@ -72,7 +72,7 @@ namespace MetalRaptors
             column._rng = new System.Random(seed);
             column._scale = Mathf.Max(MinScale, scale);
             column._emberPhase = (float)column._rng.NextDouble() * Mathf.PI * 2f;
-            column.BuildEmber();
+            if (ember) column.BuildEmber();
             if (prewarm) column.Prewarm();
             return column;
         }

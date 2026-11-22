@@ -105,13 +105,7 @@ namespace MetalRaptors
                  "a head-on merge is fought, not dodged.")]
         public float threatTailAngle = 95f;
 
-        [Header("Engagement boost (both roles)")]
-        [Tooltip("Beyond this distance a player flying away is chased with the catch-up speed.")]
-        public float engageRange = 450f;
-
-        [Tooltip("Catch-up speed as a multiple of the player's own speed; ignores flySpeed.")]
-        public float engageFactor = 1.15f;
-
+        [Header("Station keeping (both roles)")]
         [Tooltip("How quickly the catch-up speed eases in and out, per second.")]
         public float engageResponse = 2f;
 
@@ -217,10 +211,7 @@ namespace MetalRaptors
         [Tooltip("The roll starts only inside this cone around the firing player's nose, degrees.")]
         public float barrelAimCone = 22f;
 
-        [Header("Duelist: attack passes")]
-        [Tooltip("Seconds of straight flight after passing the player, before the U-turn.")]
-        public float aceAwaySeconds = 3f;
-
+        [Header("Duelist: off screen")]
         [Tooltip("Speed multiple used only while off screen, to get back into the fight.")]
         public float aceCatchUp = 1.35f;
 
@@ -270,6 +261,20 @@ namespace MetalRaptors
                 config.safeAltitudeMargin = scout.safeAltitudeMargin;
             }
             return config;
+        }
+
+        public static EnemyConfig Veteran(PlaneModelConfig plane, EnemyConfig config,
+            float playerTurnDeg, Dictionary<EnemyConfig, EnemyConfig> cache)
+        {
+            if (plane == null || config == null || cache == null) return config;
+            if (plane.pilot != PilotLevel.Veteran || EnemyRoles.IsAce(config.role)) return config;
+            if (playerTurnDeg <= 0f) return config;
+            if (cache.TryGetValue(config, out EnemyConfig copy) && copy != null) return copy;
+
+            copy = Object.Instantiate(config);
+            copy.rotationSpeed = Mathf.Max(copy.rotationSpeed, playerTurnDeg * copy.aceTurnFactor);
+            cache[config] = copy;
+            return copy;
         }
 
         public static void Scale(EnemyConfig config, float rotation)

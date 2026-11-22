@@ -6,7 +6,7 @@
     { "op": "say", "speaker": "you", "line": "l7_line4" },
 
     { "op": "wait", "seconds": 1.5 },
-    { "op": "supply", "count": 3 },
+    { "op": "supply", "count": 4 },
 
     { "op": "wave", "enemies": [ { "plane": "eindecker", "count": 2 } ] },
     { "op": "wave", "enemies": [ { "plane": "albatros", "count": 2 } ] },
@@ -20,7 +20,8 @@
 
     { "op": "wait", "seconds": 5 },
     { "op": "wave", "enemies": [ { "plane": "albatros", "count": 2 } ] },
-    { "op": "wave", "enemies": [ { "plane": "albatros", "count": 1 } ] },
+    { "op": "wave", "enemies": [ { "plane": "albatros", "count": 2 } ] },
+    { "op": "wave", "enemies": [ { "plane": "fokker", "count": 1 } ] },
     { "op": "wave", "enemies": [ { "plane": "fokker", "count": 1 } ] },
 
     { "op": "village" },
@@ -30,9 +31,10 @@
     { "op": "say", "speaker": "marchand", "line": "l7_line7" },
     { "op": "say", "speaker": "you", "line": "l7_line8" },
 
-    { "op": "battery", "village": true, "supply": 3, "waves": [
+    { "op": "battery", "village": true, "supply": 4, "waves": [
       [ { "plane": "eindecker", "count": 2 } ],
       [ { "plane": "albatros", "count": 2 } ],
+      [ { "plane": "fokker", "count": 1 } ],
       [ { "plane": "fokker", "count": 2 } ]
     ] },
 

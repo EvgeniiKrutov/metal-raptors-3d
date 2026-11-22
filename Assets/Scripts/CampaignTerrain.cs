@@ -15,6 +15,7 @@ namespace MetalRaptors
         public Rect hardstanding;
         public VosgesArena arena;
         public int marginChunks;
+        public bool gunHills;
     }
 
     public abstract class CampaignTerrain : MonoBehaviour
@@ -39,6 +40,8 @@ namespace MetalRaptors
         protected float _roadHalfWidth;
         protected Rect _hardstanding;
         protected VosgesArena _arena;
+
+        protected bool GunHills { get; private set; }
         float _keepBehind, _keepAhead;
         bool _bounded;
         int _firstChunk, _lastChunk;
@@ -131,6 +134,7 @@ namespace MetalRaptors
             _roadHalfWidth = options.roadHalfWidth;
             _hardstanding = options.hardstanding;
             _arena = options.arena;
+            GunHills = options.gunHills;
 
             if (options.worldWidth <= 0f) return;
 

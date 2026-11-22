@@ -23,6 +23,7 @@ namespace MetalRaptors
         const float FootShare = 0.8f;
         const float LensLength = 0.3f, LensGrow = 1.1f;
         const float DroopDeg = 18f;
+        const float LeftDroopDeg = 180f - DroopDeg;
 
         const float BeamReach = 1150f;
         const float BeamInner = 7f, BeamOuter = 16f;
@@ -467,6 +468,14 @@ namespace MetalRaptors
 
         public void Silence(bool quiet) => _quiet = quiet;
 
+        public void Retarget(Transform target)
+        {
+            _target = target;
+            _targetBody = target != null ? target.GetComponent<Rigidbody>() : null;
+        }
+
+        public Vector3 Foot => transform.position;
+
         bool InReach(Vector3 point) =>
             ((Vector2)point - (Vector2)MuzzlePoint).sqrMagnitude <= BeamReach * BeamReach;
 
@@ -532,7 +541,13 @@ namespace MetalRaptors
             SmokeColumn.Follow(transform, _centre, _seed, HurtSmokeScale);
         }
 
-        public void Blow()
+        float _wreckDeg = DroopDeg;
+
+        public void WreckLeft() => _wreckDeg = LeftDroopDeg;
+
+        public void Blow() => Blow(false);
+
+        public void Blow(bool quiet)
         {
             if (_down) return;
 
@@ -547,12 +562,15 @@ namespace MetalRaptors
             Vector3 foot = transform.position;
             Camera cam = Camera.main;
 
-            Explosion.Spawn(centre, BlowSize);
-            GroundBlast.Spawn(foot, BlowSize, cam != null ? cam.transform.position : foot);
+            if (!quiet)
+            {
+                Explosion.Spawn(centre, BlowSize);
+                GroundBlast.Spawn(foot, BlowSize, cam != null ? cam.transform.position : foot);
+                NightLights.Flash(centre, BlowColor, 3f, BlowSize * 5f, 0.7f, 5);
+            }
             WreckFire.Begin(transform, foot + Vector3.up * M, BlowFire, _seed);
-            NightLights.Flash(centre, BlowColor, 3f, BlowSize * 5f, 0.7f, 5);
 
-            Pose(DroopDeg);
+            Pose(_wreckDeg);
             if (_drum != null) _drum.localRotation = Quaternion.Euler(0f, 0f, 115f);
         }
 

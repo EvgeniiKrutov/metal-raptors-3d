@@ -7,8 +7,18 @@ namespace MetalRaptors
 {
     public class CampaignLevelController : MonoBehaviour, ICampaignScriptHost, IRaidHost,
         IAbilityHost, IDevSpawnHost, IDangerHost, IGunnerHost, IBoostHost, ITurnHost, IAssaultHost,
-        IStealthHost, IValleyHost, ISettleHost, IWingHost
+        IStealthHost, IValleyHost, ISettleHost, IWingHost, IRecoverHost
     {
+        const float RecoverShare = 0.5f;
+
+        public void Recover()
+        {
+            if (_gameOver || _playerFalling || _cube == null || _cube.CurrentHealth <= 0f) return;
+
+            float floor = _cube.MaxHealth * RecoverShare;
+            if (_cube.CurrentHealth < floor) _cube.Heal(floor - _cube.CurrentHealth);
+        }
+
         const float SkyTop = 1000f;
         const float CloudHeadroom = 200f;
         const float LowSkyPad = 1f;
@@ -115,11 +125,17 @@ namespace MetalRaptors
 
         const string VillageJumpCaption = "SKIP TO VILLAGE";
         const string BombingSkipCaption = "SKIP TO BOMBING";
+        const string CraneJumpCaption = "SKIP TO CRANE";
+        const float CraneJumpLead = 100f;
+        const float CraneSkipCloseSec = 0.6f;
         const float VillageJumpSkip = 5f;
         const float VillageJumpEnter = 20f;
         const float RunFloorLift = 90f;
         const float WingFlipCos = 0.3f;
         const float WingmanMaxSec = 6f;
+        const float RunFadeOutSec = 0.5f;
+        const float RunFadeHoldSec = 0.4f;
+        const float EngineMuteSec = 0.4f;
 
         const float DitchSplashSize = 75f;
         const float SinkSpeed = 26f;
@@ -185,6 +201,7 @@ namespace MetalRaptors
         bool _batteryVillage;
         bool _batterySkipped;
         VillageBombRun _bombRun;
+        CraneLastRun _lastRun;
         VillageSite _village;
         bool _hasVillage;
         bool _villageGuns;
@@ -214,6 +231,7 @@ namespace MetalRaptors
         float _settleAge;
         float _camEase = 1f;
         int _jumpStep = -1;
+        int _craneStep = -1;
         int _finalStep = -1;
         Vector3 _camBasePos;
         float _camShake;
@@ -447,6 +465,7 @@ namespace MetalRaptors
             DevFinalJump.Withdraw(JumpToFinalArena);
             DevJump.Withdraw(JumpToVillage);
             DevSkip.Withdraw(SkipToBombing);
+            DevFinalJump.Withdraw(JumpToCrane);
             EnemyController.AimedFire = false;
             if (!_handedOff) CampaignCheckpoint.InCareer = false;
             LevelScroll.Reset();
@@ -544,13 +563,18 @@ namespace MetalRaptors
             CampaignCheckpoint.Save(snapshot);
         }
 
+        bool GunHills => Alpine && _level.gunHills && !CustomBattle.Requested;
+
         CampaignLandOptions BuildLand()
         {
             float depth = Alpine ? VosgesTerrain.LandDepth : 0f;
             if (!Bounded && !_level.aerodrome)
-                return depth > 0f ? new CampaignLandOptions { depth = depth } : null;
+                return depth > 0f ? new CampaignLandOptions { depth = depth, gunHills = GunHills } : null;
 
-            var land = new CampaignLandOptions { worldWidth = _level.worldWidth, depth = depth };
+            var land = new CampaignLandOptions
+            {
+                worldWidth = _level.worldWidth, depth = depth, gunHills = GunHills,
+            };
             if (Alpine && _level.villageArena)
             {
                 _villageArena = VosgesArena.Load(WorldRight, PlayPlaneZ, ProceduralTerrain.BaseLevel);
@@ -698,6 +722,10 @@ namespace MetalRaptors
                 _hasVillage = SeenVillage(out _village);
                 PlaceVillageGuns();
             }
+            _craneStep = _villageStep >= 0 ? CraneStep(script) : -1;
+            if (_craneStep >= 0 && (_resume == null || _resume.step < _craneStep))
+                DevFinalJump.Offer(CraneJumpCaption, JumpToCrane);
+            if (_craneStep >= 0 && _resume != null && _resume.step == _craneStep) PrepareCraneSkip();
             if (!_level.stealth) return;
 
             _jumpStep = WaveTwoStep(script);
@@ -814,6 +842,7 @@ namespace MetalRaptors
                 skin: _level.PlayerSkin);
             model.localScale *= PlaneModelConfig.LevelScale;
             _playerModel = model;
+            WreckSource.Attach(go, model, planeModel, _level.PlayerSkin);
 
             PlayerConfig flight = PlaneLoadout.Build(config, planeModel, FlightPace.Fast);
             _cruise = flight.flySpeed;
@@ -1156,9 +1185,11 @@ namespace MetalRaptors
             ApplyBoostZoom();
             if (_waveArena && (_enemies == null || _enemies.AliveCount == 0)) EndWaveArena();
             if (_bombRun != null) _bombRun.Tick(Time.deltaTime, _camBasePos);
+            if (_lastRun != null) _lastRun.Tick(Time.deltaTime);
             if (_raid != null) FrameRaid();
             else if (_finale != null) FrameFinale();
             else if (_bombRun != null && _bombRun.Framing) FrameBombRun();
+            else if (_lastRun != null && _lastRun.Framing) FrameLastRun();
             else if (_cam != null && !_camHold) PositionCamera(instant: false);
             if (_flyby != null) _flyby.Tick(_camBasePos, Time.deltaTime);
 
@@ -1411,6 +1442,13 @@ namespace MetalRaptors
         void FrameBombRun()
         {
             _camBasePos = _bombRun.CameraPosition;
+            if (_cam != null) PlaceCamera();
+        }
+
+        void FrameLastRun()
+        {
+            _camBasePos = _lastRun.CameraPosition;
+            if (_lastRun.Cut) _lastCamX = _camBasePos.x;
             if (_cam != null) PlaceCamera();
         }
 
@@ -1872,7 +1910,7 @@ namespace MetalRaptors
             StopWeapons();
             if (_sound != null) _sound.EnterGameOver();
 
-            StartCoroutine(ShowFailScreenAfter(Explosion.Duration));
+            StartCoroutine(ShowFailScreenAfter(Explosion.Duration + (_cube.Wrecked ? PlaneWreck.ViewHold : 0f)));
         }
 
         void OnAirfieldLost()
@@ -1930,7 +1968,7 @@ namespace MetalRaptors
                 : Bounded ? HudObjectiveBounded : HudObjective;
             _hudView = new LevelHud(canvas.transform, objective,
                 _cube, _shooter, _bomber, _boost, _roll, _searchlight, _airfield, TryPause,
-                abilities: _abilities, gun: _rearGun, pilot: _autopilot);
+                abilities: _abilities, gun: _rearGun, pilot: _autopilot, speedDial: !Gunner);
 
             _curtain = HudCurtain.Attach(_hud);
             _curtain.Set(false);
@@ -2130,6 +2168,85 @@ namespace MetalRaptors
             return _wingFacing;
         }
 
+        static int CraneStep(CampaignScript script)
+        {
+            for (int i = 0; i < script.Steps.Length; i++)
+                if (script.Steps[i].op == CampaignOp.Wingman) return i;
+            return -1;
+        }
+
+        void JumpToCrane()
+        {
+            if (_gameOver || _playerFalling || _cube == null || _craneStep < 0) return;
+
+            VillageSite site = _village;
+            if (!_hasVillage && !ValleyVillages.Ahead(ValleyLayout,
+                    _camBasePos.x + _halfViewWidth * VillageJumpSkip, out site)) return;
+
+            _gameOver = true;
+            StopScript();
+            StopWeapons();
+
+            float x = site.CentreX + CraneJumpLead;
+            CampaignCheckpoint.Save(new CampaignSnapshot
+            {
+                level = _levelNumber,
+                step = _craneStep,
+                playerPosition = new Vector3(x, SettleY, PlayPlaneZ),
+                playerHeading = Mathf.PI,
+                playerHealth = _cube.MaxHealth,
+                camera = new Vector3(x, SettleCamY, CamZ),
+                facing = -1f,
+                companionFoe = _wing != null ? _wing.FoePlane : null,
+                points = PilotProfile.RunPoints,
+            });
+            CampaignCheckpoint.RequestRestore();
+            ScreenFade.Load(SceneNames.CampaignLevel1, null, CampaignCheckpoint.RestoreOutSec,
+                CampaignCheckpoint.RestoreHoldSec, CampaignCheckpoint.RestoreInSec);
+        }
+
+        void PrepareCraneSkip()
+        {
+            _outro = true;
+            DevSkip.Withdraw(SkipToBombing);
+            DevJump.Withdraw(JumpToVillage);
+
+            StopWeapons();
+            if (_enemies != null) _enemies.StandDown();
+            if (_supply != null) _supply.StandDown();
+            _arenaLocked = false;
+            if (_cube != null)
+            {
+                _cube.ClearWalls();
+                _cube.FlyLevel();
+                _cube.SetTargetHeading(Mathf.PI);
+            }
+            RaiseBars();
+            if (_bars != null) _bars.Snap();
+            FaceFormation(-1f);
+
+            if (_battery != null)
+            {
+                _battery.BlowAll(true);
+                _battery.Arm();
+            }
+            if (_wing != null) _wing.Close(CraneSkipCloseSec);
+            if (!_hasVillage) return;
+
+            VillageBombRun.Torch(new BombRunSetup
+            {
+                site = _village,
+                terrain = _terrain,
+                halfViewWidth = _halfViewWidth,
+                cruise = _cruise,
+                minY = ProceduralTerrain.CutRevealY + RunFloorLift,
+                laneY = SettleY,
+                playZ = PlayPlaneZ,
+                cameraDistance = CameraDistance,
+                seed = _level.seed,
+            });
+        }
+
         static int VillageStep(CampaignScript script)
         {
             bool village = false;
@@ -2208,8 +2325,10 @@ namespace MetalRaptors
             if (_villageGuns || !_hasVillage || _cubeTr == null) return;
 
             EnsureBattery();
+            Vector2? hill = null;
+            if (ValleyLayout != null && ValleyLayout.GunHillNear(_village.CentreX, out Vector2 spot)) hill = spot;
             _battery.PlaceBeside(_village.left, _village.right, _village.CentreZ,
-                _halfViewWidth * (ArenaCamScreens + 1f));
+                _halfViewWidth * (ArenaCamScreens + 1f), hill);
             _villageGuns = true;
         }
 
@@ -2316,11 +2435,60 @@ namespace MetalRaptors
         public void DownWingman()
         {
             _wingmanAt = Time.time;
-            if (_wing != null) _wing.DownCompanion();
+            DevFinalJump.Withdraw(JumpToCrane);
+            if (_wing == null || _lastRun != null) return;
+
+            if (_hasVillage && _battery != null && _terrain != null)
+            {
+                DuelPlane crane = _wing.ReleaseCompanion();
+                if (crane != null)
+                {
+                    _lastRun = CraneLastRun.Begin(new LastRunSetup
+                    {
+                        crane = crane,
+                        battery = _battery,
+                        site = _village,
+                        terrain = _terrain,
+                        cruise = _cruise,
+                        playZ = PlayPlaneZ,
+                        cameraDistance = CameraDistance,
+                        halfViewWidth = _halfViewWidth,
+                        seed = _level.seed,
+                        camera = _camBasePos,
+                        shake = amount => _camShake = Mathf.Max(_camShake, amount),
+                        muteEngine = on => { if (_sound != null) _sound.MuteEngine(on, EngineMuteSec); },
+                        fadeBack = FadeBackFromRun,
+                    });
+                    if (_lastRun != null)
+                    {
+                        _terrain.TwoWay = true;
+                        return;
+                    }
+                    crane.Kill();
+                    return;
+                }
+            }
+
+            _wing.DownCompanion();
         }
 
-        public bool WingmanDown =>
-            _wing == null || _wing.CompanionGone || Time.time - _wingmanAt >= WingmanMaxSec;
+        public bool WingmanDown => _lastRun != null
+            ? _lastRun.Done
+            : _wing == null || _wing.CompanionGone || Time.time - _wingmanAt >= WingmanMaxSec;
+
+        void FadeBackFromRun(System.Action atBlack)
+        {
+            ScreenFade.Swap(() =>
+            {
+                atBlack?.Invoke();
+                if (_sound != null) _sound.MuteEngine(false, EngineMuteSec);
+                if (_terrain != null && !_waveArena) _terrain.TwoWay = false;
+                if (_cubeTr == null) return;
+                if (_terrain != null) _terrain.BuildAround(_cubeTr.position.x);
+                if (_cam != null) PositionCamera(instant: true);
+                _lastCamX = _camBasePos.x;
+            }, RunFadeOutSec, RunFadeHoldSec);
+        }
 
         public void Unlock(PlaneAbility ability)
         {

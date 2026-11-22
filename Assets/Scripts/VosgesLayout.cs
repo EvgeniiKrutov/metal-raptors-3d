@@ -186,6 +186,7 @@ namespace MetalRaptors
 
         readonly Dictionary<int, VillageSpot?> _villages = new Dictionary<int, VillageSpot?>();
         readonly Dictionary<int, MillSpot?> _mills = new Dictionary<int, MillSpot?>();
+        readonly Dictionary<int, Vector2?> _gunHills = new Dictionary<int, Vector2?>();
         readonly Dictionary<int, HouseSpot[]> _houses = new Dictionary<int, HouseSpot[]>();
         readonly Dictionary<int, HerdSpot?> _herds = new Dictionary<int, HerdSpot?>();
         readonly Dictionary<int, GroveSpot[]>[] _groves = new Dictionary<int, GroveSpot[]>[GroveBands];
@@ -229,6 +230,99 @@ namespace MetalRaptors
         public float BandFarZ(int band) => BandTo[Mathf.Clamp(band, 0, GroveBands - 1)];
 
         public float BaseHeight(float x, float z) => _baseHeight(x, z);
+
+        public bool GunHills { get; set; }
+
+        public bool GunHillNear(float x, out Vector2 spot)
+        {
+            spot = default;
+            if (!GunHills) return false;
+
+            float best = float.MaxValue;
+            bool found = false;
+            int middle = Mathf.FloorToInt(x / VillageCell);
+            for (int cell = middle - 1; cell <= middle + 1; cell++)
+            {
+                if (!Village(cell, out var v) || !GunHill(cell, out Vector2 at)) continue;
+                float gap = Mathf.Abs(v.x - x);
+                if (gap >= best) continue;
+                best = gap;
+                spot = at;
+                found = true;
+            }
+            return found;
+        }
+
+        bool GunHill(int cell, out Vector2 spot)
+        {
+            if (!_gunHills.TryGetValue(cell, out var cached))
+            {
+                cached = null;
+                if (ValleyVillages.Site(this, cell, out VillageSite site))
+                {
+                    float z = (_playPlaneZ + site.CentreZ) * 0.5f;
+                    float x = site.right + ValleyBattery.HillGap;
+                    for (int i = 0; i < GunHillTries && InVillage(x, z, ValleyBattery.HillReach); i++)
+                        x += GunHillStep;
+                    cached = new Vector2(x, z);
+                }
+                _gunHills[cell] = cached;
+            }
+
+            spot = cached ?? default;
+            return cached.HasValue;
+        }
+
+        float GunHillHalfX => ValleyBattery.HillHalfX + ValleyBattery.HillFalloff;
+
+        float GunHillHalfZ => ValleyBattery.HillHalfZ + ValleyBattery.HillFalloff;
+
+        static float ViewSpread =>
+            Mathf.Tan(LevelCamera.BaseFieldOfView * 0.5f * Mathf.Deg2Rad) * LevelCamera.ReferenceAspect;
+
+        bool InGunClear(float x, float z, float margin)
+        {
+            if (!GunHills) return false;
+
+            int middle = Mathf.FloorToInt(x / VillageCell);
+            for (int cell = middle - 1; cell <= middle + 1; cell++)
+            {
+                if (!GunHill(cell, out Vector2 hill)) continue;
+                float half = GunHillHalfX + GunZoneScreens * ScreenWidth(hill.y)
+                             + Mathf.Max(0f, z - hill.y) * ViewSpread;
+                if (Mathf.Abs(x - hill.x) <= half + margin) return true;
+            }
+            return false;
+        }
+
+        bool InGunHill(float x, float z, float marginX, float marginZ)
+        {
+            if (!GunHills) return false;
+
+            int middle = Mathf.FloorToInt(x / VillageCell);
+            for (int cell = middle - 1; cell <= middle + 1; cell++)
+            {
+                if (!GunHill(cell, out Vector2 hill)) continue;
+                if (Mathf.Abs(x - hill.x) <= GunHillHalfX + marginX
+                    && Mathf.Abs(z - hill.y) <= GunHillHalfZ + marginZ) return true;
+            }
+            return false;
+        }
+
+        bool InGunView(float x, float z, float marginX, float marginZ)
+        {
+            if (!GunHills) return false;
+            if (InGunHill(x, z, marginX, marginZ)) return true;
+
+            int middle = Mathf.FloorToInt(x / VillageCell);
+            for (int cell = middle - 1; cell <= middle + 1; cell++)
+            {
+                if (!GunHill(cell, out Vector2 hill)) continue;
+                if (z - marginZ > hill.y) continue;
+                if (Mathf.Abs(x - hill.x) <= ValleyBattery.HillHalfX + GunFrontPad + marginX) return true;
+            }
+            return false;
+        }
 
         public float Ground(float x, float z) => Ground(x, z, true);
 
@@ -515,6 +609,11 @@ namespace MetalRaptors
             return cached.HasValue;
         }
 
+        const int GunHillTries = 40;
+        const float GunHillStep = 30f;
+        const float GunZoneScreens = 0.5f;
+        const float GunFrontPad = 60f;
+
         bool TryMill(int cell, out MillSpot spot)
         {
             spot = default;
@@ -532,6 +631,7 @@ namespace MetalRaptors
                 float facing = VosgesWindmill.FacingYaw + Range(rng, -MillFacingSpread, MillFacingSpread);
                 float phase = (float)rng.NextDouble() * 360f;
                 if (InVillage(x, z, radius + MillVillageGap)) continue;
+                if (InGunClear(x, z, radius)) continue;
 
                 float reach = radius + MillPadMargin;
                 float slope = Mathf.Max(
@@ -615,6 +715,7 @@ namespace MetalRaptors
                 float z = Range(rng, zMin, zMax);
                 if (zMax <= zMin) continue;
                 if (InVillage(x, z, radius + HouseVillageGap)) continue;
+                if (InGunClear(x, z, radius)) continue;
                 if (InMill(x, z, radius + HouseMillGap)) continue;
                 if (InHerd(x, z, radius + HouseHerdGap)) continue;
                 if (Crowded(placed, x, z, radius)) continue;
@@ -683,6 +784,7 @@ namespace MetalRaptors
                 float reachOut = Mathf.Max(rx, rz);
                 if (InVillage(x, z, reachOut + HerdVillageGap)) continue;
                 if (InMill(x, z, reachOut + HerdMillGap)) continue;
+                if (InGunHill(x, z, rx, rz)) continue;
 
                 int count = rng.Next(HerdCountMin, HerdCountMax + 1);
                 var cows = new List<CowSpot>(count);
@@ -756,6 +858,7 @@ namespace MetalRaptors
                     : Mathf.Max(BandFrom[band], ForeBackZ + rz);
                 float z = Range(rng, zFrom, BandTo[band]);
                 if (InVillage(x, z, Mathf.Min(rx, rz))) continue;
+                if (InGunView(x, z, rx, rz)) continue;
 
                 var trees = new List<TreeSpot>();
                 int count = rng.Next(BandTreesMin[band], BandTreesMax[band] + 1);
@@ -802,7 +905,7 @@ namespace MetalRaptors
 
         bool Blocked(float x, float z) =>
             InVillage(x, z, TreeClear) || InMill(x, z, TreeClear) || InHerd(x, z, TreeClear)
-            || InHouse(x, z, HouseTreeClear);
+            || InHouse(x, z, HouseTreeClear) || InGunView(x, z, TreeClear, TreeClear);
 
         TreeSpot Tree(System.Random rng, float x, float z)
         {

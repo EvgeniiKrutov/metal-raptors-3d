@@ -30,6 +30,8 @@ namespace MetalRaptors
 
         public static float Duration => MaxDelay + LifeMax;
 
+        public static float PeakTime => MaxDelay * 0.5f + GrowEnd * (LifeMin + LifeMax) * 0.5f;
+
         public const float RemovalDelay = 0.15f;
 
         struct Blob

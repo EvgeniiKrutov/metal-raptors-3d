@@ -164,6 +164,8 @@ namespace MetalRaptors
 
         public static bool FastReload { get; set; }
 
+        public static bool ShowHitboxes { get; set; }
+
         public static float DamageFactor => HighDamage ? 10f : 1f;
 
         public static float SpeedFactor => FastSpeed ? 1.5f : 1f;
@@ -179,6 +181,7 @@ namespace MetalRaptors
             HighDamage = false;
             FastSpeed = false;
             FastReload = false;
+            ShowHitboxes = false;
         }
     }
 

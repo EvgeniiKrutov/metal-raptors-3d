@@ -57,6 +57,7 @@ namespace MetalRaptors
         public bool companionForms = true;
         public bool zeppelins;
         public bool peaceful;
+        public bool gunHills;
         public float flak = 1f;
         public float people = 1.5f;
         public float enemyRotationScale = 1f;
@@ -384,10 +385,11 @@ namespace MetalRaptors
             companion = true,
             backCompanions = 2,
             supportCompanion = true,
+            gunHills = true,
             flak = 1.5f,
             enemyRotationScale = 1.03f,
             duelistSkins = new[] { "black_white", "red_green" },
-            supplyDrops = 6,
+            supplyDrops = 8,
             companionFoe = PlaneModels.Albatros,
             companionPilots = new[] { "crane", "roussel", "marchand" },
             title = "HOHRUPT",

@@ -94,6 +94,7 @@ namespace MetalRaptors
             _wallMat = TerrainSurfaces.FlatMaterial(WallColor);
 
             Layout = Arena ? null : new VosgesLayout(_seed, ValleyHeight, BaseHeight, cameraDistance, playPlaneZ);
+            if (Layout != null) Layout.GunHills = GunHills;
 
             VosgesSky.ApplyFog(daytime, cameraDistance, playPlaneZ);
         }

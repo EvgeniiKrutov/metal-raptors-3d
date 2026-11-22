@@ -365,6 +365,7 @@ namespace MetalRaptors
         Ramp _pauseGain;
         Ramp _fadeGain;
         Ramp _duck;
+        Ramp _engineGain;
 
         public static void Preload()
         {
@@ -389,6 +390,7 @@ namespace MetalRaptors
             system._pauseGain.Jump(1f);
             system._fadeGain.Jump(1f);
             system._duck.Jump(1f);
+            system._engineGain.Jump(1f);
 
             system.Arm();
             return system;
@@ -475,7 +477,9 @@ namespace MetalRaptors
             return source;
         }
 
-        float EngineGain => Gain * _duck.Value;
+        float EngineGain => Gain * _duck.Value * _engineGain.Value;
+
+        public void MuteEngine(bool on, float seconds) => _engineGain.Set(on ? 0f : 1f, Mathf.Max(0.01f, seconds));
 
         public void EnterGameOver()
         {
@@ -497,6 +501,7 @@ namespace MetalRaptors
 
             float dt = Time.unscaledDeltaTime;
             _fadeGain.Tick(dt);
+            _engineGain.Tick(dt);
             UpdateDuck(dt);
 
             if (_gameOver && GameMenu.IsOpen) StopWind();

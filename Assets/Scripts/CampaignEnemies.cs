@@ -46,6 +46,8 @@ namespace MetalRaptors
         readonly Dictionary<PlaneModelConfig, EnemyConfig> _armed =
             new Dictionary<PlaneModelConfig, EnemyConfig>();
         readonly Dictionary<EnemyRole, EnemyConfig> _aces = new Dictionary<EnemyRole, EnemyConfig>();
+        readonly Dictionary<EnemyConfig, EnemyConfig> _veterans =
+            new Dictionary<EnemyConfig, EnemyConfig>();
         readonly bool _scoutFixed;
         readonly bool _fighterFixed;
         readonly Rigidbody _player;
@@ -218,6 +220,15 @@ namespace MetalRaptors
             Duelists && plane == PlaneModels.EnemyFor(EnemyRole.Duelist)
                 ? AceConfig(EnemyRole.Duelist, plane)
                 : Base(plane);
+
+        float PlayerTurnDeg
+        {
+            get
+            {
+                var pilot = _player != null ? _player.GetComponent<CubeController>() : null;
+                return pilot != null ? pilot.BaseTurnDeg : 0f;
+            }
+        }
 
         EnemyConfig AceConfig(EnemyRole role, PlaneModelConfig plane)
         {
@@ -459,7 +470,8 @@ namespace MetalRaptors
             Raise(config, ClearanceLift(plane));
 
             float z = _player != null ? _player.position.z : 0f;
-            EnemyController boss = SpawnOne(plane, new Vector3(position.x, position.y, z), config, skin);
+            EnemyController boss = SpawnOne(plane, new Vector3(position.x, position.y, z), config, skin,
+                boss: true);
             _bosses.Add(boss);
             return boss;
         }
@@ -524,15 +536,19 @@ namespace MetalRaptors
         }
 
         EnemyController SpawnOne(PlaneModelConfig plane, Vector3 position,
-            EnemyConfig config = null, PlaneSkin skin = null, bool sneak = false, bool high = false)
+            EnemyConfig config = null, PlaneSkin skin = null, bool sneak = false, bool high = false,
+            bool boss = false)
         {
             if (config == null) config = Lifted(Base(plane), plane);
+            if (!Pursuit && !boss) config = EnemyConfigs.Veteran(plane, config, PlayerTurnDeg, _veterans);
 
             var go = new GameObject("Enemy");
             go.transform.position = position;
+            PlaneSkin paint = skin ?? EnemySkin(plane);
             Transform model = PlaneFactory.BuildPlaneModel(go.transform, plane, mirrored: true,
-                skin: skin ?? EnemySkin(plane));
+                skin: paint);
             if (!Mathf.Approximately(ModelScale, 1f)) model.localScale *= ModelScale;
+            WreckSource.Attach(go, model, plane, paint);
 
             bool gunned = PlaneFactory.GunMuzzleLocal(go, model, plane, out Vector3 gun);
             if (!gunned && plane.gunLift > 0f)
@@ -548,6 +564,7 @@ namespace MetalRaptors
             enemy.BossFight = BossFight;
             enemy.Initialize(config, _player, _minX, _maxX, _groundY, CeilingFor(plane),
                 EdgeMargin);
+            enemy.AssignPilot(plane.pilot);
             if (gunned) enemy.MountGun(gun);
             enemy.MountNose(nose);
             enemy.MountEngine(engine);

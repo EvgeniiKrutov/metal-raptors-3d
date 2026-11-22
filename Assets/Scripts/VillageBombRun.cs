@@ -294,6 +294,12 @@ namespace MetalRaptors
             return spots;
         }
 
+        public static void Torch(BombRunSetup setup)
+        {
+            var run = new VillageBombRun(setup);
+            foreach (Target target in run._targets) run.Ignite(target, target.roof);
+        }
+
         public static VillageBombRun Begin(BombRunSetup setup)
         {
             if (setup.cube == null) return null;

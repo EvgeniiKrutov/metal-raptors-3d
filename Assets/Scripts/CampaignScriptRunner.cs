@@ -107,6 +107,11 @@ namespace MetalRaptors
         bool WingmanDown { get; }
     }
 
+    public interface IRecoverHost
+    {
+        void Recover();
+    }
+
     public interface IWingHost
     {
         void BeginFight();
@@ -479,6 +484,7 @@ namespace MetalRaptors
 
             yield return Unblur();
             yield return Unfreeze();
+            if (_host is IRecoverHost recover) recover.Recover();
 
             _bar.Hide();
             yield return Wait(CinematicBars.SlideSec);

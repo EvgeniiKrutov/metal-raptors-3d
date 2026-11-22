@@ -14,9 +14,10 @@ namespace MetalRaptors
         const float MoundTop = 40f, MoundFalloff = 55f, MoundRise = 22f;
         const float EdgeMargin = 110f;
 
-        const float HillGap = 260f;
-        const float HillHalfX = 150f, HillHalfZ = 60f, HillFalloff = 130f, HillRise = 22f;
-        const float HillGunSpacing = 95f;
+        public const float HillGap = 260f;
+        public const float HillHalfX = 150f, HillHalfZ = 60f, HillFalloff = 130f;
+        const float HillRise = 22f;
+        public const float HillGunSpacing = 95f;
         const int HillGuns = 3;
         const int HillSeedShift = 100;
         const int GroundProbes = 3;
@@ -48,6 +49,7 @@ namespace MetalRaptors
         int _placed;
         bool _armed;
         bool _hillArmed;
+        bool _hillHeld;
 
         public ValleyBattery(Transform player, CampaignTerrain terrain, float playZ, float cruise,
             float planeLength, int seed)
@@ -61,6 +63,10 @@ namespace MetalRaptors
         }
 
         public bool Active => _guns.Count > 0;
+
+        public IReadOnlyList<AaGun> Hill => _hill;
+
+        public void HoldHill(bool on) => _hillHeld = on;
 
         public float CentreX { get; private set; }
 
@@ -94,7 +100,10 @@ namespace MetalRaptors
             CentreX = x;
         }
 
-        public void PlaceBeside(float villageLeft, float villageRight, float villageZ, float arenaHalf)
+        public static float HillReach => new Vector2(HillHalfX, HillHalfZ).magnitude + HillFalloff;
+
+        public void PlaceBeside(float villageLeft, float villageRight, float villageZ, float arenaHalf,
+            Vector2? hill = null)
         {
             Forget();
             CentreX = (villageLeft + villageRight) * 0.5f;
@@ -102,7 +111,8 @@ namespace MetalRaptors
             float max = CentreX + arenaHalf - EdgeMargin;
             PlaceOnMound(villageLeft - VillageGap, min, max);
             PlaceOnMound(villageRight + VillageGap, min, max);
-            RaiseHill(villageRight + HillGap, (_playZ + villageZ) * 0.5f);
+            if (hill.HasValue) RaiseHill(hill.Value.x, hill.Value.y, true);
+            else RaiseHill(villageRight + HillGap, (_playZ + villageZ) * 0.5f, false);
         }
 
         void PlaceOnMound(float x, float min, float max)
@@ -113,12 +123,11 @@ namespace MetalRaptors
             Place(spot);
         }
 
-        void RaiseHill(float x, float z)
+        void RaiseHill(float x, float z, bool exact)
         {
             if (_hill.Count > 0) return;
 
-            float reach = new Vector2(HillHalfX, HillHalfZ).magnitude + HillFalloff;
-            float spot = AaGun.ClearSpot(_terrain, x, z, reach);
+            float spot = exact ? x : AaGun.ClearSpot(_terrain, x, z, HillReach);
             Mound(spot, z, HillHalfX, HillHalfZ, false, HillFalloff, HillRise);
 
             for (int i = 0; i < HillGuns; i++)
@@ -126,6 +135,7 @@ namespace MetalRaptors
                 float gx = spot + (i - (HillGuns - 1) * 0.5f) * HillGunSpacing;
                 AaGun gun = AaGun.Place(gx, z, _player, _cruise, _planeLength,
                     _seed + (HillSeedShift + i) * SeedStep, lamp: false);
+                gun.WreckLeft();
                 _hill.Add(gun);
                 _hillIn.Add(Random.Range(HillGapMin, HillGapMax) * (i + 1) * 0.5f);
             }
@@ -185,10 +195,10 @@ namespace MetalRaptors
             }
         }
 
-        public void BlowAll()
+        public void BlowAll(bool quiet = false)
         {
             foreach (AaGun gun in _guns)
-                if (gun != null && !gun.Down) gun.Blow();
+                if (gun != null && !gun.Down) gun.Blow(quiet);
         }
 
         public void Tick(bool quiet)
@@ -199,7 +209,7 @@ namespace MetalRaptors
 
         public void TickHill(float dt, Vector3 listener, bool quiet, IReadOnlyList<Transform> escort = null)
         {
-            if (!_hillArmed || quiet || dt <= 0f) return;
+            if (!_hillArmed || _hillHeld || quiet || dt <= 0f) return;
 
             bool around = escort != null && escort.Count > 0 && escort[0] != null;
             for (int i = 0; i < _hill.Count; i++)

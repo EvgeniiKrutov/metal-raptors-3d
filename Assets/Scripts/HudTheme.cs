@@ -71,6 +71,10 @@ namespace MetalRaptors
         public static Vector2 DialCentre =>
             new Vector2(DialLeft + DialSize * 0.5f, -(DialTop + DialSize * 0.5f));
 
+        public static Vector2 SpeedDialCentre =>
+            new Vector2(-(MenuTheme.SafeRight + DialMarginSide + DialSize * 0.5f),
+                -(DialTop + DialSize * 0.5f));
+
         public static Vector2 FireCentre =>
             new Vector2(MenuTheme.SafeLeft + FireInsetLeft, MenuTheme.SafeBottom + FireInsetBottom);
 

@@ -13,6 +13,7 @@ namespace MetalRaptors
         Dive,
         Fix,
         Pause,
+        Pointer,
     }
 
     public static class HudIcons
@@ -27,6 +28,7 @@ namespace MetalRaptors
         static readonly float[] RollHead = { 0.64f, 0.50f, 0.90f, 0.50f, 0.77f, 0.70f };
         static readonly float[] LampBody = { 0.12f, 0.41f, 0.40f, 0.28f, 0.40f, 0.72f, 0.12f, 0.59f };
         static readonly float[] DiveHead = { 0.26f, 0.44f, 0.50f, 0.12f, 0.74f, 0.44f };
+        static readonly float[] PointerHead = { 0.16f, 0.18f, 0.88f, 0.50f, 0.16f, 0.82f };
 
         public static Sprite Get(HudIcon icon)
         {
@@ -73,6 +75,7 @@ namespace MetalRaptors
                 case HudIcon.Light: return Lamp(p);
                 case HudIcon.Dive: return Dive(p);
                 case HudIcon.Fix: return Wrench(p);
+                case HudIcon.Pointer: return Convex(p, PointerHead);
                 default: return Pause(p);
             }
         }

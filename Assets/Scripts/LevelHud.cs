@@ -37,6 +37,7 @@ namespace MetalRaptors
         readonly GunnerAutopilot _pilot;
 
         readonly HealthDial _health;
+        readonly SpeedDial _speed;
         readonly HealthBar _airfieldBar;
         readonly Airfield _airfield;
         readonly SkillDial _bombDial;
@@ -60,6 +61,7 @@ namespace MetalRaptors
 
         readonly TouchStick _stick;
         readonly HeadingArrow _arrow;
+        readonly CrateArrow _crateArrow;
         readonly bool _arena;
         bool _disarmed;
         Camera _cam;
@@ -68,7 +70,7 @@ namespace MetalRaptors
             PlaneShooter shooter, PlaneBomber bomber, PlaneBoost boost, PlaneBarrelRoll roll,
             PlaneSearchlight searchlight, Airfield airfield, System.Action onPause,
             bool arena = false, PlaneAbility abilities = PlaneAbility.All, RearGun gun = null,
-            GunnerAutopilot pilot = null)
+            GunnerAutopilot pilot = null, bool speedDial = false)
         {
             _plane = plane;
             _gun = gun;
@@ -84,6 +86,10 @@ namespace MetalRaptors
             _searchlight = searchlight;
 
             _health = new HealthDial(parent, HudTheme.DialCentre);
+
+            if (speedDial && !HudTheme.IsTouch && plane != null)
+                _speed = new SpeedDial(parent, HudTheme.SpeedDialCentre, plane.MinSpeedFraction,
+                    PlaneEnergy.StallFraction, plane.DiveSpeedFraction, plane.TopSpeedFraction);
 
             if (_airfield != null)
                 _airfieldBar = new HealthBar(parent, AirfieldCaption, HudTheme.Fill);
@@ -142,6 +148,8 @@ namespace MetalRaptors
                 _jam = AlertLabel(parent, JamColor, 0f);
                 _repair = AlertLabel(parent, RepairColor, HudTheme.HintRowHeight);
             }
+
+            if (_plane != null) _crateArrow = new CrateArrow(parent);
 
             Tick();
         }
@@ -272,6 +280,8 @@ namespace MetalRaptors
             if (_fixDial != null) _fixDial.Set(0f, true);
             if (_health != null && _plane != null)
                 _health.Set(_plane.CurrentHealth, _plane.MaxHealth);
+            if (_speed != null && _plane != null)
+                _speed.Set(_plane.SpeedFraction, _plane.Boosting);
 
             if (_airfieldBar != null && _airfield != null)
                 _airfieldBar.Set(_airfield.CurrentHealth, Airfield.MaxHealth);
@@ -279,6 +289,18 @@ namespace MetalRaptors
             TickJam();
             TickRepair();
             TickSteering();
+            TickCrate();
+        }
+
+        void TickCrate()
+        {
+            if (_crateArrow == null) return;
+
+            Vector3 crate = Vector3.zero;
+            bool visible = _supply != null && _plane != null && _plane.CurrentHealth > 0f
+                           && !CinematicBars.AnyShowing && !GameMenu.IsOpen && _supply.Aim(out crate);
+            if (_cam == null) _cam = Camera.main;
+            _crateArrow.Tick(_cam, _plane != null ? _plane.transform.position : Vector3.zero, crate, visible);
         }
 
         void TickRepair()

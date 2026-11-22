@@ -379,6 +379,7 @@ namespace MetalRaptors
             AddCheck(2, "HIGH DAMAGE   ×10", () => DevCheats.HighDamage, on => DevCheats.HighDamage = on);
             AddCheck(2, "SPEED   ×1.5", () => DevCheats.FastSpeed, on => DevCheats.FastSpeed = on);
             AddCheck(2, "FAST RELOAD", () => DevCheats.FastReload, on => DevCheats.FastReload = on);
+            AddCheck(2, "HITBOXES", () => DevCheats.ShowHitboxes, on => DevCheats.ShowHitboxes = on);
         }
 
         static bool AnyLevelTool => DevSkip.Available || DevJump.Available || DevFinalJump.Available

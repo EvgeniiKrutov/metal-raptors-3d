@@ -51,6 +51,8 @@ namespace MetalRaptors
 
         EnemyConfig _scoutConfig;
         EnemyConfig _fighterConfig;
+        readonly Dictionary<EnemyConfig, EnemyConfig> _veteranConfigs =
+            new Dictionary<EnemyConfig, EnemyConfig>();
         readonly Dictionary<PlaneModelConfig, EnemyConfig> _armedConfigs =
             new Dictionary<PlaneModelConfig, EnemyConfig>();
         readonly List<EnemyController> _enemies = new List<EnemyController>();
@@ -141,6 +143,7 @@ namespace MetalRaptors
             var planeModel = GameManager.CurrentPlane;
             var plane = PlaneFactory.BuildPlaneModel(go.transform, planeModel,
                 skin: GameManager.CurrentSkin);
+            WreckSource.Attach(go, plane, planeModel, GameManager.CurrentSkin);
 
             PlayerConfig flight = PlaneLoadout.Build(config, planeModel, FlightPace.Fast);
 
@@ -193,16 +196,21 @@ namespace MetalRaptors
                 {
                     EnemyConfig config = EnemyConfigs.Armed(group.plane,
                         EnemyConfigs.For(group.plane, _scoutConfig, _fighterConfig), _armedConfigs);
+                    config = EnemyConfigs.Veteran(group.plane, config, _cube.BaseTurnDeg,
+                        _veteranConfigs);
                     float ceilingY = WorldTop - group.plane.OnScreenSize / 2f;
 
                     var go = new GameObject("Enemy");
                     go.transform.position = RandomEnemySpawn(aiGroundY, config, ceilingY);
-                    PlaneFactory.BuildPlaneModel(go.transform, group.plane, mirrored: true,
-                        skin: PlaneSkins.EnemyPaint(group.plane));
+                    PlaneSkin paint = PlaneSkins.EnemyPaint(group.plane);
+                    Transform model = PlaneFactory.BuildPlaneModel(go.transform, group.plane, mirrored: true,
+                        skin: paint);
+                    WreckSource.Attach(go, model, group.plane, paint);
 
                     var enemy = go.AddComponent<EnemyController>();
                     enemy.Initialize(config, playerBody,
                         MinX, MaxX, aiGroundY, ceilingY, EdgeMargin);
+                    enemy.AssignPilot(group.plane.pilot);
                     enemy.OnDestroyed += OnEnemyDestroyed;
                     _enemies.Add(enemy);
                 }
@@ -409,7 +417,7 @@ namespace MetalRaptors
             StandDownEnemies();
             if (_sound != null) _sound.EnterGameOver();
 
-            StartCoroutine(ShowFailScreenAfter(Explosion.Duration));
+            StartCoroutine(ShowFailScreenAfter(Explosion.Duration + (_cube.Wrecked ? PlaneWreck.ViewHold : 0f)));
         }
 
         IEnumerator ShowFailScreenAfter(float delay)

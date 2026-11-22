@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace MetalRaptors
 {
-    public enum DuelRole { Escort, Peel, Hunt, Break, Cross, Level, Form, Support, Idle, Cruise }
+    public enum DuelRole { Escort, Peel, Level, Form, Support, Idle }
 
     public class DuelPlane : MonoBehaviour
     {
@@ -61,34 +61,12 @@ namespace MetalRaptors
         const float StallFraction = 0.7f;
         const float FormReach = 70f;
 
-        const float JinkHz = 0.5f;
-        const float JinkDeg = 22f;
-        const float BreakCrossDeg = 55f;
-        const float BreakFlipSeconds = 2.4f;
-        const float BreakFlipRate = 1.6f;
-
-        const float CrossLead = 280f;
-        const float CrossSpread = 110f;
-        const float CrossHold = 90f;
-
-        const float BreakOffRange = 190f;
-        const float ReattackRange = 380f;
-        const float OvershootSeconds = 1.1f;
-        const float OvershootTurnDeg = 26f;
-        const float RepositionArcDeg = 40f;
-        const float RepositionSeconds = 3f;
-        const float SeparationRange = 130f;
-        const float SeparationWeight = 1.8f;
-
-        const float FireRange = 470f;
-        const float FireAngleDeg = 12f;
-        const int BurstMin = 4;
-        const int BurstMax = 8;
         const float RestMin = 0.9f;
         const float RestMax = 1.9f;
         const float MuzzleClearance = 6f;
         const float TracerSpeed = 430f * FlightPace.Fast;
         const float ShotVolume = 0.045f;
+        const float LoudShotVolume = 0.36f;
 
         const float SupportLeash = 900f;
         const float SupportFireRange = 420f;
@@ -110,11 +88,13 @@ namespace MetalRaptors
         const float FallDiveResponse = PlaneFall.DiveResponse;
         const float FallSpeedGain = PlaneFall.SpeedGain;
         const float FallExitMargin = 60f;
+        const float FallDepthDamp = 2f;
+        const float UnscriptBlendSec = 0.6f;
+        const float UnscriptMinShare = 0.3f;
 
-        enum PassState { Approach, Overshoot, Reposition }
+        static readonly Quaternion Flip = Quaternion.Euler(180f, 0f, 0f);
 
         DuelRole _role = DuelRole.Idle;
-        DuelPlane _opponent;
         Transform _escort;
         Vector3 _stationOffset;
         Vector3 _station;
@@ -153,16 +133,14 @@ namespace MetalRaptors
         float _freeYawRate;
         Vector3 _freeLeaderPrev;
         Quaternion _freeFromRot;
-        Vector2 _crossPoint;
-        bool _hasCrossPoint;
 
-        PassState _pass;
-        float _passTimer;
-        float _passHeading;
-        float _passSide = 1f;
-        float _breakSide = 1f;
-        float _breakBlend = 1f;
-        float _breakFlipTimer;
+        bool _mirrored;
+        bool _scripted;
+        bool _scriptFall;
+        Vector3 _fallVel;
+        float _fallSpin;
+        Quaternion _blendFrom = Quaternion.identity;
+        float _blendAge = UnscriptBlendSec;
 
         float _leadSpeed = 120f;
         float _turnRate = Mathf.PI;
@@ -179,7 +157,6 @@ namespace MetalRaptors
         float _angularVelocity;
         float _bank;
         PlaneRoll _roll;
-        float _roleTime;
         float _wobbleTime;
         float _wobblePhase;
 
@@ -205,6 +182,7 @@ namespace MetalRaptors
         bool _falling;
         float _fallSpeed;
         float _fallHeadingDeg;
+        bool _posed;
 
         SmokeTrail _smoke;
         PlaneFire _fire;
@@ -236,8 +214,13 @@ namespace MetalRaptors
             }
         }
 
-        public Vector2 Velocity =>
-            new Vector2(Mathf.Cos(_heading), Mathf.Sin(_heading)) * _speed;
+        public bool Scripted => _scripted;
+
+        public Vector3 Motion => _followVel;
+
+        public Quaternion Visual => _mirrored ? transform.rotation * Flip : transform.rotation;
+
+        public Vector3 VisualUp => Visual * Vector3.up;
 
         public static DuelPlane Spawn(string name, PlaneModelConfig plane, PlayerConfig flight,
             Vector3 position, float heading, bool mirrored, PlaneSkin skin)
@@ -254,6 +237,7 @@ namespace MetalRaptors
             go.transform.position = position;
             Transform model = PlaneFactory.BuildPlaneModel(go.transform, plane, mirrored, skin);
             model.localScale *= PlaneModelConfig.LevelScale;
+            WreckSource.Attach(go, model, plane, skin);
 
             foreach (Collider col in go.GetComponentsInChildren<Collider>()) Destroy(col);
 
@@ -266,6 +250,7 @@ namespace MetalRaptors
             duel._speedDrag = flight.speedDrag;
             duel._maxSpeedFactor = Mathf.Max(1f, flight.maxSpeedMultiplier);
             duel._heading = heading;
+            duel._mirrored = mirrored;
             duel._roll = new PlaneRoll(mirrored);
             duel._z = position.z;
             duel._depthTo = position.z;
@@ -308,6 +293,7 @@ namespace MetalRaptors
         {
             if (_falling || leader == null) return;
 
+            EndScript();
             _leader = leader;
             _slaveAge = 0f;
             _slaveBlendSec = Mathf.Max(0.01f, blendSec);
@@ -315,7 +301,6 @@ namespace MetalRaptors
             _slot = OffsetFrom(leader);
             Reslot(slot, blendSec);
             _role = DuelRole.Idle;
-            _opponent = null;
             _escort = null;
             _mark = null;
             _burstLeft = 0;
@@ -339,6 +324,7 @@ namespace MetalRaptors
         {
             if (_falling || leader == null) return;
 
+            EndScript();
             _leader = leader;
             _slot = slot;
             _slotFrom = slot;
@@ -353,7 +339,6 @@ namespace MetalRaptors
             _free = true;
             _freeLive = false;
             _role = DuelRole.Idle;
-            _opponent = null;
             _escort = null;
             _mark = null;
             _burstLeft = 0;
@@ -399,38 +384,80 @@ namespace MetalRaptors
         public void SetEscort(Transform target, Vector3 offset)
         {
             if (_leader != null) return;
+            EndScript();
             _escort = target;
             _stationOffset = offset;
             _hasStation = false;
         }
 
-        public void SetRole(DuelRole role, DuelPlane opponent, float crossSide = 1f)
+        public void SetRole(DuelRole role)
         {
             if (_falling || _leader != null) return;
 
+            EndScript();
             _role = role;
-            _opponent = opponent;
-            _roleTime = 0f;
             _burstLeft = 0;
             _restTimer = Mathf.Max(_restTimer, Random.Range(RestMin, RestMax) * 0.5f);
-
-            _pass = PassState.Approach;
-            _breakSide = Random.value < 0.5f ? 1f : -1f;
-            _breakBlend = _breakSide;
-            _breakFlipTimer = BreakFlipSeconds;
             if (role == DuelRole.Escort) _hasStation = false;
-            if (role == DuelRole.Cross) AimCross(crossSide);
+        }
+
+        public void BeginScript()
+        {
+            if (_falling) return;
+
+            _scripted = true;
+            _posed = false;
+            _leader = null;
+            _free = false;
+            _freeLive = false;
+            _manualFollow = false;
+            _role = DuelRole.Idle;
+            _escort = null;
+            _mark = null;
+            _burstLeft = 0;
+            _bounded = false;
+            _depthDuration = 0f;
+        }
+
+        public void ScriptPose(Vector3 position, Quaternion visual)
+        {
+            if (!_scripted) return;
+
+            transform.SetPositionAndRotation(position, _mirrored ? visual * Flip : visual);
+            _z = position.z;
+            _depthTo = position.z;
+        }
+
+        public void EndScript()
+        {
+            if (!_scripted) return;
+
+            _scripted = false;
+            Vector3 nose = transform.right;
+            var flat = new Vector2(_followVel.x, _followVel.y);
+            if (Mathf.Abs(flat.x) < CruiseSpeed * UnscriptMinShare)
+                flat.x = (nose.x >= 0f ? 1f : -1f) * CruiseSpeed;
+            _heading = Mathf.Atan2(flat.y, flat.x);
+            _speed = Mathf.Clamp(flat.magnitude, CruiseSpeed * FreeMinPace, CruiseSpeed * FreeMaxPace);
+            _angularVelocity = 0f;
+            _bank = 0f;
+            _z = transform.position.z;
+            _depthTo = _z;
+            _depthDuration = 0f;
+            if (_roll != null) _roll.Settle(_heading);
+            _blendFrom = transform.rotation;
+            _blendAge = 0f;
         }
 
         public void FlipUpright()
         {
-            if (_falling || _roll == null) return;
+            if (_falling || _roll == null || _scripted) return;
             _roll.Flip(_heading, _turnRate * Mathf.Rad2Deg);
         }
 
         public void SetDepth(float z, float seconds)
         {
-            if (_leader != null) return;
+            if (_leader != null || _scripted) return;
             _depthFrom = _z;
             _depthTo = z;
             _depthTime = 0f;
@@ -482,26 +509,91 @@ namespace MetalRaptors
         {
             if (_falling) return;
 
+            EndScript();
             _role = DuelRole.Idle;
-            _opponent = null;
             _escort = null;
             _burstLeft = 0;
             _bounded = false;
         }
 
+        public void BeginPosed()
+        {
+            if (_falling) return;
+
+            _posed = true;
+            _scripted = false;
+            _leader = null;
+            _free = false;
+            _freeLive = false;
+            _manualFollow = false;
+            _role = DuelRole.Idle;
+            _escort = null;
+            _mark = null;
+            _burstLeft = 0;
+            _bounded = false;
+            _depthDuration = 0f;
+        }
+
+        public void Pose(Vector3 position, Quaternion rotation)
+        {
+            if (!_posed) return;
+
+            transform.SetPositionAndRotation(position, rotation);
+            _z = position.z;
+            _depthTo = position.z;
+        }
+
+        public void ShootAlong(Vector3 dir)
+        {
+            if (dir.sqrMagnitude < 1e-6f) return;
+
+            dir.Normalize();
+            Vector3 muzzle = Muzzle(dir);
+            Tracer.Spawn(muzzle, dir, TracerSpeed);
+            MuzzleFlash.Spawn(muzzle, dir, _size);
+            if (_shotClip != null && _audio != null) _audio.PlayOneShot(_shotClip, LoudShotVolume * AudioOptions.Scene);
+        }
+
+        public void Fire(Vector3 dir)
+        {
+            if (dir.sqrMagnitude < 1e-6f) return;
+
+            dir.Normalize();
+            Vector3 muzzle = Muzzle(dir);
+            Vector3 flight = _followVel + dir * TracerSpeed;
+            Tracer.Spawn(muzzle, flight.normalized, flight.magnitude);
+            MuzzleFlash.Spawn(muzzle, dir, _size);
+            if (_shotClip != null && _audio != null) _audio.PlayOneShot(_shotClip, ShotVolume * AudioOptions.Scene);
+        }
+
+        public static float RoundSpeed => TracerSpeed;
+
+        public float ShotSpacing => _shotSpacing;
+
+        public void Burn()
+        {
+            Explosion.Spawn(transform.position, _size);
+            if (_smoke != null) _smoke.Ignite(_size);
+            if (_fire == null) _fire = PlaneFire.Ignite(gameObject, _size, _engine);
+        }
+
+        public bool CrashAt(Vector3 point) => Crash(point, false);
+
         public void Kill()
         {
             if (_falling) return;
 
+            bool scripted = _scripted;
+            _scripted = false;
             _leader = null;
             _free = false;
             _falling = true;
             _role = DuelRole.Idle;
-            _opponent = null;
             _escort = null;
             _burstLeft = 0;
-            _fallSpeed = Mathf.Max(_speed, CruiseSpeed);
+            _fallSpeed = Mathf.Max(scripted ? _followVel.magnitude : _speed, CruiseSpeed);
             _fallHeadingDeg = Mathf.Cos(_heading) >= 0f ? FallDiveDeg : 180f - FallDiveDeg;
+            if (scripted) BeginScriptFall();
 
             Explosion.Spawn(transform.position, _size);
             if (_smoke != null) _smoke.Ignite(_size);
@@ -519,7 +611,10 @@ namespace MetalRaptors
             _lastPos = here;
             _tracked = true;
 
-            _roleTime += dt;
+            if (_posed || _scripted) return;
+            if (_scriptFall) { ScriptFall(dt); return; }
+
+            _blendAge += dt;
 
             if (_leader != null && !_falling)
             {
@@ -543,8 +638,41 @@ namespace MetalRaptors
             ApplyRotation();
 
             if (_falling) { TickWreck(pos); return; }
-            if (_role == DuelRole.Hunt) UpdateGun(dt);
-            else if (_role == DuelRole.Support) UpdateSupportGun(dt);
+            if (_role == DuelRole.Support) UpdateSupportGun(dt);
+        }
+
+        void BeginScriptFall()
+        {
+            _scriptFall = true;
+            _fallVel = _followVel;
+            Vector3 fwd = _fallVel.sqrMagnitude > 1f ? _fallVel.normalized : transform.right;
+            _fallSpin = Vector3.SignedAngle(LevelUp(fwd), Vector3.ProjectOnPlane(VisualUp, fwd), fwd);
+        }
+
+        void ScriptFall(float dt)
+        {
+            float side = Mathf.Abs(_fallVel.x) > 1f ? Mathf.Sign(_fallVel.x)
+                : transform.right.x >= 0f ? 1f : -1f;
+            _fallSpeed += FallSpeedGain * dt;
+            float dive = FallDiveDeg * Mathf.Deg2Rad;
+            var want = new Vector3(side * Mathf.Cos(dive), Mathf.Sin(dive), 0f) * _fallSpeed;
+            _fallVel = Vector3.Lerp(_fallVel, want, 1f - Mathf.Exp(-FallDiveResponse * dt));
+            _fallVel.z *= Mathf.Exp(-FallDepthDamp * dt);
+
+            Vector3 pos = transform.position + _fallVel * dt;
+            _fallSpin += FallSpinDeg * dt;
+            Vector3 fwd = _fallVel.sqrMagnitude > 1f ? _fallVel.normalized : transform.right;
+            Vector3 up = Quaternion.AngleAxis(_fallSpin, fwd) * LevelUp(fwd);
+            Quaternion visual = Quaternion.LookRotation(Vector3.Cross(fwd, up), up);
+            transform.SetPositionAndRotation(pos, _mirrored ? visual * Flip : visual);
+            TickWreck(pos);
+        }
+
+        static Vector3 LevelUp(Vector3 fwd)
+        {
+            Vector3 up = Vector3.ProjectOnPlane(Vector3.up, fwd);
+            if (up.sqrMagnitude < 1e-4f) up = Vector3.ProjectOnPlane(Vector3.forward, fwd);
+            return up.normalized;
         }
 
         void FollowLeader(float dt)
@@ -783,11 +911,17 @@ namespace MetalRaptors
                 || pos.y < _viewMinY - margin || pos.y > _viewMaxY + margin;
         }
 
-        void Crash(Vector3 point, bool water)
+        bool Crash(Vector3 point, bool water)
         {
-            if (!water) Explosion.Spawn(point, _size);
+            bool wrecked = false;
+            if (!water)
+            {
+                Explosion.Spawn(point, _size);
+                wrecked = PlaneWreck.Spawn(gameObject, point, Vector3.zero, true);
+            }
             if (Battlefield.Current != null) Battlefield.Current.Impact(point, _size, water);
             Remove();
+            return wrecked;
         }
 
         bool Escorting => _role == DuelRole.Escort || _role == DuelRole.Form
@@ -860,9 +994,7 @@ namespace MetalRaptors
 
         Vector3 Fly(Vector3 pos, float dt)
         {
-            TickEngagement(pos, dt);
-
-            float target = Separate(RoleHeading(pos), pos);
+            float target = RoleHeading(pos);
 
             if (_bounded && _role != DuelRole.Idle)
                 target = FlightSteering.Contain(target, pos, _minX, _maxX, SideMargin,
@@ -899,65 +1031,6 @@ namespace MetalRaptors
             _speed = Mathf.Clamp(_speed, floor, cruise * _maxSpeedFactor);
         }
 
-        void TickEngagement(Vector3 pos, float dt)
-        {
-            if (_opponent == null) return;
-
-            if (_role == DuelRole.Break)
-            {
-                _breakFlipTimer -= dt;
-                if (_breakFlipTimer <= 0f)
-                {
-                    _breakSide = -_breakSide;
-                    _breakFlipTimer = BreakFlipSeconds * Random.Range(0.8f, 1.3f);
-                }
-                _breakBlend = Mathf.MoveTowards(_breakBlend, _breakSide, BreakFlipRate * dt);
-                return;
-            }
-
-            if (_role != DuelRole.Hunt) return;
-
-            float range = Vector2.Distance(pos, _opponent.transform.position);
-
-            switch (_pass)
-            {
-                case PassState.Approach:
-                    if (range > BreakOffRange) return;
-
-                    _pass = PassState.Overshoot;
-                    _passTimer = OvershootSeconds;
-                    _passSide = Random.value < 0.5f ? 1f : -1f;
-                    _passHeading = _heading + OvershootTurnDeg * Mathf.Deg2Rad * _passSide;
-                    return;
-
-                case PassState.Overshoot:
-                    _passTimer -= dt;
-                    if (_passTimer > 0f) return;
-
-                    _pass = PassState.Reposition;
-                    _passTimer = RepositionSeconds;
-                    return;
-
-                case PassState.Reposition:
-                    _passTimer -= dt;
-                    if (range >= ReattackRange || _passTimer <= 0f) _pass = PassState.Approach;
-                    return;
-            }
-        }
-
-        float Separate(float heading, Vector3 pos)
-        {
-            if (_opponent == null || _role == DuelRole.Idle) return heading;
-
-            Vector2 away = (Vector2)pos - (Vector2)_opponent.transform.position;
-            float gap = away.magnitude;
-            if (gap >= SeparationRange || gap < 0.01f) return heading;
-
-            Vector2 dir = new Vector2(Mathf.Cos(heading), Mathf.Sin(heading))
-                        + away / gap * ((1f - gap / SeparationRange) * SeparationWeight);
-            return dir.sqrMagnitude > 1e-6f ? Mathf.Atan2(dir.y, dir.x) : heading;
-        }
-
         Vector3 Fall(Vector3 pos, float dt)
         {
             _heading = Mathf.LerpAngle(_heading * Mathf.Rad2Deg, _fallHeadingDeg,
@@ -978,44 +1051,11 @@ namespace MetalRaptors
                 case DuelRole.Level:
                     return 0f;
 
-                case DuelRole.Cruise:
-                    return _facing < 0f ? Mathf.PI : 0f;
-
                 case DuelRole.Form:
                     return FormHeading(pos);
 
                 case DuelRole.Support:
                     return Marked() ? HeadingTo(pos, LeadMark(pos)) : FormHeading(pos);
-
-                case DuelRole.Hunt:
-                {
-                    if (_opponent == null) return _heading;
-
-                    if (_pass == PassState.Overshoot) return _passHeading;
-                    if (_pass == PassState.Reposition)
-                        return HeadingTo(pos, _opponent.transform.position)
-                             + RepositionArcDeg * _passSide * Mathf.Deg2Rad;
-                    return HeadingTo(pos, Lead(pos));
-                }
-
-                case DuelRole.Break:
-                {
-                    if (_opponent == null) return _heading;
-
-                    return AwayHeading(pos)
-                         + BreakCrossDeg * _breakBlend * Mathf.Deg2Rad
-                         + Mathf.Sin(_roleTime * Mathf.PI * 2f * JinkHz) * JinkDeg * Mathf.Deg2Rad;
-                }
-
-                case DuelRole.Cross:
-                {
-                    if (!_hasCrossPoint) return _heading;
-
-                    Vector2 to = _crossPoint - (Vector2)pos;
-                    return to.sqrMagnitude > CrossHold * CrossHold
-                        ? Mathf.Atan2(to.y, to.x)
-                        : _heading;
-                }
 
                 default:
                     return 0f;
@@ -1030,34 +1070,6 @@ namespace MetalRaptors
             float ahead = Mathf.Max(FormLookahead, (station.x - pos.x) * _facing);
             float rise = Mathf.Clamp(station.y - pos.y, -ahead, ahead);
             return Mathf.Atan2(rise, ahead * _facing);
-        }
-
-        void AimCross(float side)
-        {
-            _hasCrossPoint = false;
-            if (_opponent == null) return;
-
-            Vector2 pos = transform.position;
-            Vector2 to = (Vector2)_opponent.transform.position - pos;
-            if (to.sqrMagnitude < 1f) return;
-
-            Vector2 offset = new Vector2(-to.y, to.x).normalized * (CrossSpread * side);
-            _crossPoint = pos + to.normalized * CrossLead + offset;
-            _hasCrossPoint = true;
-        }
-
-        float AwayHeading(Vector3 pos)
-        {
-            Vector2 away = (Vector2)pos - (Vector2)_opponent.transform.position;
-            return away.sqrMagnitude > 1f ? Mathf.Atan2(away.y, away.x) : _heading;
-        }
-
-        Vector2 Lead(Vector3 pos)
-        {
-            Vector2 target = _opponent.transform.position;
-            Vector2 travel = _opponent.Velocity;
-            float time = Vector2.Distance(pos, target) / TracerSpeed;
-            return target + travel * time;
         }
 
         void TrackHeading(float pathHeading, float dt)
@@ -1103,37 +1115,16 @@ namespace MetalRaptors
         {
             float flip = _roll.Angle;
 
-            transform.rotation = Quaternion.Euler(0f, 0f, _heading * Mathf.Rad2Deg)
-                               * Quaternion.Euler(flip + _bank * Mathf.Cos(flip * Mathf.Deg2Rad),
-                                                  0f, 0f);
+            Quaternion rot = Quaternion.Euler(0f, 0f, _heading * Mathf.Rad2Deg)
+                           * Quaternion.Euler(flip + _bank * Mathf.Cos(flip * Mathf.Deg2Rad), 0f, 0f);
+            if (_blendAge < UnscriptBlendSec)
+                rot = Quaternion.Slerp(_blendFrom, rot, Mathf.SmoothStep(0f, 1f, _blendAge / UnscriptBlendSec));
+            transform.rotation = rot;
         }
 
         static float HeadingTo(Vector3 from, Vector2 point)
         {
             return Mathf.Atan2(point.y - from.y, point.x - from.x);
-        }
-
-        void UpdateGun(float dt)
-        {
-            if (_opponent == null || _opponent.IsFalling) return;
-
-            if (_burstLeft > 0)
-            {
-                _shotTimer -= dt;
-                if (_shotTimer > 0f) return;
-
-                _shotTimer = _shotSpacing;
-                _burstLeft--;
-                Shoot();
-                if (_burstLeft == 0) _restTimer = Random.Range(RestMin, RestMax);
-                return;
-            }
-
-            _restTimer -= dt;
-            if (_restTimer > 0f || !Aimed()) return;
-
-            _burstLeft = Random.Range(BurstMin, BurstMax + 1);
-            _shotTimer = 0f;
         }
 
         void UpdateSupportGun(float dt)
@@ -1201,25 +1192,6 @@ namespace MetalRaptors
             MuzzleFlash.Spawn(muzzle, dir, _size);
             if (_shotClip != null && _audio != null)
                 _audio.PlayOneShot(_shotClip, SupportShotVolume * AudioOptions.Scene);
-        }
-
-        bool Aimed()
-        {
-            Vector3 pos = transform.position;
-            if (Vector2.Distance(pos, _opponent.transform.position) > FireRange) return false;
-
-            float aim = HeadingTo(pos, Lead(pos)) * Mathf.Rad2Deg;
-            return Mathf.Abs(Mathf.DeltaAngle(_heading * Mathf.Rad2Deg, aim)) <= FireAngleDeg;
-        }
-
-        void Shoot()
-        {
-            Vector3 dir = new Vector3(Mathf.Cos(_heading), Mathf.Sin(_heading), 0f);
-            Vector3 muzzle = Muzzle(dir);
-
-            Tracer.Spawn(muzzle, dir, TracerSpeed);
-            MuzzleFlash.Spawn(muzzle, dir, _size);
-            if (_shotClip != null && _audio != null) _audio.PlayOneShot(_shotClip, ShotVolume * AudioOptions.Scene);
         }
 
         Vector3 Muzzle(Vector3 dir) => _gun.HasValue
