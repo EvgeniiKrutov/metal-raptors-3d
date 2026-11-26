@@ -138,6 +138,33 @@ namespace MetalRaptors
         }
     }
 
+    public static class DevSceneJump
+    {
+        static System.Action _jump;
+
+        public static bool Available => _jump != null;
+
+        public static string Caption { get; private set; }
+
+        public static void Offer(string caption, System.Action jump)
+        {
+            Caption = caption;
+            _jump = jump;
+        }
+
+        public static void Withdraw(System.Action jump)
+        {
+            if (_jump == jump) _jump = null;
+        }
+
+        public static void Run()
+        {
+            System.Action jump = _jump;
+            _jump = null;
+            jump?.Invoke();
+        }
+    }
+
     public static class DevCareerReset
     {
         static System.Action _reset;

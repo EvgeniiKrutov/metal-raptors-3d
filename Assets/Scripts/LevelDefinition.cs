@@ -65,14 +65,23 @@ namespace MetalRaptors
         public readonly int count;
         public readonly bool sneak;
         public readonly bool high;
+        public readonly string skin;
+        public readonly string title;
+        public readonly float healthScale;
+        public readonly bool elite;
 
-        public EnemyGroup(PlaneModelConfig plane, int count, bool sneak = false, bool high = false)
+        public EnemyGroup(PlaneModelConfig plane, int count, bool sneak = false, bool high = false,
+            string skin = null, string title = null, float healthScale = 0f, bool elite = false)
         {
             kind = EnemyKind.Plane;
             this.plane = plane;
             this.count = count;
             this.sneak = sneak;
             this.high = high;
+            this.skin = skin;
+            this.title = title;
+            this.healthScale = healthScale;
+            this.elite = elite;
         }
 
         public EnemyGroup(EnemyKind kind, int count)

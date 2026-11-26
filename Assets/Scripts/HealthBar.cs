@@ -5,11 +5,17 @@ namespace MetalRaptors
 {
     public class HealthBar
     {
+        static readonly Color OutlineColor = new Color(0f, 0f, 0f, 0.85f);
+        static readonly Vector2 OutlineDistance = new Vector2(1.6f, -1.6f);
+        static readonly Color ShadowColor = new Color(0f, 0f, 0f, 0.55f);
+        static readonly Vector2 ShadowDistance = new Vector2(2.5f, -2.5f);
+        const float RowGap = 10f;
+
         readonly GameObject _root;
         readonly float _width;
         readonly Image _fill;
 
-        public HealthBar(Transform parent, string caption, Color fill)
+        public HealthBar(Transform parent, string caption, Color fill, bool outlined = false)
         {
             _width = HudTheme.SlimWidth;
             float height = HudTheme.SlimHeight;
@@ -33,6 +39,7 @@ namespace MetalRaptors
             labelRt.anchorMin = new Vector2(0.5f, 1f);
             labelRt.anchorMax = new Vector2(0.5f, 1f);
             labelRt.pivot = new Vector2(0.5f, 1f);
+            if (outlined) Darken(label.gameObject);
 
             Sprite rounded = UIFactory.RoundedSprite(height * 0.5f);
 
@@ -74,6 +81,24 @@ namespace MetalRaptors
             _fill.rectTransform.sizeDelta = size;
         }
 
+        public void SetRow(int row)
+        {
+            var rt = (RectTransform)_root.transform;
+            float step = HudTheme.SlimLabelRow + HudTheme.SlimHeight + RowGap;
+            rt.anchoredPosition = new Vector2(0f, -HudTheme.ColumnTop - Mathf.Max(0, row) * step);
+        }
+
         public void Remove() => Object.Destroy(_root);
+
+        static void Darken(GameObject target)
+        {
+            var shadow = target.AddComponent<Shadow>();
+            shadow.effectColor = ShadowColor;
+            shadow.effectDistance = ShadowDistance;
+
+            var outline = target.AddComponent<Outline>();
+            outline.effectColor = OutlineColor;
+            outline.effectDistance = OutlineDistance;
+        }
     }
 }

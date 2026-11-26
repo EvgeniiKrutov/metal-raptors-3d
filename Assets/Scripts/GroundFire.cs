@@ -93,6 +93,9 @@ namespace MetalRaptors
         float _metre;
         float _lightRange;
         float _age;
+        float _fade = 1f;
+
+        public void Fade(float k) => _fade = Mathf.Clamp01(k);
 
         public static GroundFire Begin(Transform parent, Vector3 centre, IReadOnlyList<Vector3> spots,
             float metre, float reach, int seed)
@@ -221,7 +224,7 @@ namespace MetalRaptors
                 float grow = Mathf.Clamp01((_age - tongue.at) / GrowSec);
                 if (grow <= 0f) continue;
 
-                float g = Mathf.SmoothStep(0f, 1f, grow);
+                float g = Mathf.SmoothStep(0f, 1f, grow) * _fade;
                 float stretch = 1f + StretchDepth * Mathf.Sin(now * StretchHz * tongue.rate + tongue.phase);
                 float sway = SwayAmount * tongue.height;
                 var lean = new Vector2(
@@ -258,7 +261,7 @@ namespace MetalRaptors
             if (_light != null)
             {
                 float spread = Mathf.Clamp01(_age / SpreadSec);
-                _light.intensity = LightIntensity * Mathf.SmoothStep(0.25f, 1f, spread);
+                _light.intensity = LightIntensity * Mathf.SmoothStep(0.25f, 1f, spread) * _fade;
                 _light.range = _lightRange * Mathf.Lerp(0.3f, 1f, spread);
             }
         }

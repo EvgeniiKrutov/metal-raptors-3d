@@ -58,6 +58,10 @@ namespace MetalRaptors
         public bool zeppelins;
         public bool peaceful;
         public bool gunHills;
+        public bool crashSite;
+        public float rollCooldown;
+        public float truckLift = 1f;
+        public float groundPace = 1f;
         public float flak = 1f;
         public float people = 1.5f;
         public float enemyRotationScale = 1f;
@@ -202,6 +206,22 @@ namespace MetalRaptors
             new CampaignOutroLine("roussel", "l7_after3"),
             new CampaignOutroLine("you", "l7_after4"),
             new CampaignOutroLine("roussel", "l7_after5"),
+        };
+
+        static CampaignOutroLine[] Outro8 => new[]
+        {
+            new CampaignOutroLine("marchand", "l8_after1"),
+            new CampaignOutroLine("roussel", "l8_after2"),
+            new CampaignOutroLine("you", "l8_after3"),
+            new CampaignOutroLine("roussel", "l8_after4"),
+            new CampaignOutroLine("you", "l8_after5"),
+            new CampaignOutroLine("marchand", "l8_after6"),
+            new CampaignOutroLine("roussel", "l8_after7"),
+            new CampaignOutroLine("roussel", "l8_after8"),
+            new CampaignOutroLine("roussel", "l8_after9"),
+            new CampaignOutroLine("marchand", "l8_after10"),
+            new CampaignOutroLine("marchand", "l8_after11"),
+            new CampaignOutroLine("marchand", "l8_after12"),
         };
 
         static CampaignOutroLine[] OutroLorem(int level) => new[]
@@ -408,14 +428,21 @@ namespace MetalRaptors
             clouds = new CloudsPart(),
             script = "level8",
             plane = PlaneModels.Sopwith,
-            skin = "green",
+            skin = "white",
+            worldWidth = VosgesArena.WorldWidth,
+            villageArena = true,
+            crashSite = true,
+            rollCooldown = 1.5f,
+            truckLift = 0.5f,
+            groundPace = 1.2f,
+            duelistSkins = new[] { "black_white", "red_green" },
             flak = 1.2f,
             enemyRotationScale = 1.10f,
-            supplyDrops = 2,
+            supplyDrops = 9,
             title = "TWO FIRES",
             dateline = "24 March 1918 — Rimbach valley — morning into midday",
             lore = Lore1,
-            outro = OutroLorem(8),
+            outro = Outro8,
             journal = JournalLorem,
         };
 

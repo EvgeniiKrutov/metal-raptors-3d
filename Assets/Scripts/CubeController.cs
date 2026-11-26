@@ -35,7 +35,7 @@ namespace MetalRaptors
         public bool Energy { get; set; } = true;
 
         public float FlightSpeed => _config != null
-            ? _energy.Speed * _boost * DevCheats.SpeedFactor
+            ? _energy.Speed * _boost * _throttle * DevCheats.SpeedFactor
             : 0f;
 
         public float BaseSpeed => _config != null ? _config.flySpeed : 0f;
@@ -87,6 +87,7 @@ namespace MetalRaptors
 
         const float BoostResponse = 3.5f;
         const float BoostSnap = 0.001f;
+        const float ThrottleResponse = 2.5f;
 
 
         const float GroundProbe = 500f;
@@ -120,6 +121,8 @@ namespace MetalRaptors
 
         float _boost = 1f;
         float _boostTarget = 1f;
+        float _throttle = 1f;
+        float _throttleTarget = 1f;
         bool _cinematic;
 
         readonly EnemyBarrel _barrel = new EnemyBarrel();
@@ -400,6 +403,9 @@ namespace MetalRaptors
             _boost = Mathf.Abs(_boostTarget - _boost) < BoostSnap
                 ? _boostTarget
                 : _boost + (_boostTarget - _boost) * (1f - Mathf.Exp(-BoostResponse * dt));
+            _throttle = Mathf.Abs(_throttleTarget - _throttle) < BoostSnap
+                ? _throttleTarget
+                : _throttle + (_throttleTarget - _throttle) * (1f - Mathf.Exp(-ThrottleResponse * dt));
 
             if (TurningBack)
             {
@@ -646,7 +652,9 @@ namespace MetalRaptors
             PlaneScrapes.SetGroundCollisions(!value);
         }
 
-        float CruiseSpeed => _config.flySpeed * _boost * DevCheats.SpeedFactor;
+        float CruiseSpeed => _config.flySpeed * _boost * _throttle * DevCheats.SpeedFactor;
+
+        public void SetThrottle(float fraction) => _throttleTarget = Mathf.Clamp(fraction, 0.1f, 1f);
 
         bool EnergyActive => Energy && !_cinematic;
 

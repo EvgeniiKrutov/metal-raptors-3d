@@ -120,6 +120,10 @@ namespace MetalRaptors
 
         readonly List<Mesh> _meshes = new List<Mesh>();
         readonly List<Print> _placed = new List<Print>();
+        readonly List<Transform> _groups = new List<Transform>();
+        readonly List<Vector3> _groupScales = new List<Vector3>();
+        readonly List<SmokeColumn> _smokes = new List<SmokeColumn>();
+        GroundFire _fire;
         System.Random _rng;
         GameObject _content;
         Vector3 _noiseA, _noiseB;
@@ -129,6 +133,21 @@ namespace MetalRaptors
         float _age;
         bool _revealed;
         bool _seen;
+        bool _kept;
+        bool _fading;
+        float _fadeAge;
+
+        public static void FadeAll()
+        {
+            foreach (PlaneWreck wreck in Alive)
+                if (wreck != null && !wreck._kept) wreck.BeginFade();
+        }
+
+        public static void KeepLatest()
+        {
+            PlaneWreck latest = Alive.Count > 0 ? Alive[Alive.Count - 1] : null;
+            if (latest != null) latest._kept = true;
+        }
 
         public static bool Spawn(GameObject body, Vector3 impact, Vector3 velocity, bool grounded)
         {
@@ -373,8 +392,8 @@ namespace MetalRaptors
             fires.SetParent(_content.transform, false);
             fires.rotation = Quaternion.identity;
 
-            SmokeColumn.Begin(fires, body.position + Vector3.up * bodyBounds.extents.y, seed, SmokeScale,
-                false, false);
+            _smokes.Add(SmokeColumn.Begin(fires, body.position + Vector3.up * bodyBounds.extents.y, seed,
+                SmokeScale, false, false));
 
             int wisps = 0;
             foreach (Role role in new[] { Role.Engine, Role.Wing })
@@ -383,7 +402,7 @@ namespace MetalRaptors
                     if (wisps >= MaxWisps) break;
                     if (piece.role != role || piece.group == null) continue;
                     Vector3 top = piece.group.position + Vector3.up * Union(piece.parts).extents.y;
-                    SmokeColumn.Begin(fires, top, seed + WispSeed * ++wisps, WispScale, false, false);
+                    _smokes.Add(SmokeColumn.Begin(fires, top, seed + WispSeed * ++wisps, WispScale, false, false));
                 }
 
             Vector2 centre = Flat(bodyPivot);
@@ -392,7 +411,7 @@ namespace MetalRaptors
 
             Vector3 middle = transform.TransformPoint(new Vector3(centre.x, 0f, centre.y));
             middle.y = GroundAt(middle.x, middle.z, transform.position.y);
-            GroundFire.Begin(fires, middle, spots, _metre, reach, seed + FireSeed);
+            _fire = GroundFire.Begin(fires, middle, spots, _metre, reach, seed + FireSeed);
         }
 
         List<Vector3> FireSpotsAround(Vector2 centre, out float reach)
@@ -500,8 +519,46 @@ namespace MetalRaptors
             return false;
         }
 
+        void BeginFade()
+        {
+            if (_fading) return;
+            if (!_revealed)
+            {
+                Destroy(gameObject);
+                return;
+            }
+
+            _fading = true;
+            _fadeAge = 0f;
+            _groupScales.Clear();
+            foreach (Transform group in _groups) _groupScales.Add(group != null ? group.localScale : Vector3.one);
+        }
+
+        void TickFade()
+        {
+            _fadeAge += CutscenePause.Delta;
+            float k = 1f - Mathf.SmoothStep(0f, 1f, _fadeAge / CutsceneVanish.FadeSec);
+            if (k <= 0f)
+            {
+                Destroy(gameObject);
+                return;
+            }
+
+            for (int i = 0; i < _groups.Count; i++)
+                if (_groups[i] != null) _groups[i].localScale = _groupScales[i] * k;
+            if (_fire != null) _fire.Fade(k);
+            foreach (SmokeColumn smoke in _smokes)
+                if (smoke != null) smoke.Fade(k);
+        }
+
         void Update()
         {
+            if (_fading)
+            {
+                TickFade();
+                return;
+            }
+
             if (!_revealed)
             {
                 _age += Time.deltaTime;
@@ -827,6 +884,7 @@ namespace MetalRaptors
             var go = new GameObject(name);
             go.transform.SetParent(_content.transform, false);
             go.transform.localPosition = pivot;
+            _groups.Add(go.transform);
 
             foreach (Part part in parts)
             {

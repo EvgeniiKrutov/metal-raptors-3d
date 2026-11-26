@@ -22,7 +22,7 @@ namespace MetalRaptors
 
         static readonly VehicleModel Model = new VehicleModel(ModelResource);
 
-        static readonly string[] WheelNodes =
+        public static readonly string[] WheelNodes =
             { "Wheel_FL_Spin", "Wheel_FR_Spin", "Wheel_RL_Spin", "Wheel_RR_Spin" };
 
         public static bool Measure() => Model.Measure();
@@ -42,7 +42,7 @@ namespace MetalRaptors
                           + new Vector3(Size.x * BedRear, Size.y * BedHeight, 0f);
 
         public static EnemyTruck Spawn(Vector3 groundPoint, float fenceStopX, float roadLift,
-            Rigidbody target, CampaignTerrain land)
+            Rigidbody target, CampaignTerrain land, float lift = 1f)
         {
             if (!Model.Measure()) return null;
 
@@ -50,7 +50,7 @@ namespace MetalRaptors
             root.transform.position = groundPoint;
 
             Transform view = Model.Build(root.transform);
-            MaterialLift.Apply(view);
+            MaterialLift.Apply(view, lift);
             SetLayer(root.transform, PlaneFactory.PlaneLayer);
 
             var truck = root.AddComponent<EnemyTruck>();
@@ -71,7 +71,7 @@ namespace MetalRaptors
         {
             if (_wheelRadius <= Epsilon) return;
 
-            float degrees = -Speed / _wheelRadius * Mathf.Rad2Deg * dt;
+            float degrees = -Speed * Pace / _wheelRadius * Mathf.Rad2Deg * dt;
             foreach (Transform wheel in _wheels)
                 if (wheel != null) wheel.Rotate(Vector3.right, degrees, Space.Self);
         }

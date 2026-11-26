@@ -6,8 +6,6 @@ namespace MetalRaptors
 {
     public class LevelHud
     {
-        const string AirfieldCaption = "AIRFIELD";
-
         const string KeyHint = "A / D to steer  •  F to fire  •  ";
         const string BombHint = "H to bomb  •  ";
         const string BoostHint = "R to boost  •  ";
@@ -38,7 +36,7 @@ namespace MetalRaptors
 
         readonly HealthDial _health;
         readonly SpeedDial _speed;
-        readonly HealthBar _airfieldBar;
+        HealthBar _airfieldBar;
         readonly Airfield _airfield;
         readonly SkillDial _bombDial;
         readonly SkillDial _boostDial;
@@ -92,7 +90,7 @@ namespace MetalRaptors
                     PlaneEnergy.StallFraction, plane.DiveSpeedFraction, plane.TopSpeedFraction);
 
             if (_airfield != null)
-                _airfieldBar = new HealthBar(parent, AirfieldCaption, HudTheme.Fill);
+                _airfieldBar = new HealthBar(parent, _airfield.Caption, HudTheme.Fill, _airfield.Outlined);
 
             if (!arena)
             {
@@ -285,6 +283,11 @@ namespace MetalRaptors
 
             if (_airfieldBar != null && _airfield != null)
                 _airfieldBar.Set(_airfield.CurrentHealth, Airfield.MaxHealth);
+            else if (_airfieldBar != null)
+            {
+                _airfieldBar.Remove();
+                _airfieldBar = null;
+            }
 
             TickJam();
             TickRepair();

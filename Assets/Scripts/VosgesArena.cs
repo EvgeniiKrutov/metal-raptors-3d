@@ -100,6 +100,12 @@ namespace MetalRaptors
             float reach = Mathf.Min(margin, MarginCap);
             if (Mathf.Abs(z - RoadZ) < RoadHalfWidth + reach) return true;
 
+            return Solid(x, z, margin);
+        }
+
+        public bool Solid(float x, float z, float margin)
+        {
+            float reach = Mathf.Min(margin, MarginCap);
             return Hit(_solid, x, z) || Hit(_solid, x + reach, z) || Hit(_solid, x - reach, z)
                    || Hit(_solid, x, z + reach) || Hit(_solid, x, z - reach);
         }

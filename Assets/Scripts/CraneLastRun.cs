@@ -34,7 +34,8 @@ namespace MetalRaptors
         const float ClimbRadius = 110f;
         const float LandRadius = 140f;
         const float MinLandRadius = 40f;
-        const float HomeLine = 3600f;
+        const float HomeLine = 5400f;
+        const float HomeCheck = 4500f;
 
         static readonly float[] SwingTries = { 25f, 35f, 15f, 45f, 10f, 55f };
         static readonly float[] DepthTries = { 0f, -60f, 60f, -120f, 120f };
@@ -127,10 +128,10 @@ namespace MetalRaptors
         const float BombLeadIn = 0.5f;
         const float MinFirstShot = 0.3f;
         const float GunShotSec = 3f;
-        const float CraneShotSec = 3f;
+        const float CraneShotSec = 8f;
         const float BurnSec = 2f;
         const float GunsHold = 1f;
-        const float SparedSec = 2.5f;
+        const float SparedSec = 7f;
         const float ShotLead = 0.5f;
         const float ShotHold = 1f;
         const float HitDelay = 0.25f;
@@ -176,9 +177,55 @@ namespace MetalRaptors
         const float GunCamLift = 35f;
         const float GunCamFallback = 200f;
 
+        const float RushFacing = 0.2f;
+
+        const float DodgeLead = 0.08f;
+        const float DodgeChain = 0.85f;
+        const float DodgeTail = 1f;
+        const float ClimbSecMin = 1.8f, ClimbSecMax = 2.4f;
+        const float DipSecMin = 1.5f, DipSecMax = 2f;
+        const float JinkSecMin = 1.8f, JinkSecMax = 2.4f;
+        const float RollSec = 2.5f;
+        const float RollLead = 0.5f;
+        const float RollRamp = 0.2f;
+        const float RollSlack = 2.1f;
+        const float RollChance = 0.3f;
+        const float NoseUpDeg = 6f;
+        const float NoseSpeedShare = 0.875f;
+        const float DodgeMin = 25f, DodgeMax = 55f;
+        const float DodgeLeast = 12f;
+        const float LiftMax = 70f;
+        const float SideMax = 45f, SideTight = 15f;
+        const float DipClear = 45f;
+        const float DipTreeGap = 15f;
+        const float PredictSlow = 0.75f, PredictFast = 1.15f;
+        const float SwayReturn = 0.6f;
+        const float SwayProbe = 0.02f;
+        const float SwayG = 9.81f * U;
+        const float YawCapDeg = 30f, LiftCapDeg = 35f, LeanCapDeg = 60f;
+
         enum Phase { Fly, Fall, Hold, Fading, Done }
 
         enum Shot { Follow, Guns }
+
+        enum Dodge { Climb, Dip, Jink, Roll }
+
+        struct Move
+        {
+            public Dodge kind;
+            public float at, sec, from, to;
+        }
+
+        class Window
+        {
+            public float from, to;
+            public readonly List<Move> moves = new List<Move>();
+        }
+
+        struct Sway
+        {
+            public float side, up, jink, roll;
+        }
 
         struct Segment
         {
@@ -227,6 +274,7 @@ namespace MetalRaptors
         readonly List<float> _alt = new List<float>();
         readonly List<Pending> _pending = new List<Pending>();
         readonly List<Puff> _puffs = new List<Puff>();
+        readonly List<Window> _windows = new List<Window>();
         readonly System.Random _rng;
 
         Phase _phase = Phase.Fly;
@@ -251,6 +299,8 @@ namespace MetalRaptors
         float _hillZ;
         Vector3 _gunCam;
         Vector3 _velocity;
+        Vector3 _basePos;
+        bool _rushOn;
 
         float _roundIn;
         int _roundCount;
@@ -281,11 +331,31 @@ namespace MetalRaptors
 
         public bool Framing => _phase != Phase.Done;
 
+        public DuelPlane Crane => _crane;
+
         public bool Done => _phase == Phase.Done;
 
         public bool Cut => _cutFrame == Time.frameCount;
 
         public Vector3 CameraPosition { get; private set; }
+
+        public float Rush => _rushOn && _phase == Phase.Fly && !_skipping ? 1f : 0f;
+
+        public float RushHeading => Mathf.Cos(_heading) > RushFacing ? _heading : Mathf.PI;
+
+        public Vector3 GunEye => _gunCam;
+
+        public Vector3 CraneEye
+        {
+            get
+            {
+                if (_shot == Shot.Follow) return CameraPosition;
+
+                Vector3 plane = _phase == Phase.Fly ? _basePos
+                    : _phase == Phase.Fall && _crane != null ? _crane.transform.position : _crash;
+                return new Vector3(plane.x, plane.y + ChaseLift, plane.z - _setup.cameraDistance * ChaseShare);
+            }
+        }
 
         CraneLastRun(LastRunSetup setup)
         {
@@ -328,6 +398,7 @@ namespace MetalRaptors
             CollectRoofs();
 
             Vector3 start = _crane.transform.position;
+            _basePos = start;
             _startY = start.y;
             _startRot = _crane.transform.rotation;
             _crane.BeginPosed();
@@ -594,7 +665,7 @@ namespace MetalRaptors
             VosgesLayout layout = Layout;
             _homeAt = Mathf.Min(_length, _climbEnd + HomeEase);
             _homeY = _startY;
-            float end = Mathf.Min(_length, _climbEnd + CheckPastClimb);
+            float end = Mathf.Min(_length, _climbEnd + HomeCheck);
             for (float s = _pullS; s <= end; s += AltStep)
             {
                 Vector2 at = Point(s);
@@ -754,12 +825,15 @@ namespace MetalRaptors
             _bank = Mathf.MoveTowards(_bank, eased, (climbing ? ClimbBankRate : BankRate) * dt);
             _heading = heading;
 
-            Quaternion rot = Pose(heading, _pitch, _bank);
+            var pos = new Vector3(at.x, y, at.y);
+            _basePos = pos;
+            Vector3 offset = Dodging(heading, pos, out float yaw, out float lift, out float lean);
+
+            Quaternion rot = Pose(heading + yaw, _pitch + lift, _bank + lean);
             float blend = Mathf.SmoothStep(0f, 1f, _flyAge / PoseBlendSec);
             rot = Quaternion.Slerp(_startRot, rot, blend);
 
-            var pos = new Vector3(at.x, y, at.y);
-            _crane.Pose(pos, rot);
+            _crane.Pose(pos + offset, rot);
             _velocity = Forward(heading, _pitch) * _speed;
 
             if (_s >= _fireS && _s <= _pullS) Strafe(dt);
@@ -849,13 +923,22 @@ namespace MetalRaptors
 
             AaGun mid = _guns[1];
             Later(guns, () => SetShot(Shot.Guns));
-            Later(back, () => SetShot(Shot.Follow));
-            Later(again, () => SetShot(Shot.Guns));
+            Later(back, () =>
+            {
+                SetShot(Shot.Follow);
+                _rushOn = true;
+            });
+            Later(again, () =>
+            {
+                _rushOn = false;
+                SetShot(Shot.Guns);
+            });
             Later(middle - QuietLead, () => _shooterQuiet = true);
             Later(middle, () => { if (mid != null) mid.Blow(); });
             Later(spared, Spared);
             Later(last, () =>
             {
+                _rushOn = false;
                 _thin = false;
                 _shooterQuiet = true;
                 SetShot(Shot.Guns);
@@ -863,6 +946,9 @@ namespace MetalRaptors
             Later(shot, FinalShot);
             Later(cut, () => SetShot(Shot.Follow));
             Later(cut + HitDelay, Hit);
+
+            PlanDodges(back, again);
+            PlanDodges(spared, last);
         }
 
         void Spared()
@@ -871,6 +957,238 @@ namespace MetalRaptors
             _thin = true;
             _gunIn[0] = Range(ThinStartMin, ThinStartMax);
             SetShot(Shot.Follow);
+            _rushOn = true;
+        }
+
+        void PlanDodges(float from, float to)
+        {
+            var window = new Window { from = _clock + from, to = _clock + to };
+            _windows.Add(window);
+            Room(from, to, out float dipRoom, out float sideCap);
+
+            float t = window.from + DodgeLead;
+            float up = 0f, side = 0f;
+            bool rolled = false;
+            int lastChannel = -1;
+            while (t < window.to - DodgeTail)
+            {
+                float room = window.to - t;
+                bool canRoll = !rolled && room >= RollLead + RollSec;
+                bool mustRoll = canRoll && room < RollLead + RollSec + RollSlack;
+
+                Dodge kind;
+                if (mustRoll || (canRoll && Random.value < RollChance)) kind = Dodge.Roll;
+                else kind = PickDodge(lastChannel, up, dipRoom);
+
+                var move = new Move { kind = kind, at = t };
+                switch (kind)
+                {
+                    case Dodge.Roll:
+                        move.sec = RollLead + RollSec;
+                        move.from = Mathf.Tan(NoseUpDeg * Mathf.Deg2Rad) * _setup.cruise * NoseSpeedShare;
+                        move.to = Random.value < 0.5f ? -360f : 360f;
+                        rolled = true;
+                        break;
+                    case Dodge.Climb:
+                        move.sec = Clip(Random.Range(ClimbSecMin, ClimbSecMax), room, out float climbScale);
+                        move.from = up;
+                        move.to = Mathf.Min(LiftMax, up + Random.Range(DodgeMin, DodgeMax) * climbScale);
+                        up = move.to;
+                        break;
+                    case Dodge.Dip:
+                        move.sec = Clip(Random.Range(DipSecMin, DipSecMax), room, out float dipScale);
+                        move.from = up;
+                        move.to = Mathf.Max(-dipRoom, up - Random.Range(DodgeMin, DodgeMax) * dipScale);
+                        up = move.to;
+                        break;
+                    default:
+                        move.sec = Clip(Random.Range(JinkSecMin, JinkSecMax), room, out float jinkScale);
+                        float dir = side > 1f ? -1f : side < -1f ? 1f : Random.value < 0.5f ? -1f : 1f;
+                        float amount = Random.Range(DodgeMin, DodgeMax) * jinkScale;
+                        float target = Mathf.Clamp(side + dir * amount, -sideCap, sideCap);
+                        if (Mathf.Abs(target - side) < DodgeLeast)
+                            target = Mathf.Clamp(side - dir * amount, -sideCap, sideCap);
+                        move.from = side;
+                        move.to = target;
+                        side = target;
+                        break;
+                }
+
+                window.moves.Add(move);
+                lastChannel = Channel(kind);
+                t += move.sec * DodgeChain;
+            }
+        }
+
+        static float Clip(float sec, float room, out float scale)
+        {
+            float clipped = Mathf.Min(sec, room);
+            scale = clipped / sec;
+            return clipped;
+        }
+
+        static int Channel(Dodge kind) => kind == Dodge.Jink ? 1 : kind == Dodge.Roll ? 2 : 0;
+
+        static Dodge PickDodge(int lastChannel, float up, float dipRoom)
+        {
+            bool climb = LiftMax - up >= DodgeLeast;
+            bool dip = up + dipRoom >= DodgeLeast;
+            bool vertical = lastChannel != 0 && (climb || dip);
+            bool jink = lastChannel != 1;
+
+            if (vertical && jink && Random.value < 1f / 3f) return Dodge.Jink;
+            if (!vertical) return Dodge.Jink;
+            if (climb && dip) return Random.value < 0.5f ? Dodge.Climb : Dodge.Dip;
+            return climb ? Dodge.Climb : Dodge.Dip;
+        }
+
+        void Room(float from, float to, out float dipRoom, out float sideCap)
+        {
+            float cruise = Mathf.Max(1f, _setup.cruise);
+            float first = _s + cruise * PredictSlow * from;
+            float end = Mathf.Min(_length, _s + cruise * PredictFast * to);
+
+            float centre = float.MaxValue, wide = float.MaxValue;
+            for (float s = first; s <= end; s += AltStep)
+            {
+                Vector2 at = Point(s);
+                Vector2 perp = Perp(SmoothHeading(s), 1f);
+                float y = Altitude(s);
+
+                float floor = DipFloor(at);
+                if (floor != float.MinValue) centre = Mathf.Min(centre, y - floor);
+
+                float near = DipFloor(at + perp * SideMax);
+                float far = DipFloor(at - perp * SideMax);
+                float sides = Mathf.Max(near, far);
+                if (sides != float.MinValue) wide = Mathf.Min(wide, y - sides);
+            }
+
+            sideCap = wide >= 0f ? SideMax : SideTight;
+            dipRoom = Mathf.Clamp(Mathf.Min(centre, wide >= 0f ? wide : centre), 0f, DodgeMax);
+        }
+
+        float DipFloor(Vector2 at)
+        {
+            float ground = Ground(at.x, at.y);
+            if (ground == float.MinValue) return float.MinValue;
+
+            VosgesLayout layout = Layout;
+            bool trees = layout != null && layout.InGrove(at.x, at.y, GroveMargin);
+            return Mathf.Max(ground + (trees ? TreeTop + DipTreeGap : DipClear), RoofFloor(at));
+        }
+
+        Vector3 Dodging(float heading, Vector3 pos, out float yaw, out float lift, out float lean)
+        {
+            yaw = 0f;
+            lift = 0f;
+            lean = 0f;
+            if (_windows.Count == 0) return Vector3.zero;
+
+            Sway now = SwayAt(_clock);
+            Sway before = SwayAt(_clock - SwayProbe);
+            Sway after = SwayAt(_clock + SwayProbe);
+
+            float speed = Mathf.Max(1f, _speed);
+            float vs = (after.side - before.side) / (2f * SwayProbe);
+            float vu = (after.up - before.up) / (2f * SwayProbe);
+            float aj = (after.jink - 2f * now.jink + before.jink) / (SwayProbe * SwayProbe);
+
+            yaw = Mathf.Clamp(Mathf.Atan2(vs, speed) * Mathf.Rad2Deg, -YawCapDeg, YawCapDeg) * Mathf.Deg2Rad;
+            lift = Mathf.Clamp(Mathf.Atan2(vu, speed) * Mathf.Rad2Deg, -LiftCapDeg, LiftCapDeg);
+            lean = Mathf.Clamp(Mathf.Atan2(aj, SwayG) * Mathf.Rad2Deg, -LeanCapDeg, LeanCapDeg) + now.roll;
+
+            Vector2 perp = Perp(heading, 1f);
+            var offset = new Vector3(perp.x * now.side, 0f, perp.y * now.side);
+            float up = now.up;
+            float floor = DipFloor(new Vector2(pos.x + offset.x, pos.z + offset.z));
+            if (floor != float.MinValue) up = Mathf.Max(up, Mathf.Min(0f, floor - pos.y));
+            offset.y = up;
+            return offset;
+        }
+
+        Sway SwayAt(float t)
+        {
+            for (int i = _windows.Count - 1; i >= 0; i--)
+            {
+                Window window = _windows[i];
+                if (t < window.from) continue;
+                if (t <= window.to) return Within(window, t);
+
+                float k = (t - window.to) / SwayReturn;
+                if (k >= 1f) break;
+
+                Sway end = Within(window, window.to);
+                float keep = 1f - Smoother(k);
+                end.side *= keep;
+                end.up *= keep;
+                end.jink *= keep;
+                end.roll = 0f;
+                return end;
+            }
+            return new Sway();
+        }
+
+        static Sway Within(Window window, float t)
+        {
+            float vertical = 0f, jink = 0f, roll = 0f, nose = 0f;
+            foreach (Move move in window.moves)
+            {
+                if (t < move.at) break;
+
+                float u = Mathf.Clamp01((t - move.at) / move.sec);
+                switch (move.kind)
+                {
+                    case Dodge.Roll:
+                        float spin = (t - move.at - RollLead) / RollSec;
+                        roll = spin > 0f && spin < 1f ? move.to * RollTurn(spin) : 0f;
+                        nose = u < 1f ? move.from * move.sec * NoseArc(u) : 0f;
+                        break;
+                    case Dodge.Jink:
+                        jink = Mathf.Lerp(move.from, move.to, Smoother(u));
+                        break;
+                    default:
+                        vertical = Mathf.Lerp(move.from, move.to, Smoother(u));
+                        break;
+                }
+            }
+
+            return new Sway
+            {
+                side = jink,
+                up = vertical + nose,
+                jink = jink,
+                roll = roll,
+            };
+        }
+
+        static float Smoother(float u) => u * u * u * (u * (u * 6f - 15f) + 10f);
+
+        static float RollTurn(float u)
+        {
+            float rate = 1f / (1f - RollRamp);
+            if (u > 0.5f) return 1f - RollTurn(1f - u);
+            if (u < RollRamp)
+            {
+                float x = u / RollRamp;
+                return rate * RollRamp * (x * x * x - x * x * x * x * 0.5f);
+            }
+            return rate * (RollRamp * 0.5f + u - RollRamp);
+        }
+
+        static float NoseArc(float u)
+        {
+            const float p = RollLead / (RollLead + RollSec);
+            if (u <= p)
+            {
+                float x = u / p;
+                return p * (x * x * x - x * x * x * x * 0.5f);
+            }
+
+            float k = -30f * (p / (2f * (1f - p)) + 0.5f);
+            float y = (u - p) / (1f - p);
+            float y3 = y * y * y, y4 = y3 * y, y5 = y4 * y;
+            return p * 0.5f + (1f - p) * (y - y3 + y4 * 0.5f + k * (y3 / 3f - y4 * 0.5f + y5 / 5f));
         }
 
         void SetShot(Shot shot)
@@ -1015,6 +1333,7 @@ namespace MetalRaptors
         {
             _crash = new Vector3(_fallPos.x, ground, _fallPos.z);
             bool wrecked = _crane != null && _crane.CrashAt(_crash);
+            if (wrecked) PlaneWreck.KeepLatest();
 
             Explosion.Spawn(_crash, CrashSize);
             GroundBlast.Spawn(_crash, CrashSize, CameraPosition);
@@ -1113,7 +1432,8 @@ namespace MetalRaptors
                 return;
             }
 
-            Vector3 plane = _phase == Phase.Hold || _crane == null ? _crash : _crane.transform.position;
+            Vector3 plane = _phase == Phase.Hold || _crane == null ? _crash
+                : _phase == Phase.Fly ? _basePos : _crane.transform.position;
 
             if (_chaseAt < 0f && _s >= _slowEnd) _chaseAt = _clock;
 

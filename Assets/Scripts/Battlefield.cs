@@ -51,6 +51,7 @@ namespace MetalRaptors
         readonly List<Terrain> _terrains = new List<Terrain>();
         readonly Dictionary<int, SmokeColumn> _columns = new Dictionary<int, SmokeColumn>();
         readonly List<int> _columnScratch = new List<int>();
+        readonly List<float> _holds = new List<float>();
         BattlefieldPeople _people;
         BattlefieldProps _props;
         BattlefieldRubble _rubble;
@@ -320,15 +321,29 @@ namespace MetalRaptors
             WaterSplash.Spawn(new Vector3(x, _seaLevel, z), size, _cam.transform.position);
         }
 
+        public void ClearHolds() => _holds.Clear();
+
+        public void AddHold(float x) => _holds.Add(x);
+
+        int ColumnFirst(float x) => Mathf.FloorToInt((x - _halfViewWidth - SmokeMargin) / SmokeCellSize);
+
+        int ColumnLast(float x) => Mathf.FloorToInt((x + _halfViewWidth + SmokeMargin) / SmokeCellSize);
+
+        bool ColumnKept(int cell, float camX)
+        {
+            if (cell >= ColumnFirst(camX) && cell <= ColumnLast(camX)) return true;
+            foreach (float x in _holds)
+                if (cell >= ColumnFirst(x) && cell <= ColumnLast(x)) return true;
+            return false;
+        }
+
         void UpdateColumns(float camX)
         {
             if (!_smoke) return;
-            int first = Mathf.FloorToInt((camX - _halfViewWidth - SmokeMargin) / SmokeCellSize);
-            int last = Mathf.FloorToInt((camX + _halfViewWidth + SmokeMargin) / SmokeCellSize);
 
             _columnScratch.Clear();
             foreach (var kv in _columns)
-                if (kv.Key < first || kv.Key > last) _columnScratch.Add(kv.Key);
+                if (!ColumnKept(kv.Key, camX)) _columnScratch.Add(kv.Key);
 
             foreach (int cell in _columnScratch)
             {
@@ -337,7 +352,13 @@ namespace MetalRaptors
                 _columns.Remove(cell);
             }
 
-            for (int cell = first; cell <= last; cell++)
+            FillColumns(camX);
+            foreach (float x in _holds) FillColumns(x);
+        }
+
+        void FillColumns(float focus)
+        {
+            for (int cell = ColumnFirst(focus), last = ColumnLast(focus); cell <= last; cell++)
             {
                 if (_columns.ContainsKey(cell)) continue;
 

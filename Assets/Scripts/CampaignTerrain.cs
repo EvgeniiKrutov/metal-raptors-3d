@@ -57,6 +57,7 @@ namespace MetalRaptors
 
         readonly SortedDictionary<int, Chunk> _chunks = new SortedDictionary<int, Chunk>();
         readonly List<int> _removeScratch = new List<int>();
+        readonly List<float> _holds = new List<float>();
         bool _building;
 
         protected abstract float HeightScale { get; }
@@ -159,21 +160,38 @@ namespace MetalRaptors
         {
             if (_bounded) return;
 
-            int first = FirstChunk(camX);
-            int last = LastChunk(camX);
-
             _removeScratch.Clear();
             foreach (var kv in _chunks)
-                if (kv.Key < first || kv.Key > last) _removeScratch.Add(kv.Key);
+                if (!Kept(kv.Key, camX)) _removeScratch.Add(kv.Key);
             foreach (int i in _removeScratch) RemoveChunk(i);
 
-            if (!_building)
-                foreach (int i in MissingChunks(camX))
-                {
-                    _building = true;
-                    StartCoroutine(BuildChunkSliced(i));
-                    break;
-                }
+            if (_building) return;
+            if (BuildNext(camX)) return;
+            foreach (float x in _holds)
+                if (BuildNext(x)) return;
+        }
+
+        public void ClearHolds() => _holds.Clear();
+
+        public void AddHold(float x) => _holds.Add(x);
+
+        bool Kept(int index, float camX)
+        {
+            if (index >= FirstChunk(camX) && index <= LastChunk(camX)) return true;
+            foreach (float x in _holds)
+                if (index >= FirstChunk(x) && index <= LastChunk(x)) return true;
+            return false;
+        }
+
+        bool BuildNext(float camX)
+        {
+            foreach (int i in MissingChunks(camX))
+            {
+                _building = true;
+                StartCoroutine(BuildChunkSliced(i));
+                return true;
+            }
+            return false;
         }
 
         public void BuildAround(float camX)

@@ -51,6 +51,8 @@ namespace MetalRaptors
         const float BurstTrueDeg = 1.5f;
         const float BurstMissMinDeg = 6f, BurstMissMaxDeg = 10f;
         const float BurstBreakFactor = 2f;
+        const float EliteSpreadDeg = 1f;
+        const float EliteTrueDeg = 0.75f;
 
         const float SmokeHealthThreshold = 30f;
         const float BlazeScale = 0.55f;
@@ -161,6 +163,10 @@ namespace MetalRaptors
 
         public bool Throttling { get; set; }
 
+        public bool Elite { get; private set; }
+
+        public string Title { get; set; }
+
         public bool Featured { get; set; }
 
         public bool Pursuing { get; set; }
@@ -215,6 +221,8 @@ namespace MetalRaptors
         float _angularVelocity;
         bool _dead;
         bool _falling;
+        bool _spared;
+        bool _vanishing;
         PlaneFall _fall;
         bool _reported;
         bool _byPlayer;
@@ -496,6 +504,13 @@ namespace MetalRaptors
             EnemyWing.Join(this);
             CancelTactics();
             _rookie.Reset();
+        }
+
+        public void MakeElite()
+        {
+            Elite = true;
+            Skill = PilotSkills.Elite;
+            _vet.Quick = true;
         }
 
         public void Restore(float headingRad, float health)
@@ -1690,7 +1705,7 @@ namespace MetalRaptors
         }
 
         bool SetupReached() =>
-            _vet.Elapsed >= VeteranTactics.SetupMaxSec
+            _vet.Elapsed >= _vet.SetupLimit
             || Vector2.Distance(_rb.position, ClampToBand(SetupPoint())) <= VeteranTactics.SetupReach;
 
         bool RunOpening() =>
@@ -2878,8 +2893,9 @@ namespace MetalRaptors
 
                 _burstLeft = UnityEngine.Random.Range(Skill.burstMin, Skill.burstMax + 1);
                 float side = UnityEngine.Random.value < 0.5f ? -1f : 1f;
+                float trueDeg = Elite ? EliteTrueDeg : BurstTrueDeg;
                 _burstError = UnityEngine.Random.value < Skill.trueChance
-                    ? UnityEngine.Random.Range(-BurstTrueDeg, BurstTrueDeg)
+                    ? UnityEngine.Random.Range(-trueDeg, trueDeg)
                     : side * UnityEngine.Random.Range(Skill.missMinDeg, Skill.missMaxDeg);
             }
             else if (!BurstHolds())
@@ -2891,8 +2907,9 @@ namespace MetalRaptors
             if (_fireCooldown > 0f) return;
             _fireCooldown = Mathf.Max(0.01f, _config.fireRate);
 
+            float spread = Elite ? EliteSpreadDeg : BurstSpreadDeg;
             Shoot(_config.bulletSpeed, _config.damage,
-                _burstError + UnityEngine.Random.Range(-BurstSpreadDeg, BurstSpreadDeg));
+                _burstError + UnityEngine.Random.Range(-spread, spread));
             if (--_burstLeft <= 0) EndFreeBurst();
         }
 
@@ -3063,10 +3080,40 @@ namespace MetalRaptors
             if (CurrentHealth <= 0f) BeginFall();
         }
 
+        static readonly System.Collections.Generic.List<EnemyController> Fallen =
+            new System.Collections.Generic.List<EnemyController>();
+
+        static readonly System.Collections.Generic.List<EnemyController> Present =
+            new System.Collections.Generic.List<EnemyController>();
+
+        public static System.Collections.Generic.IReadOnlyList<EnemyController> All => Present;
+
+        void OnEnable() => Present.Add(this);
+
+        void OnDisable() => Present.Remove(this);
+
+        public static void VanishFalling()
+        {
+            foreach (EnemyController enemy in Fallen.ToArray())
+                if (enemy != null) enemy.Vanish();
+        }
+
+        public void Spare() => _spared = true;
+
+        void Vanish()
+        {
+            if (!_falling || _dead || _spared || _vanishing) return;
+
+            _vanishing = true;
+            if (_smoke != null) _smoke.Settle();
+            CutsceneVanish.Begin(gameObject, RemoveWreck);
+        }
+
         void BeginFall()
         {
             if (_dead || _falling) return;
             _falling = true;
+            Fallen.Add(this);
 
             SetStreaks(false);
             CancelReversal();
@@ -3113,6 +3160,11 @@ namespace MetalRaptors
         void Explode(bool grounded)
         {
             if (_dead) return;
+            if (_vanishing)
+            {
+                RemoveWreck();
+                return;
+            }
             Land();
             _dead = true;
 
@@ -3216,6 +3268,7 @@ namespace MetalRaptors
 
         void OnDestroy()
         {
+            Fallen.Remove(this);
             EnemyWing.Leave(this);
             if (_bar != null) Destroy(_bar.gameObject);
         }

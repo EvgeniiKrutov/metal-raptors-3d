@@ -128,6 +128,7 @@ namespace MetalRaptors
         Text _skipLabel;
         Text _jumpLabel;
         Text _finalLabel;
+        Text _sceneLabel;
 
         SpawnAction _scoutSpawn;
         SpawnAction _fighterSpawn;
@@ -347,6 +348,7 @@ namespace MetalRaptors
             _skipLabel = AddLevelButton("Skip", () => DevSkip.Available, DevSkip.Run);
             _jumpLabel = AddLevelButton("Jump", () => DevJump.Available, DevJump.Run);
             _finalLabel = AddLevelButton("Final", () => DevFinalJump.Available, DevFinalJump.Run);
+            _sceneLabel = AddLevelButton("Scene", () => DevSceneJump.Available, DevSceneJump.Run);
 
             AddCheck(1, "AERODROME FIRE", () => Aerodrome.Current != null && Aerodrome.Current.Burning,
                 SetFire, () => Aerodrome.Current != null);
@@ -383,6 +385,7 @@ namespace MetalRaptors
         }
 
         static bool AnyLevelTool => DevSkip.Available || DevJump.Available || DevFinalJump.Available
+            || DevSceneJump.Available
             || Aerodrome.Current != null || DevSpawn.Available || DevCareerReset.Available;
 
         Text AddLevelButton(string name, Func<bool> visible, Action run)
@@ -648,6 +651,7 @@ namespace MetalRaptors
             SetCaption(_skipLabel, DevSkip.Available, DevSkip.Caption);
             SetCaption(_jumpLabel, DevJump.Available, DevJump.Caption);
             SetCaption(_finalLabel, DevFinalJump.Available, DevFinalJump.Caption);
+            SetCaption(_sceneLabel, DevSceneJump.Available, DevSceneJump.Caption);
 
             bool frozen = DevFreeze.Active;
             if (frozen != _statusFrozen)

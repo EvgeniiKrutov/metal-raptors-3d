@@ -44,6 +44,8 @@ namespace MetalRaptors
 
         protected Rigidbody Target => _target;
 
+        protected float Pace => _pace;
+
         protected float PlaneZ => _z;
 
         protected Collider Hitbox => _collider;
@@ -60,6 +62,7 @@ namespace MetalRaptors
         GroundVehicle _ahead;
 
         float _fenceStopX;
+        float _pace = 1f;
         float _roadLift;
         float _z;
         float _lastCollisionTime = -999f;
@@ -103,6 +106,8 @@ namespace MetalRaptors
         }
 
         public void SetAhead(GroundVehicle ahead) => _ahead = ahead;
+
+        public void SetPace(float pace) => _pace = Mathf.Max(0f, pace);
 
         public void Restore(float health)
         {
@@ -164,7 +169,7 @@ namespace MetalRaptors
             if (_standDown) return;
 
             float x = transform.position.x;
-            float next = Mathf.Max(StopLine(), x - DriveSpeed * dt);
+            float next = Mathf.Max(StopLine(), x - DriveSpeed * _pace * dt);
 
             _stopped = next >= x - Epsilon;
             if (_stopped) return;

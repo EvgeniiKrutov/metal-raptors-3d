@@ -4,6 +4,7 @@ using UnityEngine.Rendering;
 
 namespace MetalRaptors
 {
+    [DefaultExecutionOrder(100)]
     public class BoostRush : MonoBehaviour
     {
         const float FadeIn = 6f, FadeOut = 2.5f;
@@ -34,6 +35,10 @@ namespace MetalRaptors
         public bool Hidden { get; set; }
 
         public SoundSystem Sound { get; set; }
+
+        public float Cue { get; set; } = -1f;
+
+        public float CueHeading { get; set; }
 
         class Puff
         {
@@ -97,6 +102,15 @@ namespace MetalRaptors
             _running = running;
 
             float dt = Time.deltaTime;
+            if (Cue >= 0f)
+            {
+                Level = GameMenu.IsOpen || LevelBriefing.IsOpen ? 0f : Mathf.Clamp01(Cue);
+                _screen.Tick(dt, CueHeading, Level, Level > 0f);
+                TickPuffs(dt);
+                if (Sound != null) Sound.WindSwell = Level;
+                return;
+            }
+
             Level = hidden
                 ? 0f
                 : Mathf.MoveTowards(Level, running ? 1f : 0f, (running ? FadeIn : FadeOut) * dt);

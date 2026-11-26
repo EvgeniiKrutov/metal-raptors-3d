@@ -180,6 +180,7 @@ namespace MetalRaptors
         float _gunSpeed;
 
         bool _falling;
+        bool _vanishing;
         float _fallSpeed;
         float _fallHeadingDeg;
         bool _posed;
@@ -579,6 +580,35 @@ namespace MetalRaptors
 
         public bool CrashAt(Vector3 point) => Crash(point, false);
 
+        static readonly System.Collections.Generic.List<DuelPlane> Fallen =
+            new System.Collections.Generic.List<DuelPlane>();
+
+        static readonly System.Collections.Generic.List<DuelPlane> Present =
+            new System.Collections.Generic.List<DuelPlane>();
+
+        public static System.Collections.Generic.IReadOnlyList<DuelPlane> All => Present;
+
+        public float Size => _size;
+
+        void OnEnable() => Present.Add(this);
+
+        void OnDisable() => Present.Remove(this);
+
+        public static void VanishFalling()
+        {
+            foreach (DuelPlane plane in Fallen.ToArray())
+                if (plane != null) plane.Vanish();
+        }
+
+        void Vanish()
+        {
+            if (!_falling || _vanishing) return;
+
+            _vanishing = true;
+            if (_smoke != null) _smoke.Settle();
+            CutsceneVanish.Begin(gameObject, Remove);
+        }
+
         public void Kill()
         {
             if (_falling) return;
@@ -588,6 +618,7 @@ namespace MetalRaptors
             _leader = null;
             _free = false;
             _falling = true;
+            Fallen.Add(this);
             _role = DuelRole.Idle;
             _escort = null;
             _burstLeft = 0;
@@ -913,6 +944,12 @@ namespace MetalRaptors
 
         bool Crash(Vector3 point, bool water)
         {
+            if (_vanishing)
+            {
+                Remove();
+                return false;
+            }
+
             bool wrecked = false;
             if (!water)
             {
@@ -1200,6 +1237,7 @@ namespace MetalRaptors
 
         void OnDestroy()
         {
+            Fallen.Remove(this);
             if (_round != null) Destroy(_round);
         }
 

@@ -194,9 +194,13 @@ namespace MetalRaptors
 
                 for (int i = 0; i < group.count; i++, index++)
                 {
-                    EnemyConfig config = Lifted(WaveConfig(group.plane), group.plane);
-                    spawned.Add(SpawnOne(group.plane, SpawnPoint(camX, halfViewWidth, index, config,
-                        CeilingFor(group.plane), Gap(group.plane)), config));
+                    EnemyConfig config = Toughened(Lifted(WaveConfig(group.plane), group.plane),
+                        group.healthScale);
+                    PlaneSkin skin = group.skin != null ? PlaneSkins.ById(group.plane, group.skin) : null;
+                    EnemyController enemy = SpawnOne(group.plane, SpawnPoint(camX, halfViewWidth, index,
+                        config, CeilingFor(group.plane), Gap(group.plane)), config, skin);
+                    Feature(enemy, group);
+                    spawned.Add(enemy);
                 }
             }
             return spawned;
@@ -214,6 +218,39 @@ namespace MetalRaptors
             spawned.Add(SpawnOne(plane, SpawnPoint(camX, halfViewWidth, 0, config,
                 CeilingFor(plane), Gap(plane)), config));
             return spawned;
+        }
+
+        static EnemyConfig Toughened(EnemyConfig config, float healthScale)
+        {
+            if (config == null || healthScale <= 0f || Mathf.Approximately(healthScale, 1f)) return config;
+
+            EnemyConfig copy = Object.Instantiate(config);
+            copy.health = Mathf.Max(1f, config.health * healthScale);
+            return copy;
+        }
+
+        static void Feature(EnemyController enemy, EnemyGroup group)
+        {
+            if (enemy == null) return;
+
+            if (group.elite) enemy.MakeElite();
+            if (group.title == null) return;
+
+            enemy.Title = group.title;
+            enemy.HideHealthBar();
+        }
+
+        public EnemyController SpawnVisitor(PlaneModelConfig plane, string skin, Vector2 position)
+        {
+            if (plane == null) return null;
+
+            float z = _player != null ? _player.position.z : 0f;
+            EnemyController visitor = SpawnOne(plane, new Vector3(position.x, position.y, z), null,
+                PlaneSkins.ById(plane, skin), boss: true);
+            _bosses.Add(visitor);
+            visitor.HideHealthBar();
+            visitor.BeginScript();
+            return visitor;
         }
 
         EnemyConfig WaveConfig(PlaneModelConfig plane) =>

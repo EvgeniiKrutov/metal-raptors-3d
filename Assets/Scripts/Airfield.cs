@@ -11,6 +11,7 @@ namespace MetalRaptors
 
         const float HealthMargin = 2.6f;
         const float FenceAimHeight = 12f;
+        const string DefaultCaption = "AIRFIELD";
 
         public static Airfield Current { get; private set; }
 
@@ -20,6 +21,10 @@ namespace MetalRaptors
         float _groundY;
         float _health = MaxHealth;
         bool _lost;
+
+        public string Caption { get; private set; } = DefaultCaption;
+
+        public bool Outlined { get; private set; }
 
         public float CurrentHealth => _health;
 
@@ -34,15 +39,24 @@ namespace MetalRaptors
         public Vector3 AimPoint(float z) =>
             new Vector3(_field.xMax, _groundY + FenceAimHeight, z);
 
-        public static Airfield Begin(Rect field, float groundY)
+        public static Airfield Begin(Rect field, float groundY, string caption = DefaultCaption,
+            bool outlined = false)
         {
             if (Current != null) Destroy(Current.gameObject);
 
             var airfield = new GameObject("Airfield").AddComponent<Airfield>();
             airfield._field = field;
             airfield._groundY = groundY;
+            airfield.Caption = caption;
+            airfield.Outlined = outlined;
             Current = airfield;
             return airfield;
+        }
+
+        public void Retire()
+        {
+            if (Current == this) Current = null;
+            Destroy(gameObject);
         }
 
         public void Restore(float health)

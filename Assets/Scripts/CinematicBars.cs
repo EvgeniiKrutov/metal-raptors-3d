@@ -17,6 +17,8 @@ namespace MetalRaptors
 
         static readonly List<CinematicBars> Live = new List<CinematicBars>();
 
+        public static event System.Action Appeared;
+
         RectTransform _top;
         RectTransform _bottom;
         float _slide;
@@ -62,14 +64,21 @@ namespace MetalRaptors
 
         public bool IsIn => _slide >= 1f;
 
-        public void Raise() => _target = 1f;
+        public void Raise()
+        {
+            bool hidden = !AnyShowing;
+            _target = 1f;
+            if (hidden) Appeared?.Invoke();
+        }
 
         public void Lower() => _target = 0f;
 
         public void Snap()
         {
+            bool hidden = !AnyShowing;
             _slide = _target = 1f;
             Apply();
+            if (hidden) Appeared?.Invoke();
         }
 
         public void Clear()

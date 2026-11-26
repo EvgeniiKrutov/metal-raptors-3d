@@ -118,6 +118,25 @@ namespace MetalRaptors
         void EndFight();
     }
 
+    public interface IGuardHost
+    {
+        void ReleaseGuard();
+    }
+
+    public interface IRavenHost
+    {
+        void BeginRaven(PlaneModelConfig plane, string skin);
+        bool RavenReady { get; }
+        void BeginRavenLeave();
+        bool RavenGone { get; }
+    }
+
+    public interface IRescueHost
+    {
+        void BeginRescue();
+        bool RescueReady { get; }
+    }
+
     public interface ISettleHost
     {
         void BeginSettle();
@@ -143,6 +162,7 @@ namespace MetalRaptors
         int _firstSay = -1;
         bool _resumed;
         bool _settling;
+        bool _visit;
         bool _fighting;
 
         public static string WaveStatus { get; private set; }
@@ -186,6 +206,8 @@ namespace MetalRaptors
                     backupHost.SetBackup(step.groups);
                 else if (step.op == CampaignOp.Patrol && _host is IStealthHost patrolHost)
                     patrolHost.SetPatrols(step.hold, step.count);
+                else if (step.op == CampaignOp.Guard && _host is IGuardHost guardHost)
+                    guardHost.ReleaseGuard();
             }
         }
 
@@ -281,6 +303,52 @@ namespace MetalRaptors
                         Fight(true);
                         yield return Onslaught(step, index);
                         if (!FightAhead(index + 1)) Fight(false);
+                        break;
+
+                    case CampaignOp.Timer:
+                        Fight(true);
+                        yield return Timer(step, index);
+                        if (!FightAhead(index + 1)) Fight(false);
+                        break;
+
+                    case CampaignOp.Defend:
+                        Fight(true);
+                        yield return Defend(step);
+                        if (!FightAhead(index + 1)) Fight(false);
+                        break;
+
+                    case CampaignOp.Guard:
+                        if (_host is IGuardHost guardHost) guardHost.ReleaseGuard();
+                        break;
+
+                    case CampaignOp.Raven:
+                        if (_host is IRavenHost ravenHost)
+                        {
+                            _host.Checkpoint(index, _warnedFirst, _warnedPair);
+                            _visit = true;
+                            ravenHost.BeginRaven(step.plane, step.skin);
+                            while (Running && !ravenHost.RavenReady) yield return null;
+                        }
+                        break;
+
+                    case CampaignOp.RavenLeave:
+                        _visit = false;
+                        if (_host is IRavenHost leaveHost)
+                        {
+                            leaveHost.BeginRavenLeave();
+                            while (Running && !leaveHost.RavenGone) yield return null;
+                        }
+                        break;
+
+                    case CampaignOp.Rescue:
+                        if (_host is IRescueHost rescueHost)
+                        {
+                            _host.Checkpoint(index, _warnedFirst, _warnedPair);
+                            _visit = true;
+                            _settling = _host is ISettleHost;
+                            rescueHost.BeginRescue();
+                            while (Running && !rescueHost.RescueReady) yield return null;
+                        }
                         break;
 
                     case CampaignOp.Formation:
@@ -443,12 +511,13 @@ namespace MetalRaptors
 
         static bool Fights(CampaignOp op) =>
             op == CampaignOp.Wave || op == CampaignOp.Spawn || op == CampaignOp.WaitClear
-            || op == CampaignOp.Onslaught || op == CampaignOp.Zeppelin;
+            || op == CampaignOp.Onslaught || op == CampaignOp.Zeppelin || op == CampaignOp.Timer
+            || op == CampaignOp.Defend;
 
         static bool Neutral(CampaignOp op) =>
             op == CampaignOp.Wait || op == CampaignOp.Supply || op == CampaignOp.Foe
             || op == CampaignOp.Warn || op == CampaignOp.Danger || op == CampaignOp.Unlock
-            || op == CampaignOp.Jams;
+            || op == CampaignOp.Jams || op == CampaignOp.Guard;
 
         bool FightAhead(int from)
         {
@@ -593,7 +662,7 @@ namespace MetalRaptors
 
                     yield return Freeze();
                     if (!Running) yield break;
-                    if (index > _firstSay) _host.Checkpoint(index, _warnedFirst, _warnedPair);
+                    if (index > _firstSay && !_visit) _host.Checkpoint(index, _warnedFirst, _warnedPair);
                 }
 
                 yield return Wait(DialogueBar.LeadInSec);
@@ -813,6 +882,34 @@ namespace MetalRaptors
             WaveStatus = null;
         }
 
+        IEnumerator Timer(CampaignStep step, int index)
+        {
+            int wave = WaveNumber(index);
+            float left = step.seconds;
+            while (left > 0f && Running)
+            {
+                WaveStatus = $"W{wave}  {Clock(left)}";
+                left -= CutscenePause.Delta;
+                yield return null;
+            }
+
+            WaveStatus = null;
+        }
+
+        IEnumerator Defend(CampaignStep step)
+        {
+            var defense = new CampaignDefense(_host, step, _warnedFirst, _warnedPair);
+            WaveStatus = null;
+
+            while (Running && !defense.Done)
+            {
+                defense.Tick(CutscenePause.Delta);
+                _warnedFirst = defense.Warned;
+                _warnedPair = defense.WarnedPair;
+                yield return null;
+            }
+        }
+
         IEnumerator Assault(CampaignStep step, int index)
         {
             int wave = WaveNumber(index);
@@ -845,7 +942,8 @@ namespace MetalRaptors
             for (int i = 0; i <= index && i < _script.Steps.Length; i++)
             {
                 CampaignOp op = _script.Steps[i].op;
-                if (op == CampaignOp.Onslaught || op == CampaignOp.Zeppelin || op == CampaignOp.Assault)
+                if (op == CampaignOp.Onslaught || op == CampaignOp.Zeppelin || op == CampaignOp.Assault
+                    || op == CampaignOp.Timer || op == CampaignOp.Defend)
                     wave++;
             }
             return wave;

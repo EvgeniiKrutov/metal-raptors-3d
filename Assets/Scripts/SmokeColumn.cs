@@ -28,6 +28,7 @@ namespace MetalRaptors
         const float MinScale = 0.05f;
 
         static readonly Color SmokeColor = new Color(0.13f, 0.12f, 0.12f, Opacity);
+        static readonly Color WispColor = new Color(0.58f, 0.58f, 0.56f, 0.32f);
         static readonly Color EmberColor = new Color(0.85f, 0.30f, 0.07f);
 
         static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
@@ -42,6 +43,7 @@ namespace MetalRaptors
             public float spinRate;
             public float startScale;
             public float age;
+            public Color color;
         }
 
         readonly List<Puff> _puffs = new List<Puff>();
@@ -54,6 +56,8 @@ namespace MetalRaptors
         Vector3 _anchorOffset;
         bool _follows;
         bool _dense;
+        float _fade = 1f;
+        Color _color = SmokeColor;
 
         bool Emitting => !_follows || _anchor != null;
 
@@ -62,7 +66,7 @@ namespace MetalRaptors
         float Wind => _follows ? WindX * _scale * TrailWindFactor : WindX;
 
         public static SmokeColumn Begin(Transform parent, Vector3 position, int seed,
-            float scale = 1f, bool prewarm = true, bool ember = true)
+            float scale = 1f, bool prewarm = true, bool ember = true, bool wisp = false)
         {
             var go = new GameObject("Smoke Column");
             go.transform.SetParent(parent, false);
@@ -71,6 +75,7 @@ namespace MetalRaptors
             var column = go.AddComponent<SmokeColumn>();
             column._rng = new System.Random(seed);
             column._scale = Mathf.Max(MinScale, scale);
+            if (wisp) column._color = WispColor;
             column._emberPhase = (float)column._rng.NextDouble() * Mathf.PI * 2f;
             if (ember) column.BuildEmber();
             if (prewarm) column.Prewarm();
@@ -92,6 +97,8 @@ namespace MetalRaptors
         }
 
         public void Thicken() => _dense = true;
+
+        public void Fade(float k) => _fade = Mathf.Clamp01(k);
 
         void BuildEmber()
         {
@@ -143,7 +150,7 @@ namespace MetalRaptors
                           * (_dense ? DenseSizeFactor : 1f);
 
             var go = UIFactory.CreatePrimitive3D(PrimitiveType.Cube, transform.position,
-                Vector3.one * scale, SmokeColor, emissive: false, keepCollider: false);
+                Vector3.one * scale, _color, emissive: false, keepCollider: false);
             go.name = "Puff";
 
             var renderer = go.GetComponent<Renderer>();
@@ -168,10 +175,11 @@ namespace MetalRaptors
                 spinAxis = new Vector3(Range(-1f, 1f), Range(-1f, 1f), Range(-1f, 1f)).normalized,
                 spinRate = Range(SpinMin, SpinMax) * (_rng.NextDouble() < 0.5 ? -1f : 1f),
                 startScale = scale,
+                color = _color,
             };
             _puffs.Add(puff);
 
-            if (initialAge > 0f) Advance(puff, initialAge);
+            if (initialAge > 0f) Advance(puff, initialAge, _fade);
         }
 
         void Animate(float dt)
@@ -188,11 +196,11 @@ namespace MetalRaptors
                     _puffs.RemoveAt(i);
                     continue;
                 }
-                Advance(puff, dt);
+                Advance(puff, dt, _fade);
             }
         }
 
-        static void Advance(Puff puff, float dt)
+        static void Advance(Puff puff, float dt, float fade)
         {
             puff.age += dt;
             puff.tr.localPosition += puff.velocity * dt;
@@ -203,8 +211,8 @@ namespace MetalRaptors
                 puff.startScale * GrowthFactor, t);
 
             if (puff.mat == null) return;
-            var c = SmokeColor;
-            c.a = Opacity * (1f - t) * (1f - t);
+            var c = puff.color;
+            c.a = puff.color.a * (1f - t) * (1f - t) * fade;
             puff.mat.SetColor(BaseColorId, c);
         }
 

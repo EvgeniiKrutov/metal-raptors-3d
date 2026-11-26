@@ -43,6 +43,9 @@ namespace MetalRaptors
         static readonly PilotSkill Veteran =
             new PilotSkill(0.2f, 2, 3, 0.5f, 1f, 0.65f, 1f, 0.7f, 1f, true, 6f, 10f, 0f);
 
+        public static readonly PilotSkill Elite =
+            new PilotSkill(0.2f, 4, 5, 0.5f, 1f, 1f, 1f, 0.7f, 1f, true, 0f, 0f, 0f);
+
         public static PilotSkill For(PilotLevel level)
         {
             switch (level)

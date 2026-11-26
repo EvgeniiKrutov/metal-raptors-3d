@@ -42,6 +42,7 @@ namespace MetalRaptors
         const float BreakPitchDeg = 55f;
         const float BreakMinSec = 0.35f;
         const float BreakMaxSec = 1.2f;
+        const float QuickShare = 0.5f;
 
         public VeteranPhase Phase { get; private set; }
 
@@ -52,6 +53,12 @@ namespace MetalRaptors
         public bool Looping => Phase == VeteranPhase.Wingover || Phase == VeteranPhase.Reverse;
 
         public float Elapsed => _t;
+
+        public bool Quick { get; set; }
+
+        public float SetupLimit => Quick ? SetupMaxSec * QuickShare : SetupMaxSec;
+
+        float ZoomLimit => Quick ? ZoomMaxSec * QuickShare : ZoomMaxSec;
 
         float _t;
         float _from;
@@ -115,7 +122,7 @@ namespace MetalRaptors
 
         public bool ZoomDone(float energySpeed, float flySpeed) =>
             Phase == VeteranPhase.Zoom
-            && (_t >= ZoomMaxSec || energySpeed < flySpeed * ZoomSpeedFraction);
+            && (_t >= ZoomLimit || energySpeed < flySpeed * ZoomSpeedFraction);
 
         public bool FeintDone => Phase == VeteranPhase.Feint && _t >= FeintOutSec + FeintBackSec;
 

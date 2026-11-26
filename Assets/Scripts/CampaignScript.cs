@@ -9,7 +9,7 @@ namespace MetalRaptors
         Wait, Say, Wave, Spawn, WaitClear, Supply, Foe, Zeppelin, Onslaught, Formation, Warn,
         Danger, Arena, Boss, Duel, Escape, Raid, Unlock, Jams, Boost, Turn, Assault, Disarm, Finish,
         Stealth, Patrol, Lull, Backup, AaGun, Tunnel, Uboat,
-        Village, Battery, BombRun, Wingman, Settle
+        Village, Battery, BombRun, Wingman, Settle, Timer, Defend, Guard, Raven, RavenLeave, Rescue
     }
 
     public class CampaignStep
@@ -44,6 +44,7 @@ namespace MetalRaptors
 
         const string TruckId = "truck";
         const string TankId = "tank";
+        const string RandomPlaneId = "random";
 
         const float ReadBase = 1.4f;
         const float ReadPerWord = 0.32f;
@@ -212,6 +213,12 @@ namespace MetalRaptors
                 case "wingman":
                     return new CampaignStep { op = CampaignOp.Wingman, seconds = Seconds(step) };
                 case "tunnel": return new CampaignStep { op = CampaignOp.Tunnel };
+                case "timer": return new CampaignStep { op = CampaignOp.Timer, seconds = Seconds(step) };
+                case "defend": return ParseDefend(step, origin, index);
+                case "guard": return new CampaignStep { op = CampaignOp.Guard };
+                case "raven": return ParseRaven(step, origin, index);
+                case "ravenleave": return new CampaignStep { op = CampaignOp.RavenLeave };
+                case "rescue": return new CampaignStep { op = CampaignOp.Rescue };
                 case "finish": return new CampaignStep { op = CampaignOp.Finish };
                 default:
                     Debug.LogError($"CampaignScript {origin}[{index}]: unknown op '{op}'.");
@@ -313,6 +320,26 @@ namespace MetalRaptors
             };
         }
 
+        static CampaignStep ParseRaven(Dictionary<string, object> step, string origin, int index)
+        {
+            string id = Text(step, "plane");
+            PlaneModelConfig plane = id.Length > 0 ? PlaneModels.ById(id) : PlaneModels.Fokker;
+
+            if (plane == null)
+            {
+                Debug.LogError($"CampaignScript {origin}[{index}]: unknown plane '{id}'.");
+                return null;
+            }
+
+            string skin = Text(step, "skin");
+            return new CampaignStep
+            {
+                op = CampaignOp.Raven,
+                plane = plane,
+                skin = skin.Length > 0 ? skin : PlaneSkins.RavenId,
+            };
+        }
+
         static CampaignStep ParseWave(CampaignOp op, Dictionary<string, object> step, string origin,
             int index)
         {
@@ -334,28 +361,43 @@ namespace MetalRaptors
 
         static CampaignStep ParseBattery(Dictionary<string, object> step, string origin, int index)
         {
-            var waves = new List<EnemyGroup[]>();
-            if (Value(step, "waves") is List<object> list)
-                foreach (object entry in list)
-                {
-                    List<EnemyGroup> groups = GroupsFrom(entry as List<object>, origin, index);
-                    if (groups.Count > 0) waves.Add(groups.ToArray());
-                }
-
             return new CampaignStep
             {
                 op = CampaignOp.Battery,
-                waves = waves.ToArray(),
+                waves = GroupLists(step, "waves", origin, index),
                 village = Value(step, "village") is bool walled && walled,
                 count = Mathf.Max(0, Mathf.RoundToInt(Number(step, "supply", 0f))),
             };
+        }
+
+        static CampaignStep ParseDefend(Dictionary<string, object> step, string origin, int index)
+        {
+            return new CampaignStep
+            {
+                op = CampaignOp.Defend,
+                waves = GroupLists(step, "groups", origin, index, true),
+            };
+        }
+
+        static EnemyGroup[][] GroupLists(Dictionary<string, object> step, string key, string origin,
+            int index, bool random = false)
+        {
+            var lists = new List<EnemyGroup[]>();
+            if (Value(step, key) is List<object> list)
+                foreach (object entry in list)
+                {
+                    List<EnemyGroup> groups = GroupsFrom(entry as List<object>, origin, index, random);
+                    if (groups.Count > 0) lists.Add(groups.ToArray());
+                }
+            return lists.ToArray();
         }
 
         static List<EnemyGroup> Groups(Dictionary<string, object> step, string origin, int index,
             string key = "enemies") =>
             GroupsFrom(Value(step, key) as List<object>, origin, index);
 
-        static List<EnemyGroup> GroupsFrom(List<object> list, string origin, int index)
+        static List<EnemyGroup> GroupsFrom(List<object> list, string origin, int index,
+            bool random = false)
         {
             var groups = new List<EnemyGroup>();
 
@@ -380,6 +422,12 @@ namespace MetalRaptors
                     }
 
                     string id = Text(group, "plane");
+                    if (random && id == RandomPlaneId)
+                    {
+                        groups.Add(new EnemyGroup((PlaneModelConfig)null, count));
+                        continue;
+                    }
+
                     PlaneModelConfig plane = PlaneModels.ById(id);
                     if (plane == null)
                     {
@@ -389,7 +437,13 @@ namespace MetalRaptors
 
                     bool sneak = Value(group, "sneak") is bool sneaky && sneaky;
                     bool high = Value(group, "high") is bool raised && raised;
-                    groups.Add(new EnemyGroup(plane, count, sneak, high));
+                    string skin = Text(group, "skin");
+                    string title = Text(group, "name");
+                    groups.Add(new EnemyGroup(plane, count, sneak, high,
+                        skin.Length > 0 ? skin : null,
+                        title.Length > 0 ? title : null,
+                        Mathf.Max(0f, Number(group, "health", 0f)),
+                        Value(group, "elite") is bool elite && elite));
                 }
             }
 

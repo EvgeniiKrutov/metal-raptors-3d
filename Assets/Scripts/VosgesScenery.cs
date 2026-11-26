@@ -24,6 +24,13 @@ namespace MetalRaptors
         bool _day;
         Band[] _bands;
         readonly List<GameObject> _sources = new List<GameObject>();
+        readonly List<Vector3> _holds = new List<Vector3>();
+
+        public static VosgesScenery Current { get; private set; }
+
+        public void ClearHolds() => _holds.Clear();
+
+        public void AddHold(Vector3 eye) => _holds.Add(eye);
 
         public static VosgesScenery Begin(Camera cam, VosgesLayout layout, bool day)
         {
@@ -69,10 +76,16 @@ namespace MetalRaptors
             scenery._bands = bands.ToArray();
 
             scenery.Refresh(true);
+            Current = scenery;
             return scenery;
         }
 
         void LateUpdate() => Refresh(false);
+
+        void OnDestroy()
+        {
+            if (Current == this) Current = null;
+        }
 
         void Refresh(bool all)
         {
@@ -80,23 +93,47 @@ namespace MetalRaptors
 
             Vector3 eye = _cam.transform.position;
             float slope = Mathf.Tan(_cam.fieldOfView * 0.5f * Mathf.Deg2Rad) * _cam.aspect * FieldOfViewSlack;
-            bool spawnedHeavy = false;
 
             foreach (var band in _bands)
             {
-                float half = (band.farZ - eye.z) * slope + WindowMargin;
-                int first = Mathf.FloorToInt((eye.x - half) / band.cell) - 1;
-                int last = Mathf.FloorToInt((eye.x + half) / band.cell) + 1;
-
                 band.scratch.Clear();
                 foreach (var kv in band.live)
-                    if (kv.Key < first - 1 || kv.Key > last + 1) band.scratch.Add(kv.Key);
+                    if (!Kept(band, kv.Key, eye, slope)) band.scratch.Add(kv.Key);
                 foreach (int cell in band.scratch)
                 {
                     if (band.live[cell] != null) Destroy(band.live[cell]);
                     band.live.Remove(cell);
                 }
+            }
 
+            bool spawnedHeavy = Fill(eye, slope, all, false);
+            foreach (Vector3 hold in _holds) spawnedHeavy = Fill(hold, slope, all, spawnedHeavy);
+        }
+
+        static void Window(Band band, Vector3 eye, float slope, out int first, out int last)
+        {
+            float half = (band.farZ - eye.z) * slope + WindowMargin;
+            first = Mathf.FloorToInt((eye.x - half) / band.cell) - 1;
+            last = Mathf.FloorToInt((eye.x + half) / band.cell) + 1;
+        }
+
+        bool Kept(Band band, int cell, Vector3 eye, float slope)
+        {
+            Window(band, eye, slope, out int first, out int last);
+            if (cell >= first - 1 && cell <= last + 1) return true;
+            foreach (Vector3 hold in _holds)
+            {
+                Window(band, hold, slope, out first, out last);
+                if (cell >= first - 1 && cell <= last + 1) return true;
+            }
+            return false;
+        }
+
+        bool Fill(Vector3 eye, float slope, bool all, bool spawnedHeavy)
+        {
+            foreach (var band in _bands)
+            {
+                Window(band, eye, slope, out int first, out int last);
                 for (int cell = first; cell <= last; cell++)
                 {
                     if (band.live.ContainsKey(cell)) continue;
@@ -106,6 +143,7 @@ namespace MetalRaptors
                     if (band.heavy) spawnedHeavy = true;
                 }
             }
+            return spawnedHeavy;
         }
 
         Transform Site(string name, int cell)

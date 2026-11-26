@@ -12,6 +12,8 @@ namespace MetalRaptors
         readonly CampaignTerrain _land;
         readonly float _roadZ;
         readonly float _roadLift;
+        readonly float _truckLift;
+        readonly float _pace;
 
         public IReadOnlyList<GroundVehicle> Live => _live;
 
@@ -34,12 +36,15 @@ namespace MetalRaptors
             return count;
         }
 
-        public CampaignConvoy(Rigidbody player, CampaignTerrain land, float roadZ, float roadLift)
+        public CampaignConvoy(Rigidbody player, CampaignTerrain land, float roadZ, float roadLift,
+            float truckLift = 1f, float pace = 1f)
         {
             _player = player;
             _land = land;
             _roadZ = roadZ;
             _roadLift = roadLift;
+            _truckLift = truckLift;
+            _pace = pace;
         }
 
         public void Spawn(EnemyKind kind, int count, float rightEdgeX)
@@ -93,10 +98,11 @@ namespace MetalRaptors
             var point = new Vector3(x, ProceduralTerrain.BaseLevel, _roadZ);
             GroundVehicle vehicle = tank
                 ? (GroundVehicle)EnemyTank.Spawn(point, StopLine(length), _roadLift, _player, _land)
-                : EnemyTruck.Spawn(point, StopLine(length), _roadLift, _player, _land);
+                : EnemyTruck.Spawn(point, StopLine(length), _roadLift, _player, _land, _truckLift);
 
             if (vehicle == null) return null;
 
+            vehicle.SetPace(_pace);
             vehicle.SetAhead(_live.Count > 0 ? _live[_live.Count - 1] : null);
             vehicle.OnDestroyed += Remove;
             _live.Add(vehicle);

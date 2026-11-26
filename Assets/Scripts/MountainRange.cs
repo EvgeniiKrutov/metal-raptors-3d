@@ -58,6 +58,7 @@ namespace MetalRaptors
         readonly float[,] _phase = new float[Ridges.Length, 4];
         readonly Dictionary<int, Cell> _cells = new Dictionary<int, Cell>();
         readonly List<int> _removeScratch = new List<int>();
+        readonly List<float> _holds = new List<float>();
 
         public static MountainRange Begin(Camera cam, int seed, Daytime daytime)
         {
@@ -89,14 +90,15 @@ namespace MetalRaptors
             UpdateCells(_cam.transform.position.x);
         }
 
+        public void ClearHolds() => _holds.Clear();
+
+        public void AddHold(float x) => _holds.Add(x);
+
         void UpdateCells(float camX)
         {
-            int first = Mathf.FloorToInt((camX - _keep) / CellWidth);
-            int last = Mathf.FloorToInt((camX + _keep) / CellWidth);
-
             _removeScratch.Clear();
             foreach (var kv in _cells)
-                if (kv.Key < first || kv.Key > last) _removeScratch.Add(kv.Key);
+                if (!Kept(kv.Key, camX)) _removeScratch.Add(kv.Key);
 
             foreach (int cell in _removeScratch)
             {
@@ -104,7 +106,25 @@ namespace MetalRaptors
                 _cells.Remove(cell);
             }
 
-            for (int cell = first; cell <= last; cell++)
+            Fill(camX);
+            foreach (float x in _holds) Fill(x);
+        }
+
+        int First(float x) => Mathf.FloorToInt((x - _keep) / CellWidth);
+
+        int Last(float x) => Mathf.FloorToInt((x + _keep) / CellWidth);
+
+        bool Kept(int cell, float camX)
+        {
+            if (cell >= First(camX) && cell <= Last(camX)) return true;
+            foreach (float x in _holds)
+                if (cell >= First(x) && cell <= Last(x)) return true;
+            return false;
+        }
+
+        void Fill(float x)
+        {
+            for (int cell = First(x), last = Last(x); cell <= last; cell++)
                 if (!_cells.ContainsKey(cell)) _cells[cell] = BuildCell(cell);
         }
 
